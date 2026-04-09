@@ -17,7 +17,7 @@ Backoffice operativo para comerciantes y PyMEs en mercados emergentes, empezando
 ## 2. Principios de Diseño
 
 1. **Producto completo, experiencia simple.** La potencia está disponible, no impuesta. Cada pantalla tiene UN propósito claro.
-2. **Offline-first.** Los datos viven en el dispositivo. Se sincronizan cuando hay conexión. El usuario nunca ve un spinner ni un error de red.
+2. **Online-first con cache agresivo.** El servidor es la fuente de verdad. Los datos se cachean en IndexedDB para respuesta instantánea. Si se cae internet, las ventas se guardan en cola y se envían cuando vuelve. Cero cambios en infra -- todo el cache vive en el navegador del usuario.
 3. **Inteligencia invisible.** La IA está integrada en cada pantalla. El usuario ve resultados ("se acaba en 2 días"), no algoritmos.
 4. **WhatsApp como canal, no como interfaz.** La app es la experiencia completa. WhatsApp es el acceso rápido para consultas y cobros.
 5. **Construido desde cero.** No montado sobre ERPNext, Odoo ni otro ERP. El producto ES el diferenciador.
@@ -176,9 +176,9 @@ Desde la PWA (cámara nativa, resolución completa). No por WhatsApp (comprime i
 
 | Capa | Tecnología | Justificación |
 |---|---|---|
-| Frontend | Nuxt 3 (Vue), PWA offline-first | SSR + PWA nativo. Offline con Service Workers. TypeScript. Ligero |
-| DB local | IndexedDB (Dexie.js) | Almacenamiento offline en el navegador. Sincronización automática |
-| Backend | Node.js + Hono/Fastify, TypeScript | Rápido, ligero, mismo lenguaje que frontend |
+| Frontend | SvelteKit (Svelte 5) o Nuxt 3 (Vue) -- decisión al iniciar dev. PWA con Service Workers | SvelteKit: 5-8KB runtime (4-6x menos que Nuxt). Carga en 0.2s en 3G. Svelte 5 runes = menos boilerplate. Nuxt si el equipo conoce Vue |
+| DB local | IndexedDB (Dexie.js) | Cache local en el navegador. Permite respuesta instantánea y cola de ventas sin internet. No reemplaza PostgreSQL |
+| Backend | Hono, TypeScript | Ultra-ligero (14KB). Más rápido que Express (15 años, lento) y Fastify. TypeScript-first. Multi-runtime |
 | Base de datos | PostgreSQL + pg_trgm + pgvector | Relacional sólido. Fuzzy matching para OCR. Búsqueda semántica futura |
 | Cache | Redis | Sesiones, tasa BCV, colas de sincronización y mensajes WhatsApp |
 | Storage | MinIO (S3-compatible) | Fotos de productos, PDFs de reportes, imágenes de facturas, backups |
@@ -249,36 +249,46 @@ Desde la PWA (cámara nativa, resolución completa). No por WhatsApp (comprime i
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-### 4.3 Flujo offline-first
+### 4.3 Flujo online-first con cache agresivo
 
 ```
-ONLINE:
-  PWA ←→ Backend ←→ PostgreSQL
-  (IndexedDB se sincroniza como cache local)
+CON INTERNET (estado normal):
+  PWA → API Backend → PostgreSQL
+         ↓ (respuesta se cachea)
+       IndexedDB (cache local)
+  
+  La app muestra datos de IndexedDB instantáneamente
+  y refresca del servidor en background.
 
-OFFLINE:
-  PWA ←→ IndexedDB (todas las operaciones)
-  (cola de cambios pendientes)
+SIN INTERNET (graceful degradation):
+  PWA → IndexedDB (datos cacheados)
+         ↓
+       Cola de operaciones pendientes
 
 RECONEXIÓN:
-  IndexedDB → cola de cambios → Backend → PostgreSQL
-  PostgreSQL → cambios de otros dispositivos → IndexedDB
-  (resolución de conflictos: último escritor gana, con log)
+  Cola pendientes → API Backend → PostgreSQL
+  PostgreSQL → datos frescos → IndexedDB
+  Notificación: "Sincronizado. 3 ventas enviadas"
 ```
 
-**Qué funciona offline:**
-- Registrar ventas
-- Consultar inventario y precios
-- Consultar clientes
-- Ver último dashboard cacheado
-- Escanear código de barras
+**Complejidad del cache:** ~200-300 líneas de código total. Tres componentes:
+1. Service Worker cachea assets estáticos (HTML, CSS, JS) -- viene gratis con SvelteKit/Nuxt
+2. Dexie.js guarda datos del negocio en IndexedDB -- un `bulkPut` después de cada fetch
+3. Cola de operaciones para ventas sin internet -- array en IndexedDB, `setInterval` que chequea conexión
+
+**Cambios en infra:** Cero. Todo vive en el navegador. El backend solo necesita un endpoint `GET /sync?since=timestamp`.
+
+**Qué funciona sin internet:**
+- Registrar ventas (se encolan y envían después)
+- Consultar inventario y precios (datos cacheados)
+- Ver dashboard (última versión cacheada)
+- Escanear código de barras (busca en cache local)
 
 **Qué requiere internet:**
 - OCR de facturas (API de OpenAI)
 - WhatsApp (API de Meta)
-- Sincronización con otros dispositivos
 - Reportes con narrativa IA
-- Tasa BCV actualizada
+- Sincronización con otros dispositivos
 
 ### 4.4 Modelo de datos principal
 
@@ -357,7 +367,7 @@ Patrón de Square: 5 pasos, 5 minutos, sin llamar a soporte.
 | 10 | Catálogo compartible | Link web ligero con productos y precios. Cliente pide por WhatsApp |
 | 11 | Alertas predictivas de flujo de caja | Proyecta ingresos/gastos. Alerta déficit. Sugiere cobros |
 | 12 | Inteligencia en cada pantalla | Predicciones, comparativas, narrativas integradas donde se necesitan |
-| 13 | Offline-first | Funciona sin internet como estado normal |
+| 13 | Online-first con cache agresivo | Respuesta instantánea desde cache local. Ventas en cola si no hay internet. Cero cambios en infra |
 
 ---
 
@@ -377,7 +387,7 @@ Patrón de Square: 5 pasos, 5 minutos, sin llamar a soporte.
 
 ### v1.0 -- Producto Completo (4-5 meses)
 
-PWA offline-first con experiencia completa en escritorio y móvil. Ventas con todos los métodos de pago + escáner. Inventario con variantes, vencimiento, semáforo, predicciones. Clientes con perfil automático y segmentos. Cuentas por cobrar/pagar con cobro por WhatsApp. Reportes pre-construidos con narrativa IA. Exportación contable + envío al contador. 2 roles con PIN, 2FA, log de actividad. Tasa BCV automática. WhatsApp bidireccional (Cloud API). OCR de facturas (GPT-4o-mini vision). Plan gratis funcional.
+PWA online-first con cache agresivo, experiencia completa en escritorio y móvil. Ventas con todos los métodos de pago + escáner. Inventario con variantes, vencimiento, semáforo, predicciones. Clientes con perfil automático y segmentos. Cuentas por cobrar/pagar con cobro por WhatsApp. Reportes pre-construidos con narrativa IA. Exportación contable + envío al contador. 2 roles con PIN, 2FA, log de actividad. Tasa BCV automática. WhatsApp bidireccional (Cloud API). OCR de facturas (GPT-4o-mini vision). Plan gratis funcional.
 
 ### v2.0 -- Crecimiento (3 meses después)
 
@@ -400,8 +410,9 @@ Multi-sucursal con transferencias de inventario. API REST pública. Tienda onlin
 | WhatsApp | Cloud API directo, sin BSP | Setup en 30-60 min. 1,000 conversaciones servicio/mes gratis. Sin fee de BSP |
 | LLM provider | OpenRouter (primary) + Groq (fallback) | OpenRouter: un API key para GPT-4o-mini, Claude, Gemini. Groq: inferencia ultra-rápida con Llama 3 como fallback si OpenRouter falla |
 | Contabilidad | Puente, no módulo | Exportación con formato contable + envío por WhatsApp. No libro mayor ni balance |
-| Frontend | Nuxt 3 PWA | SSR + offline-first nativo. TypeScript. Ligero (<500KB) |
+| Frontend | SvelteKit (Svelte 5) o Nuxt 3 (Vue) | SvelteKit: 5-8KB runtime, 0.2s en 3G. Nuxt si el equipo conoce Vue. Decisión al iniciar dev |
 | Base de datos | PostgreSQL + pg_trgm + pgvector | Fuzzy matching para OCR aliases. Búsqueda semántica futura |
 | Hosting | Hetzner | Económico. Infra existente con Coolify/Traefik |
 | Monolito vs micro | Monolito (v1) | Un solo deploy. Sin complejidad distribuida. Microservicios en v2+ si hay necesidad |
+| Estrategia offline | Online-first con cache agresivo | Servidor es fuente de verdad. Cache en IndexedDB + cola de operaciones. ~200-300 líneas de código. Cero cambios en infra |
 | Pricing | Gratis + $19 + $35 | Plan gratis como gancho de marketing. Pro para negocios serios. Negocio para multi-tienda |

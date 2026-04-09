@@ -19,7 +19,7 @@ Los sistemas administrativos actuales en este mercado son de dos tipos: demasiad
 ## Principios de diseño
 
 - **Producto completo, experiencia simple.** Todas las capacidades de un sistema profesional. Cada feature presentado de la forma más simple posible. La potencia está disponible, no impuesta.
-- **Offline-first.** Los datos se cachean localmente en IndexedDB. La app responde instantáneamente desde cache y sincroniza con el servidor en background. Si se cae internet, las ventas se guardan en cola y se envían cuando vuelve. El usuario nunca ve un spinner ni un error de red.
+- **Online-first con cache agresivo.** Los datos se cachean localmente en IndexedDB. La app responde instantáneamente desde cache y sincroniza con el servidor en background. Si se cae internet, las ventas se guardan en cola y se envían cuando vuelve. El usuario nunca ve un spinner ni un error de red. Cero cambios en infra -- todo el cache vive en el navegador.
 - **Inteligencia en cada pantalla.** La IA no es un módulo. Está integrada en inventario, ventas, clientes, reportes y cuentas. El usuario ve resultados, no algoritmos.
 - **Tres formas de acceso.** Desktop (centro de análisis y configuración), móvil PWA (centro de acción y captura de datos), WhatsApp (acceso rápido bidireccional). Una sola app, un solo codebase, prioridades diferentes por contexto. Patrón validado por Square (Dashboard vs POS App), Shopify (Admin vs POS) y Lightspeed (Backoffice vs App). Desktop para sesiones largas de análisis (reportes, inventario completo, configuración, exportación contable). Móvil para sesiones cortas de acción (vender en 3 toques, escanear facturas, cobrar por WhatsApp, consultar stock, recibir alertas).
 - **Multi-tenant con RLS.** Una sola base de datos PostgreSQL con Row Level Security. Un negocio nunca ve datos de otro. Escala a miles de tenants sin complejidad operativa.
@@ -70,7 +70,7 @@ Nala no es un sistema contable. Es un puente: genera la información que el cont
 | 10 | Catálogo compartible | Link a página web ligera con productos y precios. El cliente pide por WhatsApp |
 | 11 | Alertas predictivas de flujo de caja | Proyecta ingresos y gastos. Alerta si viene un déficit. Sugiere cobros |
 | 12 | Inteligencia en cada pantalla | Predicciones, comparativas, narrativas y alertas integradas donde se necesitan |
-| 13 | Offline-first | Funciona sin internet como estado normal. Sincroniza cuando hay conexión |
+| 13 | Online-first con cache agresivo | Respuesta instantánea desde cache local. Ventas en cola si no hay internet. Sincroniza en background |
 
 ## Stack técnico
 
@@ -99,7 +99,7 @@ Nala no es un sistema contable. Es un puente: genera la información que el cont
 
 ## Roadmap
 
-**v1.0** -- Producto completo. PWA offline-first. Ventas, inventario, clientes, cuentas, reportes, contabilidad, roles, inteligencia integrada, WhatsApp bidireccional.
+**v1.0** -- Producto completo. PWA online-first con cache agresivo. Ventas, inventario, clientes, cuentas, reportes, contabilidad, roles, inteligencia integrada, WhatsApp bidireccional.
 
 **v2.0** -- Crecimiento. Integración Pago Móvil C2P. Campañas WhatsApp con segmentación. Cotizaciones con aprobación online. Programa de lealtad. Órdenes de compra a proveedores. OCR de recibos.
 
