@@ -44,21 +44,21 @@ Cobros por WhatsApp con mensaje personalizado. Campañas por segmento de cliente
 Perfil automático con historial de compras, frecuencia, ticket promedio, productos favoritos y saldo. Segmentos automáticos (VIP, frecuentes, en riesgo, nuevos, con deuda, inactivos). Badges visuales en toda la app.
 
 ### Controlar el negocio
-5 roles (Dueño, Gerente, Cajero, Inventarista, Contador). Log de actividad completo. Gamificación para vendedores (ranking, metas, rachas). Cierre de día automático con cuadre de caja. 2FA por email. Backups automáticos.
+2 roles: Dueño (ve todo, configura todo) y Empleado (solo vende y consulta, no ve costos ni reportes financieros). Cada usuario con PIN propio para accountability. Log de actividad completo. Gamificación para vendedores (ranking, metas, rachas). Cierre de día automático con cuadre de caja. 2FA por email. Backups automáticos.
 
 ### Contabilidad (puente al contador)
-Catálogo de cuentas pre-configurado. Asientos automáticos desde ventas y gastos. Exportación en formatos para Galac, Profit Plus, Saint. Libros de compras y ventas formato SENIAT. Portal del contador con acceso de solo lectura. Envío al contador por WhatsApp.
+Nala no es un sistema contable. Es un puente: genera la información que el contador necesita en el formato que su sistema entiende. Exportación automática en Excel con formato de libro diario (fecha, cuenta, debe, haber). Catálogo de cuentas pre-configurado por tipo de negocio que el contador ajusta una vez. Botón "Enviar al contador" que genera el paquete (ventas, gastos, P&L) y abre WhatsApp con el archivo. Libros de compras y ventas en formato SENIAT.
 
 ### WhatsApp bidireccional
 **Salida:** Resúmenes diarios, alertas, cobros a clientes, reportes al contador, campañas, recibos.
-**Entrada:** Consultar ventas, inventario, clientes. Registrar ventas simples. Actualizar precios. Registrar gastos con foto de factura (OCR). Lanzar cobros. Todo por chat, con confirmación antes de modificar datos.
+**Entrada:** Consultar ventas, inventario, clientes. Registrar ventas simples. Actualizar precios. Lanzar cobros. Todo por chat, con confirmación antes de modificar datos. El OCR de facturas y recibos se hace desde la PWA (cámara nativa, resolución completa) porque WhatsApp comprime las imágenes y pierde calidad.
 
 ## Diferenciadores
 
 | # | Feature | Detalle |
 |---|---|---|
 | 1 | WhatsApp bidireccional | Consultar, vender, cobrar y registrar gastos por chat. Sin necesidad de abrir la app |
-| 2 | Foto = Dato | OCR de facturas, recibos y listas. Por WhatsApp o cámara. La foto se convierte en dato registrado |
+| 2 | Foto = Dato | OCR de facturas, recibos y listas desde la cámara de la PWA (resolución completa). La foto se convierte en dato registrado |
 | 3 | Cierre de día automático | Cuadre de caja, detección de discrepancias, resumen al dueño, asientos contables. Sin tocar nada |
 | 4 | Benchmark anónimo | Comparar rendimiento vs negocios similares en la plataforma (datos anonimizados) |
 | 5 | Asistente de compras | Genera la orden al proveedor basada en predicciones y la envía por WhatsApp |
@@ -92,9 +92,9 @@ Catálogo de cuentas pre-configurado. Asientos automáticos desde ventas y gasto
 
 | Plan | Precio | Incluye |
 |---|---|---|
-| Gratis | $0/mes | 1 usuario, 50 productos, ventas ilimitadas, offline, dashboard, inventario |
-| Pro | $19/mes | Usuarios ilimitados, productos ilimitados, inteligencia, 5 roles, cobros WhatsApp, exportación contable, reportes completos |
-| Negocio | $35/mes | Todo Pro + soporte prioritario, onboarding asistido, portal del contador, campañas WhatsApp, segmentación, cotizaciones |
+| Gratis | $0/mes | 1 negocio, 1 usuario, 50 productos, ventas ilimitadas, offline, dashboard, inventario |
+| Pro | $19/mes | 1 negocio, usuarios ilimitados (Dueño + Empleados con PIN), productos ilimitados, inteligencia, cobros WhatsApp, exportación contable, reportes completos |
+| Negocio | $35/mes | Todo Pro + soporte prioritario, onboarding asistido, campañas WhatsApp, segmentación, cotizaciones. Negocios adicionales: +$15/mes cada uno |
 
 ## Roadmap
 
@@ -116,6 +116,7 @@ Catálogo de cuentas pre-configurado. Asientos automáticos desde ventas y gasto
 | [06 - Por qué Fina gana con menos](docs/06-por-que-fina-gana-con-menos.md) | Análisis de simplicidad, contexto Venezuela, framework de decisión |
 | [07 - Visión de producto](docs/07-nala-vision-producto-2026.md) | Visión completa: experiencia escritorio/móvil, features v1.0, stack, roadmap |
 | [08 - WhatsApp entrada + diferenciadores](docs/08-whatsapp-entrada-y-diferenciadores.md) | WhatsApp bidireccional, OCR, cierre automático, benchmark, 13 diferenciadores |
+| [09 - Decisiones técnicas](docs/09-decisiones-tecnicas.md) | Roles (2 no 5), flujo contable, arquitectura WhatsApp en producción, OCR desde PWA |
 
 ## Licencia
 
