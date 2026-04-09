@@ -84,7 +84,7 @@ Nala no es un sistema contable. Es un puente: genera la información que el cont
 | IA | GPT-4o-mini / Claude Haiku |
 | WhatsApp | Cloud API vía 360dialog/WhatsAble (v1), BSP propio (v2) |
 | Notificaciones | Web Push API, Twilio (SMS fallback) |
-| OCR | Google Vision API / AWS Textract |
+| OCR | PaddleOCR + PP-StructureV3 (self-hosted, Apache 2.0) |
 | Hosting | Hetzner |
 | CI/CD | GitHub Actions, Coolify |
 
