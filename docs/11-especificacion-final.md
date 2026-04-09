@@ -182,8 +182,8 @@ Desde la PWA (cámara nativa, resolución completa). No por WhatsApp (comprime i
 | Base de datos | PostgreSQL + pg_trgm + pgvector | Relacional sólido. Fuzzy matching para OCR. Búsqueda semántica futura |
 | Cache | Redis | Sesiones, tasa BCV, colas de sincronización y mensajes WhatsApp |
 | Storage | MinIO (S3-compatible) | Fotos de productos, PDFs de reportes, imágenes de facturas, backups |
-| IA | GPT-4o-mini / Claude Haiku | Narrativas de reportes, OCR de facturas, interpretación de WhatsApp, clasificación de negocios. ~$0.001/consulta |
-| WhatsApp | Meta Cloud API directo (v1) | Sin BSP. Webhook HTTPS. 1,000 conversaciones servicio/mes gratis |
+| IA | OpenRouter (GPT-4o-mini primary) + Groq (fallback) | OpenRouter da acceso a múltiples modelos con un solo API key. GPT-4o-mini para OCR vision + narrativas + WhatsApp. Groq como fallback (Llama 3, inferencia ultra-rápida). ~$0.001/consulta |
+| WhatsApp | Meta Cloud API directo | Sin BSP. Webhook HTTPS. 1,000 conversaciones servicio/mes gratis |
 | Notificaciones | Web Push API + Twilio (SMS fallback) | Push gratis vía PWA. SMS como respaldo |
 | Hosting | Hetzner | Económico, confiable. Infra existente con Coolify y Traefik |
 | CI/CD | GitHub Actions + Coolify | Deploy automático |
@@ -242,9 +242,9 @@ Desde la PWA (cámara nativa, resolución completa). No por WhatsApp (comprime i
 │                   SERVICIOS EXTERNOS                            │
 │                                                                 │
 │  ┌───────────┐  ┌───────────┐  ┌───────────┐  ┌───────────┐  │
-│  │  OpenAI   │  │  Meta     │  │  Twilio   │  │  BCV      │  │
-│  │  (IA,OCR) │  │  (WhatsApp│  │  (SMS     │  │  (tasa    │  │
-│  │           │  │   Cloud)  │  │  fallback)│  │  cambio)  │  │
+│  │ OpenRouter │  │  Groq     │  │  Meta     │  │  BCV      │  │
+│  │ (GPT-4o-  │  │ (Llama 3  │  │ (WhatsApp │  │  (tasa    │  │
+│  │  mini, IA)│  │  fallback)│  │  Cloud)   │  │  cambio)  │  │
 │  └───────────┘  └───────────┘  └───────────┘  └───────────┘  │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -395,9 +395,10 @@ Multi-sucursal con transferencias de inventario. API REST pública. Tienda onlin
 |---|---|---|
 | Build vs OSS base | Desde cero | Lo que diferencia a Nala (offline, IA, WhatsApp, OCR, simplicidad) hay que construirlo de cero. ERPNext/Odoo agregan complejidad sin ahorrar ese trabajo |
 | Roles | 2 (Dueño + Empleado) | PyMEs de 1-5 empleados no necesitan 5 roles. PIN por usuario para accountability |
-| OCR motor | GPT-4o-mini vision (v1) | Un API call hace OCR + interpretación + matching. Cero carga en CPU. Sin microservicio |
+| OCR motor | GPT-4o-mini vision vía OpenRouter (v1) | Un API call hace OCR + interpretación + matching. Cero carga en CPU. Groq como fallback para texto (sin vision) |
 | OCR escala | PaddleOCR self-hosted (v2+) | Cuando haya 1,000+ negocios, reduce costos 10-20x como microservicio |
 | WhatsApp | Cloud API directo, sin BSP | Setup en 30-60 min. 1,000 conversaciones servicio/mes gratis. Sin fee de BSP |
+| LLM provider | OpenRouter (primary) + Groq (fallback) | OpenRouter: un API key para GPT-4o-mini, Claude, Gemini. Groq: inferencia ultra-rápida con Llama 3 como fallback si OpenRouter falla |
 | Contabilidad | Puente, no módulo | Exportación con formato contable + envío por WhatsApp. No libro mayor ni balance |
 | Frontend | Nuxt 3 PWA | SSR + offline-first nativo. TypeScript. Ligero (<500KB) |
 | Base de datos | PostgreSQL + pg_trgm + pgvector | Fuzzy matching para OCR aliases. Búsqueda semántica futura |

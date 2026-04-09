@@ -33,9 +33,22 @@ Nala no atiende restaurantes. La complejidad del rubro de comida (gestión de me
 
 GPT-4o-mini vision recibe la imagen completa de la factura. No la procesa línea por línea. Ve toda la factura como un humano: detecta la tabla, entiende columnas (descripción, cantidad, precio, total), y extrae cada fila.
 
-Se usa **structured output** (constrained decoding de OpenAI): el modelo está obligado a devolver JSON válido que cumpla un schema definido. No es "por favor devuelve JSON". Es una restricción a nivel de generación de tokens.
+Se usa **structured output** (constrained decoding de OpenAI vía OpenRouter): el modelo está obligado a devolver JSON válido que cumpla un schema definido. No es "por favor devuelve JSON". Es una restricción a nivel de generación de tokens.
 
 ```typescript
+import OpenAI from "openai";
+
+// OpenRouter como provider, Groq como fallback
+const openrouter = new OpenAI({
+  baseURL: "https://openrouter.ai/api/v1",
+  apiKey: process.env.OPENROUTER_API_KEY,
+});
+
+const groq = new OpenAI({
+  baseURL: "https://api.groq.com/openai/v1",
+  apiKey: process.env.GROQ_API_KEY,
+});
+
 // Schema Zod que define la estructura esperada
 const InvoiceSchema = z.object({
   supplier: z.string(),
@@ -53,28 +66,39 @@ const InvoiceSchema = z.object({
   total: z.number()
 });
 
-// El API call
-const response = await openai.chat.completions.create({
-  model: "gpt-4o-mini",
-  messages: [{
-    role: "system",
-    content: "Extrae datos de facturas de proveedores. Devuelve JSON con proveedor, fecha, items (descripción, SKU si visible, cantidad, precio unitario, total línea) y total."
-  }, {
-    role: "user",
-    content: [
-      { type: "image_url", image_url: { url: imageBase64 } },
-      { type: "text", text: `Productos del negocio para matching:\n${productList}` }
-    ]
-  }],
-  response_format: {
-    type: "json_schema",
-    json_schema: {
-      name: "invoice_extraction",
-      schema: zodToJsonSchema(InvoiceSchema),
-      strict: true  // constrained decoding: 100% schema-valid
-    }
+// El API call (OpenRouter primary, Groq fallback para texto)
+async function extractInvoice(imageBase64: string, productList: string) {
+  try {
+    // Primary: GPT-4o-mini via OpenRouter (soporta vision)
+    return await openrouter.chat.completions.create({
+      model: "openai/gpt-4o-mini",
+      messages: [{
+        role: "system",
+        content: "Extrae datos de facturas. Devuelve JSON con proveedor, fecha, items y total."
+      }, {
+        role: "user",
+        content: [
+          { type: "image_url", image_url: { url: imageBase64 } },
+          { type: "text", text: `Productos para matching:\n${productList}` }
+        ]
+      }],
+      response_format: {
+        type: "json_schema",
+        json_schema: {
+          name: "invoice_extraction",
+          schema: zodToJsonSchema(InvoiceSchema),
+          strict: true
+        }
+      }
+    });
+  } catch (error) {
+    // Fallback: si OpenRouter falla, no hay fallback para vision
+    // (Groq no soporta vision con Llama 3)
+    // Se guarda la imagen en cola y se reintenta en 5 min
+    await redis.lpush("ocr:retry_queue", JSON.stringify({ imageBase64, productList }));
+    throw new Error("OCR temporarily unavailable. Queued for retry.");
   }
-});
+}
 ```
 
 Con `strict: true`, el modelo **no puede** devolver JSON inválido, campos faltantes, o tipos incorrectos. Esto elimina el problema de parseo.

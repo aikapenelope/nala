@@ -81,10 +81,10 @@ Nala no es un sistema contable. Es un puente: genera la información que el cont
 | Base de datos | PostgreSQL, pgvector |
 | Cache | Redis |
 | Storage | MinIO (S3-compatible) |
-| IA | GPT-4o-mini / Claude Haiku |
-| WhatsApp | Cloud API vía 360dialog/WhatsAble (v1), BSP propio (v2) |
+| IA | OpenRouter (GPT-4o-mini primary), Groq (fallback) |
+| WhatsApp | Meta Cloud API directo |
 | Notificaciones | Web Push API, Twilio (SMS fallback) |
-| OCR | GPT-4o-mini vision (v1), PaddleOCR self-hosted (v2+ a escala) |
+| OCR | GPT-4o-mini vision vía OpenRouter (v1), PaddleOCR self-hosted (v2+ a escala) |
 | Hosting | Hetzner |
 | CI/CD | GitHub Actions, Coolify |
 
