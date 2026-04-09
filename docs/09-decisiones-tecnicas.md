@@ -198,73 +198,97 @@ WhatsApp comprime las imágenes antes de enviarlas. Incluso con "HD quality":
 
 Para OCR, la calidad de la imagen es crítica. La PWA accede a la cámara nativa del dispositivo a resolución completa (12-48MP). Sin compresión. Sin intermediarios.
 
-### Motor OCR: PaddleOCR (open source, self-hosted)
+### Motor OCR: GPT-4o-mini con visión (v1) → PaddleOCR self-hosted (v2+)
 
-Después de investigar las opciones en producción para 2026, la decisión es **PaddleOCR con PP-StructureV3** como motor principal, con LLM como capa de interpretación.
+**Decisión v1: GPT-4o-mini vision hace OCR + interpretación en un solo paso.** No microservicio. Una función dentro del backend.
 
-**Por qué PaddleOCR y no Google Vision o Tesseract:**
+**Por qué GPT-4o-mini y no PaddleOCR para v1:**
 
-| Motor | Precisión facturas | Velocidad | Costo | Tablas/Layout | Licencia |
-|---|---|---|---|---|---|
-| **PaddleOCR + PP-StructureV3** | 95%+ en texto impreso, detecta tablas y layout | ~1-2s/página en CPU, <0.5s con GPU | Gratis (self-hosted) | Sí (nativo) | Apache 2.0 |
-| Google Vision API | 97%+ | <1s | $1.50/1,000 imágenes | Parcial | Propietario |
-| Tesseract 5.x | 92% en texto limpio, cae en tablas | ~1s/página CPU | Gratis | No (requiere post-procesamiento) | Apache 2.0 |
-| EasyOCR | 88-92% | ~3s/página | Gratis | No | Apache 2.0 |
-| AWS Textract | 97%+ | <1s | $1.50-15/1,000 páginas | Sí | Propietario |
+| Aspecto | PaddleOCR + LLM (2 pasos) | GPT-4o-mini vision (1 paso) |
+|---|---|---|
+| Precisión end-to-end | Similar (OCR + LLM corrige) | Similar o mejor (ve imagen completa con contexto) |
+| Infra adicional | Microservicio Docker (2 CPU, 2GB RAM) | Cero. Una llamada a API |
+| Carga en CPU del servidor | Alta (compite con backend, DB, Redis) | Cero (se procesa en servidores de OpenAI) |
+| Costo por factura | ~$0.003 (OCR gratis + LLM) | ~$0.005-0.01 |
+| Costo 30 facturas/mes | ~$0.09 | ~$0.15-0.30 |
+| Complejidad de deploy | Docker container, mantener modelo, actualizar | Una llamada a API. Nada que mantener |
+| Escalabilidad | Limitada por CPU. 500 negocios simultáneos saturan | Ilimitada. OpenAI escala por ti |
+| Facturas desordenadas | OCR lee texto, LLM interpreta después | Ve la imagen completa, entiende contexto visual |
+| Vendor lock-in | Ninguno | Dependencia de OpenAI |
 
-**PaddleOCR gana porque:**
-1. **Gratis en producción.** No hay costo por imagen. Para un SaaS con miles de negocios escaneando facturas, esto es la diferencia entre viable y no viable
-2. **PP-StructureV3 entiende tablas.** Las facturas de proveedores son tablas. Tesseract no entiende tablas. PaddleOCR sí: detecta filas, columnas, celdas, y extrae cada línea como dato estructurado
-3. **Corre en CPU.** No necesitamos GPU dedicada. En nuestro servidor Hetzner (cx33, 4 vCPU) procesa ~1-2 segundos por factura. Suficiente para el volumen de PyMEs
-4. **Apache 2.0.** Uso comercial sin restricciones
-5. **100+ idiomas.** Español incluido con buena precisión
-6. **PaddleOCR-VL (0.9B params)** es la versión 2025 que supera a GPT-4o en benchmarks de documentos con solo 900M parámetros. Corre en CPU. Es el futuro del pipeline si necesitamos más precisión
+**GPT-4o-mini gana para v1 porque:**
+1. **Cero carga en CPU.** Con varios usuarios simultáneos, PaddleOCR compite por CPU con todo lo demás en Hetzner
+2. **Simplicidad.** Un API call, no un microservicio + API call. Menos código, menos bugs
+3. **Costo negligible.** $0.15 vs $0.09 por negocio/mes. En un plan de $19/mes, irrelevante
+4. **Mejor en facturas desordenadas.** Recibos térmicos borrosos, facturas a mano, PDFs mal escaneados -- GPT-4o-mini entiende contexto visual
 
-**Arquitectura del pipeline OCR en producción:**
+**Migración a PaddleOCR en v2+:** Cuando haya 1,000+ negocios y el costo de API suba, PaddleOCR self-hosted reduce costos 10-20x. Se extrae la función a un microservicio. Pero no en v1.
+
+**No es microservicio en v1.** Es una función dentro del backend:
+
+```typescript
+async function extractInvoiceData(imageBuffer: Buffer, businessProducts: Product[]): Promise<InvoiceData> {
+  const response = await openai.chat.completions.create({
+    model: "gpt-4o-mini",
+    messages: [{
+      role: "user",
+      content: [
+        {
+          type: "image_url",
+          image_url: { url: `data:image/jpeg;base64,${imageBuffer.toString('base64')}` }
+        },
+        {
+          type: "text",
+          text: `Extrae de esta factura: proveedor, fecha, número, y cada línea de producto con descripción, cantidad, precio unitario y total. Devuelve JSON estructurado.
+          
+          Productos existentes en inventario para matching:
+          ${businessProducts.map(p => `${p.id}: ${p.name} (SKU: ${p.sku || 'N/A'})`).join('\n')}
+          
+          Para cada línea, intenta matchear con un producto existente por nombre similar o SKU exacto.`
+        }
+      ]
+    }],
+    response_format: { type: "json_object" }
+  });
+  return JSON.parse(response.choices[0].message.content);
+}
+```
+
+**Arquitectura del pipeline OCR en producción (v1):**
 
 ```
-┌──────────────┐     ┌──────────────────┐     ┌──────────────────┐     ┌──────────────┐
-│  PWA         │     │  Nala Backend    │     │  OCR Service     │     │  PostgreSQL  │
-│  (cámara)    │────▶│  (API endpoint)  │────▶│  (PaddleOCR)     │────▶│  (datos)     │
-│              │     │                  │     │                  │     │              │
-│  Foto full   │     │  Recibe imagen   │     │  1. Detecta texto│     │  Gasto       │
-│  resolución  │     │  Valida formato  │     │  2. Detecta tabla│     │  registrado  │
-│              │     │  Envía a OCR     │     │  3. Extrae líneas│     │              │
-│              │     │                  │     │  4. Estructura    │     │  Inventario  │
-│              │◀────│  Devuelve datos  │◀────│     JSON         │     │  actualizado │
-│  Confirma    │     │  parseados       │     │                  │     │              │
-└──────────────┘     └──────┬───────────┘     └──────────────────┘     └──────────────┘
-                            │
-                            ▼
+┌──────────────┐     ┌──────────────────────────────────┐     ┌──────────────┐
+│  PWA         │     │  Nala Backend                    │     │  PostgreSQL  │
+│  (cámara)    │────▶│                                  │────▶│              │
+│              │     │  1. Recibe imagen                │     │  Gasto       │
+│  Foto full   │     │  2. Carga productos del negocio  │     │  registrado  │
+│  resolución  │     │  3. Llama GPT-4o-mini vision     │     │              │
+│              │     │  4. Recibe JSON estructurado      │     │  Inventario  │
+│              │◀────│  5. Devuelve datos al usuario     │     │  actualizado │
+│  Confirma    │     │                                  │     │              │
+└──────────────┘     └──────────────────────────────────┘     └──────────────┘
+                              │
+                              ▼ (API call, no microservicio)
                      ┌──────────────────┐
-                     │  LLM (GPT-4o-    │
-                     │  mini)           │
+                     │  OpenAI API      │
+                     │  GPT-4o-mini     │
+                     │  (visión)        │
                      │                  │
-                     │  Interpreta OCR  │
-                     │  Matchea con     │
-                     │  inventario      │
-                     │  Estructura      │
-                     │  final           │
+                     │  OCR + interpreta│
+                     │  + matchea       │
+                     │  en 1 solo paso  │
                      └──────────────────┘
 ```
 
 **Paso a paso del flujo:**
 
-1. **PWA:** Usuario toca "Escanear factura" → cámara nativa se abre → toma foto a resolución completa
-2. **Upload:** La imagen se envía al backend de Nala vía POST (si hay internet) o se guarda en IndexedDB (si está offline) para procesarse después
-3. **PaddleOCR (PP-StructureV3):** Recibe la imagen y ejecuta:
-   - Detección de regiones de texto
-   - Detección de tablas y estructura
-   - Reconocimiento de caracteres por región
-   - Output: JSON estructurado con cada línea de texto y su posición, más tablas detectadas con filas/columnas
-4. **LLM (GPT-4o-mini):** Recibe el JSON del OCR y lo interpreta:
-   - Identifica: proveedor, fecha, número de factura, monto total, impuestos
-   - Extrae cada línea de producto: descripción, cantidad, precio unitario, total
-   - Intenta matchear cada producto con el inventario existente (fuzzy matching)
-   - Output: JSON estructurado listo para guardar
-5. **Backend:** Recibe el JSON interpretado y lo presenta al usuario en la PWA para confirmación
-6. **PWA:** Muestra los datos extraídos. El usuario confirma o corrige
-7. **PostgreSQL:** Se registra el gasto y se actualiza inventario
+1. **PWA:** Usuario toca "Escanear factura" → cámara nativa → foto a resolución completa
+2. **Upload:** Imagen al backend vía POST (o IndexedDB si offline, se procesa después)
+3. **Backend:** Carga los productos del negocio desde PostgreSQL para matching
+4. **GPT-4o-mini vision:** Recibe imagen + lista de productos. En un solo paso: lee el texto, detecta la tabla, extrae líneas, matchea con inventario, devuelve JSON estructurado
+5. **Backend:** Presenta datos al usuario en la PWA para confirmación
+6. **PWA:** Usuario confirma o corrige
+7. **PostgreSQL:** Se registra gasto y se actualiza inventario
 
 ### Escenario 1: Factura del proveedor (producción)
 
@@ -386,47 +410,17 @@ CREATE TABLE product_aliases (
 3. **La próxima vez:** Antes de fuzzy matching, se busca en la tabla de alias. Si "HP 1KG" del proveedor X ya tiene alias, se matchea instantáneamente sin LLM
 4. **Con el tiempo:** Cada negocio construye su propia tabla de alias. El sistema se vuelve más rápido y preciso con cada factura procesada
 
-### Deployment del servicio OCR
-
-PaddleOCR corre como un **microservicio separado** en el mismo servidor:
-
-```yaml
-# docker-compose.yml (simplificado)
-services:
-  nala-api:
-    image: nala/backend:latest
-    ports:
-      - "3000:3000"
-
-  nala-ocr:
-    image: nala/ocr:latest          # PaddleOCR + PP-StructureV3
-    ports:
-      - "8080:8080"                 # API interna, no expuesta al público
-    environment:
-      - PADDLE_MODEL=PP-StructureV3
-    deploy:
-      resources:
-        limits:
-          cpus: "2"
-          memory: 2G
-```
-
-- El servicio OCR expone un endpoint HTTP interno: `POST /ocr/extract` que recibe imagen y devuelve JSON
-- El backend de Nala llama a este endpoint cuando recibe una imagen del usuario
-- No necesita GPU. 2 CPU cores y 2GB RAM son suficientes para el volumen de PyMEs (~30 facturas/mes por negocio)
-- Si el volumen crece, se escala horizontalmente (más instancias del servicio OCR)
-
-### Costos en producción
+### Costos en producción (v1 con GPT-4o-mini)
 
 | Concepto | Costo |
 |---|---|
-| PaddleOCR (self-hosted) | $0 (ya está en nuestro servidor) |
-| LLM por factura (GPT-4o-mini) | ~$0.002-0.005 por factura |
+| GPT-4o-mini vision por factura | ~$0.005-0.01 (imagen input + JSON output) |
 | Storage de imágenes (MinIO) | Negligible (~1MB por factura) |
-| **Total por factura** | **~$0.002-0.005** |
-| **30 facturas/mes por negocio** | **~$0.06-0.15/mes** |
+| Infra adicional | $0 (no hay microservicio, no hay carga en CPU) |
+| **Total por factura** | **~$0.005-0.01** |
+| **30 facturas/mes por negocio** | **~$0.15-0.30/mes** |
 
-Comparado con Google Vision ($1.50/1,000 = $0.045/factura) o AWS Textract ($1.50-15/1,000), PaddleOCR self-hosted es 10-20x más barato a escala.
+**Cuándo migrar a PaddleOCR (v2+):** Cuando el costo de API supere ~$500/mes (aprox. 1,000+ negocios activos escaneando). En ese punto, PaddleOCR self-hosted como microservicio reduce costos 10-20x. Pero para v1 con <500 negocios, GPT-4o-mini es más simple, más rápido de implementar, y el costo es absorbido por la suscripción.
 
 ### Modo offline
 
