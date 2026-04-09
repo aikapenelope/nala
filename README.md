@@ -117,7 +117,8 @@ Nala no es un sistema contable. Es un puente: genera la información que el cont
 | [07 - Visión de producto](docs/07-nala-vision-producto-2026.md) | Visión completa: experiencia escritorio/móvil, features v1.0, stack, roadmap |
 | [08 - WhatsApp entrada + diferenciadores](docs/08-whatsapp-entrada-y-diferenciadores.md) | WhatsApp bidireccional, OCR, cierre automático, benchmark, 13 diferenciadores |
 | [09 - Decisiones técnicas](docs/09-decisiones-tecnicas.md) | Roles (2 no 5), flujo contable, arquitectura WhatsApp en producción, OCR con GPT-4o-mini vision |
-| [10 - Build vs OSS base](docs/10-build-vs-oss-base.md) | Por qué construir desde cero y no montar sobre ERPNext, Odoo u otro ERP open source |
+| [10 - Build vs OSS base](docs/10-build-vs-oss-base.md) | Por qué construir desde cero. Patrones de UX adoptados de ERPNext, Loyverse, Square y Fina |
+| **[11 - Especificación final](docs/11-especificacion-final.md)** | **Documento definitivo: capacidades, arquitectura, modelo de datos, UX, stack, decisiones, roadmap** |
 
 ## Licencia
 
