@@ -19,7 +19,7 @@ Los sistemas administrativos actuales en este mercado son de dos tipos: demasiad
 ## Principios de diseño
 
 - **Producto completo, experiencia simple.** Todas las capacidades de un sistema profesional. Cada feature presentado de la forma más simple posible. La potencia está disponible, no impuesta.
-- **Offline-first.** Los datos viven en el dispositivo. Se sincronizan cuando hay conexión. El usuario nunca ve un spinner de carga ni un error de red.
+- **Offline-first.** Los datos se cachean localmente en IndexedDB. La app responde instantáneamente desde cache y sincroniza con el servidor en background. Si se cae internet, las ventas se guardan en cola y se envían cuando vuelve. El usuario nunca ve un spinner ni un error de red.
 - **Inteligencia en cada pantalla.** La IA no es un módulo. Está integrada en inventario, ventas, clientes, reportes y cuentas. El usuario ve resultados, no algoritmos.
 - **Tres formas de acceso.** Desktop (centro de análisis y configuración), móvil PWA (centro de acción y captura de datos), WhatsApp (acceso rápido bidireccional). Una sola app, un solo codebase, prioridades diferentes por contexto. Patrón validado por Square (Dashboard vs POS App), Shopify (Admin vs POS) y Lightspeed (Backoffice vs App). Desktop para sesiones largas de análisis (reportes, inventario completo, configuración, exportación contable). Móvil para sesiones cortas de acción (vender en 3 toques, escanear facturas, cobrar por WhatsApp, consultar stock, recibir alertas).
 - **Multi-tenant con RLS.** Una sola base de datos PostgreSQL con Row Level Security. Un negocio nunca ve datos de otro. Escala a miles de tenants sin complejidad operativa.
@@ -76,9 +76,9 @@ Nala no es un sistema contable. Es un puente: genera la información que el cont
 
 | Capa | Tecnología |
 |---|---|
-| Frontend | Nuxt 3 (Vue), PWA offline-first |
-| DB local | IndexedDB (Dexie.js) |
-| Backend | Node.js, Hono/Fastify, TypeScript |
+| Frontend | SvelteKit (Svelte 5) o Nuxt 3 (Vue) -- decisión al iniciar dev. PWA con Service Workers |
+| DB local | IndexedDB (Dexie.js) -- cache local + cola de operaciones offline |
+| Backend | Hono (TypeScript, 14KB, ultra-rápido) |
 | Base de datos | PostgreSQL, pgvector |
 | Cache | Redis |
 | Storage | MinIO (S3-compatible) |
@@ -123,6 +123,7 @@ Nala no es un sistema contable. Es un puente: genera la información que el cont
 | [12 - Pipeline OCR en detalle](docs/12-ocr-pipeline-detalle.md) | Flujo completo de lectura de facturas, matching, validación, código, fallos y costos LLM |
 | [13 - Cierre contable, migración, multi-tenant, PWA](docs/13-cierre-contable-migracion-multitenant-pwa.md) | Cuadre de caja con gap de ventas no registradas, importación desde legacy, PostgreSQL RLS, PWA como centro de acción vs desktop como centro de análisis |
 | [14 - Experiencia desktop vs móvil](docs/14-experiencia-desktop-vs-movil.md) | Cómo lo hacen Square/Shopify/Lightspeed, datos de uso real, wireframes de cada pantalla, tabla de funcionalidades por dispositivo, principios de diseño, implementación técnica |
+| [15 - Catálogo, stack técnico, estrategia offline](docs/15-catalogo-stack-offline.md) | Página de catálogo para clientes, SvelteKit vs Nuxt, por qué IndexedDB, por qué Hono, online-first con cache agresivo vs offline-first puro |
 
 ## Licencia
 
