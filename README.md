@@ -10,7 +10,7 @@ No es un POS. No es un software contable. No es un CRM. Es el backoffice complet
 
 ## Para quién es
 
-El dueño-operador: la persona que abre el negocio a las 6am, atiende clientes, cuenta inventario, cobra deudas, paga al proveedor y cierra caja a las 8pm. Panaderías, ferreterías, tiendas de ropa, restaurantes, autopartes, peluquerías, bodegas, farmacias. PyMEs de 1 a 30 empleados en mercados emergentes, empezando por Venezuela.
+El dueño-operador: la persona que abre el negocio a las 6am, atiende clientes, cuenta inventario, cobra deudas, paga al proveedor y cierra caja a las 8pm. Ferreterías, tiendas de ropa, autopartes, peluquerías, bodegas, farmacias, tiendas de electrónica, librerías, cosméticos, distribuidoras de alimentos. PyMEs de 1 a 30 empleados en mercados emergentes, empezando por Venezuela. No restaurantes (la complejidad de mesas, recetas y cocina requiere un producto vertical dedicado).
 
 ## Por qué existe
 
@@ -26,7 +26,7 @@ Los sistemas administrativos actuales en este mercado son de dos tipos: demasiad
 ## Qué hace
 
 ### Vender
-Registro de venta en 3-4 toques. Funciona offline. 7 métodos de pago (efectivo, Pago Móvil, Binance, Zinli, transferencia, Zelle, fiado). Gestión de mesas para restaurantes. Seguimiento de repartidores y vendedores. Descuento automático de ingredientes por receta. Escaneo de código de barras con la cámara. Cotizaciones con envío por WhatsApp.
+Registro de venta en 3-4 toques. Funciona offline. 7 métodos de pago (efectivo, Pago Móvil, Binance, Zinli, transferencia, Zelle, fiado). Seguimiento de vendedores. Descuentos por línea y por ticket. Escaneo de código de barras con la cámara. Cotizaciones con envío por WhatsApp.
 
 ### Saber cuánto tengo
 Inventario con variantes (talla, color, referencia, modelo). Fechas de vencimiento. Semáforo de stock (verde, amarillo, rojo, gris). Predicción de agotamiento por producto. Análisis de rentabilidad (margen, rotación, score). Detección de productos muertos. Importación desde Excel. Conteo físico con escáner.
@@ -119,6 +119,7 @@ Nala no es un sistema contable. Es un puente: genera la información que el cont
 | [09 - Decisiones técnicas](docs/09-decisiones-tecnicas.md) | Roles (2 no 5), flujo contable, arquitectura WhatsApp en producción, OCR con GPT-4o-mini vision |
 | [10 - Build vs OSS base](docs/10-build-vs-oss-base.md) | Por qué construir desde cero. Patrones de UX adoptados de ERPNext, Loyverse, Square y Fina |
 | **[11 - Especificación final](docs/11-especificacion-final.md)** | **Documento definitivo: capacidades, arquitectura, modelo de datos, UX, stack, decisiones, roadmap** |
+| [12 - Pipeline OCR en detalle](docs/12-ocr-pipeline-detalle.md) | Flujo completo de lectura de facturas, matching, validación, código, fallos y costos LLM |
 
 ## Licencia
 
