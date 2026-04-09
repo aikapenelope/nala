@@ -21,7 +21,8 @@ Los sistemas administrativos actuales en este mercado son de dos tipos: demasiad
 - **Producto completo, experiencia simple.** Todas las capacidades de un sistema profesional. Cada feature presentado de la forma más simple posible. La potencia está disponible, no impuesta.
 - **Offline-first.** Los datos viven en el dispositivo. Se sincronizan cuando hay conexión. El usuario nunca ve un spinner de carga ni un error de red.
 - **Inteligencia en cada pantalla.** La IA no es un módulo. Está integrada en inventario, ventas, clientes, reportes y cuentas. El usuario ve resultados, no algoritmos.
-- **Tres formas de acceso.** Escritorio (experiencia completa), móvil (misma funcionalidad, layout adaptado), WhatsApp (consultas rápidas, ventas simples, cobros). Ninguna es secundaria.
+- **Tres formas de acceso.** Desktop (centro de análisis y configuración), móvil PWA (centro de acción y captura de datos), WhatsApp (acceso rápido bidireccional). Una sola app, un solo codebase, prioridades diferentes por contexto.
+- **Multi-tenant con RLS.** Una sola base de datos PostgreSQL con Row Level Security. Un negocio nunca ve datos de otro. Escala a miles de tenants sin complejidad operativa.
 
 ## Qué hace
 
@@ -120,6 +121,7 @@ Nala no es un sistema contable. Es un puente: genera la información que el cont
 | [10 - Build vs OSS base](docs/10-build-vs-oss-base.md) | Por qué construir desde cero. Patrones de UX adoptados de ERPNext, Loyverse, Square y Fina |
 | **[11 - Especificación final](docs/11-especificacion-final.md)** | **Documento definitivo: capacidades, arquitectura, modelo de datos, UX, stack, decisiones, roadmap** |
 | [12 - Pipeline OCR en detalle](docs/12-ocr-pipeline-detalle.md) | Flujo completo de lectura de facturas, matching, validación, código, fallos y costos LLM |
+| [13 - Cierre contable, migración, multi-tenant, PWA](docs/13-cierre-contable-migracion-multitenant-pwa.md) | Cuadre de caja con gap de ventas no registradas, importación desde legacy, PostgreSQL RLS, PWA como centro de acción vs desktop como centro de análisis |
 
 ## Licencia
 
