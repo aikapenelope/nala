@@ -1,324 +1,448 @@
-# Nala: Visión de Producto 2026
+# Nala: Visión de Producto 2026 (v2)
 
-> Cómo construir un sistema administrativo para PyMEs venezolanas que se sienta 2026, manteniendo la simplicidad que hace exitoso a Fina.
-
----
-
-## La Tesis
-
-Fina demostró que el mercado existe y que la simplicidad gana. Pero Fina es un producto de 2020 que funciona en 2026. Nala es un producto **nacido en 2026** que absorbe las lecciones de Fina y las combina con lo que la tecnología permite hoy.
-
-La diferencia no es "más features". Es **mejor experiencia con la misma simplicidad**.
+> Un sistema administrativo completo para PyMEs venezolanas. Potente en escritorio, igual de potente en móvil, con WhatsApp como canal de salida. No es un chatbot. Es un producto de verdad.
 
 ---
 
-## Los 3 Pilares de Nala
+## Corrección de Rumbo
 
-### Pilar 1: WhatsApp es la interfaz
+La versión anterior de este documento se inclinó demasiado hacia "WhatsApp es la interfaz". Eso convierte a Nala en un bot, no en un producto. Y se parece demasiado a Aurora (voice-first, conversacional).
 
-El usuario venezolano vive en WhatsApp. No en un navegador, no en una app, no en un dashboard. En WhatsApp. Nala no pelea contra eso. Nala **vive dentro de WhatsApp** tanto como sea posible.
+Nala es diferente:
 
-### Pilar 2: Funciona sin internet
+- **Aurora** = PWA voice-first para interacción con clientes finales del negocio
+- **Nala** = Sistema administrativo completo para el dueño y sus empleados
 
-En Venezuela, internet no es confiable. Electricidad tampoco. Nala funciona offline primero, online después. No es un feature. Es la arquitectura.
-
-### Pilar 3: Inteligencia invisible
-
-Nala tiene IA, predicciones, automatización. Pero el usuario nunca ve nada de eso. Solo ve resultados: "Pide más harina", "Juan te debe $50", "Hoy vendiste más que ayer". La complejidad está debajo. La superficie es simple.
+Nala es una **aplicación de verdad** con pantallas, tablas, gráficos, formularios y flujos completos. Funciona en escritorio (pantalla grande, teclado, mouse) y en móvil (PWA, táctil, bolsillo). WhatsApp es un canal de salida para notificaciones y cobros, no la interfaz principal.
 
 ---
 
-## Cómo Se Siente Usar Nala
+## La Tesis Revisada
 
-### El primer día
+El dueño de una PyME venezolana necesita un sistema que:
 
-1. El dueño de una panadería descarga Nala (PWA, se instala desde el navegador en 3 segundos, pesa menos de 500KB)
-2. Abre la app. Una sola pregunta: "¿Qué tipo de negocio tienes?" → Panadería
-3. Nala pre-configura todo: categorías de productos (panes, dulces, bebidas), cuentas contables, roles, plantillas. Cero configuración manual
-4. "¿Tienes una lista de productos en Excel o los quieres agregar uno por uno?" → Sube Excel o agrega manualmente
-5. Listo. Puede vender
-
-**Tiempo total: 5 minutos.** Sin llamar a soporte. Sin tutorial de 30 minutos. Sin configurar nada.
-
-### Un día normal
-
-**6:00 AM** - El dueño abre el negocio. Abre Nala en su celular. Ve un solo número grande: "$0 vendido hoy". Debajo: "3 productos con stock bajo". Nada más.
-
-**7:30 AM** - Llega un cliente. El cajero toca "Nueva venta", selecciona "Pan campesino x3, Café con leche x1". Toca "Cobrar". Aparecen las opciones: Efectivo, Pago Móvil, Binance. El cliente paga con Pago Móvil. El cajero toca "Pago Móvil" y listo. La venta se registra, el inventario se descuenta, la caja se actualiza. Todo en 4 toques.
-
-**8:00 AM** - Se va la luz. Nala sigue funcionando. El cajero sigue registrando ventas. Cuando vuelve la luz (y el internet), todo se sincroniza automáticamente. El cajero ni se entera.
-
-**12:00 PM** - El dueño recibe una notificación en WhatsApp: "Llevas $180 vendidos esta mañana. 12% más que el martes pasado. La Harina PAN baja rápido, te queda para ~2 días."
-
-**3:00 PM** - Un cliente habitual llega. El vendedor ve en la pantalla: "María García - viene cada semana, siempre compra pan campesino y cachitos. Última visita: hace 8 días. Le debe $15 de la vez pasada."
-
-**6:00 PM** - El dueño quiere cobrarle a los clientes que le deben. Abre Nala, toca "Cobros pendientes". Ve la lista. Toca "Recordar a todos". Nala genera un mensaje personalizado para cada uno y abre WhatsApp con el mensaje listo. El dueño solo presiona enviar. 5 clientes cobrados en 2 minutos.
-
-**9:00 PM** - El dueño recibe el resumen del día por WhatsApp:
-
-> "Hoy vendiste $420. Tu mejor producto fue Pan Campesino (85 unidades). Ganancia estimada: $180. Tienes $95 pendientes por cobrar. La Harina PAN se acaba mañana, te recomiendo pedir 2 sacos. Mañana es miércoles, históricamente tu mejor día."
-
-No abrió Nala ni una vez para ver esto. Le llegó solo.
+1. **Sea completo:** Ventas, inventario, cuentas, clientes, reportes, contabilidad. Todo en un lugar
+2. **Sea fácil:** Cada pantalla tiene un propósito claro. No hay menús con 47 opciones. Pero todo está ahí cuando lo necesitas
+3. **Sea potente:** Gráficos que se entienden, reportes que dicen algo útil, alertas que te ahorran dinero
+4. **Funcione siempre:** Offline, en 3G, en un celular de $100, en una PC vieja con Chrome
+5. **Se sienta 2026:** Rápido, bonito, inteligente. No un formulario de los 2000 con fondo gris
 
 ---
 
-## Arquitectura de Producto
+## Los 3 Pilares (Revisados)
 
-### La app: PWA offline-first
+### Pilar 1: Producto completo, experiencia simple
 
-| Aspecto | Decisión | Por qué |
-|---|---|---|
-| Tipo | Progressive Web App (PWA) | Se instala desde el navegador. Sin App Store. Pesa <500KB. Funciona en Android de $100 |
-| Offline | Service Workers + IndexedDB | Todas las operaciones críticas funcionan sin internet. Cola de sincronización automática |
-| Carga | <2 segundos en 3G | Optimizada para conexiones lentas venezolanas |
-| Notificaciones | Push vía PWA + WhatsApp | Push para alertas rápidas. WhatsApp para reportes y cobros |
-| Actualizaciones | Automáticas, sin descarga | El usuario siempre tiene la última versión sin hacer nada |
+Nala tiene todas las capacidades de un sistema administrativo profesional. Pero cada feature se presenta de la forma más simple posible. La potencia está disponible, no impuesta.
 
-**Referencia:** Starbucks PWA pesa 233KB (vs 148MB la app nativa) y duplicó usuarios activos. Uber PWA funciona en 2G. Alibaba PWA aumentó conversiones 76%.
+- En escritorio: layout completo con sidebar, tablas con filtros, gráficos interactivos, atajos de teclado
+- En móvil: la misma funcionalidad adaptada a pantalla táctil, con navegación por tabs y gestos
+- Misma base de datos, misma sesión, cambio fluido entre dispositivos
 
-### WhatsApp como canal principal
+### Pilar 2: Offline-first como arquitectura
 
-Nala no necesita la WhatsApp Business API (verificación de Meta complicada). Usa el modelo de **generación de mensajes**:
+No es un "modo offline" que se activa cuando falla internet. Es la forma en que Nala funciona siempre. Los datos viven en el dispositivo. Se sincronizan cuando hay conexión. El usuario nunca ve un spinner de carga ni un error de red.
 
-| Acción | Cómo funciona |
-|---|---|
-| Cobrar a un cliente | Nala genera link `wa.me/58412XXXX?text=Hola María, te recordamos que tienes un saldo de $15...` El dueño toca y envía |
-| Enviar recibo | Nala genera PDF del recibo + link wa.me. Un toque para enviar |
-| Reporte diario | Nala envía resumen por WhatsApp al dueño (esto sí puede usar Twilio o un bot simple) |
-| Campaña de marketing | Nala genera lista de mensajes personalizados. El dueño los envía desde su WhatsApp con listas de difusión |
-| Soporte | El usuario escribe a Nala por WhatsApp. Un humano responde (no chatbot) |
+### Pilar 3: Inteligencia integrada en cada pantalla
 
-**Futuro:** Cuando la verificación de Meta se complete, Nala puede enviar mensajes automáticamente sin cambiar la experiencia del usuario.
+La IA no es un módulo aparte. Está integrada en cada pantalla del producto:
 
-### IA invisible
+- En inventario: predicciones de agotamiento junto a cada producto
+- En ventas: comparativa automática con periodos anteriores
+- En clientes: segmentos y alertas junto al perfil
+- En reportes: narrativas generadas junto a los gráficos
+- En cobros: priorización inteligente de a quién cobrar primero
 
-| Lo que el usuario ve | Lo que pasa debajo |
-|---|---|
-| "La Harina PAN se acaba mañana" | Algoritmo de series temporales analiza velocidad de venta, stock actual, y día de la semana |
-| "María viene cada semana y compra cachitos" | Análisis de frecuencia y patrones de compra por cliente |
-| "Hoy vendiste 12% más que el martes pasado" | Comparativa automática con mismo día de semanas anteriores |
-| "Tu producto más rentable es Pan Campesino" | Cálculo de margen × volumen × frecuencia |
-| "Se registraron 3 anulaciones hoy, el promedio es 0.2" | Detección de anomalías estadísticas |
-| Categorías de productos pre-configuradas al registrarse | Clasificación por tipo de negocio con datos de miles de negocios similares |
-
-El usuario nunca ve "Módulo de IA", "Dashboard de Analytics", "Configurar Algoritmo". Solo ve frases en español simple que le dicen qué hacer.
+No hay un "botón de IA". La inteligencia es parte del producto como el color es parte del diseño.
 
 ---
 
-## Features de Nala (versión 1.0)
+## Experiencia en Escritorio (Desktop)
 
-### Lo que tiene desde el día 1
+El dueño o gerente que trabaja desde una PC o laptop tiene acceso a la experiencia completa.
 
-Organizado por lo que el usuario **hace**, no por módulos técnicos.
+### Layout principal
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  Nala          Panadería Don Pedro       Bs/USD: 36.50  │
+├──────────┬──────────────────────────────────────────────┤
+│          │                                              │
+│  Inicio  │   Hoy: $420 vendidos                        │
+│          │   ▲ 12% vs martes pasado                    │
+│  Vender  │                                              │
+│          │   ┌──────────┐ ┌──────────┐ ┌──────────┐   │
+│  Invent. │   │ 23 ventas│ │ $95 x cob│ │ 3 stock ↓│   │
+│          │   └──────────┘ └──────────┘ └──────────┘   │
+│  Clientes│                                              │
+│          │   Ventas últimos 7 días                      │
+│  Cuentas │   ████████████████████                       │
+│          │   █████████████████                          │
+│  Reportes│   ████████████████████████                   │
+│          │   ██████████████████                         │
+│  Contab. │                                              │
+│          │   Top productos hoy        Alertas           │
+│  Config. │   1. Pan campesino (85u)   ⚠ Harina PAN:   │
+│          │   2. Cachitos (42u)          se acaba en     │
+│          │   3. Café con leche (38u)    ~2 días         │
+│          │                                              │
+└──────────┴──────────────────────────────────────────────┘
+```
+
+### Pantallas principales en escritorio
+
+#### Inicio (Dashboard)
+
+- Número grande: ventas del día en USD (con equivalente en Bs. al lado)
+- 3 tarjetas: total ventas, pendiente por cobrar, productos con stock bajo
+- Gráfico de ventas de los últimos 7 días (barras, simple, con comparativa semana anterior en gris)
+- Top 5 productos del día
+- Panel de alertas inteligentes (máximo 5, priorizadas por impacto)
+- Comparativa automática: "12% más que el martes pasado" o "15% menos, revisa qué pasó"
 
 #### Vender
 
-- Registro de venta en 3-4 toques (producto → cantidad → método de pago → listo)
-- Funciona offline. Sincroniza cuando hay internet
-- Métodos de pago: efectivo, Pago Móvil, Binance, Zinli, transferencia, Zelle, fiado
-- Gestión de mesas (restaurantes)
-- Seguimiento de repartidores
-- Control de quién vendió qué (mesonero/vendedor)
-- Descuento automático de ingredientes por receta (restaurantes)
-- Escaneo de código de barras con la cámara del celular
+- Buscador de productos con autocompletado (escribir o escanear código de barras)
+- Lista de venta activa con cantidades editables
+- Selector de método de pago (iconos grandes: Efectivo, Pago Móvil, Binance, Zinli, Transferencia, Zelle, Fiado)
+- Botón de cobrar que cierra la venta en un click
+- Para restaurantes: vista de mesas con estado (libre, ocupada, cuenta pedida)
+- Historial de ventas del día con filtros (por vendedor, por método de pago, por hora)
+- Atajo de teclado: F2 para nueva venta, Enter para confirmar
 
-#### Saber cuánto tengo
+#### Inventario
 
-- Inventario con variantes (talla, color, referencia, modelo)
-- Fechas de vencimiento
-- Alertas inteligentes: "Te quedan 5 unidades de X, se acaba en ~3 días"
-- Importación desde Excel
-- Conteo físico con escáner
+- Tabla de productos con columnas: nombre, stock, costo, precio, margen, estado
+- Estado con semáforo visual: verde (OK), amarillo (bajo), rojo (crítico), gris (sin movimiento 60+ días)
+- Columna de predicción: "Se acaba en ~X días" junto a cada producto
+- Filtros rápidos: todos, stock bajo, sin movimiento, por categoría
+- Edición inline: click en precio o stock para editar directo en la tabla
+- Importación masiva desde Excel con mapeo inteligente de columnas
+- Botón "Agregar producto" con formulario mínimo: nombre, costo, precio, stock inicial. Todo lo demás es opcional
+- Vista de recetas (restaurantes): ingredientes por plato, costo calculado automáticamente
 
-#### Saber cuánto me deben / debo
+#### Clientes
 
-- Cuentas por cobrar con un toque para cobrar por WhatsApp
-- Cuentas por pagar
-- Registro de pagos recibidos
-- Conciliación básica: "¿Este pago de $50 por Pago Móvil es de Juan?" → Sí/No
+- Lista de clientes con búsqueda instantánea
+- Cada cliente muestra: nombre, última compra, frecuencia, total gastado, saldo pendiente
+- Badges automáticos: "VIP", "Nuevo", "En riesgo", "Con deuda"
+- Click en un cliente abre ficha completa:
+  - Datos de contacto
+  - Historial de compras (timeline visual)
+  - Productos favoritos
+  - Gráfico de gasto mensual
+  - Saldo pendiente con botón "Cobrar por WhatsApp"
+  - Notas del vendedor
+- Segmentos predefinidos con un click: VIP, frecuentes, en riesgo, nuevos, con deuda, inactivos
+- Desde cualquier segmento: "Enviar campaña" genera mensajes WhatsApp personalizados
 
-#### Saber cómo me fue
+#### Cuentas
 
-- Pantalla principal: un número grande (ventas del día). Debajo: 3 alertas máximo
-- Resumen diario automático por WhatsApp a las 9pm
-- Resumen semanal los lunes
-- Comparativa automática: "Esta semana vs la anterior"
-- Top productos (más vendidos, más rentables, muertos)
-- Todo en español simple, sin gráficos complejos
+- Vista dividida: Por cobrar | Por pagar
+- Cada cuenta muestra: cliente/proveedor, monto, antigüedad, estado
+- Código de color por antigüedad: verde (<15 días), amarillo (15-30), rojo (>30)
+- Acciones rápidas: marcar como pagado, cobrar por WhatsApp, ver historial
+- Resumen arriba: total por cobrar, total por pagar, balance neto
+- Filtros: por antigüedad, por monto, por cliente
 
-#### Cobrar y comunicar
+#### Reportes
 
-- Generador de mensajes WhatsApp para cobros
-- Generador de campañas WhatsApp (segmentos: no compran hace 30 días, VIP, con deuda)
-- Envío de recibos digitales por WhatsApp
-- Recordatorios automáticos: "Tienes 8 clientes que no compran hace 30 días"
+- Reportes pre-construidos (no configurables, pero completos):
+  - **Resumen del día:** ventas, gastos, ganancia, comparativa
+  - **Resumen de la semana/mes:** tendencias, top productos, top clientes
+  - **Rentabilidad por producto:** margen, rotación, contribución, score
+  - **Movimiento de inventario:** entradas, salidas, ajustes, valorización
+  - **Cuentas por cobrar aging:** desglose por antigüedad
+  - **Ventas por vendedor:** ranking, comisiones, metas
+  - **Resumen financiero:** ingresos, costos, gastos, ganancia bruta/neta (P&L simplificado)
+- Cada reporte tiene:
+  - Gráfico visual (barras o líneas, según el dato)
+  - Tabla con los números
+  - Párrafo narrativo generado por IA: "Este mes vendiste 8% más que el anterior. Tu producto estrella fue..."
+  - Botón "Exportar PDF" y botón "Enviar al contador por WhatsApp"
+- Selector de periodo: hoy, esta semana, este mes, mes anterior, rango personalizado
+- Todos los montos en USD con equivalente en Bs. (tasa BCV del día)
 
-#### Conocer a mis clientes
+#### Contabilidad (Puente)
 
-- Perfil automático: historial de compras, frecuencia, ticket promedio, productos favoritos, saldo
-- Segmentos automáticos: VIP, frecuentes, en riesgo, nuevos, con deuda, inactivos
-- Al tocar un cliente en cualquier pantalla, se ve su ficha completa
+- Catálogo de cuentas pre-configurado por tipo de negocio (editable por el contador)
+- Vista de asientos generados automáticamente a partir de ventas, compras y gastos
+- Exportación en formatos:
+  - PDF con formato de libro diario
+  - Excel con columnas contables estándar (fecha, cuenta, debe, haber, descripción)
+  - Formato específico para Galac, Profit Plus, Saint (seleccionable)
+- Libro de ventas y libro de compras en formato SENIAT
+- Botón "Enviar al contador": genera el paquete completo y abre WhatsApp con el archivo adjunto
+- Portal del contador (URL dedicada, solo lectura): el contador entra con su propio login y descarga lo que necesita
 
-#### Seguridad
+#### Configuración
 
-- 2FA por email (gratis, simple)
-- Dos modos: Dueño (ve todo) y Empleado (solo vende)
-- Log de actividad: quién hizo qué y cuándo
-- Backups automáticos visibles: "Último respaldo: hace 2 horas"
-- Tasa BCV actualizada automáticamente (sin configuración)
-
-#### Contabilidad (puente, no módulo)
-
-- Botón "Enviar al contador": genera PDF/Excel con formato contable y abre WhatsApp
-- Catálogo de cuentas pre-configurado por tipo de negocio (el contador puede ajustar)
-- Libro de ventas/compras en formato SENIAT
+- Datos del negocio (nombre, RIF, dirección, logo)
+- Usuarios y roles:
+  - **Dueño/Admin:** acceso total
+  - **Gerente:** ve reportes, gestiona inventario, no configura usuarios
+  - **Cajero:** solo vende y cobra, no ve costos ni reportes financieros
+  - **Inventarista:** solo gestiona inventario
+  - **Contador:** solo ve reportes y exportaciones contables
+- Métodos de pago habilitados
+- Categorías de productos
+- Tasa de cambio: BCV automática (con opción de tasa manual paralela)
+- Notificaciones: qué alertas recibir y por dónde (push, WhatsApp)
+- Seguridad: 2FA, cambio de contraseña, sesiones activas
+- Log de actividad: tabla con todas las acciones de todos los usuarios
 
 ---
 
-## Lo que Nala NO tiene en v1.0 (a propósito)
+## Experiencia en Móvil (PWA)
 
-| Feature | Por qué no |
+La misma funcionalidad, adaptada a pantalla pequeña. No es una versión recortada. Es la misma app con layout diferente.
+
+### Navegación
+
+Barra inferior con 5 tabs: Inicio | Vender | Inventario | Clientes | Más (cuentas, reportes, config)
+
+### Diferencias con escritorio
+
+| Acción | Escritorio | Móvil |
+|---|---|---|
+| Buscar producto | Escribir en buscador | Escribir o escanear código de barras con cámara |
+| Ver inventario | Tabla completa con columnas | Lista con cards, swipe para acciones |
+| Registrar venta | Click en productos + Enter | Tap en productos + botón grande "Cobrar" |
+| Ver reportes | Gráficos + tablas lado a lado | Gráficos apilados, scroll vertical |
+| Cobrar por WhatsApp | Click en botón, se abre WhatsApp web | Tap en botón, se abre WhatsApp nativo |
+| Escanear código | Webcam (si tiene) | Cámara del celular (nativo, rápido) |
+
+### Optimizaciones móviles
+
+- Botones grandes (mínimo 48px) para dedos, no para mouse
+- Gestos: swipe left en un producto para editar stock, swipe right para ver detalle
+- Pull-to-refresh para sincronizar manualmente
+- Indicador de estado de conexión siempre visible (verde = online, gris = offline)
+- Notificaciones push nativas (inventario bajo, venta grande, anomalía, resumen del día)
+- Modo landscape para tablets (layout de 2 columnas, similar a escritorio)
+
+---
+
+## WhatsApp como Canal de Salida (No Interfaz)
+
+WhatsApp no es donde el usuario trabaja. Es donde Nala le **envía cosas** y donde el usuario **ejecuta cobros**. La diferencia es importante.
+
+### Lo que sale por WhatsApp
+
+| Qué | Cuándo | Cómo |
+|---|---|---|
+| Resumen diario | 9pm automático | Mensaje con: ventas, ganancia, top producto, alertas. Generado por Nala, enviado vía push o Twilio |
+| Resumen semanal | Lunes 8am | Comparativa semanal, tendencias, recomendaciones |
+| Cobro a cliente | Cuando el usuario toca "Cobrar" | Link wa.me con mensaje personalizado. El usuario toca y envía desde su WhatsApp |
+| Recibo de venta | Cuando el usuario toca "Enviar recibo" | PDF generado + link wa.me |
+| Campaña de marketing | Cuando el usuario la lanza desde Nala | Lista de mensajes personalizados listos para enviar por lista de difusión |
+| Reporte al contador | Cuando el usuario toca "Enviar al contador" | PDF/Excel adjunto + link wa.me |
+| Alerta crítica | Cuando ocurre (stock agotado, anomalía grave) | Push notification + opcionalmente WhatsApp |
+
+### Lo que NO pasa por WhatsApp
+
+- Registrar ventas (eso se hace en la app)
+- Gestionar inventario (eso se hace en la app)
+- Ver reportes completos (eso se hace en la app)
+- Configurar el sistema (eso se hace en la app)
+- Consultar clientes (eso se hace en la app)
+
+WhatsApp es el **mensajero**, no el **cerebro**.
+
+---
+
+## Inteligencia Integrada en Cada Pantalla
+
+La IA no es un módulo. Es una capa que enriquece cada pantalla del producto.
+
+### Cómo se ve en cada pantalla
+
+| Pantalla | Sin IA (Fina) | Con IA integrada (Nala) |
+|---|---|---|
+| **Inventario** | Lista de productos con stock | Cada producto tiene: "Se acaba en ~X días". Productos muertos marcados en gris. Semáforo de estado |
+| **Dashboard** | Número de ventas del día | "Vendiste 12% más que el martes pasado. Tu mejor hora fue 10-11am. Mañana es miércoles, históricamente tu mejor día" |
+| **Clientes** | Lista de nombres | Badges automáticos (VIP, en riesgo). "María no viene hace 12 días, normalmente viene cada 7" |
+| **Reportes** | Gráficos y tablas | Párrafo narrativo debajo de cada gráfico explicando qué significan los números y qué hacer |
+| **Cuentas por cobrar** | Lista de deudas | Ordenadas por probabilidad de cobro. "Juan siempre paga cuando le recuerdas. Pedro tiene 3 deudas vencidas" |
+| **Ventas** | Historial de transacciones | "3 anulaciones hoy, el promedio es 0.2. Revisar cajero Juan" |
+| **Producto individual** | Nombre, precio, stock | "Este producto tiene margen de 45% y se vende 3 veces al día. Es tu #2 más rentable" |
+
+### Cómo se implementa
+
+- Los insights se calculan en el backend con queries SQL + lógica simple (no necesita ML complejo para el 80% de los casos)
+- Los reportes narrativos usan GPT-4o-mini / Claude Haiku (costo ~$0.001 por generación)
+- Se pre-calculan en batch (no en tiempo real) para no depender de conexión
+- Se cachean localmente para funcionar offline
+- Se actualizan cuando hay sincronización
+
+---
+
+## Features Completos de Nala v1.0
+
+### Ventas
+
+- Registro de venta en 3-4 pasos (buscar/escanear → cantidad → método de pago → confirmar)
+- Funciona offline con sincronización automática
+- 7 métodos de pago: efectivo, Pago Móvil, Binance, Zinli, transferencia, Zelle, fiado
+- Gestión de mesas para restaurantes (vista visual de mesas con estado)
+- Seguimiento de repartidores
+- Control por vendedor/mesonero (quién vendió qué)
+- Descuento automático de ingredientes por receta
+- Escaneo de código de barras (cámara en móvil, webcam en escritorio)
+- Historial de ventas con filtros (fecha, vendedor, método de pago, producto)
+- Anulación de ventas con motivo obligatorio (queda en log)
+- Descuentos por porcentaje o monto fijo
+- Cotizaciones: crear, enviar por WhatsApp, convertir en venta con un click
+
+### Inventario
+
+- Productos con variantes (talla, color, referencia, modelo)
+- Fechas de vencimiento con alertas
+- Semáforo de stock: verde, amarillo, rojo, gris (sin movimiento)
+- Predicción de agotamiento por producto ("se acaba en ~X días")
+- Importación masiva desde Excel con mapeo inteligente
+- Conteo físico con escáner (escanear → confirmar cantidad → ajustar)
+- Categorías de productos (pre-configuradas por tipo de negocio, editables)
+- Recetas con cálculo de costo automático (restaurantes)
+- Alertas de productos muertos (sin movimiento 60+ días)
+- Análisis de rentabilidad: margen, rotación, score, junto a cada producto
+- Edición inline en tabla (click/tap para editar precio o stock)
+
+### Clientes y CRM
+
+- Perfil automático: historial, frecuencia, ticket promedio, productos favoritos, saldo
+- Segmentos automáticos: VIP, frecuentes, en riesgo, nuevos, con deuda, inactivos
+- Badges visuales en toda la app (al ver un cliente en cualquier pantalla)
+- Ficha completa con timeline de compras y gráfico de gasto
+- Notas del vendedor por cliente
+- Cobro por WhatsApp desde la ficha del cliente (un toque)
+- Campañas por segmento: seleccionar segmento → generar mensajes → enviar por WhatsApp
+
+### Cuentas
+
+- Por cobrar y por pagar en vista dividida
+- Código de color por antigüedad
+- Cobro masivo por WhatsApp ("Cobrar a todos los vencidos")
+- Registro de pagos con conciliación básica
+- Resumen: total por cobrar, total por pagar, balance neto
+- Historial de pagos por cliente/proveedor
+
+### Reportes
+
+- 7 reportes pre-construidos con gráficos + tablas + narrativa IA
+- Selector de periodo flexible
+- Exportación PDF y Excel
+- Envío al contador por WhatsApp
+- Comparativas automáticas (periodo actual vs anterior)
+- Todos los montos en USD + Bs. (tasa BCV)
+
+### Contabilidad
+
+- Catálogo de cuentas pre-configurado (editable)
+- Asientos automáticos desde ventas/compras/gastos
+- Exportación: PDF libro diario, Excel contable, formatos Galac/Profit Plus/Saint
+- Libros de compras/ventas formato SENIAT
+- Portal del contador (URL dedicada, solo lectura)
+
+### Seguridad
+
+- 2FA por email
+- 5 roles: Dueño, Gerente, Cajero, Inventarista, Contador
+- Log de actividad completo
+- Backups automáticos con indicador visible
+- Cierre de sesión por inactividad
+- Tasa BCV automática
+
+### Plataforma
+
+- PWA instalable (<500KB, <2s en 3G)
+- Offline-first con sincronización automática
+- Responsive: escritorio completo + móvil optimizado + tablet
+- Notificaciones push
+- WhatsApp como canal de salida (cobros, reportes, alertas, recibos)
+- Escaneo de código de barras vía cámara
+
+---
+
+## Lo que NO tiene en v1.0
+
+| Feature | Por qué esperar |
 |---|---|
-| API REST pública | Ningún usuario de $25/mes la usaría |
-| Webhooks | Mismo motivo |
-| Tienda online / e-commerce | Requiere fotos de productos, precios online, logística. El usuario no está listo |
-| Multi-sucursal | Solo relevante para <5% del mercado. Se agrega después |
-| Dashboards personalizables | El usuario no quiere personalizar. Quiere que funcione |
-| Chatbot IA | El usuario prefiere hablar con una persona. El soporte humano es el diferenciador |
-| Nómina | Complejidad legal alta, valor percibido bajo |
-| Programa de lealtad complejo | Demasiada configuración. En v2 se puede agregar como "Compra 10, el 11 gratis" |
-| Integración con marketplaces | Mercado venezolano en marketplaces es mínimo |
-| Modo conversacional / chat UI | Suena futurista pero confunde al usuario promedio hoy |
-| Embedded finance / préstamos | Requiere licencia financiera. No es viable en v1 |
-
-Estos features se agregan en v2, v3, etc., cuando el usuario base ya esté cómodo y los pida.
+| API REST / Webhooks | Se agrega en v3 cuando haya demanda de integraciones |
+| Tienda online | Requiere ecosistema de e-commerce. v3 |
+| Multi-sucursal | <5% del mercado. v3 |
+| Nómina | Complejidad legal. Fuera de scope |
+| Programa de lealtad | v2, versión simple ("Compra 10, el 11 gratis") |
+| Integración con marketplaces | Mercado mínimo en Venezuela |
+| Embedded finance / préstamos | Requiere licencia financiera |
+| Chatbot / modo conversacional | Nala es una app, no un bot |
 
 ---
 
 ## Modelo de Negocio
 
-### Pricing
-
-| Plan | Precio | Qué incluye |
+| Plan | Precio | Incluye |
 |---|---|---|
-| **Gratis** | $0/mes | 1 usuario, 50 productos, ventas ilimitadas, offline, reportes básicos. Sin límite de tiempo |
-| **Pro** | $19/mes | Usuarios ilimitados, productos ilimitados, IA (alertas inteligentes, predicciones), cobros por WhatsApp, exportación contable, 2FA, roles |
-| **Negocio** | $35/mes | Todo Pro + soporte prioritario por WhatsApp, onboarding asistido, reportes avanzados, segmentación de clientes, campañas WhatsApp |
-
-### Por qué un plan gratis
-
-- Fina no tiene plan gratis. Loyverse sí. Wave sí. Square sí
-- El plan gratis es el mejor marketing en un mercado donde la gente desconfía de pagar por software
-- El usuario prueba gratis, se acostumbra, y cuando necesita más (segundo empleado, más productos, alertas inteligentes), paga
-- El plan gratis también genera boca a boca: "Usa Nala, es gratis"
-- Costo de servir un usuario gratis: mínimo (PWA, sin servidor pesado, sin soporte humano incluido)
-
-### Monetización futura (v2+)
-
-| Fuente | Detalle |
-|---|---|
-| Comisión por cobros | Si Nala procesa pagos (Pago Móvil C2P integrado), cobra 1-2% por transacción |
-| Exportación contable premium | Plantillas específicas para Galac, Profit Plus, Saint |
-| Multi-sucursal | Add-on de $10/mes por sucursal adicional |
-| Tienda online | Add-on de $15/mes cuando se lance |
+| **Gratis** | $0/mes | 1 usuario, 50 productos, ventas ilimitadas, offline, dashboard básico, inventario |
+| **Pro** | $19/mes | Usuarios ilimitados, productos ilimitados, inteligencia (predicciones, alertas, narrativas), 5 roles, cobros WhatsApp, exportación contable, 2FA, reportes completos |
+| **Negocio** | $35/mes | Todo Pro + soporte prioritario, onboarding asistido, portal del contador, campañas WhatsApp, segmentación de clientes, cotizaciones |
 
 ---
 
-## Diferenciadores vs Fina
-
-| Aspecto | Fina | Nala |
-|---|---|---|
-| Instalación | Navegador web | PWA instalable (ícono en pantalla, se siente como app) |
-| Offline | No funciona sin internet | Funciona completamente offline |
-| Velocidad | Depende de conexión | <2 segundos en 3G, instantáneo offline |
-| Onboarding | 3 pasos + asistencia humana | 1 pregunta + auto-configuración por IA. Humano disponible si quiere |
-| Reportes | Dashboard que el usuario debe abrir | Llegan solos por WhatsApp |
-| Cobros | Manual (el usuario busca quién debe y escribe) | Un toque: "Cobrar a todos" → WhatsApp listo |
-| Tasa de cambio | Manual | BCV automática |
-| Roles | No tiene | Dueño vs Empleado (simple, sin configuración) |
-| Seguridad | Básica | 2FA + log de actividad + backups visibles |
-| Inteligencia | No tiene | Alertas inteligentes, predicciones, anomalías (todo invisible) |
-| Clientes | Registro básico | Perfil automático con historial, frecuencia, segmentos |
-| Contabilidad | No tiene | Exportación con formato contable + envío por WhatsApp al contador |
-| Precio | $30-35/mes | Gratis + $19/mes + $35/mes |
-| Marketing | SMS (nadie usa SMS) | WhatsApp (donde está la gente) |
-
----
-
-## Stack Técnico Sugerido
+## Stack Técnico
 
 | Capa | Tecnología | Por qué |
 |---|---|---|
-| Frontend | PWA con Nuxt 3 (Vue) o Next.js (React) | SSR + PWA nativo. Offline-first con Service Workers. Ligero |
-| Base de datos local | IndexedDB (vía Dexie.js) | Almacenamiento offline en el navegador. Sincronización cuando hay internet |
-| Backend | Node.js / Bun + Hono o Fastify | Ligero, rápido, TypeScript nativo |
-| Base de datos | PostgreSQL + pgvector | Relacional sólido. pgvector para búsqueda semántica futura |
-| Cache | Redis | Sesiones, cache de tasa BCV, colas de sincronización |
-| Storage | MinIO (S3-compatible) | Fotos de productos, PDFs de reportes, backups |
-| IA | GPT-4o-mini / Claude Haiku vía API | Reportes narrativos, clasificación de negocios, detección de anomalías. Costo: ~$0.001 por consulta |
-| Tasa BCV | Scraper o API pública | Actualización diaria automática |
-| Notificaciones | Web Push API + Twilio (SMS fallback) | Push gratis vía PWA. SMS como respaldo |
-| WhatsApp | Links wa.me (v1) → Twilio/BSP (v2) | Sin dependencia de Meta API en v1. Migración transparente en v2 |
-| Hosting | Hetzner (hel1) | Económico, confiable, ya lo usamos en la infra actual |
-| CI/CD | GitHub Actions + Coolify | Deploy automático. Ya tenemos Coolify en el control plane |
+| Frontend | Nuxt 3 (Vue) PWA | SSR + offline-first. Responsive nativo. TypeScript. Ligero |
+| DB local | IndexedDB (Dexie.js) | Almacenamiento offline, sincronización |
+| Backend | Node.js + Hono/Fastify | Rápido, TypeScript, ligero |
+| Base de datos | PostgreSQL + pgvector | Relacional sólido, búsqueda semántica futura |
+| Cache | Redis | Sesiones, tasa BCV, colas |
+| Storage | MinIO | Fotos, PDFs, backups |
+| IA | GPT-4o-mini / Claude Haiku | Narrativas, clasificación, anomalías (~$0.001/consulta) |
+| Tasa BCV | Scraper / API pública | Actualización diaria |
+| Notificaciones | Web Push + Twilio fallback | Push gratis, SMS como respaldo |
+| WhatsApp | Links wa.me (v1) → BSP (v2) | Sin dependencia Meta API en v1 |
+| Hosting | Hetzner (hel1) | Económico, ya tenemos infra |
+| CI/CD | GitHub Actions + Coolify | Deploy automático |
 
 ---
 
 ## Roadmap
 
-### v1.0 - MVP (3-4 meses)
+### v1.0 - Producto Completo (4-5 meses)
 
-**Objetivo:** Reemplazar el cuaderno y Excel. Que el dueño pueda vender, saber cuánto tiene, y cobrar.
-
-- PWA offline-first
-- Registro de ventas (3-4 toques)
-- Inventario básico con alertas
-- Cuentas por cobrar/pagar
-- Cobro por WhatsApp (generador de mensajes)
-- Resumen diario por notificación push
+- PWA offline-first con experiencia completa en escritorio y móvil
+- Ventas con todos los métodos de pago + escaneo de código de barras
+- Inventario con variantes, vencimiento, semáforo, predicciones
+- Clientes con perfil automático y segmentos
+- Cuentas por cobrar/pagar con cobro por WhatsApp
+- Reportes pre-construidos con gráficos + narrativa IA
+- Exportación contable + portal del contador
+- 5 roles, 2FA, log de actividad
 - Tasa BCV automática
-- 2 roles: Dueño / Empleado
 - Plan gratis funcional
-
-### v1.5 - Inteligencia (2 meses después)
-
-**Objetivo:** Que Nala le diga al dueño qué hacer, sin que pregunte.
-
-- Alertas inteligentes con contexto ("Harina PAN se acaba en 2 días")
-- Perfil de cliente automático
-- Segmentación de clientes
-- Resumen diario/semanal por WhatsApp
-- Detección de anomalías básica
-- Comparativas automáticas (semana vs semana)
-- Exportación contable (PDF/Excel con formato)
 
 ### v2.0 - Crecimiento (3 meses después)
 
-**Objetivo:** Features que generan ingresos adicionales y retienen usuarios Pro.
-
-- Integración Pago Móvil C2P (cobro directo desde Nala)
+- Integración Pago Móvil C2P
 - Campañas WhatsApp con segmentación
-- Plantillas contables para Galac/Profit Plus
-- Escáner de código de barras
-- Reportes narrativos con IA
-- Programa de lealtad simple ("Compra 10, el 11 gratis")
-- Log de actividad completo
-
-### v3.0 - Escala (6 meses después)
-
-**Objetivo:** Expandir a negocios más grandes y preparar para otros países.
-
-- Multi-sucursal
-- API REST (para integraciones de terceros)
-- Tienda online básica
+- Cotizaciones con aprobación online
+- Programa de lealtad simple
 - Órdenes de compra a proveedores
-- Portal del contador
-- Onboarding para otros países LATAM (Colombia, Ecuador, Perú)
+- Escáner OCR de recibos/facturas
+
+### v3.0 - Escala (4 meses después)
+
+- Multi-sucursal con transferencias
+- API REST pública
+- Tienda online básica
+- Expansión LATAM (Colombia, Ecuador, Perú)
 
 ---
 
-## Resumen en Una Frase
+## Resumen
 
-> **Nala es el sistema administrativo que le llega al dueño por WhatsApp, funciona sin luz, y le dice qué hacer sin que pregunte.**
+> **Nala es un sistema administrativo completo que se siente moderno, funciona sin internet, y tiene inteligencia integrada en cada pantalla. WhatsApp es su mensajero, no su interfaz. Es potente en escritorio y en el bolsillo.**
 
-No es "Fina con más features". Es una experiencia completamente diferente construida sobre la misma verdad: la gente quiere menos problemas, no más software.
+No es un bot. No es un chatbot. No es "WhatsApp con features". Es una aplicación profesional diseñada para que un dueño de negocio venezolano tenga en sus manos lo que antes solo tenían empresas grandes, pero sin la complejidad que viene con eso.
