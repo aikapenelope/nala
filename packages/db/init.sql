@@ -34,6 +34,31 @@ ALTER TABLE activity_log ENABLE ROW LEVEL SECURITY;
 CREATE POLICY activity_log_tenant_isolation ON activity_log
   USING (business_id = current_business_id());
 
+-- Categories: scoped to the current business
+ALTER TABLE categories ENABLE ROW LEVEL SECURITY;
+CREATE POLICY categories_tenant_isolation ON categories
+  USING (business_id = current_business_id());
+
+-- Units of measure: scoped to the current business
+ALTER TABLE units_of_measure ENABLE ROW LEVEL SECURITY;
+CREATE POLICY units_of_measure_tenant_isolation ON units_of_measure
+  USING (business_id = current_business_id());
+
+-- Products: scoped to the current business
+ALTER TABLE products ENABLE ROW LEVEL SECURITY;
+CREATE POLICY products_tenant_isolation ON products
+  USING (business_id = current_business_id());
+
+-- Product variants: scoped to the current business
+ALTER TABLE product_variants ENABLE ROW LEVEL SECURITY;
+CREATE POLICY product_variants_tenant_isolation ON product_variants
+  USING (business_id = current_business_id());
+
+-- Price history: scoped to the current business
+ALTER TABLE price_history ENABLE ROW LEVEL SECURITY;
+CREATE POLICY price_history_tenant_isolation ON price_history
+  USING (business_id = current_business_id());
+
 -- ============================================================
 -- Note: The application connects as a role that has RLS enforced.
 -- Superuser/admin connections bypass RLS for migrations and seeds.
