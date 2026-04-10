@@ -7,7 +7,7 @@ on:
 
 jobs:
   check:
-    name: Typecheck + Lint + Build
+    name: Typecheck + Lint + Test + Build
     runs-on: ubuntu-latest
 
     services:
@@ -48,6 +48,12 @@ jobs:
 
       - name: Lint
         run: npx turbo lint
+
+      - name: Test
+        run: npx turbo test
+        env:
+          DATABASE_URL: postgresql://nova:test@localhost:5432/nova_test
+          REDIS_URL: redis://localhost:6379
 
       - name: Build
         run: npx turbo build
