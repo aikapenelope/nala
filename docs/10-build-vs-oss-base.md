@@ -57,7 +57,7 @@
 | **Tasa BCV automática** | Específico de Venezuela | No existe | Custom development |
 | **Gamificación** | Ranking, metas, rachas para vendedores | No tiene | Custom development |
 | **Velocidad** | <2s en 3G | ERPNext es notoriamente lento. Usuarios reportan problemas de performance con bases de datos grandes | Problema estructural |
-| **Stack** | Nuxt 3 (Vue), TypeScript, PostgreSQL | Python (Frappe), MariaDB, jQuery | Stack completamente diferente al que queremos |
+| **Stack** | Nuxt 4 (Vue 3), TypeScript, PostgreSQL | Python (Frappe), MariaDB, jQuery | Stack completamente diferente al que queremos |
 
 **El problema fundamental:** ERPNext es un ERP que hay que simplificar. Nala es un producto simple que tiene que ser potente. Son filosofías opuestas. Simplificar ERPNext es más trabajo que construir Nala desde cero, porque tienes que:
 
@@ -89,7 +89,7 @@ Mismos problemas que ERPNext, más:
 
 | Aspecto | Ventaja |
 |---|---|
-| **Control total del stack** | Nuxt 3 + TypeScript + PostgreSQL. El stack que conocemos y que es óptimo para PWA offline-first |
+| **Control total del stack** | Nuxt 4  TypeScript + PostgreSQL. El stack que conocemos y que es óptimo para PWA offline-first |
 | **PWA offline-first nativa** | No es un parche sobre un ERP web. Es la arquitectura desde el día 1 |
 | **Simplicidad real** | No hay que esconder nada. Cada pantalla se diseña para el usuario target |
 | **Velocidad** | Sin el overhead de un framework ERP. Queries directas a PostgreSQL. <2s en 3G |

@@ -76,11 +76,11 @@ Nala no es un sistema contable. Es un puente: genera la información que el cont
 
 | Capa | Tecnología |
 |---|---|
-| Frontend | SvelteKit (Svelte 5) o Nuxt 3 (Vue) -- decisión al iniciar dev. PWA con Service Workers |
+| Frontend | Nuxt 4 (Vue 3), PWA con Service Workers |
 | DB local | IndexedDB (Dexie.js) -- cache local + cola de operaciones offline |
 | Backend | Hono (TypeScript, 14KB, ultra-rápido) |
 | Base de datos | PostgreSQL, pgvector |
-| Cache | Redis |
+| Cache | Redis 7 (ya en data plane 10.0.1.20) |
 | Storage | MinIO (S3-compatible) |
 | IA | OpenRouter (GPT-4o-mini primary), Groq (fallback) |
 | WhatsApp | Meta Cloud API directo |
@@ -123,7 +123,8 @@ Nala no es un sistema contable. Es un puente: genera la información que el cont
 | [12 - Pipeline OCR en detalle](docs/12-ocr-pipeline-detalle.md) | Flujo completo de lectura de facturas, matching, validación, código, fallos y costos LLM |
 | [13 - Cierre contable, migración, multi-tenant, PWA](docs/13-cierre-contable-migracion-multitenant-pwa.md) | Cuadre de caja con gap de ventas no registradas, importación desde legacy, PostgreSQL RLS, PWA como centro de acción vs desktop como centro de análisis |
 | [14 - Experiencia desktop vs móvil](docs/14-experiencia-desktop-vs-movil.md) | Cómo lo hacen Square/Shopify/Lightspeed, datos de uso real, wireframes de cada pantalla, tabla de funcionalidades por dispositivo, principios de diseño, implementación técnica |
-| [15 - Catálogo, stack técnico, estrategia offline](docs/15-catalogo-stack-offline.md) | Página de catálogo para clientes, SvelteKit vs Nuxt, por qué IndexedDB, por qué Hono, online-first con cache agresivo vs offline-first puro |
+| [15 - Catálogo, stack técnico, estrategia offline](docs/15-catalogo-stack-offline.md) | Página de catálogo para clientes, Nuxt 4 decisión final, por qué IndexedDB, por qué Hono, online-first con cache agresivo |
+| [16 - Fina vs Nala + estructura dashboard](docs/16-fina-vs-nala-dashboard-estructura.md) | Comparación feature por feature, qué dejamos fuera y por qué, wireframes del dashboard desktop/móvil, estructura de navegación completa con flujos |
 
 ## Licencia
 
