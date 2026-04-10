@@ -127,6 +127,7 @@ Nova no es un sistema contable. Es un puente: genera la información que el cont
 | [16 - Fina vs Nova + estructura dashboard](docs/16-fina-vs-nala-dashboard-estructura.md) | Comparación feature por feature, qué dejamos fuera y por qué, wireframes del dashboard desktop/móvil, estructura de navegación completa con flujos |
 | [17 - Dashboard rediseño basado en investigación](docs/17-dashboard-rediseno-investigacion.md) | Patrones de Square/Shopify/F1Studioz 2026, progressive disclosure, alertas accionables, qué quitar y qué dejar del dashboard, principios de diseño |
 | [18 - Roadmap de desarrollo y producción](docs/18-roadmap-desarrollo-produccion.md) | 10 fases de desarrollo (18 semanas), estructura monorepo, CI/CD, testing, monitoreo, prácticas de producción |
+| [19 - WhatsApp arquitectura y seguridad](docs/19-whatsapp-arquitectura-seguridad.md) | Alcance exacto (qué sí y qué no por WhatsApp), flujo completo de un mensaje, identificación por teléfono, seguridad, código del webhook, cuándo implementar |
 
 ## Licencia
 
