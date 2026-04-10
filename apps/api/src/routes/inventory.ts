@@ -31,6 +31,14 @@ import type { AppEnv } from "../types";
 
 const inventory = new Hono<AppEnv>();
 
+/**
+ * Escape LIKE/ILIKE special characters in user input.
+ * Prevents `%` and `_` from acting as wildcards in search queries.
+ */
+function escapeLike(input: string): string {
+  return input.replace(/[%_\\]/g, "\\$&");
+}
+
 // ============================================================
 // Products
 // ============================================================
@@ -49,7 +57,8 @@ const listProductsQuery = z.object({
  *
  * Supports:
  * - Full-text search by name (pg_trgm fuzzy match via ILIKE)
- * - Filter by category, stock semaphore status
+ * - Filter by category
+ * - Filter by stock semaphore status (applied in DB via CASE expression)
  * - Pagination with page/limit
  * - Returns semaphore color for each product
  */
@@ -73,7 +82,42 @@ inventory.get(
     }
 
     if (search) {
-      conditions.push(ilike(products.name, `%${search}%`));
+      conditions.push(ilike(products.name, `%${escapeLike(search)}%`));
+    }
+
+    // Filter by semaphore status in SQL to get correct pagination.
+    // The semaphore logic mirrors calculateStockSemaphore() from @nova/shared.
+    if (status) {
+      switch (status) {
+        case "gray":
+          // No movement in 60+ days
+          conditions.push(
+            sql`${products.lastSoldAt} IS NOT NULL AND ${products.lastSoldAt} < NOW() - INTERVAL '60 days'`,
+          );
+          break;
+        case "red":
+          // Stock at or below critical (and not gray)
+          conditions.push(sql`${products.stock} <= ${products.stockCritical}`);
+          conditions.push(
+            sql`(${products.lastSoldAt} IS NULL OR ${products.lastSoldAt} >= NOW() - INTERVAL '60 days')`,
+          );
+          break;
+        case "yellow":
+          // Stock between critical and min (and not gray)
+          conditions.push(sql`${products.stock} > ${products.stockCritical}`);
+          conditions.push(sql`${products.stock} <= ${products.stockMin}`);
+          conditions.push(
+            sql`(${products.lastSoldAt} IS NULL OR ${products.lastSoldAt} >= NOW() - INTERVAL '60 days')`,
+          );
+          break;
+        case "green":
+          // Stock above min (and not gray)
+          conditions.push(sql`${products.stock} > ${products.stockMin}`);
+          conditions.push(
+            sql`(${products.lastSoldAt} IS NULL OR ${products.lastSoldAt} >= NOW() - INTERVAL '60 days')`,
+          );
+          break;
+      }
     }
 
     // Query products
@@ -85,13 +129,13 @@ inventory.get(
       .limit(limit)
       .offset(offset);
 
-    // Count total for pagination
+    // Count total for pagination (same conditions, correct count)
     const [countResult] = await db
       .select({ count: sql<number>`count(*)::int` })
       .from(products)
       .where(and(...conditions));
 
-    // Add semaphore color and filter by status if requested
+    // Add semaphore color to response
     const enriched = rows.map((p) => ({
       ...p,
       semaphore: calculateStockSemaphore(
@@ -102,12 +146,8 @@ inventory.get(
       ),
     }));
 
-    const filtered = status
-      ? enriched.filter((p) => p.semaphore === status)
-      : enriched;
-
     return c.json({
-      products: filtered,
+      products: enriched,
       total: countResult?.count ?? 0,
       page,
       limit,
@@ -170,6 +210,25 @@ inventory.post(
     const db = c.get("db");
     const businessId = c.get("businessId");
 
+    // Validate categoryId exists if provided
+    if (data.categoryId) {
+      const [cat] = await db
+        .select({ id: categories.id })
+        .from(categories)
+        .where(
+          and(
+            eq(categories.id, data.categoryId),
+            eq(categories.businessId, businessId),
+            eq(categories.isActive, true),
+          ),
+        )
+        .limit(1);
+
+      if (!cat) {
+        return c.json({ error: "Category not found" }, 400);
+      }
+    }
+
     const [product] = await db
       .insert(products)
       .values({
@@ -222,6 +281,25 @@ inventory.patch(
 
     if (!current) {
       return c.json({ error: "Product not found" }, 404);
+    }
+
+    // Validate categoryId if being changed
+    if (data.categoryId) {
+      const [cat] = await db
+        .select({ id: categories.id })
+        .from(categories)
+        .where(
+          and(
+            eq(categories.id, data.categoryId),
+            eq(categories.businessId, businessId),
+            eq(categories.isActive, true),
+          ),
+        )
+        .limit(1);
+
+      if (!cat) {
+        return c.json({ error: "Category not found" }, 400);
+      }
     }
 
     // Build update values, only including fields that were provided
@@ -312,6 +390,23 @@ inventory.post(
     const data = c.req.valid("json");
     const db = c.get("db");
     const businessId = c.get("businessId");
+
+    // Validate parent product exists and belongs to this business
+    const [parent] = await db
+      .select({ id: products.id })
+      .from(products)
+      .where(
+        and(
+          eq(products.id, productId),
+          eq(products.businessId, businessId),
+          eq(products.isActive, true),
+        ),
+      )
+      .limit(1);
+
+    if (!parent) {
+      return c.json({ error: "Product not found" }, 404);
+    }
 
     const [variant] = await db
       .insert(productVariants)
