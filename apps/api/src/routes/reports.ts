@@ -660,4 +660,175 @@ reports.get(
   },
 );
 
+// ============================================================
+// Smart Alerts
+// ============================================================
+
+/** Alert severity levels. */
+type AlertSeverity = "critical" | "warning" | "info";
+
+interface SmartAlert {
+  id: string;
+  icon: string;
+  title: string;
+  suggestion: string;
+  actionLabel: string;
+  actionTo: string;
+  severity: AlertSeverity;
+}
+
+/**
+ * GET /reports/alerts - Smart actionable alerts for the dashboard.
+ *
+ * Generates alerts from real data:
+ * - Critical stock products (red semaphore) with reorder suggestion
+ * - Low stock products (yellow semaphore) with days-to-depletion estimate
+ * - Overdue receivables (>30 days) with WhatsApp collection link
+ * - Dead stock products (no movement in 60+ days)
+ */
+reports.get("/reports/alerts", async (c) => {
+  const db = c.get("db");
+  const businessId = c.get("businessId");
+  const alerts: SmartAlert[] = [];
+
+  // 1. Critical stock products (stock <= stockCritical)
+  const criticalProducts = await db
+    .select({
+      id: products.id,
+      name: products.name,
+      stock: products.stock,
+      stockCritical: products.stockCritical,
+    })
+    .from(products)
+    .where(
+      and(
+        eq(products.businessId, businessId),
+        eq(products.isActive, true),
+        sql`${products.stock} <= ${products.stockCritical}`,
+        sql`(${products.lastSoldAt} IS NULL OR ${products.lastSoldAt} >= NOW() - INTERVAL '${sql.raw(String(DEAD_STOCK_DAYS))} days')`,
+      ),
+    )
+    .limit(5);
+
+  for (const p of criticalProducts) {
+    alerts.push({
+      id: `stock-critical-${p.id}`,
+      icon: "🔴",
+      title: `${p.name}: solo ${p.stock} en stock`,
+      suggestion: "Stock critico. Pedir al proveedor urgente.",
+      actionLabel: "Ver producto",
+      actionTo: `/inventory/${p.id}`,
+      severity: "critical",
+    });
+  }
+
+  // 2. Low stock products (stock <= stockMin but > stockCritical)
+  const lowProducts = await db
+    .select({
+      id: products.id,
+      name: products.name,
+      stock: products.stock,
+    })
+    .from(products)
+    .where(
+      and(
+        eq(products.businessId, businessId),
+        eq(products.isActive, true),
+        sql`${products.stock} > ${products.stockCritical}`,
+        sql`${products.stock} <= ${products.stockMin}`,
+        sql`(${products.lastSoldAt} IS NULL OR ${products.lastSoldAt} >= NOW() - INTERVAL '${sql.raw(String(DEAD_STOCK_DAYS))} days')`,
+      ),
+    )
+    .limit(3);
+
+  for (const p of lowProducts) {
+    alerts.push({
+      id: `stock-low-${p.id}`,
+      icon: "📦",
+      title: `${p.name}: ${p.stock} unidades restantes`,
+      suggestion: "Stock bajo. Considerar reposicion.",
+      actionLabel: "Ver inventario",
+      actionTo: "/inventory?status=yellow",
+      severity: "warning",
+    });
+  }
+
+  // 3. Overdue receivables (>30 days)
+  const overdueReceivables = await db
+    .select({
+      id: accountsReceivable.id,
+      customerId: accountsReceivable.customerId,
+      balanceUsd: accountsReceivable.balanceUsd,
+      createdAt: accountsReceivable.createdAt,
+      customerName: customers.name,
+      customerPhone: customers.phone,
+    })
+    .from(accountsReceivable)
+    .innerJoin(customers, eq(accountsReceivable.customerId, customers.id))
+    .where(
+      and(
+        eq(accountsReceivable.businessId, businessId),
+        eq(accountsReceivable.status, "pending"),
+        sql`${accountsReceivable.createdAt} < NOW() - INTERVAL '${sql.raw(String(AGING_THRESHOLDS.yellow))} days'`,
+      ),
+    )
+    .orderBy(desc(sql`${accountsReceivable.balanceUsd}::numeric`))
+    .limit(3);
+
+  for (const r of overdueReceivables) {
+    const days = Math.floor(
+      (Date.now() - r.createdAt.getTime()) / (1000 * 60 * 60 * 24),
+    );
+    const hasPhone = !!r.customerPhone;
+
+    alerts.push({
+      id: `receivable-overdue-${r.id}`,
+      icon: "💰",
+      title: `${r.customerName} debe $${Number(r.balanceUsd).toFixed(2)} hace ${days} dias`,
+      suggestion: hasPhone
+        ? "Tiene telefono registrado. Puedes cobrar por WhatsApp."
+        : "Sin telefono registrado. Contactar directamente.",
+      actionLabel: hasPhone ? "Cobrar por WhatsApp" : "Ver cuentas",
+      actionTo: "/accounts",
+      severity: days > 45 ? "critical" : "warning",
+    });
+  }
+
+  // 4. Dead stock (no movement in 60+ days, but has stock)
+  const [deadCount] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(products)
+    .where(
+      and(
+        eq(products.businessId, businessId),
+        eq(products.isActive, true),
+        sql`${products.stock} > 0`,
+        sql`${products.lastSoldAt} IS NOT NULL`,
+        sql`${products.lastSoldAt} < NOW() - INTERVAL '${sql.raw(String(DEAD_STOCK_DAYS))} days'`,
+      ),
+    );
+
+  if (deadCount && deadCount.count > 0) {
+    alerts.push({
+      id: "dead-stock",
+      icon: "⚠️",
+      title: `${deadCount.count} producto${deadCount.count > 1 ? "s" : ""} sin movimiento en 60+ dias`,
+      suggestion: "Considerar descuento o liquidacion para liberar capital.",
+      actionLabel: "Ver productos",
+      actionTo: "/inventory?status=gray",
+      severity: "info",
+    });
+  }
+
+  // Sort: critical first, then warning, then info
+  const severityOrder: Record<AlertSeverity, number> = {
+    critical: 0,
+    warning: 1,
+    info: 2,
+  };
+  alerts.sort((a, b) => severityOrder[a.severity] - severityOrder[b.severity]);
+
+  return c.json({ alerts });
+});
+
 export { reports };
