@@ -16,7 +16,7 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import { eq, and, sql, desc, gte, lte } from "drizzle-orm";
+import { eq, and, sql, desc, gte, lte, inArray } from "drizzle-orm";
 import {
   createSaleSchema,
   voidSaleSchema,
@@ -35,6 +35,7 @@ import {
   activityLog,
   accountingEntries,
   accountingAccounts,
+  customers,
 } from "@nova/db";
 import { getCurrentRate } from "../services/exchange-rate";
 import type { AppEnv } from "../types";
@@ -72,7 +73,7 @@ const listSalesQuery = z.object({
 
 /** GET /sales - List sales with filters. */
 salesRoutes.get("/sales", zValidator("query", listSalesQuery), async (c) => {
-  const { date, userId, page, limit } = c.req.valid("query");
+  const { date, userId, method, page, limit } = c.req.valid("query");
   const db = c.get("db");
   const businessId = c.get("businessId");
   const offset = (page - 1) * limit;
@@ -84,12 +85,25 @@ salesRoutes.get("/sales", zValidator("query", listSalesQuery), async (c) => {
   }
 
   if (date) {
-    const dayStart = new Date(date);
-    dayStart.setHours(0, 0, 0, 0);
-    const dayEnd = new Date(date);
-    dayEnd.setHours(23, 59, 59, 999);
+    // Use UTC boundaries to avoid timezone issues.
+    // The date string is expected as YYYY-MM-DD.
+    const dayStart = new Date(`${date}T00:00:00.000Z`);
+    const dayEnd = new Date(`${date}T23:59:59.999Z`);
+    if (isNaN(dayStart.getTime())) {
+      return c.json({ error: "Invalid date format. Use YYYY-MM-DD." }, 400);
+    }
     conditions.push(gte(sales.createdAt, dayStart));
     conditions.push(lte(sales.createdAt, dayEnd));
+  }
+
+  // Filter by payment method requires a subquery on sale_payments
+  if (method) {
+    conditions.push(
+      sql`${sales.id} IN (
+        SELECT ${salePayments.saleId} FROM ${salePayments}
+        WHERE ${salePayments.method} = ${method}
+      )`,
+    );
   }
 
   const rows = await db
@@ -145,23 +159,136 @@ salesRoutes.get("/sales/:id", async (c) => {
 /**
  * POST /sales - Create a new sale.
  *
+ * Validates before inserting:
+ * - Exchange rate is available
+ * - All products exist and are active
+ * - Sufficient stock for each item
+ * - Payments cover the sale total
+ * - Fiado requires a customer
+ *
  * Atomic transaction:
- * 1. Validate items and payments
- * 2. Calculate totals (USD and Bs.)
- * 3. Insert sale, items, payments
- * 4. Decrement product stock
- * 5. If fiado: create accounts_receivable entry
- * 6. Generate accounting entries
- * 7. Log activity
+ * 1. Insert sale, items, payments
+ * 2. Decrement product stock
+ * 3. If fiado: create accounts_receivable + update customer balance
+ * 4. Generate accounting entries
+ * 5. Log activity
  */
 salesRoutes.post("/sales", zValidator("json", createSaleSchema), async (c) => {
   const data = c.req.valid("json");
   const user = c.get("user");
   const db = c.get("db");
   const businessId = c.get("businessId");
-  const rate = await getCurrentRate();
 
-  // Calculate totals
+  // 1. Get exchange rate (fail early if unavailable)
+  let rate;
+  try {
+    rate = await getCurrentRate();
+  } catch (err) {
+    const message =
+      err instanceof Error ? err.message : "Exchange rate unavailable";
+    return c.json({ error: `Cannot create sale: ${message}` }, 503);
+  }
+
+  // 2. Validate fiado requires customer
+  const hasFiado = data.payments.some((p) => p.method === "fiado");
+  if (hasFiado && !data.customerId) {
+    return c.json(
+      { error: "Fiado payment requires a customer (customerId)" },
+      400,
+    );
+  }
+
+  // 3. Validate customer exists if provided
+  if (data.customerId) {
+    const [customer] = await db
+      .select({ id: customers.id })
+      .from(customers)
+      .where(
+        and(
+          eq(customers.id, data.customerId),
+          eq(customers.businessId, businessId),
+          eq(customers.isActive, true),
+        ),
+      )
+      .limit(1);
+
+    if (!customer) {
+      return c.json({ error: "Customer not found" }, 400);
+    }
+  }
+
+  // 4. Validate all products exist, are active, and have sufficient stock
+  const productIds = [...new Set(data.items.map((i) => i.productId))];
+  const dbProducts = await db
+    .select()
+    .from(products)
+    .where(
+      and(
+        inArray(products.id, productIds),
+        eq(products.businessId, businessId),
+      ),
+    );
+
+  const productMap = new Map(dbProducts.map((p) => [p.id, p]));
+
+  for (const item of data.items) {
+    const product = productMap.get(item.productId);
+    if (!product) {
+      return c.json({ error: `Product ${item.productId} not found` }, 400);
+    }
+    if (!product.isActive) {
+      return c.json(
+        { error: `Product "${product.name}" is no longer available` },
+        400,
+      );
+    }
+
+    // Check stock (aggregate quantity per product across all items)
+    const totalQtyForProduct = data.items
+      .filter((i) => i.productId === item.productId)
+      .reduce((sum, i) => sum + i.quantity, 0);
+
+    if (product.stock < totalQtyForProduct) {
+      return c.json(
+        {
+          error: `Insufficient stock for "${product.name}": available ${product.stock}, requested ${totalQtyForProduct}`,
+        },
+        400,
+      );
+    }
+  }
+
+  // 5. Validate variant stock if applicable
+  const variantIds = data.items
+    .map((i) => i.variantId)
+    .filter((id): id is string => id !== undefined);
+
+  if (variantIds.length > 0) {
+    const dbVariants = await db
+      .select()
+      .from(productVariants)
+      .where(inArray(productVariants.id, variantIds));
+
+    const variantMap = new Map(dbVariants.map((v) => [v.id, v]));
+
+    for (const item of data.items) {
+      if (!item.variantId) continue;
+      const variant = variantMap.get(item.variantId);
+      if (!variant || !variant.isActive) {
+        return c.json({ error: `Variant ${item.variantId} not found` }, 400);
+      }
+      if (variant.stock < item.quantity) {
+        return c.json(
+          {
+            error: `Insufficient stock for variant ${item.variantId}: available ${variant.stock}, requested ${item.quantity}`,
+          },
+          400,
+        );
+      }
+    }
+  }
+
+  // 6. Validate payments cover the total
   const itemsWithTotals = data.items.map((item) => ({
     ...item,
     lineTotal: calculateLineTotal(
@@ -172,11 +299,23 @@ salesRoutes.post("/sales", zValidator("json", createSaleSchema), async (c) => {
   }));
 
   const totalUsd = calculateSaleTotal(data.items, data.discountPercent);
+  const totalPayments = data.payments.reduce((sum, p) => sum + p.amountUsd, 0);
+
+  // Allow a small tolerance for floating point rounding (1 cent)
+  if (totalPayments < totalUsd - 0.01) {
+    return c.json(
+      {
+        error: `Payments ($${totalPayments.toFixed(2)}) do not cover sale total ($${totalUsd.toFixed(2)})`,
+      },
+      400,
+    );
+  }
+
   const totalBs = Math.round(totalUsd * rate.rateBcv * 100) / 100;
 
   // Atomic transaction
   const result = await db.transaction(async (tx) => {
-    // 1. Insert sale record
+    // Insert sale record
     const [sale] = await tx
       .insert(sales)
       .values({
@@ -192,7 +331,7 @@ salesRoutes.post("/sales", zValidator("json", createSaleSchema), async (c) => {
       })
       .returning();
 
-    // 2. Insert sale items
+    // Insert sale items
     await tx.insert(saleItems).values(
       itemsWithTotals.map((item) => ({
         saleId: sale.id,
@@ -205,7 +344,7 @@ salesRoutes.post("/sales", zValidator("json", createSaleSchema), async (c) => {
       })),
     );
 
-    // 3. Insert sale payments
+    // Insert sale payments
     await tx.insert(salePayments).values(
       data.payments.map((payment) => ({
         saleId: sale.id,
@@ -219,7 +358,7 @@ salesRoutes.post("/sales", zValidator("json", createSaleSchema), async (c) => {
       })),
     );
 
-    // 4. Decrement product stock for each item
+    // Decrement product stock for each item
     for (const item of data.items) {
       if (item.variantId) {
         await tx
@@ -241,7 +380,7 @@ salesRoutes.post("/sales", zValidator("json", createSaleSchema), async (c) => {
         .where(eq(products.id, item.productId));
     }
 
-    // 5. If fiado payment, create accounts_receivable
+    // If fiado payment, create accounts_receivable and update customer balance
     const fiadoPayment = data.payments.find((p) => p.method === "fiado");
     if (fiadoPayment && data.customerId) {
       await tx.insert(accountsReceivable).values({
@@ -251,10 +390,34 @@ salesRoutes.post("/sales", zValidator("json", createSaleSchema), async (c) => {
         amountUsd: String(fiadoPayment.amountUsd),
         balanceUsd: String(fiadoPayment.amountUsd),
       });
+
+      // Update customer balance
+      await tx
+        .update(customers)
+        .set({
+          balanceUsd: sql`${customers.balanceUsd}::numeric + ${fiadoPayment.amountUsd}`,
+          totalPurchases: sql`${customers.totalPurchases} + 1`,
+          totalSpentUsd: sql`${customers.totalSpentUsd}::numeric + ${totalUsd}`,
+          averageTicketUsd: sql`(${customers.totalSpentUsd}::numeric + ${totalUsd}) / (${customers.totalPurchases} + 1)`,
+          lastPurchaseAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(customers.id, data.customerId));
+    } else if (data.customerId) {
+      // Non-fiado sale with customer: update purchase stats only
+      await tx
+        .update(customers)
+        .set({
+          totalPurchases: sql`${customers.totalPurchases} + 1`,
+          totalSpentUsd: sql`${customers.totalSpentUsd}::numeric + ${totalUsd}`,
+          averageTicketUsd: sql`(${customers.totalSpentUsd}::numeric + ${totalUsd}) / (${customers.totalPurchases} + 1)`,
+          lastPurchaseAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(customers.id, data.customerId));
     }
 
-    // 6. Generate accounting entries (revenue)
-    // Find the sales revenue account and cash/bank account
+    // Generate accounting entries (revenue)
     const revenueAccounts = await tx
       .select()
       .from(accountingAccounts)
@@ -290,7 +453,7 @@ salesRoutes.post("/sales", zValidator("json", createSaleSchema), async (c) => {
       });
     }
 
-    // 7. Log activity
+    // Log activity
     await tx.insert(activityLog).values({
       businessId,
       userId: user.id,
