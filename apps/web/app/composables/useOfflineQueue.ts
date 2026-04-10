@@ -8,15 +8,19 @@
  * The server is always the source of truth. If a conflict
  * occurs (e.g., product out of stock), the server rejects
  * the sale and the user is notified.
+ *
+ * Connected to: POST /api/sales
  */
 
 import type { PendingSale } from "./useOfflineDb";
 
 export function useOfflineQueue() {
   const { db, isAvailable } = useOfflineDb();
+  const { $api } = useApi();
   const pendingCount = ref(0);
   const isSyncing = ref(false);
   const isOnline = ref(true);
+  const lastSyncError = ref<string | null>(null);
 
   /** Check online status. */
   function updateOnlineStatus() {
@@ -72,11 +76,13 @@ export function useOfflineQueue() {
   /**
    * Sync all pending sales to the server.
    * Sends in FIFO order (oldest first).
+   * Stops on first server rejection to maintain order.
    */
   async function syncPendingSales() {
     if (!isAvailable || !db || isSyncing.value) return;
 
     isSyncing.value = true;
+    lastSyncError.value = null;
 
     try {
       const pending = await db.pendingSales
@@ -86,13 +92,35 @@ export function useOfflineQueue() {
 
       for (const sale of pending) {
         try {
-          // TODO: POST to /api/sales with sale data
-          // await $fetch('/api/sales', { method: 'POST', body: sale });
+          // POST to /api/sales with the queued sale data
+          await $api("/api/sales", {
+            method: "POST",
+            body: {
+              items: sale.items.map((item) => ({
+                productId: item.productId,
+                quantity: item.quantity,
+                unitPrice: item.price,
+                discountPercent: item.discount,
+              })),
+              payments: [
+                {
+                  method: sale.paymentMethod,
+                  amountUsd: sale.total,
+                },
+              ],
+              customerId: sale.customerId,
+              discountPercent: 0,
+            },
+          });
 
-          // Mark as synced
+          // Mark as synced on success
           await db.pendingSales.update(sale.id, { synced: true });
-        } catch {
-          // If server rejects, stop syncing (don't skip ahead)
+        } catch (err) {
+          // If server rejects, record the error and stop syncing
+          // (don't skip ahead -- maintain FIFO order)
+          const fetchError = err as { data?: { error?: string } };
+          lastSyncError.value =
+            fetchError.data?.error ?? "Error sincronizando venta";
           break;
         }
       }
@@ -113,6 +141,7 @@ export function useOfflineQueue() {
     pendingCount: readonly(pendingCount),
     isSyncing: readonly(isSyncing),
     isOnline: readonly(isOnline),
+    lastSyncError: readonly(lastSyncError),
     init,
     queueSale,
     syncPendingSales,

@@ -5,13 +5,16 @@
  * Design: Grid of products (most sold first) + active ticket on the right.
  * Mobile: product grid fills screen, ticket slides up from bottom.
  *
- * Flow: tap product → adds to ticket → tap "Cobrar $XX" → checkout.
+ * Flow: tap product -> adds to ticket -> tap "Cobrar $XX" -> checkout.
  * 3-4 taps to complete a sale.
+ *
+ * Connected to: GET /api/products (loads real product grid)
  */
 
 import { calculateLineTotal, calculateSaleTotal } from "@nova/shared";
 
 const { isDesktop } = useDevice();
+const { $api } = useApi();
 
 /** Active ticket items. */
 interface TicketItem {
@@ -21,31 +24,47 @@ interface TicketItem {
   quantity: number;
   unitPrice: number;
   discountPercent: number;
+  maxStock: number;
 }
 
 const ticketItems = ref<TicketItem[]>([]);
 const searchQuery = ref("");
-const showCheckout = ref(false);
+const isLoadingProducts = ref(true);
 
-/** Mock products for the grid. Ordered by frequency (most sold first). */
-const gridProducts = ref([
-  { id: "1", name: "Pan Campesino", price: 1.5, stock: 200 },
-  { id: "2", name: "Café con Leche", price: 1.0, stock: 100 },
-  { id: "3", name: "Queso Blanco", price: 3.0, stock: 45 },
-  { id: "4", name: "Harina PAN 1kg", price: 2.0, stock: 5 },
-  { id: "5", name: "Aceite Diana 1L", price: 4.5, stock: 12 },
-  { id: "6", name: "Azúcar 1kg", price: 1.8, stock: 30 },
-  { id: "7", name: "Arroz 1kg", price: 1.2, stock: 50 },
-  { id: "8", name: "Pasta 500g", price: 0.8, stock: 80 },
-  { id: "9", name: "Leche 1L", price: 2.5, stock: 20 },
-]);
+/** Products from API for the grid. */
+interface GridProduct {
+  id: string;
+  name: string;
+  price: string;
+  stock: number;
+}
+
+const gridProducts = ref<GridProduct[]>([]);
+
+/** Load products from API on mount. */
+onMounted(async () => {
+  try {
+    const result = await $api<{
+      products: GridProduct[];
+    }>("/api/products?limit=100");
+    gridProducts.value = result.products;
+  } catch {
+    // Products will show empty grid with error implicit
+  } finally {
+    isLoadingProducts.value = false;
+  }
+});
 
 /** Add product to ticket or increment quantity if already there. */
-function addToTicket(product: (typeof gridProducts.value)[0]) {
+function addToTicket(product: GridProduct) {
+  if (product.stock <= 0) return;
+
   const existing = ticketItems.value.find(
     (item) => item.productId === product.id,
   );
   if (existing) {
+    // Don't exceed available stock
+    if (existing.quantity >= product.stock) return;
     existing.quantity++;
   } else {
     ticketItems.value.push({
@@ -53,8 +72,9 @@ function addToTicket(product: (typeof gridProducts.value)[0]) {
       productId: product.id,
       name: product.name,
       quantity: 1,
-      unitPrice: product.price,
+      unitPrice: Number(product.price),
       discountPercent: 0,
+      maxStock: product.stock,
     });
   }
 }
@@ -68,7 +88,9 @@ function removeFromTicket(itemId: string) {
 function updateQuantity(itemId: string, delta: number) {
   const item = ticketItems.value.find((i) => i.id === itemId);
   if (!item) return;
-  item.quantity = Math.max(1, item.quantity + delta);
+  const newQty = item.quantity + delta;
+  if (newQty < 1 || newQty > item.maxStock) return;
+  item.quantity = newQty;
 }
 
 /** Calculate line total for display. */
@@ -98,11 +120,23 @@ const filteredProducts = computed(() => {
   return gridProducts.value.filter((p) => p.name.toLowerCase().includes(q));
 });
 
-/** Clear the ticket after a successful sale. Called from checkout. */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars -- Used by checkout flow in Sprint 3.4
-function clearTicket() {
-  ticketItems.value = [];
-  showCheckout.value = false;
+/**
+ * Navigate to checkout, passing ticket data via sessionStorage.
+ * sessionStorage is used instead of query params because ticket data
+ * can be large and contains structured objects.
+ */
+function goToCheckout() {
+  if (ticketItems.value.length === 0) return;
+
+  if (import.meta.client) {
+    sessionStorage.setItem(
+      "nova:checkout:items",
+      JSON.stringify(ticketItems.value),
+    );
+    sessionStorage.setItem("nova:checkout:total", String(ticketTotal.value));
+  }
+
+  navigateTo("/sales/checkout");
 }
 </script>
 
@@ -124,8 +158,22 @@ function clearTicket() {
         />
       </div>
 
+      <!-- Loading -->
+      <div v-if="isLoadingProducts" class="py-12 text-center text-gray-400">
+        Cargando productos...
+      </div>
+
+      <!-- Empty -->
+      <div
+        v-else-if="filteredProducts.length === 0"
+        class="py-12 text-center text-gray-400"
+      >
+        {{ searchQuery ? "Sin resultados" : "No hay productos registrados" }}
+      </div>
+
       <!-- Product grid -->
       <div
+        v-else
         class="grid gap-2"
         :class="isDesktop ? 'grid-cols-4' : 'grid-cols-3'"
       >
@@ -138,18 +186,18 @@ function clearTicket() {
           @click="addToTicket(product)"
         >
           <span
-            class="text-sm font-medium text-gray-900 text-center truncate w-full"
+            class="w-full truncate text-center text-sm font-medium text-gray-900"
           >
             {{ product.name }}
           </span>
           <span class="mt-1 text-xs font-semibold text-nova-primary">
-            ${{ product.price.toFixed(2) }}
+            ${{ Number(product.price).toFixed(2) }}
           </span>
           <span
             v-if="product.stock <= 5"
             class="mt-0.5 text-[10px] text-stock-red"
           >
-            {{ product.stock }} left
+            {{ product.stock }} disp.
           </span>
         </button>
       </div>
@@ -178,9 +226,9 @@ function clearTicket() {
           :key="item.id"
           class="flex items-center justify-between py-2"
         >
-          <div class="flex-1 min-w-0">
+          <div class="min-w-0 flex-1">
             <p class="truncate text-sm text-gray-900">{{ item.name }}</p>
-            <div class="flex items-center gap-2 mt-0.5">
+            <div class="mt-0.5 flex items-center gap-2">
               <button
                 class="h-5 w-5 rounded bg-gray-100 text-xs"
                 @click="updateQuantity(item.id, -1)"
@@ -219,12 +267,12 @@ function clearTicket() {
 
       <!-- Checkout button -->
       <div v-if="ticketItems.length > 0" class="border-t border-gray-100 p-4">
-        <NuxtLink
-          to="/sales/checkout"
+        <button
           class="block w-full rounded-xl bg-nova-primary py-3 text-center font-semibold text-white"
+          @click="goToCheckout"
         >
           Cobrar ${{ ticketTotal.toFixed(2) }}
-        </NuxtLink>
+        </button>
       </div>
     </div>
   </div>
