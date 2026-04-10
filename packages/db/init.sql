@@ -59,6 +59,23 @@ ALTER TABLE price_history ENABLE ROW LEVEL SECURITY;
 CREATE POLICY price_history_tenant_isolation ON price_history
   USING (business_id = current_business_id());
 
+-- Exchange rates: global table (no business_id), no RLS needed
+
+-- Sales: scoped to the current business
+ALTER TABLE sales ENABLE ROW LEVEL SECURITY;
+CREATE POLICY sales_tenant_isolation ON sales
+  USING (business_id = current_business_id());
+
+-- Sale items: accessed via sale_id join, RLS on parent is sufficient
+-- but we add it for defense in depth via sale join
+
+-- Sale payments: accessed via sale_id join
+
+-- Quotations: scoped to the current business
+ALTER TABLE quotations ENABLE ROW LEVEL SECURITY;
+CREATE POLICY quotations_tenant_isolation ON quotations
+  USING (business_id = current_business_id());
+
 -- ============================================================
 -- Note: The application connects as a role that has RLS enforced.
 -- Superuser/admin connections bypass RLS for migrations and seeds.

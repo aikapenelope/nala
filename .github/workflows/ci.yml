@@ -1,0 +1,67 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  check:
+    name: Typecheck + Lint + Build
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_DB: nova_test
+          POSTGRES_USER: nova
+          POSTGRES_PASSWORD: test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Typecheck all packages (shared, db, api)
+      - name: Typecheck packages
+        run: npx turbo typecheck --filter=@nova/shared --filter=@nova/db --filter=@nova/api
+
+      # Lint all packages
+      - name: Lint
+        run: npx turbo lint
+
+      # Build all packages (includes Nuxt build with type checking)
+      - name: Build
+        run: npx turbo build
+        env:
+          DATABASE_URL: postgresql://nova:test@localhost:5432/nova_test
+          REDIS_URL: redis://localhost:6379
+
+      # Future: run tests when they exist
+      # - name: Test
+      #   run: npx turbo test
+      #   env:
+      #     DATABASE_URL: postgresql://nova:test@localhost:5432/nova_test
+      #     REDIS_URL: redis://localhost:6379

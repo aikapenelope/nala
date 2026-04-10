@@ -1,7 +1,7 @@
 /**
  * Drizzle ORM schema for Nova.
  *
- * Phase 2: adds categories, products, product_variants, units_of_measure.
+ * Phase 3: adds sales, sale_items, sale_payments, exchange_rates, quotations.
  * RLS policies are applied via init.sql (not Drizzle).
  */
 
@@ -295,6 +295,180 @@ export const priceHistory = pgTable("price_history", {
   newPrice: numeric("new_price", { precision: 12, scale: 2 }),
   changedBy: uuid("changed_by").references(() => users.id),
   createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+// ============================================================
+// Phase 3 tables: Sales
+// ============================================================
+
+/**
+ * Exchange rates - BCV and parallel rates per day.
+ * Updated daily via cron job. Cached in Redis for fast access.
+ */
+export const exchangeRates = pgTable(
+  "exchange_rates",
+  {
+    id: uuid("id")
+      .default(sql`gen_random_uuid()`)
+      .primaryKey(),
+    /** Date this rate applies to (one rate per day). */
+    date: timestamp("date", { withTimezone: true }).notNull(),
+    /** Official BCV rate (Bs. per 1 USD). */
+    rateBcv: numeric("rate_bcv", { precision: 12, scale: 4 }).notNull(),
+    /** Parallel/informal rate (optional, manually set by owner). */
+    rateParallel: numeric("rate_parallel", { precision: 12, scale: 4 }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [uniqueIndex("idx_exchange_rates_date").on(table.date)],
+);
+
+/**
+ * Sales - each row is a completed sale transaction.
+ * Items and payments are in separate tables for flexibility.
+ */
+export const sales = pgTable(
+  "sales",
+  {
+    id: uuid("id")
+      .default(sql`gen_random_uuid()`)
+      .primaryKey(),
+    businessId: uuid("business_id")
+      .notNull()
+      .references(() => businesses.id),
+    /** Who made the sale (employee PIN or owner). */
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id),
+    /** Optional customer for fiado or CRM tracking. */
+    customerId: uuid("customer_id"),
+
+    /** Total in USD (sum of items after discounts). */
+    totalUsd: numeric("total_usd", { precision: 12, scale: 2 }).notNull(),
+    /** Total in Bs. at the BCV rate of the moment. */
+    totalBs: numeric("total_bs", { precision: 12, scale: 2 }),
+    /** BCV rate applied to this sale. */
+    exchangeRate: numeric("exchange_rate", { precision: 12, scale: 4 }),
+
+    /** Discount on the entire sale (percentage 0-100). */
+    discountPercent: numeric("discount_percent", {
+      precision: 5,
+      scale: 2,
+    }).default("0"),
+
+    /** Sale status. */
+    status: text("status").notNull().default("completed"),
+
+    /** Void reason (required when status = 'voided'). */
+    voidReason: text("void_reason"),
+    /** Who approved the void (owner PIN). */
+    voidedBy: uuid("voided_by").references(() => users.id),
+
+    /** Notes visible on the receipt. */
+    notes: text("notes"),
+
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("idx_sales_business").on(table.businessId),
+    index("idx_sales_user").on(table.userId),
+    index("idx_sales_created").on(table.createdAt),
+  ],
+);
+
+/**
+ * Sale items - line items within a sale.
+ * Each row is one product (or variant) sold with quantity and price.
+ */
+export const saleItems = pgTable("sale_items", {
+  id: uuid("id")
+    .default(sql`gen_random_uuid()`)
+    .primaryKey(),
+  saleId: uuid("sale_id")
+    .notNull()
+    .references(() => sales.id, { onDelete: "cascade" }),
+  productId: uuid("product_id")
+    .notNull()
+    .references(() => products.id),
+  variantId: uuid("variant_id").references(() => productVariants.id),
+
+  /** Quantity sold. */
+  quantity: integer("quantity").notNull(),
+  /** Unit price at time of sale (USD). */
+  unitPrice: numeric("unit_price", { precision: 12, scale: 2 }).notNull(),
+  /** Line discount (percentage 0-100). */
+  discountPercent: numeric("discount_percent", {
+    precision: 5,
+    scale: 2,
+  }).default("0"),
+  /** Line total after discount (USD). */
+  lineTotal: numeric("line_total", { precision: 12, scale: 2 }).notNull(),
+});
+
+/**
+ * Sale payments - how a sale was paid.
+ * A sale can have multiple payments (split payment).
+ */
+export const salePayments = pgTable("sale_payments", {
+  id: uuid("id")
+    .default(sql`gen_random_uuid()`)
+    .primaryKey(),
+  saleId: uuid("sale_id")
+    .notNull()
+    .references(() => sales.id, { onDelete: "cascade" }),
+
+  /** Payment method used. */
+  method: text("method").notNull(),
+  /** Amount paid in USD. */
+  amountUsd: numeric("amount_usd", { precision: 12, scale: 2 }).notNull(),
+  /** Amount paid in Bs. (if paid in Bs.). */
+  amountBs: numeric("amount_bs", { precision: 12, scale: 2 }),
+  /** BCV rate at the moment of payment. */
+  exchangeRate: numeric("exchange_rate", { precision: 12, scale: 4 }),
+  /** Payment reference (Pago Movil ref, transfer number, etc.). */
+  reference: text("reference"),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+/**
+ * Quotations - pre-sales that can be converted to sales.
+ * Same structure as sales but with status 'draft' or 'sent'.
+ */
+export const quotations = pgTable("quotations", {
+  id: uuid("id")
+    .default(sql`gen_random_uuid()`)
+    .primaryKey(),
+  businessId: uuid("business_id")
+    .notNull()
+    .references(() => businesses.id),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id),
+  customerId: uuid("customer_id"),
+
+  totalUsd: numeric("total_usd", { precision: 12, scale: 2 }).notNull(),
+  /** Items stored as JSON for simplicity (quotations are temporary). */
+  items: jsonb("items").notNull().default([]),
+
+  status: text("status").notNull().default("draft"),
+  /** Sale ID if this quotation was converted. */
+  convertedToSaleId: uuid("converted_to_sale_id").references(() => sales.id),
+
+  expiresAt: timestamp("expires_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
 });
