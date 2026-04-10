@@ -35,9 +35,9 @@ app.use("*", logger());
 app.use(
   "*",
   cors({
-    origin: ["http://localhost:3000"],
+    origin: process.env.CORS_ORIGIN?.split(",") ?? ["http://localhost:3000"],
     allowMethods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
-    allowHeaders: ["Content-Type", "Authorization"],
+    allowHeaders: ["Content-Type", "Authorization", "X-Business-Id"],
   }),
 );
 
