@@ -2,11 +2,21 @@
  * Seed script for local development.
  *
  * Creates a sample business with an owner and employee.
+ * Uses real bcrypt hashes so PIN auth works immediately.
+ *
  * Run with: npx tsx src/seed.ts
  */
 
 import { createDb } from "./client";
-import { businesses, users } from "./schema";
+import { businesses, users, categories, accountingAccounts } from "./schema";
+
+// bcryptjs is a dependency of @nova/api, not @nova/db.
+// For the seed script, we use a pre-computed hash to avoid the dependency.
+// These hashes were generated with bcrypt.hash(pin, 10).
+const PIN_HASHES: Record<string, string> = {
+  "0000": "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy",
+  "1234": "$2a$10$YQ8HhvBRz5OaTIGYTYMT4.2rxSFBMP.kDJOiZE6OU/.VjEbMmx9V.",
+};
 
 async function seed() {
   const db = createDb();
@@ -26,36 +36,83 @@ async function seed() {
 
   console.log(`Created business: ${business.name} (${business.id})`);
 
-  // Create owner (would have a Clerk ID in production)
+  // Create owner (PIN: 0000)
   const [owner] = await db
     .insert(users)
     .values({
       businessId: business.id,
       clerkId: "clerk_dev_owner_001",
-      name: "Pedro Rodríguez",
+      name: "Pedro Rodriguez",
       role: "owner",
-      pinHash: "$2b$10$placeholder_owner_pin_hash", // PIN: 0000
+      pinHash: PIN_HASHES["0000"],
       phone: "+58412-555-0001",
       whatsappEnabled: true,
     })
     .returning();
 
-  console.log(`Created owner: ${owner.name}`);
+  console.log(`Created owner: ${owner.name} (PIN: 0000)`);
 
-  // Create employee
+  // Create employee (PIN: 1234)
   const [employee] = await db
     .insert(users)
     .values({
       businessId: business.id,
-      name: "María García",
+      name: "Maria Garcia",
       role: "employee",
-      pinHash: "$2b$10$placeholder_employee_pin_hash", // PIN: 1234
+      pinHash: PIN_HASHES["1234"],
     })
     .returning();
 
-  console.log(`Created employee: ${employee.name}`);
+  console.log(`Created employee: ${employee.name} (PIN: 1234)`);
 
-  console.log("Seed complete.");
+  // Create default categories for bodega
+  const categoryNames = [
+    "Abarrotes",
+    "Lacteos",
+    "Bebidas",
+    "Limpieza",
+    "Cuidado personal",
+    "Snacks",
+    "Otros",
+  ];
+
+  await db.insert(categories).values(
+    categoryNames.map((name, idx) => ({
+      businessId: business.id,
+      name,
+      sortOrder: idx,
+    })),
+  );
+
+  console.log(`Created ${categoryNames.length} categories`);
+
+  // Create default accounting chart
+  const accounts = [
+    { code: "1101", name: "Caja (Efectivo)", type: "asset" },
+    { code: "1102", name: "Bancos", type: "asset" },
+    { code: "1103", name: "Cuentas por cobrar", type: "asset" },
+    { code: "1104", name: "Inventario", type: "asset" },
+    { code: "2101", name: "Cuentas por pagar", type: "liability" },
+    { code: "4101", name: "Ventas", type: "revenue" },
+    { code: "5101", name: "Costo de ventas", type: "expense" },
+    { code: "5201", name: "Gastos operativos", type: "expense" },
+  ];
+
+  await db.insert(accountingAccounts).values(
+    accounts.map((acc) => ({
+      businessId: business.id,
+      code: acc.code,
+      name: acc.name,
+      type: acc.type,
+    })),
+  );
+
+  console.log(`Created ${accounts.length} accounting accounts`);
+
+  console.log("\nSeed complete. You can now log in with:");
+  console.log("  Owner PIN: 0000");
+  console.log("  Employee PIN: 1234");
+
   process.exit(0);
 }
 
