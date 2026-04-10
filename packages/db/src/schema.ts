@@ -1,7 +1,8 @@
 /**
  * Drizzle ORM schema for Nova.
  *
- * Phase 3: adds sales, sale_items, sale_payments, exchange_rates, quotations.
+ * Phase 4: adds customers, customer_segments, accounts_receivable,
+ * accounts_payable, day_closes.
  * RLS policies are applied via init.sql (not Drizzle).
  */
 
@@ -471,4 +472,96 @@ export const quotations = pgTable("quotations", {
   updatedAt: timestamp("updated_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
+});
+
+// ============================================================
+// Phase 4 tables: Customers, Accounts, Day Close
+// ============================================================
+
+/** Customers - CRM profiles built from purchase history. */
+export const customers = pgTable(
+  "customers",
+  {
+    id: uuid("id").default(sql`gen_random_uuid()`).primaryKey(),
+    businessId: uuid("business_id").notNull().references(() => businesses.id),
+    name: text("name").notNull(),
+    phone: text("phone"),
+    email: text("email"),
+    address: text("address"),
+    notes: text("notes"),
+    totalPurchases: integer("total_purchases").notNull().default(0),
+    totalSpentUsd: numeric("total_spent_usd", { precision: 12, scale: 2 }).notNull().default("0"),
+    averageTicketUsd: numeric("average_ticket_usd", { precision: 12, scale: 2 }).notNull().default("0"),
+    lastPurchaseAt: timestamp("last_purchase_at", { withTimezone: true }),
+    balanceUsd: numeric("balance_usd", { precision: 12, scale: 2 }).notNull().default("0"),
+    isActive: boolean("is_active").notNull().default(true),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("idx_customers_business").on(table.businessId),
+    index("idx_customers_name_trgm").using("gin", sql`${table.name} gin_trgm_ops`),
+  ],
+);
+
+/** Customer segments - auto-calculated labels (VIP, at_risk, etc.). */
+export const customerSegments = pgTable("customer_segments", {
+  id: uuid("id").default(sql`gen_random_uuid()`).primaryKey(),
+  customerId: uuid("customer_id").notNull().references(() => customers.id, { onDelete: "cascade" }),
+  businessId: uuid("business_id").notNull().references(() => businesses.id),
+  segment: text("segment").notNull(),
+  assignedAt: timestamp("assigned_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** Accounts receivable - money customers owe us (fiado). */
+export const accountsReceivable = pgTable(
+  "accounts_receivable",
+  {
+    id: uuid("id").default(sql`gen_random_uuid()`).primaryKey(),
+    businessId: uuid("business_id").notNull().references(() => businesses.id),
+    customerId: uuid("customer_id").notNull().references(() => customers.id),
+    saleId: uuid("sale_id").references(() => sales.id),
+    amountUsd: numeric("amount_usd", { precision: 12, scale: 2 }).notNull(),
+    paidUsd: numeric("paid_usd", { precision: 12, scale: 2 }).notNull().default("0"),
+    balanceUsd: numeric("balance_usd", { precision: 12, scale: 2 }).notNull(),
+    status: text("status").notNull().default("pending"),
+    dueDate: timestamp("due_date", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("idx_ar_business").on(table.businessId),
+    index("idx_ar_customer").on(table.customerId),
+  ],
+);
+
+/** Accounts payable - money we owe to suppliers. */
+export const accountsPayable = pgTable("accounts_payable", {
+  id: uuid("id").default(sql`gen_random_uuid()`).primaryKey(),
+  businessId: uuid("business_id").notNull().references(() => businesses.id),
+  supplierName: text("supplier_name").notNull(),
+  description: text("description"),
+  amountUsd: numeric("amount_usd", { precision: 12, scale: 2 }).notNull(),
+  paidUsd: numeric("paid_usd", { precision: 12, scale: 2 }).notNull().default("0"),
+  balanceUsd: numeric("balance_usd", { precision: 12, scale: 2 }).notNull(),
+  status: text("status").notNull().default("pending"),
+  dueDate: timestamp("due_date", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** Day closes - end-of-day cash reconciliation. */
+export const dayCloses = pgTable("day_closes", {
+  id: uuid("id").default(sql`gen_random_uuid()`).primaryKey(),
+  businessId: uuid("business_id").notNull().references(() => businesses.id),
+  closedBy: uuid("closed_by").notNull().references(() => users.id),
+  date: timestamp("date", { withTimezone: true }).notNull(),
+  cashCounted: numeric("cash_counted", { precision: 12, scale: 2 }).notNull(),
+  cashExpected: numeric("cash_expected", { precision: 12, scale: 2 }).notNull(),
+  cashDifference: numeric("cash_difference", { precision: 12, scale: 2 }).notNull(),
+  totalSalesUsd: numeric("total_sales_usd", { precision: 12, scale: 2 }).notNull(),
+  totalSalesCount: integer("total_sales_count").notNull(),
+  totalVoidsCount: integer("total_voids_count").notNull().default(0),
+  notes: text("notes"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });

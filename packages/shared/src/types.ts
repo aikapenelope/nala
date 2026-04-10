@@ -32,9 +32,6 @@ export type PaymentMethod =
 /** Stock status semaphore colors. */
 export type StockStatus = "green" | "yellow" | "red" | "gray";
 
-/** Accounts receivable/payable aging color codes. */
-export type AgingColor = "green" | "yellow" | "red";
-
 /** API response wrapper for consistent responses. */
 export interface ApiResponse<T> {
   success: boolean;

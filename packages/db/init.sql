@@ -76,6 +76,31 @@ ALTER TABLE quotations ENABLE ROW LEVEL SECURITY;
 CREATE POLICY quotations_tenant_isolation ON quotations
   USING (business_id = current_business_id());
 
+-- Customers
+ALTER TABLE customers ENABLE ROW LEVEL SECURITY;
+CREATE POLICY customers_tenant_isolation ON customers
+  USING (business_id = current_business_id());
+
+-- Customer segments
+ALTER TABLE customer_segments ENABLE ROW LEVEL SECURITY;
+CREATE POLICY customer_segments_tenant_isolation ON customer_segments
+  USING (business_id = current_business_id());
+
+-- Accounts receivable
+ALTER TABLE accounts_receivable ENABLE ROW LEVEL SECURITY;
+CREATE POLICY ar_tenant_isolation ON accounts_receivable
+  USING (business_id = current_business_id());
+
+-- Accounts payable
+ALTER TABLE accounts_payable ENABLE ROW LEVEL SECURITY;
+CREATE POLICY ap_tenant_isolation ON accounts_payable
+  USING (business_id = current_business_id());
+
+-- Day closes
+ALTER TABLE day_closes ENABLE ROW LEVEL SECURITY;
+CREATE POLICY day_closes_tenant_isolation ON day_closes
+  USING (business_id = current_business_id());
+
 -- ============================================================
 -- Note: The application connects as a role that has RLS enforced.
 -- Superuser/admin connections bypass RLS for migrations and seeds.
