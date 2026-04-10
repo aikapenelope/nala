@@ -9,7 +9,7 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import { PIN_LENGTH, MAX_PIN_ATTEMPTS, PIN_LOCKOUT_MINUTES } from "@nova/shared";
+import { PIN_LENGTH } from "@nova/shared";
 
 const auth = new Hono();
 
@@ -29,9 +29,9 @@ const pinSchema = z.object({
  * 4. If no match: increment failed attempts, lock after MAX_PIN_ATTEMPTS
  */
 auth.post("/pin", zValidator("json", pinSchema), async (c) => {
-  const { businessId, pin } = c.req.valid("json");
-
+  // Validated input available via c.req.valid("json")
   // TODO: When DB is connected:
+  // const { businessId, pin } = c.req.valid("json");
   // 1. Find active users for businessId
   // 2. For each user, compare bcrypt(pin, user.pinHash)
   // 3. Handle lockout logic (pinFailedAttempts >= MAX_PIN_ATTEMPTS)
