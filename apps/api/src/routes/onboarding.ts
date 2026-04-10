@@ -6,6 +6,9 @@
  * This is called once per Clerk user, right after they sign up.
  * It creates the business record, the owner user linked to their Clerk ID,
  * and pre-configures categories and accounting chart based on business type.
+ *
+ * The entire operation runs in a single database transaction. If any step
+ * fails, everything is rolled back -- no orphaned records.
  */
 
 import { Hono } from "hono";
@@ -13,7 +16,7 @@ import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { verifyToken } from "@clerk/backend";
-import { businessTypeSchema } from "@nova/shared";
+import { businessTypeSchema, PIN_LENGTH } from "@nova/shared";
 import {
   businesses,
   users,
@@ -29,7 +32,8 @@ const onboarding = new Hono();
 const onboardingSchema = z.object({
   businessType: businessTypeSchema,
   businessName: z.string().min(1).max(100),
-  ownerPin: z.string().length(4).optional().default("0000"),
+  ownerName: z.string().min(1).max(100),
+  ownerPin: z.string().length(PIN_LENGTH),
 });
 
 /**
@@ -149,39 +153,50 @@ const DEFAULT_ACCOUNTS: Array<{
  * POST /onboarding - Create business + owner.
  *
  * Requires a valid Clerk session (the user just signed up).
- * Creates:
+ * Creates in a single transaction:
  * 1. Business record with type and name
  * 2. Owner user linked to the Clerk ID
  * 3. Pre-configured categories for the business type
  * 4. Pre-configured accounting chart
  */
 onboarding.post("/", zValidator("json", onboardingSchema), async (c) => {
-  const { businessType, businessName, ownerPin } = c.req.valid("json");
+  const { businessType, businessName, ownerName, ownerPin } =
+    c.req.valid("json");
   const db = getDb();
 
-  // Get Clerk user ID from auth header
+  // Authenticate: extract Clerk user ID from JWT
   const authHeader = c.req.header("Authorization");
   let clerkUserId: string | null = null;
 
-  if (authHeader?.startsWith("Bearer ") && process.env.CLERK_SECRET_KEY) {
+  const clerkSecretKey = process.env.CLERK_SECRET_KEY;
+
+  if (authHeader?.startsWith("Bearer ") && clerkSecretKey) {
     try {
       const token = authHeader.slice(7);
       const payload = await verifyToken(token, {
-        secretKey: process.env.CLERK_SECRET_KEY,
+        secretKey: clerkSecretKey,
       });
       clerkUserId = payload.sub ?? null;
     } catch {
       return c.json({ error: "Invalid authentication token" }, 401);
     }
-  } else if (!process.env.CLERK_SECRET_KEY) {
-    // Dev mode fallback
+  } else if (!clerkSecretKey && process.env.NODE_ENV === "development") {
+    // Dev-only fallback, requires explicit NODE_ENV=development
     clerkUserId = "dev-clerk-001";
+  } else if (!clerkSecretKey) {
+    return c.json(
+      { error: "Server misconfiguration: authentication not available" },
+      500,
+    );
   } else {
-    return c.json({ error: "Authorization required" }, 401);
+    return c.json(
+      { error: "Authorization header with Bearer token required" },
+      401,
+    );
   }
 
   if (!clerkUserId) {
-    return c.json({ error: "Could not identify user" }, 401);
+    return c.json({ error: "Could not identify user from token" }, 401);
   }
 
   // Check if user already has a business (prevent duplicates)
@@ -199,43 +214,42 @@ onboarding.post("/", zValidator("json", onboardingSchema), async (c) => {
   // Hash the owner's PIN
   const pinHash = await bcrypt.hash(ownerPin, 10);
 
-  // Create business
-  const [business] = await db
-    .insert(businesses)
-    .values({
-      name: businessName,
-      type: businessType,
-    })
-    .returning();
+  // All-or-nothing: create business, owner, categories, accounts in one transaction
+  const result = await db.transaction(async (tx) => {
+    // 1. Create business
+    const [business] = await tx
+      .insert(businesses)
+      .values({
+        name: businessName,
+        type: businessType,
+      })
+      .returning();
 
-  // Create owner user linked to Clerk ID
-  const [owner] = await db
-    .insert(users)
-    .values({
-      businessId: business.id,
-      clerkId: clerkUserId,
-      name: businessName, // Will be updated from Clerk profile later
-      role: "owner",
-      pinHash,
-    })
-    .returning();
+    // 2. Create owner user linked to Clerk ID
+    const [owner] = await tx
+      .insert(users)
+      .values({
+        businessId: business.id,
+        clerkId: clerkUserId,
+        name: ownerName,
+        role: "owner",
+        pinHash,
+      })
+      .returning();
 
-  // Pre-configure categories for the business type
-  const categoryNames =
-    CATEGORIES_BY_TYPE[businessType] ?? CATEGORIES_BY_TYPE["otro"];
-  if (categoryNames.length > 0) {
-    await db.insert(categories).values(
+    // 3. Pre-configure categories for the business type
+    const categoryNames =
+      CATEGORIES_BY_TYPE[businessType] ?? CATEGORIES_BY_TYPE["otro"];
+    await tx.insert(categories).values(
       categoryNames.map((name, idx) => ({
         businessId: business.id,
         name,
         sortOrder: idx,
       })),
     );
-  }
 
-  // Pre-configure accounting chart
-  if (DEFAULT_ACCOUNTS.length > 0) {
-    await db.insert(accountingAccounts).values(
+    // 4. Pre-configure accounting chart
+    await tx.insert(accountingAccounts).values(
       DEFAULT_ACCOUNTS.map((acc) => ({
         businessId: business.id,
         code: acc.code,
@@ -243,21 +257,26 @@ onboarding.post("/", zValidator("json", onboardingSchema), async (c) => {
         type: acc.type,
       })),
     );
-  }
 
-  return c.json({
-    business: {
-      id: business.id,
-      name: business.name,
-      type: business.type,
-    },
-    user: {
-      id: owner.id,
-      name: owner.name,
-      role: owner.role,
-      businessId: business.id,
-    },
+    return { business, owner };
   });
+
+  return c.json(
+    {
+      business: {
+        id: result.business.id,
+        name: result.business.name,
+        type: result.business.type,
+      },
+      user: {
+        id: result.owner.id,
+        name: result.owner.name,
+        role: result.owner.role,
+        businessId: result.business.id,
+      },
+    },
+    201,
+  );
 });
 
 export { onboarding };
