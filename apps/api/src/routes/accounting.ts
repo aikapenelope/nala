@@ -50,9 +50,12 @@ accounting.post("/accounting/export", async (c) => {
   // TODO: Generate Excel with libro diario format
   // Columns: fecha, cuenta, debe, haber, descripcion, referencia
   // Also generate: sales summary, expense summary, P&L
-  return c.json({
-    message: "Export generation requires database connection",
-  }, 503);
+  return c.json(
+    {
+      message: "Export generation requires database connection",
+    },
+    503,
+  );
 });
 
 // ============================================================
@@ -151,9 +154,12 @@ accounting.post(
   zValidator("json", ocrConfirmSchema),
   async (c) => {
     // TODO: Atomic transaction when DB is connected
-    return c.json({
-      message: "OCR confirmation requires database connection",
-    }, 503);
+    return c.json(
+      {
+        message: "OCR confirmation requires database connection",
+      },
+      503,
+    );
   },
 );
 

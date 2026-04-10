@@ -70,57 +70,69 @@ function buildPrompt(input: NarrativeInput): string {
 /** Call OpenRouter API (GPT-4o-mini). */
 async function callOpenRouter(prompt: string): Promise<string> {
   const parsed = JSON.parse(prompt);
-  const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+  const response = await fetch(
+    "https://openrouter.ai/api/v1/chat/completions",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: "openai/gpt-4o-mini",
+        messages: [
+          { role: "system", content: parsed.system },
+          { role: "user", content: parsed.user },
+        ],
+        max_tokens: 200,
+        temperature: 0.7,
+      }),
     },
-    body: JSON.stringify({
-      model: "openai/gpt-4o-mini",
-      messages: [
-        { role: "system", content: parsed.system },
-        { role: "user", content: parsed.user },
-      ],
-      max_tokens: 200,
-      temperature: 0.7,
-    }),
-  });
+  );
 
   if (!response.ok) throw new Error(`OpenRouter error: ${response.status}`);
 
   const data = (await response.json()) as {
     choices: Array<{ message: { content: string } }>;
   };
-  return data.choices[0]?.message?.content ?? buildStaticNarrative({ type: "daily_summary", data: {} });
+  return (
+    data.choices[0]?.message?.content ??
+    buildStaticNarrative({ type: "daily_summary", data: {} })
+  );
 }
 
 /** Call Groq API (Llama 3 fallback). */
 async function callGroq(prompt: string): Promise<string> {
   const parsed = JSON.parse(prompt);
-  const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+  const response = await fetch(
+    "https://api.groq.com/openai/v1/chat/completions",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: "llama-3.1-8b-instant",
+        messages: [
+          { role: "system", content: parsed.system },
+          { role: "user", content: parsed.user },
+        ],
+        max_tokens: 200,
+        temperature: 0.7,
+      }),
     },
-    body: JSON.stringify({
-      model: "llama-3.1-8b-instant",
-      messages: [
-        { role: "system", content: parsed.system },
-        { role: "user", content: parsed.user },
-      ],
-      max_tokens: 200,
-      temperature: 0.7,
-    }),
-  });
+  );
 
   if (!response.ok) throw new Error(`Groq error: ${response.status}`);
 
   const data = (await response.json()) as {
     choices: Array<{ message: { content: string } }>;
   };
-  return data.choices[0]?.message?.content ?? buildStaticNarrative({ type: "daily_summary", data: {} });
+  return (
+    data.choices[0]?.message?.content ??
+    buildStaticNarrative({ type: "daily_summary", data: {} })
+  );
 }
 
 /** Static fallback narrative when no AI is available. */

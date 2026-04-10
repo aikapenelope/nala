@@ -3,13 +3,15 @@
  *
  * Supports two auth methods:
  * - Bearer {jwt}: Clerk JWT for owners on personal devices
- * - Pin {business_id}:{pin}: PIN for employees on shared devices (Sprint 1.3)
+ * - Pin {token}: PIN session token for employees on shared devices
  *
- * After auth, sets `user` and `businessId` on the Hono context.
+ * After auth, sets `user`, `businessId`, and `db` on the Hono context.
  */
 
 import { verifyToken } from "@clerk/backend";
+import { findUserByClerkId } from "@nova/db";
 import type { Context, Next } from "hono";
+import { getDb } from "../db";
 
 export interface AuthUser {
   id: string;
@@ -38,9 +40,12 @@ async function verifyClerkJwt(token: string): Promise<string | null> {
  * Auth middleware for protected API routes.
  *
  * In development (no CLERK_SECRET_KEY), falls back to a mock user.
- * In production, verifies the Clerk JWT from the Authorization header.
+ * In production, verifies the Clerk JWT and looks up the user in DB.
  */
 export async function authMiddleware(c: Context, next: Next) {
+  const db = getDb();
+  c.set("db", db);
+
   const authHeader = c.req.header("Authorization");
 
   // Development fallback when Clerk is not configured
@@ -57,12 +62,6 @@ export async function authMiddleware(c: Context, next: Next) {
     return;
   }
 
-  // PIN auth for employees on shared devices (Sprint 1.3)
-  if (authHeader?.startsWith("Pin ")) {
-    // Will be implemented in Sprint 1.3
-    return c.json({ error: "PIN auth not yet implemented" }, 501);
-  }
-
   // Clerk JWT auth for owners
   if (!authHeader?.startsWith("Bearer ")) {
     return c.json({ error: "Authorization header required" }, 401);
@@ -75,13 +74,28 @@ export async function authMiddleware(c: Context, next: Next) {
     return c.json({ error: "Invalid or expired token" }, 401);
   }
 
-  // TODO (Sprint 1.2): Look up user in DB by clerk_id to get businessId and role
-  // For now, set a placeholder that will be replaced when DB is connected
+  // Look up user in DB by Clerk ID to get businessId and role
+  const dbUser = await findUserByClerkId(db, clerkUserId);
+
+  if (!dbUser) {
+    return c.json(
+      {
+        error: "User not found. Complete onboarding first.",
+        code: "USER_NOT_FOUND",
+      },
+      404,
+    );
+  }
+
+  if (!dbUser.isActive) {
+    return c.json({ error: "Account is deactivated" }, 403);
+  }
+
   const user: AuthUser = {
-    id: clerkUserId,
-    businessId: "pending-db-lookup",
-    name: "Clerk User",
-    role: "owner",
+    id: dbUser.id,
+    businessId: dbUser.businessId,
+    name: dbUser.name,
+    role: dbUser.role as "owner" | "employee",
     clerkId: clerkUserId,
   };
 

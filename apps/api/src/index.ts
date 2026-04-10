@@ -7,8 +7,23 @@
 
 import { serve } from "@hono/node-server";
 import { app } from "./app";
+import { initDb } from "./db";
+import { initRedis } from "./redis";
 
 const port = Number(process.env.PORT) || 3001;
+
+// Initialize services before starting the server
+if (process.env.DATABASE_URL) {
+  initDb();
+  console.log("Database connected.");
+} else {
+  console.warn("DATABASE_URL not set. Running in dev mode without DB.");
+}
+
+const redis = initRedis();
+if (redis) {
+  console.log("Redis connected.");
+}
 
 console.log(`Nova API starting on port ${port}...`);
 

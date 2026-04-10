@@ -16,7 +16,7 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 import { health } from "./routes/health";
-import { auth } from "./routes/auth";
+import { auth, ownerPinRoute } from "./routes/auth";
 import { onboarding } from "./routes/onboarding";
 import { inventory } from "./routes/inventory";
 import { salesRoutes } from "./routes/sales";
@@ -52,11 +52,14 @@ const api = new Hono<AppEnv>();
 api.use("*", authMiddleware);
 api.use("*", tenantMiddleware);
 
-// Placeholder route to verify middleware chain works
+// User info route
 api.get("/me", (c) => {
   const user = c.get("user");
   return c.json({ user });
 });
+
+// Owner PIN verification (protected - uses businessId from session)
+api.route("/", ownerPinRoute);
 
 // Inventory routes (products, categories, variants)
 api.route("/", inventory);
