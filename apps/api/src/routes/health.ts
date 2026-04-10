@@ -3,6 +3,14 @@
  *
  * Returns the status of the API and its dependent services.
  * Used by monitoring tools (Uptime Kuma) and load balancers.
+ *
+ * HTTP status codes:
+ * - 200: Process is alive and can serve requests
+ * - 503: Process is alive but critical services (DB) are down
+ *
+ * The response body always contains honest service status regardless
+ * of the HTTP code. Monitoring tools should check body.services for
+ * detailed status.
  */
 
 import { Hono } from "hono";
@@ -17,14 +25,14 @@ health.get("/", async (c) => {
   let dbOk = false;
   let redisOk = false;
 
-  // Test database connectivity (graceful when DB not configured)
+  // Test database connectivity
   const db = tryGetDb();
   if (db) {
     try {
       await db.execute(sql`SELECT 1`);
       dbOk = true;
     } catch {
-      // DB connection failed
+      // DB connection failed - will be reflected in response
     }
   }
 
@@ -35,20 +43,20 @@ health.get("/", async (c) => {
       await redis.ping();
       redisOk = true;
     } catch {
-      // Redis connection failed
+      // Redis connection failed - will be reflected in response
     }
   }
 
-  // Status logic:
-  // - "ok" when DB is connected (Redis is optional)
-  // - "degraded" when DB is connected but Redis is not
-  // - "error" when DB is not connected
+  // Status determination:
+  // - "ok": DB is connected (Redis optional)
+  // - "degraded": DB connected but Redis is not
+  // - "error": DB is not connected or not configured
   let status: HealthCheckResponse["status"];
-  if (!db) {
-    // DB not configured at all (dev mode) - report as ok
-    status = "ok";
-  } else if (dbOk) {
-    status = redisOk ? "ok" : "degraded";
+  if (dbOk) {
+    status = redisOk || !redis ? "ok" : "degraded";
+  } else if (!db) {
+    // DB not initialized - only acceptable in development
+    status = process.env.NODE_ENV === "development" ? "degraded" : "error";
   } else {
     status = "error";
   }
@@ -62,5 +70,9 @@ health.get("/", async (c) => {
     },
   };
 
-  return c.json(response, status === "error" ? 503 : 200);
+  // Return 503 only when DB is configured but unreachable.
+  // This tells load balancers to stop sending traffic.
+  const httpStatus = status === "error" ? 503 : 200;
+
+  return c.json(response, httpStatus);
 });

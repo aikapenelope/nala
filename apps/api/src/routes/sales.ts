@@ -34,8 +34,14 @@ const salesRoutes = new Hono<AppEnv>();
 
 /** GET /exchange-rate - Get current BCV exchange rate. */
 salesRoutes.get("/exchange-rate", async (c) => {
-  const rate = await getCurrentRate();
-  return c.json(rate);
+  try {
+    const rate = await getCurrentRate();
+    return c.json(rate);
+  } catch (err) {
+    const message =
+      err instanceof Error ? err.message : "Exchange rate unavailable";
+    return c.json({ error: message }, 503);
+  }
 });
 
 // ============================================================
