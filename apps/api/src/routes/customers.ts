@@ -1,11 +1,27 @@
 /**
  * Customer and accounts API routes.
+ *
+ * GET    /customers          - List customers (search, pagination)
+ * GET    /customers/:id      - Get customer detail with receivables
+ * POST   /customers          - Create customer
+ * PATCH  /customers/:id      - Update customer
+ *
+ * GET    /accounts/receivable              - List pending receivables
+ * POST   /accounts/receivable/:id/payment  - Record payment on receivable
+ * POST   /accounts/receivable/collect-all  - Generate WhatsApp collection links
+ *
+ * GET    /accounts/payable                 - List pending payables
+ * POST   /accounts/payable                 - Create payable
+ * PATCH  /accounts/payable/:id/pay         - Record payment on payable
+ *
+ * POST   /day-close           - Record end-of-day cash reconciliation
+ * GET    /day-close/history   - List past day closes
  */
 
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import { eq, and, sql, desc, gte, lte } from "drizzle-orm";
+import { eq, and, sql, desc, gte, lte, ilike } from "drizzle-orm";
 import {
   createCustomerSchema,
   updateCustomerSchema,
@@ -19,11 +35,17 @@ import {
   accountsPayable,
   dayCloses,
   sales,
+  salePayments,
   activityLog,
 } from "@nova/db";
 import type { AppEnv } from "../types";
 
 const customersRoutes = new Hono<AppEnv>();
+
+/** Escape LIKE/ILIKE special characters in user input. */
+function escapeLike(input: string): string {
+  return input.replace(/[%_\\]/g, "\\$&");
+}
 
 const listCustomersQuery = z.object({
   search: z.string().optional(),
@@ -48,11 +70,7 @@ customersRoutes.get(
     ];
 
     if (search) {
-      conditions.push(
-        sql`${customers.name} ILIKE ${"%" + search + "%"}` as ReturnType<
-          typeof eq
-        >,
-      );
+      conditions.push(ilike(customers.name, `%${escapeLike(search)}%`));
     }
 
     const rows = await db
@@ -188,7 +206,12 @@ customersRoutes.get("/accounts/receivable", async (c) => {
   return c.json({ accounts: rows, totalPending });
 });
 
-/** POST /accounts/receivable/:id/payment - Record a payment against a receivable. */
+/**
+ * POST /accounts/receivable/:id/payment - Record a payment against a receivable.
+ *
+ * Atomic: updates receivable balance, customer balance, and logs activity
+ * in a single transaction. Rejects overpayment.
+ */
 customersRoutes.post(
   "/accounts/receivable/:id/payment",
   zValidator("json", recordPaymentSchema),
@@ -206,50 +229,67 @@ customersRoutes.post(
         and(
           eq(accountsReceivable.id, id),
           eq(accountsReceivable.businessId, businessId),
+          eq(accountsReceivable.status, "pending"),
         ),
       )
       .limit(1);
 
     if (!account) {
-      return c.json({ error: "Account not found" }, 404);
+      return c.json({ error: "Account not found or already paid" }, 404);
     }
 
     const currentBalance = Number(account.balanceUsd);
-    const newPaid = Number(account.paidUsd) + amountUsd;
-    const newBalance = Math.max(0, currentBalance - amountUsd);
-    const newStatus = newBalance <= 0 ? "paid" : "pending";
 
-    const [updated] = await db
-      .update(accountsReceivable)
-      .set({
-        paidUsd: String(newPaid),
-        balanceUsd: String(newBalance),
-        status: newStatus,
-        updatedAt: new Date(),
-      })
-      .where(eq(accountsReceivable.id, id))
-      .returning();
+    // Reject overpayment
+    if (amountUsd > currentBalance + 0.01) {
+      return c.json(
+        {
+          error: `Payment $${amountUsd.toFixed(2)} exceeds balance $${currentBalance.toFixed(2)}`,
+        },
+        400,
+      );
+    }
 
-    // Update customer balance
-    if (account.customerId) {
-      await db
+    // Cap payment at balance to handle rounding
+    const effectivePayment = Math.min(amountUsd, currentBalance);
+    const newPaid = Number(account.paidUsd) + effectivePayment;
+    const newBalance = Math.max(0, currentBalance - effectivePayment);
+    const newStatus = newBalance <= 0.01 ? "paid" : "pending";
+
+    // Atomic: update receivable + customer balance + log
+    const result = await db.transaction(async (tx) => {
+      const [updated] = await tx
+        .update(accountsReceivable)
+        .set({
+          paidUsd: String(newPaid),
+          balanceUsd: String(newBalance),
+          status: newStatus,
+          updatedAt: new Date(),
+        })
+        .where(eq(accountsReceivable.id, id))
+        .returning();
+
+      // Update customer balance
+      await tx
         .update(customers)
         .set({
-          balanceUsd: sql`GREATEST(0, ${customers.balanceUsd}::numeric - ${amountUsd})`,
+          balanceUsd: sql`GREATEST(0, ${customers.balanceUsd}::numeric - ${effectivePayment})`,
           updatedAt: new Date(),
         })
         .where(eq(customers.id, account.customerId));
-    }
 
-    // Log activity
-    await db.insert(activityLog).values({
-      businessId,
-      userId: user.id,
-      action: "payment_received",
-      detail: `Payment $${amountUsd} on receivable ${id.slice(0, 8)}`,
+      // Log activity
+      await tx.insert(activityLog).values({
+        businessId,
+        userId: user.id,
+        action: "payment_received",
+        detail: `Payment $${effectivePayment.toFixed(2)} on receivable ${id.slice(0, 8)}`,
+      });
+
+      return updated;
     });
 
-    return c.json({ account: updated });
+    return c.json({ account: result });
   },
 );
 
@@ -338,7 +378,11 @@ customersRoutes.post(
   },
 );
 
-/** PATCH /accounts/payable/:id/pay - Record a payment on an account payable. */
+/**
+ * PATCH /accounts/payable/:id/pay - Record a payment on an account payable.
+ *
+ * Rejects overpayment. Marks as paid when balance reaches zero.
+ */
 customersRoutes.patch(
   "/accounts/payable/:id/pay",
   zValidator("json", recordPaymentSchema),
@@ -355,17 +399,30 @@ customersRoutes.patch(
         and(
           eq(accountsPayable.id, id),
           eq(accountsPayable.businessId, businessId),
+          eq(accountsPayable.status, "pending"),
         ),
       )
       .limit(1);
 
     if (!account) {
-      return c.json({ error: "Account not found" }, 404);
+      return c.json({ error: "Account not found or already paid" }, 404);
     }
 
-    const newPaid = Number(account.paidUsd) + amountUsd;
-    const newBalance = Math.max(0, Number(account.balanceUsd) - amountUsd);
-    const newStatus = newBalance <= 0 ? "paid" : "pending";
+    const currentBalance = Number(account.balanceUsd);
+
+    if (amountUsd > currentBalance + 0.01) {
+      return c.json(
+        {
+          error: `Payment $${amountUsd.toFixed(2)} exceeds balance $${currentBalance.toFixed(2)}`,
+        },
+        400,
+      );
+    }
+
+    const effectivePayment = Math.min(amountUsd, currentBalance);
+    const newPaid = Number(account.paidUsd) + effectivePayment;
+    const newBalance = Math.max(0, currentBalance - effectivePayment);
+    const newStatus = newBalance <= 0.01 ? "paid" : "pending";
 
     const [updated] = await db
       .update(accountsPayable)
@@ -389,8 +446,8 @@ customersRoutes.patch(
 /**
  * POST /day-close - Record end-of-day cash reconciliation.
  *
- * Calculates expected cash from today's cash sales,
- * compares with counted cash, records the difference.
+ * Calculates expected cash by summing ONLY cash ("efectivo") payments
+ * from today's completed sales. Compares with the physical cash count.
  */
 customersRoutes.post(
   "/day-close",
@@ -401,11 +458,11 @@ customersRoutes.post(
     const db = c.get("db");
     const businessId = c.get("businessId");
 
-    // Calculate expected cash from today's sales
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
-    const todayEnd = new Date();
-    todayEnd.setHours(23, 59, 59, 999);
+    // Use UTC boundaries for today
+    const now = new Date();
+    const dateStr = now.toISOString().split("T")[0];
+    const todayStart = new Date(`${dateStr}T00:00:00.000Z`);
+    const todayEnd = new Date(`${dateStr}T23:59:59.999Z`);
 
     // Get today's completed sales
     const todaySales = await db
@@ -426,8 +483,30 @@ customersRoutes.post(
     );
     const totalSalesCount = todaySales.length;
 
+    // Calculate expected cash: sum of "efectivo" payments from today's sales
+    const saleIds = todaySales.map((s) => s.id);
+    let cashExpected = 0;
+
+    if (saleIds.length > 0) {
+      const cashPayments = await db
+        .select({
+          total: sql<number>`COALESCE(SUM(${salePayments.amountUsd}::numeric), 0)::float`,
+        })
+        .from(salePayments)
+        .where(
+          and(
+            sql`${salePayments.saleId} = ANY(${saleIds})`,
+            eq(salePayments.method, "efectivo"),
+          ),
+        );
+
+      cashExpected = cashPayments[0]?.total ?? 0;
+    }
+
+    const cashDifference = cashCounted - cashExpected;
+
     // Count voided sales
-    const voidedSales = await db
+    const [voidedResult] = await db
       .select({ count: sql<number>`count(*)::int` })
       .from(sales)
       .where(
@@ -439,23 +518,18 @@ customersRoutes.post(
         ),
       );
 
-    // For cashExpected, we'd ideally sum only cash payments.
-    // Simplified: use total sales as expected (owner adjusts mentally for non-cash).
-    const cashExpected = totalSalesUsd;
-    const cashDifference = cashCounted - cashExpected;
-
     const [dayClose] = await db
       .insert(dayCloses)
       .values({
         businessId,
         closedBy: user.id,
-        date: new Date(),
+        date: now,
         cashCounted: String(cashCounted),
         cashExpected: String(cashExpected),
         cashDifference: String(cashDifference),
         totalSalesUsd: String(totalSalesUsd),
         totalSalesCount,
-        totalVoidsCount: voidedSales[0]?.count ?? 0,
+        totalVoidsCount: voidedResult?.count ?? 0,
         notes,
       })
       .returning();
