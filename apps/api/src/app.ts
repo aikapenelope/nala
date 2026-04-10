@@ -21,6 +21,7 @@ import { onboarding } from "./routes/onboarding";
 import { inventory } from "./routes/inventory";
 import { salesRoutes } from "./routes/sales";
 import { customersRoutes } from "./routes/customers";
+import { reports } from "./routes/reports";
 import { authMiddleware } from "./middleware/auth";
 import { tenantMiddleware } from "./middleware/tenant";
 import type { AppEnv } from "./types";
@@ -62,6 +63,9 @@ api.route("/", salesRoutes);
 
 // Customer and accounts routes
 api.route("/", customersRoutes);
+
+// Reports routes
+api.route("/", reports);
 
 app.route("/api", api);
 
