@@ -101,6 +101,26 @@ ALTER TABLE day_closes ENABLE ROW LEVEL SECURITY;
 CREATE POLICY day_closes_tenant_isolation ON day_closes
   USING (business_id = current_business_id());
 
+-- Accounting accounts
+ALTER TABLE accounting_accounts ENABLE ROW LEVEL SECURITY;
+CREATE POLICY accounting_accounts_tenant_isolation ON accounting_accounts
+  USING (business_id = current_business_id());
+
+-- Accounting entries
+ALTER TABLE accounting_entries ENABLE ROW LEVEL SECURITY;
+CREATE POLICY accounting_entries_tenant_isolation ON accounting_entries
+  USING (business_id = current_business_id());
+
+-- Expenses
+ALTER TABLE expenses ENABLE ROW LEVEL SECURITY;
+CREATE POLICY expenses_tenant_isolation ON expenses
+  USING (business_id = current_business_id());
+
+-- Product aliases
+ALTER TABLE product_aliases ENABLE ROW LEVEL SECURITY;
+CREATE POLICY product_aliases_tenant_isolation ON product_aliases
+  USING (business_id = current_business_id());
+
 -- ============================================================
 -- Note: The application connects as a role that has RLS enforced.
 -- Superuser/admin connections bypass RLS for migrations and seeds.

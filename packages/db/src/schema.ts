@@ -1,8 +1,8 @@
 /**
  * Drizzle ORM schema for Nova.
  *
- * Phase 4: adds customers, customer_segments, accounts_receivable,
- * accounts_payable, day_closes.
+ * Phase 6: adds accounting_accounts, accounting_entries, expenses,
+ * expense_items, product_aliases for OCR matching.
  * RLS policies are applied via init.sql (not Drizzle).
  */
 
@@ -565,3 +565,82 @@ export const dayCloses = pgTable("day_closes", {
   notes: text("notes"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+// ============================================================
+// Phase 6 tables: Accounting + OCR
+// ============================================================
+
+/** Chart of accounts - pre-configured per business type. */
+export const accountingAccounts = pgTable("accounting_accounts", {
+  id: uuid("id").default(sql`gen_random_uuid()`).primaryKey(),
+  businessId: uuid("business_id").notNull().references(() => businesses.id),
+  /** Account code (e.g. "4101" for cash sales). */
+  code: text("code").notNull(),
+  name: text("name").notNull(),
+  /** Account type: asset, liability, equity, revenue, expense. */
+  type: text("type").notNull(),
+  /** Parent account for hierarchy (null = top level). */
+  parentId: uuid("parent_id"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** Accounting entries - auto-generated from sales, expenses, payments. */
+export const accountingEntries = pgTable("accounting_entries", {
+  id: uuid("id").default(sql`gen_random_uuid()`).primaryKey(),
+  businessId: uuid("business_id").notNull().references(() => businesses.id),
+  date: timestamp("date", { withTimezone: true }).notNull(),
+  debitAccountId: uuid("debit_account_id").notNull().references(() => accountingAccounts.id),
+  creditAccountId: uuid("credit_account_id").notNull().references(() => accountingAccounts.id),
+  amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
+  description: text("description"),
+  /** Reference to the source (sale ID, expense ID, etc.). */
+  referenceType: text("reference_type"),
+  referenceId: uuid("reference_id"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** Expenses - purchases and operational costs. */
+export const expenses = pgTable("expenses", {
+  id: uuid("id").default(sql`gen_random_uuid()`).primaryKey(),
+  businessId: uuid("business_id").notNull().references(() => businesses.id),
+  supplierId: text("supplier_id"),
+  supplierName: text("supplier_name"),
+  invoiceNumber: text("invoice_number"),
+  date: timestamp("date", { withTimezone: true }).notNull(),
+  total: numeric("total", { precision: 12, scale: 2 }).notNull(),
+  /** URL of the invoice image in MinIO. */
+  imageUrl: text("image_url"),
+  status: text("status").notNull().default("confirmed"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** Expense items - line items from an invoice (OCR output). */
+export const expenseItems = pgTable("expense_items", {
+  id: uuid("id").default(sql`gen_random_uuid()`).primaryKey(),
+  expenseId: uuid("expense_id").notNull().references(() => expenses.id, { onDelete: "cascade" }),
+  description: text("description").notNull(),
+  quantity: integer("quantity").notNull(),
+  unitPrice: numeric("unit_price", { precision: 12, scale: 2 }).notNull(),
+  lineTotal: numeric("line_total", { precision: 12, scale: 2 }).notNull(),
+  /** Matched product (null if new product). */
+  productId: uuid("product_id").references(() => products.id),
+});
+
+/** Product aliases - learned OCR matches per supplier. */
+export const productAliases = pgTable(
+  "product_aliases",
+  {
+    id: uuid("id").default(sql`gen_random_uuid()`).primaryKey(),
+    businessId: uuid("business_id").notNull().references(() => businesses.id),
+    supplierId: text("supplier_id"),
+    /** The text as it appears on the supplier's invoice. */
+    aliasText: text("alias_text").notNull(),
+    /** The Nova product this alias maps to. */
+    productId: uuid("product_id").notNull().references(() => products.id),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("idx_aliases_business_supplier").on(table.businessId, table.supplierId),
+  ],
+);
