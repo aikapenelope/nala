@@ -119,7 +119,11 @@ const keypadRows = [
 
         <!-- Keypad -->
         <div>
-          <div v-for="(row, rowIdx) in keypadRows" :key="rowIdx" class="mb-2 flex justify-center gap-2">
+          <div
+            v-for="(row, rowIdx) in keypadRows"
+            :key="rowIdx"
+            class="mb-2 flex justify-center gap-2"
+          >
             <button
               v-for="digit in row"
               :key="digit"

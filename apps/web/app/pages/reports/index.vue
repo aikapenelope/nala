@@ -7,13 +7,48 @@
 definePageMeta({ middleware: ["admin-only"] });
 
 const reportsList = [
-  { to: "/reports/daily", icon: "📊", title: "Resumen del día", desc: "Ventas, comparativas, top productos" },
-  { to: "/reports/weekly", icon: "📈", title: "Resumen semanal", desc: "Tendencias, mejor día, producto estrella" },
-  { to: "/reports/profitability", icon: "💰", title: "Rentabilidad", desc: "Margen, rotación, score por producto" },
-  { to: "/reports/inventory", icon: "📦", title: "Movimiento inventario", desc: "Entradas, salidas, valorización" },
-  { to: "/reports/receivable", icon: "🧾", title: "Cuentas por cobrar", desc: "Aging, top deudores" },
-  { to: "/reports/sellers", icon: "👥", title: "Ventas por vendedor", desc: "Ranking, totales, ticket promedio" },
-  { to: "/reports/financial", icon: "📋", title: "Resumen financiero", desc: "Ingresos, costos, ganancia (P&L)" },
+  {
+    to: "/reports/daily",
+    icon: "📊",
+    title: "Resumen del día",
+    desc: "Ventas, comparativas, top productos",
+  },
+  {
+    to: "/reports/weekly",
+    icon: "📈",
+    title: "Resumen semanal",
+    desc: "Tendencias, mejor día, producto estrella",
+  },
+  {
+    to: "/reports/profitability",
+    icon: "💰",
+    title: "Rentabilidad",
+    desc: "Margen, rotación, score por producto",
+  },
+  {
+    to: "/reports/inventory",
+    icon: "📦",
+    title: "Movimiento inventario",
+    desc: "Entradas, salidas, valorización",
+  },
+  {
+    to: "/reports/receivable",
+    icon: "🧾",
+    title: "Cuentas por cobrar",
+    desc: "Aging, top deudores",
+  },
+  {
+    to: "/reports/sellers",
+    icon: "👥",
+    title: "Ventas por vendedor",
+    desc: "Ranking, totales, ticket promedio",
+  },
+  {
+    to: "/reports/financial",
+    icon: "📋",
+    title: "Resumen financiero",
+    desc: "Ingresos, costos, ganancia (P&L)",
+  },
 ];
 </script>
 

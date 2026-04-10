@@ -8,8 +8,8 @@ definePageMeta({ middleware: ["admin-only"] });
 
 const narrative = ref(
   "Hoy vendiste $420 en 23 transacciones, 12% más que el martes pasado. " +
-  "Tu producto estrella fue Pan Campesino con 85 unidades. " +
-  "El efectivo representó el 68% de las ventas.",
+    "Tu producto estrella fue Pan Campesino con 85 unidades. " +
+    "El efectivo representó el 68% de las ventas.",
 );
 
 const salesByMethod = ref([
@@ -52,30 +52,51 @@ const topProducts = ref([
 
     <!-- Sales by method -->
     <div class="mb-4 rounded-xl bg-white p-5 shadow-sm">
-      <h3 class="mb-3 text-sm font-semibold text-gray-700">Ventas por método</h3>
+      <h3 class="mb-3 text-sm font-semibold text-gray-700">
+        Ventas por método
+      </h3>
       <div class="space-y-2">
-        <div v-for="m in salesByMethod" :key="m.method" class="flex items-center gap-3">
+        <div
+          v-for="m in salesByMethod"
+          :key="m.method"
+          class="flex items-center gap-3"
+        >
           <span class="w-24 text-sm text-gray-600">{{ m.method }}</span>
           <div class="flex-1 h-4 rounded-full bg-gray-100 overflow-hidden">
-            <div class="h-full rounded-full bg-nova-primary" :style="{ width: `${m.percent}%` }" />
+            <div
+              class="h-full rounded-full bg-nova-primary"
+              :style="{ width: `${m.percent}%` }"
+            />
           </div>
-          <span class="w-16 text-right text-sm font-medium text-gray-900">${{ m.amount.toFixed(0) }}</span>
-          <span class="w-8 text-right text-xs text-gray-400">{{ m.count }}</span>
+          <span class="w-16 text-right text-sm font-medium text-gray-900"
+            >${{ m.amount.toFixed(0) }}</span
+          >
+          <span class="w-8 text-right text-xs text-gray-400">{{
+            m.count
+          }}</span>
         </div>
       </div>
     </div>
 
     <!-- Top products table -->
     <div class="rounded-xl bg-white shadow-sm overflow-hidden">
-      <h3 class="px-5 pt-4 text-sm font-semibold text-gray-700">Top productos</h3>
+      <h3 class="px-5 pt-4 text-sm font-semibold text-gray-700">
+        Top productos
+      </h3>
       <table class="w-full text-left text-sm mt-2">
         <thead class="border-b bg-gray-50">
           <tr>
             <th class="px-5 py-2 font-medium text-gray-500">#</th>
             <th class="px-5 py-2 font-medium text-gray-500">Producto</th>
-            <th class="px-5 py-2 font-medium text-gray-500 text-right">Cant.</th>
-            <th class="px-5 py-2 font-medium text-gray-500 text-right">Total</th>
-            <th class="px-5 py-2 font-medium text-gray-500 text-right">Margen</th>
+            <th class="px-5 py-2 font-medium text-gray-500 text-right">
+              Cant.
+            </th>
+            <th class="px-5 py-2 font-medium text-gray-500 text-right">
+              Total
+            </th>
+            <th class="px-5 py-2 font-medium text-gray-500 text-right">
+              Margen
+            </th>
           </tr>
         </thead>
         <tbody class="divide-y divide-gray-100">
@@ -83,7 +104,9 @@ const topProducts = ref([
             <td class="px-5 py-2 text-gray-400">{{ i + 1 }}</td>
             <td class="px-5 py-2 font-medium text-gray-900">{{ p.name }}</td>
             <td class="px-5 py-2 text-right text-gray-700">{{ p.qty }}</td>
-            <td class="px-5 py-2 text-right text-gray-900">${{ p.total.toFixed(2) }}</td>
+            <td class="px-5 py-2 text-right text-gray-900">
+              ${{ p.total.toFixed(2) }}
+            </td>
             <td class="px-5 py-2 text-right text-gray-500">{{ p.margin }}%</td>
           </tr>
         </tbody>

@@ -40,35 +40,45 @@ async function exportAndSend() {
         Paquete para el contador
       </h2>
       <p class="mb-4 text-xs text-gray-500">
-        Genera un Excel con formato de libro diario (fecha, cuenta, debe,
-        haber) + resumen de ventas y gastos + P&L simplificado.
+        Genera un Excel con formato de libro diario (fecha, cuenta, debe, haber)
+        + resumen de ventas y gastos + P&L simplificado.
       </p>
 
       <div class="space-y-3">
-        <div class="flex items-center justify-between rounded-lg bg-gray-50 px-4 py-3">
+        <div
+          class="flex items-center justify-between rounded-lg bg-gray-50 px-4 py-3"
+        >
           <div>
             <p class="text-sm font-medium text-gray-900">Libro diario</p>
             <p class="text-xs text-gray-500">Asientos contables del período</p>
           </div>
           <span class="text-xs text-gray-400">Excel</span>
         </div>
-        <div class="flex items-center justify-between rounded-lg bg-gray-50 px-4 py-3">
+        <div
+          class="flex items-center justify-between rounded-lg bg-gray-50 px-4 py-3"
+        >
           <div>
             <p class="text-sm font-medium text-gray-900">Resumen de ventas</p>
             <p class="text-xs text-gray-500">Por método de pago y categoría</p>
           </div>
           <span class="text-xs text-gray-400">Excel</span>
         </div>
-        <div class="flex items-center justify-between rounded-lg bg-gray-50 px-4 py-3">
+        <div
+          class="flex items-center justify-between rounded-lg bg-gray-50 px-4 py-3"
+        >
           <div>
             <p class="text-sm font-medium text-gray-900">Resumen de gastos</p>
             <p class="text-xs text-gray-500">Por proveedor y categoría</p>
           </div>
           <span class="text-xs text-gray-400">Excel</span>
         </div>
-        <div class="flex items-center justify-between rounded-lg bg-gray-50 px-4 py-3">
+        <div
+          class="flex items-center justify-between rounded-lg bg-gray-50 px-4 py-3"
+        >
           <div>
-            <p class="text-sm font-medium text-gray-900">Estado de resultados</p>
+            <p class="text-sm font-medium text-gray-900">
+              Estado de resultados
+            </p>
             <p class="text-xs text-gray-500">P&L simplificado del período</p>
           </div>
           <span class="text-xs text-gray-400">PDF</span>
@@ -91,10 +101,14 @@ async function exportAndSend() {
         Libro de compras y ventas en formato requerido por el SENIAT.
       </p>
       <div class="flex gap-3">
-        <button class="flex-1 rounded-lg border border-gray-300 py-2 text-sm font-medium text-gray-700">
+        <button
+          class="flex-1 rounded-lg border border-gray-300 py-2 text-sm font-medium text-gray-700"
+        >
           Libro de ventas
         </button>
-        <button class="flex-1 rounded-lg border border-gray-300 py-2 text-sm font-medium text-gray-700">
+        <button
+          class="flex-1 rounded-lg border border-gray-300 py-2 text-sm font-medium text-gray-700"
+        >
           Libro de compras
         </button>
       </div>

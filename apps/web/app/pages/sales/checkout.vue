@@ -151,9 +151,7 @@ function newSale() {
 
       <!-- Payment method selector -->
       <div class="mb-4">
-        <p class="mb-3 text-sm font-semibold text-gray-700">
-          Método de pago
-        </p>
+        <p class="mb-3 text-sm font-semibold text-gray-700">Método de pago</p>
         <div class="grid grid-cols-4 gap-2">
           <button
             v-for="method in paymentMethods"
@@ -212,9 +210,7 @@ function newSale() {
         @click="confirmSale"
       >
         {{
-          isSubmitting
-            ? "Registrando..."
-            : `Confirmar $${totalUsd.toFixed(2)}`
+          isSubmitting ? "Registrando..." : `Confirmar $${totalUsd.toFixed(2)}`
         }}
       </button>
 

@@ -48,6 +48,13 @@ export default defineNuxtConfig({
     },
   },
 
+  runtimeConfig: {
+    public: {
+      /** Base URL of the Nova API. Override with NUXT_PUBLIC_API_BASE. */
+      apiBase: "http://localhost:3001",
+    },
+  },
+
   typescript: {
     strict: true,
     typeCheck: true,

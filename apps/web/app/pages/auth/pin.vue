@@ -9,9 +9,17 @@
  *
  * Design: Large numeric keypad (60px buttons), 4 dots indicator,
  * employee name shortcuts at the bottom.
+ *
+ * Connected to:
+ * - POST /auth/pin (via useNovaAuth.switchUser)
+ * - GET /auth/employees?businessId=...
  */
 
 import { PIN_LENGTH } from "@nova/shared";
+
+const router = useRouter();
+const { switchUser } = useNovaAuth();
+const { $api } = useApi();
 
 const pin = ref("");
 const error = ref("");
@@ -19,7 +27,42 @@ const isLocked = ref(false);
 const isLoading = ref(false);
 
 /** Employee list for quick-select shortcuts. */
-const employees = ref<Array<{ id: string; name: string }>>([]);
+const employees = ref<Array<{ id: string; name: string; role: string }>>([]);
+
+/** Business ID from localStorage (set during onboarding or previous session). */
+const businessId = ref<string | null>(null);
+
+/** Load business ID and employee list on mount. */
+onMounted(async () => {
+  if (!import.meta.client) return;
+
+  // Restore businessId from the stored Nova user or localStorage
+  const storedUser = localStorage.getItem("nova:user");
+  if (storedUser) {
+    try {
+      const parsed = JSON.parse(storedUser);
+      businessId.value = parsed.businessId ?? null;
+    } catch {
+      // Corrupted data, ignore
+    }
+  }
+
+  if (!businessId.value) {
+    businessId.value = localStorage.getItem("nova:businessId");
+  }
+
+  // Load employee list for shortcuts
+  if (businessId.value) {
+    try {
+      const result = await $api<{
+        employees: Array<{ id: string; name: string; role: string }>;
+      }>(`/auth/employees?businessId=${businessId.value}`);
+      employees.value = result.employees;
+    } catch {
+      // Non-critical: shortcuts won't show
+    }
+  }
+});
 
 /** Handle digit press on the keypad. */
 function pressDigit(digit: string) {
@@ -44,19 +87,39 @@ function deleteDigit() {
 /** Submit PIN for verification. */
 async function submitPin() {
   if (pin.value.length !== PIN_LENGTH) return;
+  if (!businessId.value) {
+    error.value = "No hay negocio configurado. Inicia como dueño primero.";
+    pin.value = "";
+    return;
+  }
 
   isLoading.value = true;
   error.value = "";
 
   try {
-    // TODO: Call API to verify PIN
-    // const result = await $fetch('/api/auth/pin', {
-    //   method: 'POST',
-    //   body: { pin: pin.value }
-    // });
+    const result = await switchUser(pin.value, businessId.value);
 
-    // Placeholder: always fail until API is connected
-    error.value = "PIN incorrecto";
+    if (result.success) {
+      // Navigate to dashboard on successful PIN entry
+      router.push("/");
+      return;
+    }
+
+    if (result.locked) {
+      isLocked.value = true;
+      error.value = result.error ?? "Cuenta bloqueada";
+      // Auto-unlock after 5 minutes
+      setTimeout(
+        () => {
+          isLocked.value = false;
+          error.value = "";
+        },
+        5 * 60 * 1000,
+      );
+    } else {
+      error.value = result.error ?? "PIN incorrecto";
+    }
+
     pin.value = "";
   } catch {
     error.value = "Error de conexión";
@@ -110,7 +173,11 @@ const keypadRows = [
 
     <!-- Numeric keypad -->
     <div class="w-full max-w-xs">
-      <div v-for="(row, rowIdx) in keypadRows" :key="rowIdx" class="mb-3 flex justify-center gap-3">
+      <div
+        v-for="(row, rowIdx) in keypadRows"
+        :key="rowIdx"
+        class="mb-3 flex justify-center gap-3"
+      >
         <button
           v-for="digit in row"
           :key="digit"
@@ -142,7 +209,10 @@ const keypadRows = [
     </div>
 
     <!-- Employee shortcuts -->
-    <div v-if="employees.length > 0" class="mt-8 flex flex-wrap justify-center gap-2">
+    <div
+      v-if="employees.length > 0"
+      class="mt-8 flex flex-wrap justify-center gap-2"
+    >
       <button
         v-for="emp in employees"
         :key="emp.id"

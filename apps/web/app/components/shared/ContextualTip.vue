@@ -33,10 +33,7 @@ function dismiss() {
       <p class="text-sm font-medium text-blue-900">{{ title }}</p>
       <p class="mt-0.5 text-xs text-blue-700">{{ description }}</p>
     </div>
-    <button
-      class="text-xs text-blue-500 hover:text-blue-700"
-      @click="dismiss"
-    >
+    <button class="text-xs text-blue-500 hover:text-blue-700" @click="dismiss">
       Entendido
     </button>
   </div>
