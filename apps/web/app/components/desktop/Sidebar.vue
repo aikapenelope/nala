@@ -33,8 +33,7 @@ const navItems: NavItem[] = [
   { to: "/settings", icon: "settings", label: "Config.", adminOnly: true },
 ];
 
-// TODO: Replace with real auth composable in Phase 1
-const isAdmin = ref(true);
+const { isAdmin, user } = useNovaAuth();
 
 const visibleItems = computed(() =>
   navItems.filter((item) => !item.adminOnly || isAdmin.value),
@@ -64,12 +63,20 @@ const visibleItems = computed(() =>
       </NuxtLink>
     </nav>
 
-    <!-- Sync status -->
+    <!-- User switch button -->
     <div class="border-t border-gray-200 px-4 py-3">
-      <div class="flex items-center gap-2 text-xs text-gray-500">
-        <span class="h-2 w-2 rounded-full bg-green-500" />
-        <span>Conectado</span>
-      </div>
+      <NuxtLink
+        to="/auth/pin"
+        class="flex items-center gap-2 text-xs text-gray-500 hover:text-nova-primary"
+      >
+        <span
+          class="flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold text-white"
+          :class="isAdmin ? 'bg-nova-primary' : 'bg-gray-400'"
+        >
+          {{ user?.name?.charAt(0) ?? "?" }}
+        </span>
+        <span>{{ user?.name ?? "Sin usuario" }}</span>
+      </NuxtLink>
     </div>
   </aside>
 </template>

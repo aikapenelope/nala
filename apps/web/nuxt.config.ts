@@ -6,7 +6,7 @@ export default defineNuxtConfig({
 
   devtools: { enabled: true },
 
-  modules: ["@vite-pwa/nuxt", "@nuxt/eslint"],
+  modules: ["@clerk/nuxt", "@vite-pwa/nuxt", "@nuxt/eslint"],
 
   css: ["~/assets/css/main.css"],
 

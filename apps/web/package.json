@@ -12,6 +12,7 @@
     "typecheck": "nuxt typecheck"
   },
   "dependencies": {
+    "@clerk/nuxt": "^2.1.2",
     "@nova/shared": "*",
     "@vite-pwa/nuxt": "^1.0.0",
     "dexie": "^4.0.11",

@@ -16,6 +16,8 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 import { health } from "./routes/health";
+import { auth } from "./routes/auth";
+import { onboarding } from "./routes/onboarding";
 import { authMiddleware } from "./middleware/auth";
 import { tenantMiddleware } from "./middleware/tenant";
 import type { AppEnv } from "./types";
@@ -35,6 +37,8 @@ app.use(
 
 // Public routes (no auth required)
 app.route("/health", health);
+app.route("/auth", auth);
+app.route("/onboarding", onboarding);
 
 // Protected API routes with typed context variables
 const api = new Hono<AppEnv>();
