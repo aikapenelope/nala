@@ -18,6 +18,7 @@ import { logger } from "hono/logger";
 import { health } from "./routes/health";
 import { auth } from "./routes/auth";
 import { onboarding } from "./routes/onboarding";
+import { inventory } from "./routes/inventory";
 import { authMiddleware } from "./middleware/auth";
 import { tenantMiddleware } from "./middleware/tenant";
 import type { AppEnv } from "./types";
@@ -50,6 +51,9 @@ api.get("/me", (c) => {
   const user = c.get("user");
   return c.json({ user });
 });
+
+// Inventory routes (products, categories, variants)
+api.route("/", inventory);
 
 app.route("/api", api);
 
