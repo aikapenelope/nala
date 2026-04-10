@@ -1,116 +1,168 @@
 <script setup lang="ts">
 /**
  * Daily summary report.
- * Chart + table + AI narrative.
+ * Connected to: GET /api/reports/daily
  */
 
 definePageMeta({ middleware: ["admin-only"] });
 
-const narrative = ref(
-  "Hoy vendiste $420 en 23 transacciones, 12% más que el martes pasado. " +
-    "Tu producto estrella fue Pan Campesino con 85 unidades. " +
-    "El efectivo representó el 68% de las ventas.",
-);
+const { $api } = useApi();
+const isLoading = ref(true);
+const loadError = ref("");
+const narrative = ref("");
 
-const salesByMethod = ref([
-  { method: "Efectivo", count: 15, amount: 285.0, percent: 68 },
-  { method: "Pago Móvil", count: 5, amount: 85.0, percent: 20 },
-  { method: "Binance", count: 2, amount: 30.0, percent: 7 },
-  { method: "Fiado", count: 1, amount: 20.0, percent: 5 },
-]);
+const data = ref({
+  totalSales: 0,
+  totalCount: 0,
+  avgTicket: 0,
+  vsPreviousDay: 0,
+  vsSameDayLastWeek: 0,
+  topProducts: [] as Array<{ name: string; qty: number; total: number }>,
+  salesByMethod: {} as Record<string, number>,
+});
 
-const topProducts = ref([
-  { name: "Pan Campesino", qty: 85, total: 127.5, margin: 47 },
-  { name: "Café con Leche", qty: 42, total: 42.0, margin: 60 },
-  { name: "Queso Blanco", qty: 15, total: 45.0, margin: 33 },
-  { name: "Harina PAN", qty: 12, total: 24.0, margin: 25 },
-  { name: "Aceite Diana", qty: 8, total: 36.0, margin: 33 },
-]);
+async function fetchReport() {
+  isLoading.value = true;
+  loadError.value = "";
+  try {
+    const result = await $api<{
+      data: typeof data.value;
+      narrative: string;
+    }>("/api/reports/daily");
+    data.value = result.data;
+    narrative.value = result.narrative;
+  } catch (err) {
+    loadError.value =
+      err instanceof Error ? err.message : "Error cargando reporte";
+  } finally {
+    isLoading.value = false;
+  }
+}
+
+onMounted(fetchReport);
+
+const methodEntries = computed(() => {
+  const entries = Object.entries(data.value.salesByMethod);
+  const total = entries.reduce((s, [, v]) => s + v, 0);
+  return entries.map(([method, amount]) => ({
+    method,
+    amount,
+    percent: total > 0 ? Math.round((amount / total) * 100) : 0,
+  }));
+});
+
+const methodLabels: Record<string, string> = {
+  efectivo: "Efectivo",
+  pago_movil: "Pago Movil",
+  binance: "Binance",
+  zinli: "Zinli",
+  transferencia: "Transferencia",
+  zelle: "Zelle",
+  fiado: "Fiado",
+};
 </script>
 
 <template>
-  <SharedReportLayout title="Resumen del día" :narrative="narrative">
-    <!-- Summary cards -->
-    <div class="mb-4 grid grid-cols-4 gap-3">
-      <div class="rounded-xl bg-white p-4 text-center shadow-sm">
-        <p class="text-2xl font-bold text-gray-900">$420</p>
-        <p class="text-xs text-gray-500">Ventas</p>
-      </div>
-      <div class="rounded-xl bg-white p-4 text-center shadow-sm">
-        <p class="text-2xl font-bold text-gray-900">23</p>
-        <p class="text-xs text-gray-500">Transacciones</p>
-      </div>
-      <div class="rounded-xl bg-white p-4 text-center shadow-sm">
-        <p class="text-2xl font-bold text-green-600">+12%</p>
-        <p class="text-xs text-gray-500">vs ayer</p>
-      </div>
-      <div class="rounded-xl bg-white p-4 text-center shadow-sm">
-        <p class="text-2xl font-bold text-gray-900">$18.26</p>
-        <p class="text-xs text-gray-500">Ticket prom.</p>
-      </div>
+  <SharedReportLayout title="Resumen del dia" :narrative="narrative">
+    <div v-if="isLoading" class="py-12 text-center text-gray-400">
+      Cargando...
     </div>
-
-    <!-- Sales by method -->
-    <div class="mb-4 rounded-xl bg-white p-5 shadow-sm">
-      <h3 class="mb-3 text-sm font-semibold text-gray-700">
-        Ventas por método
-      </h3>
-      <div class="space-y-2">
-        <div
-          v-for="m in salesByMethod"
-          :key="m.method"
-          class="flex items-center gap-3"
-        >
-          <span class="w-24 text-sm text-gray-600">{{ m.method }}</span>
-          <div class="flex-1 h-4 rounded-full bg-gray-100 overflow-hidden">
-            <div
-              class="h-full rounded-full bg-nova-primary"
-              :style="{ width: `${m.percent}%` }"
-            />
-          </div>
-          <span class="w-16 text-right text-sm font-medium text-gray-900"
-            >${{ m.amount.toFixed(0) }}</span
+    <div
+      v-else-if="loadError"
+      class="rounded-xl bg-red-50 p-4 text-sm text-red-600"
+    >
+      {{ loadError }}
+    </div>
+    <template v-else>
+      <div class="mb-4 grid grid-cols-4 gap-3">
+        <div class="rounded-xl bg-white p-4 text-center shadow-sm">
+          <p class="text-2xl font-bold text-gray-900">
+            ${{ data.totalSales.toFixed(0) }}
+          </p>
+          <p class="text-xs text-gray-500">Ventas</p>
+        </div>
+        <div class="rounded-xl bg-white p-4 text-center shadow-sm">
+          <p class="text-2xl font-bold text-gray-900">{{ data.totalCount }}</p>
+          <p class="text-xs text-gray-500">Transacciones</p>
+        </div>
+        <div class="rounded-xl bg-white p-4 text-center shadow-sm">
+          <p
+            class="text-2xl font-bold"
+            :class="data.vsPreviousDay >= 0 ? 'text-green-600' : 'text-red-600'"
           >
-          <span class="w-8 text-right text-xs text-gray-400">{{
-            m.count
-          }}</span>
+            {{ data.vsPreviousDay >= 0 ? "+" : "" }}{{ data.vsPreviousDay }}%
+          </p>
+          <p class="text-xs text-gray-500">vs ayer</p>
+        </div>
+        <div class="rounded-xl bg-white p-4 text-center shadow-sm">
+          <p class="text-2xl font-bold text-gray-900">
+            ${{ data.avgTicket.toFixed(2) }}
+          </p>
+          <p class="text-xs text-gray-500">Ticket prom.</p>
         </div>
       </div>
-    </div>
 
-    <!-- Top products table -->
-    <div class="rounded-xl bg-white shadow-sm overflow-hidden">
-      <h3 class="px-5 pt-4 text-sm font-semibold text-gray-700">
-        Top productos
-      </h3>
-      <table class="w-full text-left text-sm mt-2">
-        <thead class="border-b bg-gray-50">
-          <tr>
-            <th class="px-5 py-2 font-medium text-gray-500">#</th>
-            <th class="px-5 py-2 font-medium text-gray-500">Producto</th>
-            <th class="px-5 py-2 font-medium text-gray-500 text-right">
-              Cant.
-            </th>
-            <th class="px-5 py-2 font-medium text-gray-500 text-right">
-              Total
-            </th>
-            <th class="px-5 py-2 font-medium text-gray-500 text-right">
-              Margen
-            </th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-gray-100">
-          <tr v-for="(p, i) in topProducts" :key="p.name">
-            <td class="px-5 py-2 text-gray-400">{{ i + 1 }}</td>
-            <td class="px-5 py-2 font-medium text-gray-900">{{ p.name }}</td>
-            <td class="px-5 py-2 text-right text-gray-700">{{ p.qty }}</td>
-            <td class="px-5 py-2 text-right text-gray-900">
-              ${{ p.total.toFixed(2) }}
-            </td>
-            <td class="px-5 py-2 text-right text-gray-500">{{ p.margin }}%</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
+      <div
+        v-if="methodEntries.length > 0"
+        class="mb-4 rounded-xl bg-white p-5 shadow-sm"
+      >
+        <h3 class="mb-3 text-sm font-semibold text-gray-700">
+          Ventas por metodo
+        </h3>
+        <div class="space-y-2">
+          <div
+            v-for="m in methodEntries"
+            :key="m.method"
+            class="flex items-center gap-3"
+          >
+            <span class="w-24 text-sm text-gray-600">{{
+              methodLabels[m.method] ?? m.method
+            }}</span>
+            <div class="h-4 flex-1 overflow-hidden rounded-full bg-gray-100">
+              <div
+                class="h-full rounded-full bg-nova-primary"
+                :style="{ width: `${m.percent}%` }"
+              />
+            </div>
+            <span class="w-16 text-right text-sm font-medium text-gray-900"
+              >${{ m.amount.toFixed(0) }}</span
+            >
+          </div>
+        </div>
+      </div>
+
+      <div
+        v-if="data.topProducts.length > 0"
+        class="overflow-hidden rounded-xl bg-white shadow-sm"
+      >
+        <h3 class="px-5 pt-4 text-sm font-semibold text-gray-700">
+          Top productos
+        </h3>
+        <table class="mt-2 w-full text-left text-sm">
+          <thead class="border-b bg-gray-50">
+            <tr>
+              <th class="px-5 py-2 font-medium text-gray-500">#</th>
+              <th class="px-5 py-2 font-medium text-gray-500">Producto</th>
+              <th class="px-5 py-2 text-right font-medium text-gray-500">
+                Cant.
+              </th>
+              <th class="px-5 py-2 text-right font-medium text-gray-500">
+                Total
+              </th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-100">
+            <tr v-for="(p, i) in data.topProducts" :key="p.name">
+              <td class="px-5 py-2 text-gray-400">{{ i + 1 }}</td>
+              <td class="px-5 py-2 font-medium text-gray-900">{{ p.name }}</td>
+              <td class="px-5 py-2 text-right text-gray-700">{{ p.qty }}</td>
+              <td class="px-5 py-2 text-right text-gray-900">
+                ${{ p.total.toFixed(2) }}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </template>
   </SharedReportLayout>
 </template>
