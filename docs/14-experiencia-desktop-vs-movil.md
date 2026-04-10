@@ -1,6 +1,6 @@
-# Nala: Experiencia Desktop vs Móvil -- Diseño por Contexto de Uso
+# Nova: Experiencia Desktop vs Móvil -- Diseño por Contexto de Uso
 
-> Cómo lo hacen Square, Shopify y Lightspeed en EEUU, qué datos respaldan las decisiones, y cómo Nala adapta cada experiencia al contexto real del comerciante venezolano.
+> Cómo lo hacen Square, Shopify y Lightspeed en EEUU, qué datos respaldan las decisiones, y cómo Nova adapta cada experiencia al contexto real del comerciante venezolano.
 
 ---
 
@@ -43,7 +43,7 @@ No es que el móvil sea "menos". Es que cada dispositivo se usa en un contexto d
 
 ## Datos de Uso Real (2025-2026)
 
-| Dato | Fuente | Implicación para Nala |
+| Dato | Fuente | Implicación para Nova |
 |---|---|---|
 | 59.6% del tráfico web global es móvil | SQ Magazine 2025 | La mayoría de usuarios accederán desde el celular |
 | Usuarios móviles hacen 4.8 sesiones/día vs 2.1 en desktop | SQ Magazine 2025 | Móvil = sesiones cortas y frecuentes. Desktop = sesiones largas y pocas |
@@ -52,11 +52,11 @@ No es que el móvil sea "menos". Es que cada dispositivo se usa en un contexto d
 | 61% de búsquedas móviles resultan en acción en <1 hora | SQ Magazine 2025 | Móvil = acción inmediata (vender, cobrar, consultar) |
 | Conversión desktop (4.3%) > móvil (2.2%) | SQ Magazine 2025 | Decisiones complejas (configurar, analizar) se hacen mejor en desktop |
 | En LATAM, móvil creció 5.9% YoY (mayor crecimiento global) | SQ Magazine 2025 | Venezuela es mobile-first. La PWA es la experiencia principal |
-| En África, 84% del tráfico es móvil | SQ Magazine 2025 | Mercados emergentes = mobile-first. Nala debe priorizar móvil |
+| En África, 84% del tráfico es móvil | SQ Magazine 2025 | Mercados emergentes = mobile-first. Nova debe priorizar móvil |
 
 ---
 
-## Diseño de Nala por Contexto
+## Diseño de Nova por Contexto
 
 ### Móvil PWA: Centro de Acción
 

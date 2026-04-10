@@ -1,4 +1,4 @@
-# Nala: Visión de Producto 2026 (v2)
+# Nova: Visión de Producto 2026 (v2)
 
 > Un sistema administrativo completo para PyMEs venezolanas. Potente en escritorio, igual de potente en móvil, con WhatsApp como canal de salida. No es un chatbot. Es un producto de verdad.
 
@@ -6,14 +6,14 @@
 
 ## Corrección de Rumbo
 
-La versión anterior de este documento se inclinó demasiado hacia "WhatsApp es la interfaz". Eso convierte a Nala en un bot, no en un producto. Y se parece demasiado a Aurora (voice-first, conversacional).
+La versión anterior de este documento se inclinó demasiado hacia "WhatsApp es la interfaz". Eso convierte a Nova en un bot, no en un producto. Y se parece demasiado a Aurora (voice-first, conversacional).
 
-Nala es diferente:
+Nova es diferente:
 
 - **Aurora** = PWA voice-first para interacción con clientes finales del negocio
-- **Nala** = Sistema administrativo completo para el dueño y sus empleados
+- **Nova** = Sistema administrativo completo para el dueño y sus empleados
 
-Nala es una **aplicación de verdad** con pantallas, tablas, gráficos, formularios y flujos completos. Funciona en escritorio (pantalla grande, teclado, mouse) y en móvil (PWA, táctil, bolsillo). WhatsApp es un canal de salida para notificaciones y cobros, no la interfaz principal.
+Nova es una **aplicación de verdad** con pantallas, tablas, gráficos, formularios y flujos completos. Funciona en escritorio (pantalla grande, teclado, mouse) y en móvil (PWA, táctil, bolsillo). WhatsApp es un canal de salida para notificaciones y cobros, no la interfaz principal.
 
 ---
 
@@ -33,7 +33,7 @@ El dueño de una PyME venezolana necesita un sistema que:
 
 ### Pilar 1: Producto completo, experiencia simple
 
-Nala tiene todas las capacidades de un sistema administrativo profesional. Pero cada feature se presenta de la forma más simple posible. La potencia está disponible, no impuesta.
+Nova tiene todas las capacidades de un sistema administrativo profesional. Pero cada feature se presenta de la forma más simple posible. La potencia está disponible, no impuesta.
 
 - En escritorio: layout completo con sidebar, tablas con filtros, gráficos interactivos, atajos de teclado
 - En móvil: la misma funcionalidad adaptada a pantalla táctil, con navegación por tabs y gestos
@@ -41,7 +41,7 @@ Nala tiene todas las capacidades de un sistema administrativo profesional. Pero 
 
 ### Pilar 2: Offline-first como arquitectura
 
-No es un "modo offline" que se activa cuando falla internet. Es la forma en que Nala funciona siempre. Los datos viven en el dispositivo. Se sincronizan cuando hay conexión. El usuario nunca ve un spinner de carga ni un error de red.
+No es un "modo offline" que se activa cuando falla internet. Es la forma en que Nova funciona siempre. Los datos viven en el dispositivo. Se sincronizan cuando hay conexión. El usuario nunca ve un spinner de carga ni un error de red.
 
 ### Pilar 3: Inteligencia integrada en cada pantalla
 
@@ -65,7 +65,7 @@ El dueño o gerente que trabaja desde una PC o laptop tiene acceso a la experien
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│  Nala          Panadería Don Pedro       Bs/USD: 36.50  │
+│  Nova          Panadería Don Pedro       Bs/USD: 36.50  │
 ├──────────┬──────────────────────────────────────────────┤
 │          │                                              │
 │  Inicio  │   Hoy: $420 vendidos                        │
@@ -225,17 +225,17 @@ Barra inferior con 5 tabs: Inicio | Vender | Inventario | Clientes | Más (cuent
 
 ## WhatsApp como Canal de Salida (No Interfaz)
 
-WhatsApp no es donde el usuario trabaja. Es donde Nala le **envía cosas** y donde el usuario **ejecuta cobros**. La diferencia es importante.
+WhatsApp no es donde el usuario trabaja. Es donde Nova le **envía cosas** y donde el usuario **ejecuta cobros**. La diferencia es importante.
 
 ### Lo que sale por WhatsApp
 
 | Qué | Cuándo | Cómo |
 |---|---|---|
-| Resumen diario | 9pm automático | Mensaje con: ventas, ganancia, top producto, alertas. Generado por Nala, enviado vía push o Twilio |
+| Resumen diario | 9pm automático | Mensaje con: ventas, ganancia, top producto, alertas. Generado por Nova, enviado vía push o Twilio |
 | Resumen semanal | Lunes 8am | Comparativa semanal, tendencias, recomendaciones |
 | Cobro a cliente | Cuando el usuario toca "Cobrar" | Link wa.me con mensaje personalizado. El usuario toca y envía desde su WhatsApp |
 | Recibo de venta | Cuando el usuario toca "Enviar recibo" | PDF generado + link wa.me |
-| Campaña de marketing | Cuando el usuario la lanza desde Nala | Lista de mensajes personalizados listos para enviar por lista de difusión |
+| Campaña de marketing | Cuando el usuario la lanza desde Nova | Lista de mensajes personalizados listos para enviar por lista de difusión |
 | Reporte al contador | Cuando el usuario toca "Enviar al contador" | PDF/Excel adjunto + link wa.me |
 | Alerta crítica | Cuando ocurre (stock agotado, anomalía grave) | Push notification + opcionalmente WhatsApp |
 
@@ -257,7 +257,7 @@ La IA no es un módulo. Es una capa que enriquece cada pantalla del producto.
 
 ### Cómo se ve en cada pantalla
 
-| Pantalla | Sin IA (Fina) | Con IA integrada (Nala) |
+| Pantalla | Sin IA (Fina) | Con IA integrada (Nova) |
 |---|---|---|
 | **Inventario** | Lista de productos con stock | Cada producto tiene: "Se acaba en ~X días". Productos muertos marcados en gris. Semáforo de estado |
 | **Dashboard** | Número de ventas del día | "Vendiste 12% más que el martes pasado. Tu mejor hora fue 10-11am. Mañana es miércoles, históricamente tu mejor día" |
@@ -277,7 +277,7 @@ La IA no es un módulo. Es una capa que enriquece cada pantalla del producto.
 
 ---
 
-## Features Completos de Nala v1.0
+## Features Completos de Nova v1.0
 
 ### Ventas
 
@@ -375,7 +375,7 @@ La IA no es un módulo. Es una capa que enriquece cada pantalla del producto.
 | Programa de lealtad | v2, versión simple ("Compra 10, el 11 gratis") |
 | Integración con marketplaces | Mercado mínimo en Venezuela |
 | Embedded finance / préstamos | Requiere licencia financiera |
-| Chatbot / modo conversacional | Nala es una app, no un bot |
+| Chatbot / modo conversacional | Nova es una app, no un bot |
 
 ---
 
@@ -443,6 +443,6 @@ La IA no es un módulo. Es una capa que enriquece cada pantalla del producto.
 
 ## Resumen
 
-> **Nala es un sistema administrativo completo que se siente moderno, funciona sin internet, y tiene inteligencia integrada en cada pantalla. WhatsApp es su mensajero, no su interfaz. Es potente en escritorio y en el bolsillo.**
+> **Nova es un sistema administrativo completo que se siente moderno, funciona sin internet, y tiene inteligencia integrada en cada pantalla. WhatsApp es su mensajero, no su interfaz. Es potente en escritorio y en el bolsillo.**
 
 No es un bot. No es un chatbot. No es "WhatsApp con features". Es una aplicación profesional diseñada para que un dueño de negocio venezolano tenga en sus manos lo que antes solo tenían empresas grandes, pero sin la complejidad que viene con eso.

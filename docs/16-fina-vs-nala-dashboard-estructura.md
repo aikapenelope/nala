@@ -1,4 +1,4 @@
-# Nala vs Fina: Comparación de Features + Estructura del Dashboard
+# Nova vs Fina: Comparación de Features + Estructura del Dashboard
 
 ---
 
@@ -9,8 +9,8 @@ Redis 7 ya está en el data plane (10.0.1.20) junto con PostgreSQL 16+pgvector, 
 ```
 Control Plane (cx23, 10.0.1.10)     App Plane A (cx33, 10.0.1.30)
 ┌─────────────────────────┐         ┌─────────────────────────┐
-│ Coolify                 │         │ Nala Frontend (Nuxt 4)  │
-│ Traefik (reverse proxy) │         │ Nala Backend (Hono)     │
+│ Coolify                 │         │ Nova Frontend (Nuxt 4)  │
+│ Traefik (reverse proxy) │         │ Nova Backend (Hono)     │
 │ Monitoring              │         │ WhatsApp Webhook        │
 └─────────────────────────┘         └─────────────────────────┘
                                               │
@@ -25,11 +25,11 @@ Data Plane (cx33, 10.0.1.20)                  │ red privada
 
 ---
 
-## 2. Fina vs Nala: Qué Tiene Fina que Nala Cubre, Qué Dejamos Fuera
+## 2. Fina vs Nova: Qué Tiene Fina que Nova Cubre, Qué Dejamos Fuera
 
-### Lo que Fina tiene y Nala CUBRE (igual o mejor)
+### Lo que Fina tiene y Nova CUBRE (igual o mejor)
 
-| Feature de Fina | Cómo lo cubre Nala | Mejor/Igual/Diferente |
+| Feature de Fina | Cómo lo cubre Nova | Mejor/Igual/Diferente |
 |---|---|---|
 | Dashboard en tiempo real (facturación, ganancia, alertas, cuentas) | Dashboard con ventas del día, comparativa automática, 3 tarjetas, alertas inteligentes | Mejor (comparativas, IA narrativa) |
 | Inventario por talla/color/referencia | Inventario con variantes (producto padre → variantes hijas con SKU) | Igual |
@@ -57,20 +57,20 @@ Data Plane (cx33, 10.0.1.20)                  │ red privada
 | Soporte técnico gratuito | Soporte por WhatsApp en plan Negocio | Igual |
 | Centro de tutoriales | Onboarding interactivo dentro de la app con datos reales | Mejor (aprende haciendo) |
 
-### Lo que Fina tiene y Nala DEJA FUERA (a propósito)
+### Lo que Fina tiene y Nova DEJA FUERA (a propósito)
 
-| Feature de Fina | Por qué Nala no lo tiene |
+| Feature de Fina | Por qué Nova no lo tiene |
 |---|---|
-| Gestión de mesas (restaurantes) | Nala no atiende restaurantes. Decidido en doc 12 |
+| Gestión de mesas (restaurantes) | Nova no atiende restaurantes. Decidido en doc 12 |
 | Descuento automático de ingredientes por receta | Feature de restaurantes. Fuera de scope |
 | Seguimiento de repartidores | Feature de restaurantes/delivery. Fuera de scope |
 | Roles de mesonero | Feature de restaurantes. Fuera de scope |
 | Programa de partners | No es un feature del producto. Es un programa comercial. Se puede agregar después si hay demanda |
-| Pago único (acceso de por vida) | Modelo de negocio diferente. Nala es SaaS con plan gratis + suscripción |
+| Pago único (acceso de por vida) | Modelo de negocio diferente. Nova es SaaS con plan gratis + suscripción |
 
-### Lo que Nala tiene y Fina NO tiene
+### Lo que Nova tiene y Fina NO tiene
 
-| Feature de Nala | Valor |
+| Feature de Nova | Valor |
 |---|---|
 | Funciona sin internet (cache + cola de ventas) | Crítico en Venezuela |
 | WhatsApp bidireccional (entrada + salida) | Consultar, vender, cobrar por chat |

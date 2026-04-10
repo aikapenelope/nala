@@ -1,10 +1,10 @@
-# Nala: Especificación Final de Producto
+# Nova: Especificación Final de Producto
 
 > Documento definitivo que consolida capacidades, arquitectura y funcionamiento. Referencia para construir el producto.
 
 ---
 
-## 1. Qué es Nala
+## 1. Qué es Nova
 
 Backoffice operativo para comerciantes y PyMEs en mercados emergentes, empezando por Venezuela. Ventas, inventario, clientes, cuentas, reportes y contabilidad en un solo lugar. Tres formas de acceso: escritorio (experiencia completa), móvil PWA (misma funcionalidad), WhatsApp (acceso rápido bidireccional). Funciona sin internet. Inteligencia integrada en cada pantalla.
 
@@ -96,7 +96,7 @@ Backoffice operativo para comerciantes y PyMEs en mercados emergentes, empezando
 
 ### 3.6 Contabilidad (Puente al Contador)
 
-Nala no es un sistema contable. Es un puente entre las operaciones del negocio y el contador.
+Nova no es un sistema contable. Es un puente entre las operaciones del negocio y el contador.
 
 - Catálogo de cuentas pre-configurado por tipo de negocio. El contador lo ajusta una vez
 - Cada venta, gasto y pago genera asientos contables automáticamente (invisible para el usuario)
@@ -127,9 +127,9 @@ Desde la PWA (cámara nativa, resolución completa). No por WhatsApp (comprime i
 
 ### 3.8 WhatsApp Bidireccional
 
-**Infraestructura:** WhatsApp Cloud API directo (Meta), sin BSP en v1. Webhook HTTPS en servidor Nala. LLM (GPT-4o-mini) interpreta mensajes entrantes y ejecuta acciones.
+**Infraestructura:** WhatsApp Cloud API directo (Meta), sin BSP en v1. Webhook HTTPS en servidor Nova. LLM (GPT-4o-mini) interpreta mensajes entrantes y ejecuta acciones.
 
-**Salida (Nala → usuario):**
+**Salida (Nova → usuario):**
 - Resúmenes diarios y semanales automáticos
 - Alertas críticas (stock agotado, anomalía)
 - Cobros a clientes (mensaje personalizado con monto)
@@ -137,11 +137,11 @@ Desde la PWA (cámara nativa, resolución completa). No por WhatsApp (comprime i
 - Campañas de marketing por segmento
 - Recibos digitales de venta
 
-**Entrada (usuario → Nala):**
+**Entrada (usuario → Nova):**
 - Consultar: "cuánto vendí hoy", "cuánto me debe Juan", "inventario bajo"
 - Actuar: "registra venta 3 pan campesino pago móvil", "sube precio del pan a 1.80"
 - Cobrar: "cobra a todos los que deben más de 30 días"
-- Confirmar: responder "sí" a sugerencias de Nala
+- Confirmar: responder "sí" a sugerencias de Nova
 
 **Lo que NO se hace por WhatsApp:** gestión completa de inventario, reportes visuales detallados, configuración, conteo físico, OCR de facturas.
 
@@ -161,7 +161,7 @@ Desde la PWA (cámara nativa, resolución completa). No por WhatsApp (comprime i
 ### 3.10 Multi-moneda
 
 - Precios de productos siempre en USD (referencia estable)
-- Al cobrar, Nala calcula equivalente en Bs. a tasa BCV del momento
+- Al cobrar, Nova calcula equivalente en Bs. a tasa BCV del momento
 - Si el cliente paga en Bs., se registra monto en Bs. y equivalente en USD
 - Reportes siempre muestran ambas monedas
 - Alerta si la tasa cambió más de 2% en un día
@@ -212,7 +212,7 @@ Desde la PWA (cámara nativa, resolución completa). No por WhatsApp (comprime i
 │                     SERVIDOR (Hetzner)                           │
 │                                                                 │
 │  ┌─────────────────────────────────────────────────────────┐   │
-│  │                  Nala Backend (Node.js)                  │   │
+│  │                  Nova Backend (Node.js)                  │   │
 │  │                                                         │   │
 │  │  ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────────┐  │   │
 │  │  │  API    │ │  Sync   │ │WhatsApp │ │  OCR        │  │   │
@@ -330,14 +330,14 @@ Barra inferior con 5 tabs: Inicio | Vender | Inventario | Clientes | Más. Misma
 Patrón de Square: 5 pasos, 5 minutos, sin llamar a soporte.
 
 1. "¿Qué tipo de negocio?" → selector visual con íconos
-2. Nala pre-configura: categorías, cuentas contables, métodos de pago
+2. Nova pre-configura: categorías, cuentas contables, métodos de pago
 3. "¿Tienes productos en Excel?" → Sí (sube) / No (agrega uno: nombre + precio)
 4. "¿Tienes empleados?" → Sí (crea PIN) / No
 5. Tutorial interactivo guía la primera venta dentro de la app con datos reales
 
 ### 5.4 Patrones de UX adoptados
 
-| Origen | Patrón | Implementación en Nala |
+| Origen | Patrón | Implementación en Nova |
 |---|---|---|
 | Loyverse | Venta en 3 toques | Grid de productos (más vendidos primero) → toque agrega → botón "Cobrar" |
 | Square | Dashboard de una pregunta | Un número grande (ventas del día) + indicador de tendencia + 3 tarjetas + 3 alertas máximo |
@@ -403,7 +403,7 @@ Multi-sucursal con transferencias de inventario. API REST pública. Tienda onlin
 
 | Decisión | Elección | Razón |
 |---|---|---|
-| Build vs OSS base | Desde cero | Lo que diferencia a Nala (offline, IA, WhatsApp, OCR, simplicidad) hay que construirlo de cero. ERPNext/Odoo agregan complejidad sin ahorrar ese trabajo |
+| Build vs OSS base | Desde cero | Lo que diferencia a Nova (offline, IA, WhatsApp, OCR, simplicidad) hay que construirlo de cero. ERPNext/Odoo agregan complejidad sin ahorrar ese trabajo |
 | Roles | 2 (Dueño + Empleado) | PyMEs de 1-5 empleados no necesitan 5 roles. PIN por usuario para accountability |
 | OCR motor | GPT-4o-mini vision vía OpenRouter (v1) | Un API call hace OCR + interpretación + matching. Cero carga en CPU. Groq como fallback para texto (sin vision) |
 | OCR escala | PaddleOCR self-hosted (v2+) | Cuando haya 1,000+ negocios, reduce costos 10-20x como microservicio |

@@ -1,14 +1,14 @@
 # Decisión: Pipeline OCR en Detalle + Sin Restaurantes
 
-> Cómo funciona la lectura de facturas multi-producto en producción, qué puede fallar, cómo se guarda en la DB, cómo reducir costos de LLM, y por qué Nala no atiende restaurantes.
+> Cómo funciona la lectura de facturas multi-producto en producción, qué puede fallar, cómo se guarda en la DB, cómo reducir costos de LLM, y por qué Nova no atiende restaurantes.
 
 ---
 
 ## 1. Sin Restaurantes
 
-Nala no atiende restaurantes. La complejidad del rubro de comida (gestión de mesas, recetas con ingredientes, kitchen display, propinas, pedidos online, delivery) requiere un producto vertical dedicado (como Toast en EEUU). Intentar cubrir restaurantes diluye el producto y agrega complejidad que el resto de comerciantes no necesita.
+Nova no atiende restaurantes. La complejidad del rubro de comida (gestión de mesas, recetas con ingredientes, kitchen display, propinas, pedidos online, delivery) requiere un producto vertical dedicado (como Toast en EEUU). Intentar cubrir restaurantes diluye el producto y agrega complejidad que el resto de comerciantes no necesita.
 
-**Nala atiende:** Ferreterías, tiendas de ropa, autopartes, peluquerías, bodegas, farmacias, tiendas de electrónica, librerías, tiendas de cosméticos, distribuidoras de alimentos, y cualquier comercio que venda productos (no platos preparados).
+**Nova atiende:** Ferreterías, tiendas de ropa, autopartes, peluquerías, bodegas, farmacias, tiendas de electrónica, librerías, tiendas de cosméticos, distribuidoras de alimentos, y cualquier comercio que venda productos (no platos preparados).
 
 **Lo que se elimina del producto:**
 - Gestión de mesas

@@ -1,6 +1,6 @@
 # Decisión: Construir Desde Cero vs Montar Sobre OSS Existente
 
-> Análisis de si vale la pena usar ERPNext, Odoo, o algún otro sistema open source como base para Nala, o construir desde cero.
+> Análisis de si vale la pena usar ERPNext, Odoo, o algún otro sistema open source como base para Nova, o construir desde cero.
 
 ---
 
@@ -31,7 +31,7 @@
 
 ## La Comparación Real
 
-### Opción A: Montar Nala sobre ERPNext
+### Opción A: Montar Nova sobre ERPNext
 
 **Lo que ganas:**
 - Contabilidad completa ya construida (libro diario, mayor, balance, P&L, multi-moneda)
@@ -46,7 +46,7 @@
 
 **Lo que pierdes:**
 
-| Aspecto | Lo que Nala necesita | Lo que ERPNext ofrece | Gap |
+| Aspecto | Lo que Nova necesita | Lo que ERPNext ofrece | Gap |
 |---|---|---|---|
 | **PWA offline-first** | Arquitectura offline-first con IndexedDB y Service Workers | App web tradicional. No funciona offline | Enorme. Habría que reescribir el frontend completo |
 | **Simplicidad** | 2 roles, pantallas mínimas, onboarding en 5 min | 50+ DocTypes, cientos de campos, onboarding de días/semanas | Habría que esconder el 90% de ERPNext |
@@ -59,7 +59,7 @@
 | **Velocidad** | <2s en 3G | ERPNext es notoriamente lento. Usuarios reportan problemas de performance con bases de datos grandes | Problema estructural |
 | **Stack** | Nuxt 4 (Vue 3), TypeScript, PostgreSQL | Python (Frappe), MariaDB, jQuery | Stack completamente diferente al que queremos |
 
-**El problema fundamental:** ERPNext es un ERP que hay que simplificar. Nala es un producto simple que tiene que ser potente. Son filosofías opuestas. Simplificar ERPNext es más trabajo que construir Nala desde cero, porque tienes que:
+**El problema fundamental:** ERPNext es un ERP que hay que simplificar. Nova es un producto simple que tiene que ser potente. Son filosofías opuestas. Simplificar ERPNext es más trabajo que construir Nova desde cero, porque tienes que:
 
 1. Entender el framework Frappe (curva de aprendizaje de semanas)
 2. Esconder/deshabilitar el 90% de los módulos y campos
@@ -69,9 +69,9 @@
 6. Construir el OCR desde cero de todas formas
 7. Lidiar con la licencia GPL-3.0 (todo tu código debe ser open source)
 8. Lidiar con actualizaciones de ERPNext que rompen tus customizaciones
-9. Performance: ERPNext con MariaDB es lento para el tipo de queries que Nala necesita
+9. Performance: ERPNext con MariaDB es lento para el tipo de queries que Nova necesita
 
-### Opción B: Montar Nala sobre Odoo Community
+### Opción B: Montar Nova sobre Odoo Community
 
 Mismos problemas que ERPNext, más:
 - Los módulos más útiles (contabilidad avanzada, POS completo, marketing) son solo Enterprise (propietario, $24.90/usuario/mes)
@@ -105,17 +105,17 @@ Mismos problemas que ERPNext, más:
 
 **Construir desde cero.** Razones:
 
-1. **Lo que hace diferente a Nala (offline, IA, WhatsApp, OCR, simplicidad) hay que construirlo de cero de todas formas.** Montar sobre ERPNext no ahorra ese trabajo. Solo agrega complejidad.
+1. **Lo que hace diferente a Nova (offline, IA, WhatsApp, OCR, simplicidad) hay que construirlo de cero de todas formas.** Montar sobre ERPNext no ahorra ese trabajo. Solo agrega complejidad.
 
-2. **El 80% de lo que ERPNext ofrece, Nala no lo necesita.** Nala no necesita manufactura, MRP, proyectos, HR, nómina, website builder, e-commerce, helpdesk. Cargar con todo eso es peso muerto.
+2. **El 80% de lo que ERPNext ofrece, Nova no lo necesita.** Nova no necesita manufactura, MRP, proyectos, HR, nómina, website builder, e-commerce, helpdesk. Cargar con todo eso es peso muerto.
 
 3. **El 20% que sí necesita (inventario, ventas, cuentas, reportes) no es tan complejo de construir.** Un CRUD de productos con variantes, un registro de ventas, cuentas por cobrar/pagar, y reportes agregados son semanas de desarrollo, no meses. La complejidad está en la experiencia, no en el backend.
 
-4. **La contabilidad de Nala es un puente, no un módulo.** No necesitamos libro mayor, balance general, estados financieros auditables. Necesitamos exportar un Excel con formato contable. Eso es una función, no un módulo de ERP.
+4. **La contabilidad de Nova es un puente, no un módulo.** No necesitamos libro mayor, balance general, estados financieros auditables. Necesitamos exportar un Excel con formato contable. Eso es una función, no un módulo de ERP.
 
 5. **Performance.** ERPNext/Odoo son lentos para el tipo de experiencia que queremos (<2s en 3G, offline-first). Optimizar un ERP existente para eso es más difícil que construir algo ligero desde cero.
 
-6. **El stack no coincide.** ERPNext es Python/MariaDB/jQuery. Nala es TypeScript/PostgreSQL/Vue. Forzar un stack diferente al que el equipo domina es contraproducente.
+6. **El stack no coincide.** ERPNext es Python/MariaDB/jQuery. Nova es TypeScript/PostgreSQL/Vue. Forzar un stack diferente al que el equipo domina es contraproducente.
 
 ---
 
@@ -147,7 +147,7 @@ La paradoja: construir desde cero parece más trabajo, pero en realidad es menos
 
 ## Patrones y UX a Replicar (detalle)
 
-Lo que tomamos de cada sistema, con especificaciones concretas para implementar en Nala.
+Lo que tomamos de cada sistema, con especificaciones concretas para implementar en Nova.
 
 ### De ERPNext: Modelo de datos de inventario
 
@@ -169,7 +169,7 @@ Lo que tomamos de cada sistema, con especificaciones concretas para implementar 
 
 **Flujo de compras:**
 - Orden de compra → Recepción de mercancía → Factura del proveedor
-- En Nala simplificamos: el OCR de la factura hace los 3 pasos en uno (detecta proveedor, items, montos, actualiza inventario y registra cuenta por pagar)
+- En Nova simplificamos: el OCR de la factura hace los 3 pasos en uno (detecta proveedor, items, montos, actualiza inventario y registra cuenta por pagar)
 
 ### De Loyverse: Flujo de venta en 3 toques
 
@@ -178,7 +178,7 @@ Lo que tomamos de cada sistema, con especificaciones concretas para implementar 
 2. Toque en producto → se agrega al ticket. Toque de nuevo → incrementa cantidad
 3. Botón grande "Cobrar $XX.XX" → selector de método de pago → confirmar
 
-**Lo que NO tiene Loyverse que Nala sí:**
+**Lo que NO tiene Loyverse que Nova sí:**
 - Búsqueda por texto y escáner de código de barras (Loyverse solo tiene grid)
 - Descuentos por línea y por ticket
 - Fiado (venta a crédito vinculada al cliente)
@@ -192,7 +192,7 @@ Lo que tomamos de cada sistema, con especificaciones concretas para implementar 
 - Debajo: 3-4 métricas secundarias (transacciones, ticket promedio, comparativa)
 - No hay 15 widgets. No hay configuración. Es una respuesta a "¿cómo me fue hoy?"
 
-**En Nala:**
+**En Nova:**
 - Número grande: "$420 vendidos hoy" (USD, con Bs. en gris al lado)
 - Indicador: "▲ 12% vs martes pasado" (verde si sube, rojo si baja)
 - 3 tarjetas: ventas totales | pendiente por cobrar | productos stock bajo
@@ -207,9 +207,9 @@ Lo que tomamos de cada sistema, con especificaciones concretas para implementar 
 3. "Agrega tu primer producto" (nombre + precio, nada más)
 4. Listo. Puedes vender
 
-**En Nala:**
+**En Nova:**
 1. "¿Qué tipo de negocio tienes?" → Panadería (selector visual)
-2. Nala pre-configura: categorías, cuentas contables, métodos de pago comunes para panaderías
+2. Nova pre-configura: categorías, cuentas contables, métodos de pago comunes para panaderías
 3. "¿Tienes productos en Excel?" → Sí (sube) / No (agrega uno: nombre + precio)
 4. "¿Tienes empleados?" → Sí (crea PIN para cada uno) / No (solo tú)
 5. Listo. Tutorial interactivo guía la primera venta dentro de la app
@@ -223,7 +223,7 @@ Lo que tomamos de cada sistema, con especificaciones concretas para implementar 
 
 **Soporte humano:**
 - Configuración inicial asistida por un humano, gratis
-- En Nala: el plan Negocio ($35/mes) incluye onboarding asistido
+- En Nova: el plan Negocio ($35/mes) incluye onboarding asistido
 - El plan Gratis y Pro tienen onboarding interactivo dentro de la app (sin humano)
 
 **Entender Venezuela:**
