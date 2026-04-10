@@ -1,13 +1,18 @@
 <script setup lang="ts">
 /**
- * Customer list page with search, segment filter, and badges.
+ * Customer list page with search and segment badges.
+ *
+ * Connected to: GET /api/customers?search=&page=&limit=
  */
 
 import type { CustomerSegment } from "@nova/shared";
 
 const { isDesktop } = useDevice();
+const { $api } = useApi();
+
 const searchQuery = ref("");
-const segmentFilter = ref<CustomerSegment | null>(null);
+const isLoading = ref(true);
+const loadError = ref("");
 
 const segmentConfig: Record<CustomerSegment, { label: string; color: string }> =
   {
@@ -19,68 +24,67 @@ const segmentConfig: Record<CustomerSegment, { label: string; color: string }> =
     inactive: { label: "Inactivo", color: "bg-gray-100 text-gray-500" },
   };
 
-const customers = ref([
-  {
-    id: "c1",
-    name: "Juan Pérez",
-    phone: "+58412-555-0010",
-    totalPurchases: 45,
-    averageTicket: 18.5,
-    balance: 65.0,
-    segments: ["frequent", "with_debt"] as CustomerSegment[],
-  },
-  {
-    id: "c2",
-    name: "María García",
-    phone: "+58414-555-0020",
-    totalPurchases: 120,
-    averageTicket: 32.0,
-    balance: 0,
-    segments: ["vip", "frequent"] as CustomerSegment[],
-  },
-  {
-    id: "c3",
-    name: "Pedro López",
-    phone: "+58424-555-0030",
-    totalPurchases: 8,
-    averageTicket: 12.0,
-    balance: 100.0,
-    segments: ["at_risk", "with_debt"] as CustomerSegment[],
-  },
-  {
-    id: "c4",
-    name: "Ana Rodríguez",
-    phone: null,
-    totalPurchases: 2,
-    averageTicket: 15.0,
-    balance: 0,
-    segments: ["new"] as CustomerSegment[],
-  },
-]);
+interface Customer {
+  id: string;
+  name: string;
+  phone: string | null;
+  totalPurchases: number;
+  averageTicketUsd: string;
+  balanceUsd: string;
+}
 
-const filteredCustomers = computed(() => {
-  return customers.value.filter((c) => {
-    if (
-      searchQuery.value &&
-      !c.name.toLowerCase().includes(searchQuery.value.toLowerCase())
-    )
-      return false;
-    if (segmentFilter.value && !c.segments.includes(segmentFilter.value))
-      return false;
-    return true;
-  });
+const customersList = ref<Customer[]>([]);
+const totalCustomers = ref(0);
+
+let searchTimer: ReturnType<typeof setTimeout> | null = null;
+
+async function fetchCustomers() {
+  isLoading.value = true;
+  loadError.value = "";
+
+  try {
+    const params = new URLSearchParams();
+    if (searchQuery.value) params.set("search", searchQuery.value);
+    params.set("limit", "100");
+
+    const result = await $api<{
+      customers: Customer[];
+      total: number;
+    }>(`/api/customers?${params.toString()}`);
+
+    customersList.value = result.customers;
+    totalCustomers.value = result.total;
+  } catch (err) {
+    const message =
+      err instanceof Error ? err.message : "Error cargando clientes";
+    loadError.value = message;
+  } finally {
+    isLoading.value = false;
+  }
+}
+
+function onSearchInput() {
+  if (searchTimer) clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => fetchCustomers(), 300);
+}
+
+onMounted(() => {
+  fetchCustomers();
 });
+
+/** Derive simple segments from customer data for badge display. */
+function getSegments(c: Customer): CustomerSegment[] {
+  const segments: CustomerSegment[] = [];
+  if (Number(c.balanceUsd) > 0) segments.push("with_debt");
+  if (c.totalPurchases >= 20) segments.push("frequent");
+  return segments;
+}
 </script>
 
 <template>
   <div>
     <div class="mb-4 flex items-center justify-between">
       <h1 class="text-xl font-bold text-gray-900">Clientes</h1>
-      <NuxtLink
-        to="/clients/new"
-        class="rounded-lg bg-nova-primary px-4 py-2 text-sm font-medium text-white"
-        >+ Cliente</NuxtLink
-      >
     </div>
 
     <div class="mb-4 flex gap-3">
@@ -89,103 +93,137 @@ const filteredCustomers = computed(() => {
         type="text"
         placeholder="Buscar cliente..."
         class="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-nova-primary focus:outline-none"
+        @input="onSearchInput"
       />
-      <select
-        v-model="segmentFilter"
-        class="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+    </div>
+
+    <!-- Loading -->
+    <div v-if="isLoading" class="py-12 text-center text-gray-400">
+      Cargando clientes...
+    </div>
+
+    <!-- Error -->
+    <div
+      v-else-if="loadError"
+      class="rounded-xl bg-red-50 p-6 text-center text-sm text-red-600"
+    >
+      {{ loadError }}
+      <button
+        class="mt-2 block w-full text-xs font-medium text-red-700 underline"
+        @click="fetchCustomers"
       >
-        <option :value="null">Todos</option>
-        <option value="vip">VIP</option>
-        <option value="frequent">Frecuentes</option>
-        <option value="at_risk">En riesgo</option>
-        <option value="with_debt">Con deuda</option>
-      </select>
+        Reintentar
+      </button>
     </div>
 
-    <!-- Desktop table -->
-    <div v-if="isDesktop" class="overflow-hidden rounded-xl bg-white shadow-sm">
-      <table class="w-full text-left text-sm">
-        <thead class="border-b border-gray-200 bg-gray-50">
-          <tr>
-            <th class="px-4 py-3 font-medium text-gray-500">Cliente</th>
-            <th class="px-4 py-3 font-medium text-gray-500">Teléfono</th>
-            <th class="px-4 py-3 font-medium text-gray-500 text-right">
-              Compras
-            </th>
-            <th class="px-4 py-3 font-medium text-gray-500 text-right">
-              Ticket prom.
-            </th>
-            <th class="px-4 py-3 font-medium text-gray-500 text-right">
-              Saldo
-            </th>
-            <th class="px-4 py-3 font-medium text-gray-500">Segmentos</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-gray-100">
-          <tr
-            v-for="c in filteredCustomers"
-            :key="c.id"
-            class="cursor-pointer hover:bg-gray-50"
-          >
-            <td class="px-4 py-3 font-medium text-gray-900">{{ c.name }}</td>
-            <td class="px-4 py-3 text-gray-500">{{ c.phone ?? "-" }}</td>
-            <td class="px-4 py-3 text-right text-gray-700">
-              {{ c.totalPurchases }}
-            </td>
-            <td class="px-4 py-3 text-right text-gray-700">
-              ${{ c.averageTicket.toFixed(2) }}
-            </td>
-            <td
-              class="px-4 py-3 text-right font-medium"
-              :class="c.balance > 0 ? 'text-red-600' : 'text-gray-500'"
-            >
-              {{ c.balance > 0 ? `$${c.balance.toFixed(2)}` : "-" }}
-            </td>
-            <td class="px-4 py-3">
-              <div class="flex flex-wrap gap-1">
-                <span
-                  v-for="seg in c.segments"
-                  :key="seg"
-                  class="rounded-full px-2 py-0.5 text-[10px] font-medium"
-                  :class="segmentConfig[seg].color"
-                  >{{ segmentConfig[seg].label }}</span
-                >
-              </div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+    <!-- Empty -->
+    <div
+      v-else-if="customersList.length === 0"
+      class="py-12 text-center text-gray-400"
+    >
+      {{ searchQuery ? "Sin resultados" : "No hay clientes registrados" }}
     </div>
 
-    <!-- Mobile cards -->
-    <div v-else class="space-y-2">
+    <template v-else>
+      <!-- Desktop table -->
       <div
-        v-for="c in filteredCustomers"
-        :key="c.id"
-        class="flex items-center gap-3 rounded-xl bg-white p-4 shadow-sm"
+        v-if="isDesktop"
+        class="overflow-hidden rounded-xl bg-white shadow-sm"
       >
-        <div
-          class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-nova-primary text-sm font-bold text-white"
-        >
-          {{ c.name.charAt(0) }}
-        </div>
-        <div class="flex-1 min-w-0">
-          <div class="flex items-center gap-2">
-            <p class="truncate font-medium text-gray-900">{{ c.name }}</p>
-            <span
-              v-for="seg in c.segments.slice(0, 2)"
-              :key="seg"
-              class="rounded-full px-1.5 py-0.5 text-[9px] font-medium"
-              :class="segmentConfig[seg].color"
-              >{{ segmentConfig[seg].label }}</span
+        <table class="w-full text-left text-sm">
+          <thead class="border-b border-gray-200 bg-gray-50">
+            <tr>
+              <th class="px-4 py-3 font-medium text-gray-500">Cliente</th>
+              <th class="px-4 py-3 font-medium text-gray-500">Telefono</th>
+              <th class="px-4 py-3 text-right font-medium text-gray-500">
+                Compras
+              </th>
+              <th class="px-4 py-3 text-right font-medium text-gray-500">
+                Ticket prom.
+              </th>
+              <th class="px-4 py-3 text-right font-medium text-gray-500">
+                Saldo
+              </th>
+              <th class="px-4 py-3 font-medium text-gray-500">Segmentos</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-100">
+            <tr
+              v-for="c in customersList"
+              :key="c.id"
+              class="cursor-pointer hover:bg-gray-50"
             >
+              <td class="px-4 py-3 font-medium text-gray-900">{{ c.name }}</td>
+              <td class="px-4 py-3 text-gray-500">{{ c.phone ?? "-" }}</td>
+              <td class="px-4 py-3 text-right text-gray-700">
+                {{ c.totalPurchases }}
+              </td>
+              <td class="px-4 py-3 text-right text-gray-700">
+                ${{ Number(c.averageTicketUsd).toFixed(2) }}
+              </td>
+              <td
+                class="px-4 py-3 text-right font-medium"
+                :class="
+                  Number(c.balanceUsd) > 0 ? 'text-red-600' : 'text-gray-500'
+                "
+              >
+                {{
+                  Number(c.balanceUsd) > 0
+                    ? `$${Number(c.balanceUsd).toFixed(2)}`
+                    : "-"
+                }}
+              </td>
+              <td class="px-4 py-3">
+                <div class="flex flex-wrap gap-1">
+                  <span
+                    v-for="seg in getSegments(c)"
+                    :key="seg"
+                    class="rounded-full px-2 py-0.5 text-[10px] font-medium"
+                    :class="segmentConfig[seg].color"
+                  >
+                    {{ segmentConfig[seg].label }}
+                  </span>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Mobile cards -->
+      <div v-else class="space-y-2">
+        <div
+          v-for="c in customersList"
+          :key="c.id"
+          class="flex items-center gap-3 rounded-xl bg-white p-4 shadow-sm"
+        >
+          <div
+            class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-nova-primary text-sm font-bold text-white"
+          >
+            {{ c.name.charAt(0) }}
           </div>
-          <p class="text-xs text-gray-500">{{ c.totalPurchases }} compras</p>
-        </div>
-        <div v-if="c.balance > 0" class="text-sm font-medium text-red-600">
-          ${{ c.balance.toFixed(2) }}
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center gap-2">
+              <p class="truncate font-medium text-gray-900">{{ c.name }}</p>
+              <span
+                v-for="seg in getSegments(c).slice(0, 2)"
+                :key="seg"
+                class="rounded-full px-1.5 py-0.5 text-[9px] font-medium"
+                :class="segmentConfig[seg].color"
+              >
+                {{ segmentConfig[seg].label }}
+              </span>
+            </div>
+            <p class="text-xs text-gray-500">{{ c.totalPurchases }} compras</p>
+          </div>
+          <div
+            v-if="Number(c.balanceUsd) > 0"
+            class="text-sm font-medium text-red-600"
+          >
+            ${{ Number(c.balanceUsd).toFixed(2) }}
+          </div>
         </div>
       </div>
-    </div>
+    </template>
   </div>
 </template>

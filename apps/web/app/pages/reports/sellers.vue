@@ -1,48 +1,73 @@
 <script setup lang="ts">
-/** Sales by seller ranking report. */
+/**
+ * Sales by seller report.
+ * Connected to: GET /api/reports/sellers?period=week
+ */
 definePageMeta({ middleware: ["admin-only"] });
-const narrative = ref(
-  "María García lidera con 180 ventas y $2,100 en total. Pedro tiene mejor ticket promedio ($15 vs $11.67).",
-);
-const sellers = ref([
-  { name: "María García", sales: 180, total: 2100, avgTicket: 11.67, rank: 1 },
-  {
-    name: "Pedro Rodríguez",
-    sales: 120,
-    total: 1800,
-    avgTicket: 15.0,
-    rank: 2,
-  },
-]);
-</script>
+const { $api } = useApi();
+const isLoading = ref(true);
+const narrative = ref("");
+const sellers = ref<
+  Array<{ name: string; sales: number; total: number; avgTicket: number }>
+>([]);
 
+onMounted(async () => {
+  try {
+    const result = await $api<{
+      data: { sellers: typeof sellers.value };
+      narrative: string;
+    }>("/api/reports/sellers?period=week");
+    sellers.value = result.data.sellers;
+    narrative.value = result.narrative;
+  } catch {
+    /* empty state */
+  } finally {
+    isLoading.value = false;
+  }
+});
+</script>
 <template>
   <SharedReportLayout title="Ventas por vendedor" :narrative="narrative">
-    <div class="space-y-3">
-      <div
-        v-for="s in sellers"
-        :key="s.name"
-        class="rounded-xl bg-white p-5 shadow-sm"
-      >
-        <div class="flex items-center justify-between">
-          <div class="flex items-center gap-3">
-            <span
-              class="flex h-8 w-8 items-center justify-center rounded-full bg-nova-primary text-sm font-bold text-white"
-              >{{ s.rank }}</span
-            >
-            <div>
-              <p class="font-medium text-gray-900">{{ s.name }}</p>
-              <p class="text-xs text-gray-500">
-                {{ s.sales }} ventas · ${{ s.avgTicket.toFixed(2) }} ticket
-                prom.
-              </p>
-            </div>
-          </div>
-          <p class="text-lg font-bold text-gray-900">
-            ${{ s.total.toFixed(0) }}
-          </p>
-        </div>
-      </div>
+    <div v-if="isLoading" class="py-12 text-center text-gray-400">
+      Cargando...
+    </div>
+    <div
+      v-else-if="sellers.length === 0"
+      class="py-12 text-center text-gray-400"
+    >
+      Sin datos de vendedores
+    </div>
+    <div v-else class="overflow-hidden rounded-xl bg-white shadow-sm">
+      <table class="w-full text-left text-sm">
+        <thead class="border-b bg-gray-50">
+          <tr>
+            <th class="px-4 py-3 font-medium text-gray-500">#</th>
+            <th class="px-4 py-3 font-medium text-gray-500">Vendedor</th>
+            <th class="px-4 py-3 text-right font-medium text-gray-500">
+              Ventas
+            </th>
+            <th class="px-4 py-3 text-right font-medium text-gray-500">
+              Total
+            </th>
+            <th class="px-4 py-3 text-right font-medium text-gray-500">
+              Ticket prom.
+            </th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+          <tr v-for="(s, i) in sellers" :key="s.name">
+            <td class="px-4 py-3 text-gray-400">{{ i + 1 }}</td>
+            <td class="px-4 py-3 font-medium text-gray-900">{{ s.name }}</td>
+            <td class="px-4 py-3 text-right text-gray-700">{{ s.sales }}</td>
+            <td class="px-4 py-3 text-right font-medium text-gray-900">
+              ${{ s.total.toFixed(2) }}
+            </td>
+            <td class="px-4 py-3 text-right text-gray-500">
+              ${{ s.avgTicket.toFixed(2) }}
+            </td>
+          </tr>
+        </tbody>
+      </table>
     </div>
   </SharedReportLayout>
 </template>

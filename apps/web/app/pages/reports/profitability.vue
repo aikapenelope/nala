@@ -1,67 +1,77 @@
 <script setup lang="ts">
-/** Product profitability report. */
+/**
+ * Product profitability report.
+ * Connected to: GET /api/reports/profitability
+ */
 definePageMeta({ middleware: ["admin-only"] });
-const narrative = ref(
-  "Pan Campesino lidera con score 92 (alto margen + alta rotación). Queso Blanco tiene margen bajo (33%) pero buena rotación.",
-);
-const products = ref([
-  {
-    name: "Pan Campesino",
-    margin: 47,
-    rotation: 85,
-    contribution: 30,
-    score: 92,
-  },
-  {
-    name: "Café con Leche",
-    margin: 60,
-    rotation: 42,
-    contribution: 10,
-    score: 78,
-  },
-  {
-    name: "Queso Blanco",
-    margin: 33,
-    rotation: 15,
-    contribution: 11,
-    score: 55,
-  },
-  { name: "Harina PAN", margin: 25, rotation: 12, contribution: 6, score: 40 },
-  { name: "Aceite Diana", margin: 33, rotation: 8, contribution: 9, score: 38 },
-]);
-</script>
+const { $api } = useApi();
+const isLoading = ref(true);
+const narrative = ref("");
+const productData = ref<
+  Array<{
+    name: string;
+    margin: number;
+    rotation: number;
+    contribution: number;
+    score: number;
+  }>
+>([]);
 
+onMounted(async () => {
+  try {
+    const result = await $api<{
+      data: { products: typeof productData.value };
+      narrative: string;
+    }>("/api/reports/profitability");
+    productData.value = result.data.products;
+    narrative.value = result.narrative;
+  } catch {
+    /* empty state */
+  } finally {
+    isLoading.value = false;
+  }
+});
+</script>
 <template>
   <SharedReportLayout title="Rentabilidad por producto" :narrative="narrative">
-    <div class="rounded-xl bg-white shadow-sm overflow-hidden">
+    <div v-if="isLoading" class="py-12 text-center text-gray-400">
+      Cargando...
+    </div>
+    <div
+      v-else-if="productData.length === 0"
+      class="py-12 text-center text-gray-400"
+    >
+      Sin datos de rentabilidad
+    </div>
+    <div v-else class="overflow-hidden rounded-xl bg-white shadow-sm">
       <table class="w-full text-left text-sm">
         <thead class="border-b bg-gray-50">
           <tr>
-            <th class="px-5 py-3 font-medium text-gray-500">Producto</th>
-            <th class="px-5 py-3 text-right font-medium text-gray-500">
+            <th class="px-4 py-3 font-medium text-gray-500">Producto</th>
+            <th class="px-4 py-3 text-right font-medium text-gray-500">
               Margen
             </th>
-            <th class="px-5 py-3 text-right font-medium text-gray-500">
-              Rotación
+            <th class="px-4 py-3 text-right font-medium text-gray-500">
+              Rotacion
             </th>
-            <th class="px-5 py-3 text-right font-medium text-gray-500">
-              Contribución
+            <th class="px-4 py-3 text-right font-medium text-gray-500">
+              Contribucion
             </th>
-            <th class="px-5 py-3 text-right font-medium text-gray-500">
+            <th class="px-4 py-3 text-right font-medium text-gray-500">
               Score
             </th>
           </tr>
         </thead>
         <tbody class="divide-y divide-gray-100">
-          <tr v-for="p in products" :key="p.name">
-            <td class="px-5 py-3 font-medium text-gray-900">{{ p.name }}</td>
-            <td class="px-5 py-3 text-right text-gray-700">{{ p.margin }}%</td>
-            <td class="px-5 py-3 text-right text-gray-700">{{ p.rotation }}</td>
-            <td class="px-5 py-3 text-right text-gray-700">
+          <tr v-for="p in productData" :key="p.name">
+            <td class="px-4 py-3 font-medium text-gray-900">{{ p.name }}</td>
+            <td class="px-4 py-3 text-right text-gray-700">{{ p.margin }}%</td>
+            <td class="px-4 py-3 text-right text-gray-700">{{ p.rotation }}</td>
+            <td class="px-4 py-3 text-right text-gray-700">
               {{ p.contribution }}%
             </td>
             <td
-              class="px-5 py-3 text-right font-semibold"
+              class="px-4 py-3 text-right font-medium"
               :class="
                 p.score >= 70
                   ? 'text-green-600'
