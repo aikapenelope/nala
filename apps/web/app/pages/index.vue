@@ -1,13 +1,15 @@
 <script setup lang="ts">
 /**
- * Dashboard with progressive disclosure.
+ * Dashboard with progressive disclosure (doc 17 spec).
  *
  * Level 1 (visible without scroll): Answer to "How did I do today?"
- *   - Big number: today's sales
+ *   - Big number: today's sales (tap -> sales detail)
  *   - Trend vs same day last week
- *   - 2-3 summary cards (receivable, low stock, alerts)
+ *   - 2-3 summary cards: receivable, low stock, alerts count
+ *   - BCV exchange rate in header area
  *
  * Level 2 (scroll down): Detail on demand
+ *   - Actionable alerts with suggestion + action button
  *   - Weekly chart with AI narrative
  *   - Last sale info
  *
@@ -16,6 +18,9 @@
  *   - GET /api/reports/weekly (weekly chart + narrative)
  *   - GET /api/reports/inventory (low stock count)
  *   - GET /api/accounts/receivable (total pending)
+ *   - GET /api/reports/alerts (smart actionable alerts)
+ *   - GET /api/exchange-rate (BCV rate)
+ *   - GET /api/sales?limit=1 (last sale)
  */
 
 const { isMobile, isDesktop } = useDevice();
@@ -26,7 +31,7 @@ const { $api } = useApi();
 const isLoading = ref(true);
 const loadError = ref("");
 
-/** Daily report data from API. */
+/** Daily report data. */
 const todaySales = ref(0);
 const todayCount = ref(0);
 const todayAvgTicket = ref(0);
@@ -37,7 +42,22 @@ const trendPositive = ref(true);
 const receivableTotal = ref(0);
 const lowStockCount = ref(0);
 
-/** Weekly data from API. */
+/** Exchange rate. */
+const exchangeRate = ref<number | null>(null);
+
+/** Smart alerts from API. */
+interface Alert {
+  id: string;
+  icon: string;
+  title: string;
+  suggestion: string;
+  actionLabel: string;
+  actionTo: string;
+  severity: "critical" | "warning" | "info";
+}
+const alerts = ref<Alert[]>([]);
+
+/** Weekly data. */
 const weeklyData = ref<Array<{ day: string; amount: number }>>([]);
 const weeklyNarrative = ref("");
 
@@ -46,45 +66,62 @@ const weeklyMax = computed(() => {
   return Math.max(...weeklyData.value.map((d) => d.amount), 1);
 });
 
-/** Sync status from offline queue. */
+/** Last sale. */
+const lastSale = ref<{
+  totalUsd: string;
+  createdAt: string;
+} | null>(null);
+
+/** Sync status. */
 const syncStatus = ref<"online" | "offline" | "syncing">("online");
 const pendingSyncCount = ref(0);
 
-/** Load all dashboard data from API. */
+/** Load all dashboard data from API in parallel. */
 async function loadDashboard() {
   isLoading.value = true;
   loadError.value = "";
 
   try {
-    // Fetch daily report, weekly report, receivables, and inventory in parallel
-    const [dailyResult, weeklyResult, receivableResult, inventoryResult] =
-      await Promise.allSettled([
-        $api<{
-          data: {
-            totalSales: number;
-            totalCount: number;
-            avgTicket: number;
-            vsPreviousDay: number;
-            vsSameDayLastWeek: number;
-          };
-          narrative: string;
-        }>("/api/reports/daily"),
+    const [
+      dailyResult,
+      weeklyResult,
+      receivableResult,
+      inventoryResult,
+      alertsResult,
+      rateResult,
+      lastSaleResult,
+    ] = await Promise.allSettled([
+      $api<{
+        data: {
+          totalSales: number;
+          totalCount: number;
+          avgTicket: number;
+          vsPreviousDay: number;
+          vsSameDayLastWeek: number;
+        };
+      }>("/api/reports/daily"),
 
-        $api<{
-          data: {
-            dailyBreakdown: Array<{ day: string; amount: number }>;
-          };
-          narrative: string;
-        }>("/api/reports/weekly?period=week"),
+      $api<{
+        data: { dailyBreakdown: Array<{ day: string; amount: number }> };
+        narrative: string;
+      }>("/api/reports/weekly?period=week"),
 
-        $api<{ totalPending: number }>("/api/accounts/receivable"),
+      $api<{ totalPending: number }>("/api/accounts/receivable"),
 
-        $api<{ lowStock: number; criticalStock: number }>(
-          "/api/reports/inventory",
-        ),
-      ]);
+      $api<{ data: { lowStock: number; criticalStock: number } }>(
+        "/api/reports/inventory",
+      ),
 
-    // Daily report
+      $api<{ alerts: Alert[] }>("/api/reports/alerts"),
+
+      $api<{ rateBcv: number }>("/api/exchange-rate"),
+
+      $api<{ sales: Array<{ totalUsd: string; createdAt: string }> }>(
+        "/api/sales?limit=1",
+      ),
+    ]);
+
+    // Daily
     if (dailyResult.status === "fulfilled") {
       const d = dailyResult.value.data;
       todaySales.value = d.totalSales;
@@ -94,7 +131,7 @@ async function loadDashboard() {
       trendPositive.value = d.vsSameDayLastWeek >= 0;
     }
 
-    // Weekly report
+    // Weekly
     if (weeklyResult.status === "fulfilled") {
       weeklyData.value = weeklyResult.value.data.dailyBreakdown;
       weeklyNarrative.value = weeklyResult.value.narrative;
@@ -107,16 +144,24 @@ async function loadDashboard() {
 
     // Inventory
     if (inventoryResult.status === "fulfilled") {
-      const inv = inventoryResult.value;
-      // inv comes wrapped in { data: { ... } } from the reports endpoint
-      const invData =
-        (
-          inv as unknown as {
-            data: { lowStock: number; criticalStock: number };
-          }
-        ).data ?? inv;
-      lowStockCount.value =
-        (invData.lowStock ?? 0) + (invData.criticalStock ?? 0);
+      const inv = inventoryResult.value.data;
+      lowStockCount.value = (inv.lowStock ?? 0) + (inv.criticalStock ?? 0);
+    }
+
+    // Alerts
+    if (alertsResult.status === "fulfilled") {
+      alerts.value = alertsResult.value.alerts;
+    }
+
+    // Exchange rate
+    if (rateResult.status === "fulfilled") {
+      exchangeRate.value = rateResult.value.rateBcv;
+    }
+
+    // Last sale
+    if (lastSaleResult.status === "fulfilled") {
+      const salesArr = lastSaleResult.value.sales;
+      lastSale.value = salesArr[0] ?? null;
     }
   } catch (err) {
     const message =
@@ -127,7 +172,7 @@ async function loadDashboard() {
   }
 }
 
-/** Update online status. */
+/** Online status. */
 function updateOnlineStatus() {
   if (import.meta.client) {
     syncStatus.value = navigator.onLine ? "online" : "offline";
@@ -147,10 +192,13 @@ onMounted(() => {
 
   if (isAuthenticated.value) {
     loadDashboard();
+  } else {
+    // Redirect unauthenticated users to landing page
+    navigateTo("/landing");
   }
 });
 
-/** Day name in Spanish for the trend comparison. */
+/** Day name for trend comparison. */
 const dayNames = [
   "domingo",
   "lunes",
@@ -164,6 +212,23 @@ const todayDayName = computed(() => {
   const lastWeekDay = new Date();
   lastWeekDay.setDate(lastWeekDay.getDate() - 7);
   return dayNames[lastWeekDay.getDay()] ?? "semana pasada";
+});
+
+/** Format relative time for last sale. */
+function timeAgo(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "hace un momento";
+  if (mins < 60) return `hace ${mins} min`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `hace ${hours}h`;
+  return `hace ${Math.floor(hours / 24)}d`;
+}
+
+/** Alerts to show: all on desktop, max 2 on mobile. */
+const visibleAlerts = computed(() => {
+  if (isMobile.value) return alerts.value.slice(0, 1);
+  return alerts.value.slice(0, 4);
 });
 </script>
 
@@ -188,25 +253,30 @@ const todayDayName = computed(() => {
       </button>
     </div>
 
-    <!-- Not authenticated -->
+    <!-- Not authenticated: redirect to landing -->
     <div v-else-if="!isAuthenticated" class="py-12 text-center text-gray-500">
-      <p>Inicia sesion para ver tu dashboard</p>
-      <NuxtLink
-        to="/auth/pin"
-        class="mt-4 inline-block rounded-xl bg-nova-primary px-6 py-2 text-sm font-medium text-white"
-      >
-        Ingresar PIN
-      </NuxtLink>
+      <p>Redirigiendo...</p>
     </div>
 
     <template v-else>
+      <!-- ============================================ -->
+      <!-- BCV Rate (header area)                       -->
+      <!-- ============================================ -->
+      <div
+        v-if="exchangeRate"
+        class="mb-3 flex items-center justify-end text-xs text-gray-400"
+      >
+        <span>Bs. {{ exchangeRate.toFixed(2) }} / USD</span>
+      </div>
+
       <!-- ============================================ -->
       <!-- LEVEL 1: The answer (no scroll needed)       -->
       <!-- ============================================ -->
 
       <!-- Main metric: today's sales -->
-      <div
-        class="cursor-pointer rounded-xl bg-white p-6 text-center shadow-sm transition-colors hover:bg-gray-50"
+      <NuxtLink
+        to="/sales/history"
+        class="block cursor-pointer rounded-xl bg-white p-6 text-center shadow-sm transition-colors hover:bg-gray-50"
       >
         <p class="text-4xl font-bold text-gray-900">
           ${{ todaySales.toFixed(2) }}
@@ -224,7 +294,7 @@ const todayDayName = computed(() => {
           {{ todayCount }} ventas · ${{ todayAvgTicket.toFixed(2) }} ticket
           promedio
         </p>
-      </div>
+      </NuxtLink>
 
       <!-- Summary cards -->
       <div
@@ -251,12 +321,16 @@ const todayDayName = computed(() => {
           <p class="text-xs text-gray-500">stock bajo</p>
         </NuxtLink>
 
-        <div v-if="isDesktop" class="rounded-xl bg-white p-4 shadow-sm">
+        <NuxtLink
+          v-if="isDesktop"
+          to="/reports"
+          class="rounded-xl bg-white p-4 shadow-sm transition-colors hover:bg-gray-50"
+        >
           <p class="text-lg font-semibold text-gray-900">
-            {{ todayCount }}
+            {{ alerts.length }}
           </p>
-          <p class="text-xs text-gray-500">ventas hoy</p>
-        </div>
+          <p class="text-xs text-gray-500">alertas pendientes</p>
+        </NuxtLink>
       </div>
 
       <!-- Sync status indicator -->
@@ -295,7 +369,49 @@ const todayDayName = computed(() => {
       <!-- LEVEL 2: Detail (scroll down)                -->
       <!-- ============================================ -->
 
-      <!-- Weekly chart (Level 2) -->
+      <!-- Actionable alerts (doc 17: suggestion + action button) -->
+      <div v-if="visibleAlerts.length > 0" class="mt-6">
+        <h2 class="mb-3 text-sm font-semibold text-gray-700">
+          Alertas que necesitan tu atencion
+        </h2>
+        <div class="space-y-2">
+          <div
+            v-for="alert in visibleAlerts"
+            :key="alert.id"
+            class="rounded-xl bg-white p-4 shadow-sm"
+          >
+            <div class="flex items-start gap-3">
+              <span class="text-xl">{{ alert.icon }}</span>
+              <div class="flex-1">
+                <p class="text-sm font-medium text-gray-900">
+                  {{ alert.title }}
+                </p>
+                <p class="mt-0.5 text-xs text-gray-500">
+                  {{ alert.suggestion }}
+                </p>
+              </div>
+              <NuxtLink
+                :to="alert.actionTo"
+                class="flex-shrink-0 rounded-lg bg-nova-primary/10 px-3 py-1.5 text-xs font-medium text-nova-primary"
+              >
+                {{ alert.actionLabel }}
+              </NuxtLink>
+            </div>
+          </div>
+        </div>
+        <NuxtLink
+          v-if="alerts.length > visibleAlerts.length"
+          to="/reports"
+          class="mt-2 block text-center text-xs text-gray-400 hover:text-nova-primary"
+        >
+          Ver {{ alerts.length - visibleAlerts.length }} alerta{{
+            alerts.length - visibleAlerts.length > 1 ? "s" : ""
+          }}
+          mas
+        </NuxtLink>
+      </div>
+
+      <!-- Weekly chart (Level 2, admin only) -->
       <div
         v-if="isAdmin && weeklyData.length > 0"
         class="mt-6 rounded-xl bg-white p-5 shadow-sm"
@@ -311,7 +427,9 @@ const todayDayName = computed(() => {
             :key="d.day"
             class="flex flex-1 flex-col items-center gap-1"
           >
-            <span class="text-[10px] text-gray-500"> ${{ d.amount }} </span>
+            <span class="text-[10px] text-gray-500">
+              ${{ d.amount.toFixed(0) }}
+            </span>
             <div
               class="w-full rounded-t bg-nova-primary/80"
               :style="{
@@ -334,6 +452,12 @@ const todayDayName = computed(() => {
         >
           Ver reporte completo →
         </NuxtLink>
+      </div>
+
+      <!-- Last sale (doc 17: "access to last action") -->
+      <div v-if="lastSale" class="mt-4 text-xs text-gray-400">
+        Ultima venta: ${{ Number(lastSale.totalUsd).toFixed(2) }},
+        {{ timeAgo(lastSale.createdAt) }}
       </div>
     </template>
   </div>
