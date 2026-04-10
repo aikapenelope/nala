@@ -41,9 +41,7 @@ const visibleItems = computed(() =>
 </script>
 
 <template>
-  <aside
-    class="flex h-screen w-56 flex-col border-r border-gray-200 bg-white"
-  >
+  <aside class="flex h-screen w-56 flex-col border-r border-gray-200 bg-white">
     <!-- Logo -->
     <div class="flex h-16 items-center px-6">
       <span class="text-xl font-bold text-nova-primary">Nova</span>

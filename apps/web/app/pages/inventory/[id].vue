@@ -391,7 +391,13 @@ async function submitForm() {
         class="w-full rounded-xl bg-nova-primary py-3 font-medium text-white disabled:opacity-50"
         :disabled="isSubmitting"
       >
-        {{ isSubmitting ? "Guardando..." : isEditing ? "Guardar cambios" : "Crear producto" }}
+        {{
+          isSubmitting
+            ? "Guardando..."
+            : isEditing
+              ? "Guardar cambios"
+              : "Crear producto"
+        }}
       </button>
     </form>
   </div>

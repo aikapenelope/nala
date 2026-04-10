@@ -167,10 +167,24 @@ const filteredProducts = computed(() => {
             <th class="px-4 py-3 font-medium text-gray-500">Estado</th>
             <th class="px-4 py-3 font-medium text-gray-500">Producto</th>
             <th class="px-4 py-3 font-medium text-gray-500">SKU</th>
-            <th class="px-4 py-3 font-medium text-gray-500 text-right">Stock</th>
-            <th v-if="isAdmin" class="px-4 py-3 font-medium text-gray-500 text-right">Costo</th>
-            <th class="px-4 py-3 font-medium text-gray-500 text-right">Precio</th>
-            <th v-if="isAdmin" class="px-4 py-3 font-medium text-gray-500 text-right">Margen</th>
+            <th class="px-4 py-3 font-medium text-gray-500 text-right">
+              Stock
+            </th>
+            <th
+              v-if="isAdmin"
+              class="px-4 py-3 font-medium text-gray-500 text-right"
+            >
+              Costo
+            </th>
+            <th class="px-4 py-3 font-medium text-gray-500 text-right">
+              Precio
+            </th>
+            <th
+              v-if="isAdmin"
+              class="px-4 py-3 font-medium text-gray-500 text-right"
+            >
+              Margen
+            </th>
           </tr>
         </thead>
         <tbody class="divide-y divide-gray-100">
@@ -229,7 +243,9 @@ const filteredProducts = computed(() => {
 
         <!-- Price -->
         <div class="text-right">
-          <p class="font-medium text-gray-900">${{ product.price.toFixed(2) }}</p>
+          <p class="font-medium text-gray-900">
+            ${{ product.price.toFixed(2) }}
+          </p>
         </div>
       </NuxtLink>
     </div>

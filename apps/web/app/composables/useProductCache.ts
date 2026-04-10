@@ -28,8 +28,7 @@ export function useProductCache() {
 
     try {
       products.value = await db.products.toArray();
-      lastSyncAt.value =
-        localStorage.getItem("nova:products:lastSync") ?? null;
+      lastSyncAt.value = localStorage.getItem("nova:products:lastSync") ?? null;
     } catch (err) {
       console.error("Failed to load products from cache:", err);
     }

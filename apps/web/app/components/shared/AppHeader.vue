@@ -29,9 +29,7 @@ const { user, isAdmin } = useNovaAuth();
         v-if="user"
         class="rounded-full px-2 py-0.5 text-xs font-medium"
         :class="
-          isAdmin
-            ? 'bg-blue-100 text-blue-700'
-            : 'bg-gray-100 text-gray-600'
+          isAdmin ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'
         "
       >
         {{ isAdmin ? "Admin" : user.name }}

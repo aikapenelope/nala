@@ -102,17 +102,9 @@ onUnmounted(() => {
       v-if="isScanning"
       class="relative w-full max-w-sm overflow-hidden rounded-xl"
     >
-      <video
-        ref="videoRef"
-        class="w-full"
-        autoplay
-        playsinline
-        muted
-      />
+      <video ref="videoRef" class="w-full" autoplay playsinline muted />
       <!-- Scan overlay -->
-      <div
-        class="absolute inset-0 flex items-center justify-center"
-      >
+      <div class="absolute inset-0 flex items-center justify-center">
         <div class="h-48 w-48 rounded-lg border-2 border-white/50" />
       </div>
       <button

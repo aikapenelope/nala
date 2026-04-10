@@ -67,8 +67,7 @@ function autoDetectColumns() {
       keywords.some((k) => h.includes(k)),
     );
     if (match >= 0 && headers.value[match]) {
-      (columnMap.value as Record<string, string>)[field] =
-        headers.value[match];
+      (columnMap.value as Record<string, string>)[field] = headers.value[match];
     }
   }
 }
@@ -230,7 +229,10 @@ async function startImport() {
         </div>
 
         <!-- Validation errors -->
-        <div v-if="validationErrors.length > 0" class="rounded-xl bg-red-50 p-4">
+        <div
+          v-if="validationErrors.length > 0"
+          class="rounded-xl bg-red-50 p-4"
+        >
           <p
             v-for="err in validationErrors"
             :key="err"
@@ -251,7 +253,10 @@ async function startImport() {
       </div>
 
       <!-- Step 3: Importing -->
-      <div v-else-if="step === 'importing'" class="rounded-xl bg-white p-8 text-center shadow-sm">
+      <div
+        v-else-if="step === 'importing'"
+        class="rounded-xl bg-white p-8 text-center shadow-sm"
+      >
         <p class="text-gray-500">Importando productos...</p>
       </div>
 

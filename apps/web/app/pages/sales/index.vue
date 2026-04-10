@@ -137,7 +137,9 @@ function clearTicket() {
           :disabled="product.stock <= 0"
           @click="addToTicket(product)"
         >
-          <span class="text-sm font-medium text-gray-900 text-center truncate w-full">
+          <span
+            class="text-sm font-medium text-gray-900 text-center truncate w-full"
+          >
             {{ product.name }}
           </span>
           <span class="mt-1 text-xs font-semibold text-nova-primary">
@@ -157,7 +159,11 @@ function clearTicket() {
     <div
       v-if="ticketItems.length > 0 || isDesktop"
       class="rounded-xl bg-white shadow-sm"
-      :class="isDesktop ? 'w-80 flex flex-col' : 'fixed bottom-16 left-0 right-0 z-40 mx-2 max-h-[50vh] flex flex-col'"
+      :class="
+        isDesktop
+          ? 'w-80 flex flex-col'
+          : 'fixed bottom-16 left-0 right-0 z-40 mx-2 max-h-[50vh] flex flex-col'
+      "
     >
       <div class="border-b border-gray-100 px-4 py-3">
         <h2 class="text-sm font-semibold text-gray-700">
