@@ -1,15 +1,18 @@
 /**
  * Authentication middleware.
  *
- * Supports two auth methods:
- * - Bearer {jwt}: Clerk JWT for owners on personal devices
- * - Pin {token}: PIN session token for employees on shared devices
+ * Verifies Clerk JWT tokens and looks up the user in the database
+ * to populate the request context with user info and businessId.
+ *
+ * In development mode (NODE_ENV=development without CLERK_SECRET_KEY),
+ * uses a dev-only mock user. This is gated behind an explicit env check
+ * so it cannot accidentally run in production.
  *
  * After auth, sets `user`, `businessId`, and `db` on the Hono context.
  */
 
 import { verifyToken } from "@clerk/backend";
-import { findUserByClerkId } from "@nova/db";
+import { findUserByClerkId, findBusinessById } from "@nova/db";
 import type { Context, Next } from "hono";
 import { getDb } from "../db";
 
@@ -39,17 +42,20 @@ async function verifyClerkJwt(token: string): Promise<string | null> {
 /**
  * Auth middleware for protected API routes.
  *
- * In development (no CLERK_SECRET_KEY), falls back to a mock user.
- * In production, verifies the Clerk JWT and looks up the user in DB.
+ * Production: verifies Clerk JWT, looks up user in DB, validates business exists.
+ * Development: allows a mock user ONLY when NODE_ENV=development AND CLERK_SECRET_KEY is not set.
  */
 export async function authMiddleware(c: Context, next: Next) {
   const db = getDb();
   c.set("db", db);
 
-  const authHeader = c.req.header("Authorization");
+  const clerkSecretKey = process.env.CLERK_SECRET_KEY;
 
-  // Development fallback when Clerk is not configured
-  if (!process.env.CLERK_SECRET_KEY) {
+  // Development-only mock user.
+  // Requires BOTH conditions: NODE_ENV=development AND no CLERK_SECRET_KEY.
+  // In production, config.ts already exits if CLERK_SECRET_KEY is missing,
+  // so this branch is unreachable in production.
+  if (!clerkSecretKey && process.env.NODE_ENV === "development") {
     c.set("user", {
       id: "dev-user-001",
       businessId: "dev-business-001",
@@ -62,7 +68,18 @@ export async function authMiddleware(c: Context, next: Next) {
     return;
   }
 
-  // Clerk JWT auth for owners
+  // If we get here without CLERK_SECRET_KEY, something is wrong.
+  if (!clerkSecretKey) {
+    return c.json(
+      {
+        error: "Server misconfiguration: authentication not available",
+      },
+      500,
+    );
+  }
+
+  // Require Authorization header
+  const authHeader = c.req.header("Authorization");
   if (!authHeader?.startsWith("Bearer ")) {
     return c.json({ error: "Authorization header required" }, 401);
   }
@@ -74,7 +91,7 @@ export async function authMiddleware(c: Context, next: Next) {
     return c.json({ error: "Invalid or expired token" }, 401);
   }
 
-  // Look up user in DB by Clerk ID to get businessId and role
+  // Look up user in DB by Clerk ID
   const dbUser = await findUserByClerkId(db, clerkUserId);
 
   if (!dbUser) {
@@ -89,6 +106,23 @@ export async function authMiddleware(c: Context, next: Next) {
 
   if (!dbUser.isActive) {
     return c.json({ error: "Account is deactivated" }, 403);
+  }
+
+  // Validate that the business actually exists in the database.
+  // This prevents stale businessId references from causing silent failures.
+  const business = await findBusinessById(db, dbUser.businessId);
+  if (!business) {
+    return c.json(
+      {
+        error: "Business not found. Account may be corrupted.",
+        code: "BUSINESS_NOT_FOUND",
+      },
+      500,
+    );
+  }
+
+  if (!business.isActive) {
+    return c.json({ error: "Business is deactivated" }, 403);
   }
 
   const user: AuthUser = {

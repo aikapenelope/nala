@@ -165,14 +165,10 @@ export const products = pgTable(
     barcode: text("barcode"),
 
     /** Cost price in USD. For products with variants, this is the default. */
-    cost: numeric("cost", { precision: 12, scale: 2 })
-      .notNull()
-      .default("0"),
+    cost: numeric("cost", { precision: 12, scale: 2 }).notNull().default("0"),
 
     /** Sale price in USD. For products with variants, this is the default. */
-    price: numeric("price", { precision: 12, scale: 2 })
-      .notNull()
-      .default("0"),
+    price: numeric("price", { precision: 12, scale: 2 }).notNull().default("0"),
 
     /** Current stock. For products with variants, this is the sum of variant stocks. */
     stock: integer("stock").notNull().default(0),
@@ -252,12 +248,8 @@ export const productVariants = pgTable(
     /** Variant attributes as JSON. E.g. { "talla": "M", "color": "Azul" }. */
     attributes: jsonb("attributes").notNull().default({}),
 
-    cost: numeric("cost", { precision: 12, scale: 2 })
-      .notNull()
-      .default("0"),
-    price: numeric("price", { precision: 12, scale: 2 })
-      .notNull()
-      .default("0"),
+    cost: numeric("cost", { precision: 12, scale: 2 }).notNull().default("0"),
+    price: numeric("price", { precision: 12, scale: 2 }).notNull().default("0"),
     stock: integer("stock").notNull().default(0),
     barcode: text("barcode"),
     isActive: boolean("is_active").notNull().default(true),
@@ -481,52 +473,89 @@ export const quotations = pgTable("quotations", {
 export const customers = pgTable(
   "customers",
   {
-    id: uuid("id").default(sql`gen_random_uuid()`).primaryKey(),
-    businessId: uuid("business_id").notNull().references(() => businesses.id),
+    id: uuid("id")
+      .default(sql`gen_random_uuid()`)
+      .primaryKey(),
+    businessId: uuid("business_id")
+      .notNull()
+      .references(() => businesses.id),
     name: text("name").notNull(),
     phone: text("phone"),
     email: text("email"),
     address: text("address"),
     notes: text("notes"),
     totalPurchases: integer("total_purchases").notNull().default(0),
-    totalSpentUsd: numeric("total_spent_usd", { precision: 12, scale: 2 }).notNull().default("0"),
-    averageTicketUsd: numeric("average_ticket_usd", { precision: 12, scale: 2 }).notNull().default("0"),
+    totalSpentUsd: numeric("total_spent_usd", { precision: 12, scale: 2 })
+      .notNull()
+      .default("0"),
+    averageTicketUsd: numeric("average_ticket_usd", { precision: 12, scale: 2 })
+      .notNull()
+      .default("0"),
     lastPurchaseAt: timestamp("last_purchase_at", { withTimezone: true }),
-    balanceUsd: numeric("balance_usd", { precision: 12, scale: 2 }).notNull().default("0"),
+    balanceUsd: numeric("balance_usd", { precision: 12, scale: 2 })
+      .notNull()
+      .default("0"),
     isActive: boolean("is_active").notNull().default(true),
-    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
   },
   (table) => [
     index("idx_customers_business").on(table.businessId),
-    index("idx_customers_name_trgm").using("gin", sql`${table.name} gin_trgm_ops`),
+    index("idx_customers_name_trgm").using(
+      "gin",
+      sql`${table.name} gin_trgm_ops`,
+    ),
   ],
 );
 
 /** Customer segments - auto-calculated labels (VIP, at_risk, etc.). */
 export const customerSegments = pgTable("customer_segments", {
-  id: uuid("id").default(sql`gen_random_uuid()`).primaryKey(),
-  customerId: uuid("customer_id").notNull().references(() => customers.id, { onDelete: "cascade" }),
-  businessId: uuid("business_id").notNull().references(() => businesses.id),
+  id: uuid("id")
+    .default(sql`gen_random_uuid()`)
+    .primaryKey(),
+  customerId: uuid("customer_id")
+    .notNull()
+    .references(() => customers.id, { onDelete: "cascade" }),
+  businessId: uuid("business_id")
+    .notNull()
+    .references(() => businesses.id),
   segment: text("segment").notNull(),
-  assignedAt: timestamp("assigned_at", { withTimezone: true }).notNull().defaultNow(),
+  assignedAt: timestamp("assigned_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
 });
 
 /** Accounts receivable - money customers owe us (fiado). */
 export const accountsReceivable = pgTable(
   "accounts_receivable",
   {
-    id: uuid("id").default(sql`gen_random_uuid()`).primaryKey(),
-    businessId: uuid("business_id").notNull().references(() => businesses.id),
-    customerId: uuid("customer_id").notNull().references(() => customers.id),
+    id: uuid("id")
+      .default(sql`gen_random_uuid()`)
+      .primaryKey(),
+    businessId: uuid("business_id")
+      .notNull()
+      .references(() => businesses.id),
+    customerId: uuid("customer_id")
+      .notNull()
+      .references(() => customers.id),
     saleId: uuid("sale_id").references(() => sales.id),
     amountUsd: numeric("amount_usd", { precision: 12, scale: 2 }).notNull(),
-    paidUsd: numeric("paid_usd", { precision: 12, scale: 2 }).notNull().default("0"),
+    paidUsd: numeric("paid_usd", { precision: 12, scale: 2 })
+      .notNull()
+      .default("0"),
     balanceUsd: numeric("balance_usd", { precision: 12, scale: 2 }).notNull(),
     status: text("status").notNull().default("pending"),
     dueDate: timestamp("due_date", { withTimezone: true }),
-    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
   },
   (table) => [
     index("idx_ar_business").on(table.businessId),
@@ -536,33 +565,57 @@ export const accountsReceivable = pgTable(
 
 /** Accounts payable - money we owe to suppliers. */
 export const accountsPayable = pgTable("accounts_payable", {
-  id: uuid("id").default(sql`gen_random_uuid()`).primaryKey(),
-  businessId: uuid("business_id").notNull().references(() => businesses.id),
+  id: uuid("id")
+    .default(sql`gen_random_uuid()`)
+    .primaryKey(),
+  businessId: uuid("business_id")
+    .notNull()
+    .references(() => businesses.id),
   supplierName: text("supplier_name").notNull(),
   description: text("description"),
   amountUsd: numeric("amount_usd", { precision: 12, scale: 2 }).notNull(),
-  paidUsd: numeric("paid_usd", { precision: 12, scale: 2 }).notNull().default("0"),
+  paidUsd: numeric("paid_usd", { precision: 12, scale: 2 })
+    .notNull()
+    .default("0"),
   balanceUsd: numeric("balance_usd", { precision: 12, scale: 2 }).notNull(),
   status: text("status").notNull().default("pending"),
   dueDate: timestamp("due_date", { withTimezone: true }),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
 });
 
 /** Day closes - end-of-day cash reconciliation. */
 export const dayCloses = pgTable("day_closes", {
-  id: uuid("id").default(sql`gen_random_uuid()`).primaryKey(),
-  businessId: uuid("business_id").notNull().references(() => businesses.id),
-  closedBy: uuid("closed_by").notNull().references(() => users.id),
+  id: uuid("id")
+    .default(sql`gen_random_uuid()`)
+    .primaryKey(),
+  businessId: uuid("business_id")
+    .notNull()
+    .references(() => businesses.id),
+  closedBy: uuid("closed_by")
+    .notNull()
+    .references(() => users.id),
   date: timestamp("date", { withTimezone: true }).notNull(),
   cashCounted: numeric("cash_counted", { precision: 12, scale: 2 }).notNull(),
   cashExpected: numeric("cash_expected", { precision: 12, scale: 2 }).notNull(),
-  cashDifference: numeric("cash_difference", { precision: 12, scale: 2 }).notNull(),
-  totalSalesUsd: numeric("total_sales_usd", { precision: 12, scale: 2 }).notNull(),
+  cashDifference: numeric("cash_difference", {
+    precision: 12,
+    scale: 2,
+  }).notNull(),
+  totalSalesUsd: numeric("total_sales_usd", {
+    precision: 12,
+    scale: 2,
+  }).notNull(),
   totalSalesCount: integer("total_sales_count").notNull(),
   totalVoidsCount: integer("total_voids_count").notNull().default(0),
   notes: text("notes"),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
 });
 
 // ============================================================
@@ -571,8 +624,12 @@ export const dayCloses = pgTable("day_closes", {
 
 /** Chart of accounts - pre-configured per business type. */
 export const accountingAccounts = pgTable("accounting_accounts", {
-  id: uuid("id").default(sql`gen_random_uuid()`).primaryKey(),
-  businessId: uuid("business_id").notNull().references(() => businesses.id),
+  id: uuid("id")
+    .default(sql`gen_random_uuid()`)
+    .primaryKey(),
+  businessId: uuid("business_id")
+    .notNull()
+    .references(() => businesses.id),
   /** Account code (e.g. "4101" for cash sales). */
   code: text("code").notNull(),
   name: text("name").notNull(),
@@ -581,28 +638,44 @@ export const accountingAccounts = pgTable("accounting_accounts", {
   /** Parent account for hierarchy (null = top level). */
   parentId: uuid("parent_id"),
   isActive: boolean("is_active").notNull().default(true),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
 });
 
 /** Accounting entries - auto-generated from sales, expenses, payments. */
 export const accountingEntries = pgTable("accounting_entries", {
-  id: uuid("id").default(sql`gen_random_uuid()`).primaryKey(),
-  businessId: uuid("business_id").notNull().references(() => businesses.id),
+  id: uuid("id")
+    .default(sql`gen_random_uuid()`)
+    .primaryKey(),
+  businessId: uuid("business_id")
+    .notNull()
+    .references(() => businesses.id),
   date: timestamp("date", { withTimezone: true }).notNull(),
-  debitAccountId: uuid("debit_account_id").notNull().references(() => accountingAccounts.id),
-  creditAccountId: uuid("credit_account_id").notNull().references(() => accountingAccounts.id),
+  debitAccountId: uuid("debit_account_id")
+    .notNull()
+    .references(() => accountingAccounts.id),
+  creditAccountId: uuid("credit_account_id")
+    .notNull()
+    .references(() => accountingAccounts.id),
   amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
   description: text("description"),
   /** Reference to the source (sale ID, expense ID, etc.). */
   referenceType: text("reference_type"),
   referenceId: uuid("reference_id"),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
 });
 
 /** Expenses - purchases and operational costs. */
 export const expenses = pgTable("expenses", {
-  id: uuid("id").default(sql`gen_random_uuid()`).primaryKey(),
-  businessId: uuid("business_id").notNull().references(() => businesses.id),
+  id: uuid("id")
+    .default(sql`gen_random_uuid()`)
+    .primaryKey(),
+  businessId: uuid("business_id")
+    .notNull()
+    .references(() => businesses.id),
   supplierId: text("supplier_id"),
   supplierName: text("supplier_name"),
   invoiceNumber: text("invoice_number"),
@@ -611,13 +684,19 @@ export const expenses = pgTable("expenses", {
   /** URL of the invoice image in MinIO. */
   imageUrl: text("image_url"),
   status: text("status").notNull().default("confirmed"),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
 });
 
 /** Expense items - line items from an invoice (OCR output). */
 export const expenseItems = pgTable("expense_items", {
-  id: uuid("id").default(sql`gen_random_uuid()`).primaryKey(),
-  expenseId: uuid("expense_id").notNull().references(() => expenses.id, { onDelete: "cascade" }),
+  id: uuid("id")
+    .default(sql`gen_random_uuid()`)
+    .primaryKey(),
+  expenseId: uuid("expense_id")
+    .notNull()
+    .references(() => expenses.id, { onDelete: "cascade" }),
   description: text("description").notNull(),
   quantity: integer("quantity").notNull(),
   unitPrice: numeric("unit_price", { precision: 12, scale: 2 }).notNull(),
@@ -630,17 +709,28 @@ export const expenseItems = pgTable("expense_items", {
 export const productAliases = pgTable(
   "product_aliases",
   {
-    id: uuid("id").default(sql`gen_random_uuid()`).primaryKey(),
-    businessId: uuid("business_id").notNull().references(() => businesses.id),
+    id: uuid("id")
+      .default(sql`gen_random_uuid()`)
+      .primaryKey(),
+    businessId: uuid("business_id")
+      .notNull()
+      .references(() => businesses.id),
     supplierId: text("supplier_id"),
     /** The text as it appears on the supplier's invoice. */
     aliasText: text("alias_text").notNull(),
     /** The Nova product this alias maps to. */
-    productId: uuid("product_id").notNull().references(() => products.id),
-    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    productId: uuid("product_id")
+      .notNull()
+      .references(() => products.id),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
   },
   (table) => [
-    index("idx_aliases_business_supplier").on(table.businessId, table.supplierId),
+    index("idx_aliases_business_supplier").on(
+      table.businessId,
+      table.supplierId,
+    ),
   ],
 );
 
@@ -650,22 +740,40 @@ export const productAliases = pgTable(
 
 /** Seller daily goals. */
 export const sellerGoals = pgTable("seller_goals", {
-  id: uuid("id").default(sql`gen_random_uuid()`).primaryKey(),
-  businessId: uuid("business_id").notNull().references(() => businesses.id),
-  userId: uuid("user_id").notNull().references(() => users.id),
+  id: uuid("id")
+    .default(sql`gen_random_uuid()`)
+    .primaryKey(),
+  businessId: uuid("business_id")
+    .notNull()
+    .references(() => businesses.id),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id),
   date: timestamp("date", { withTimezone: true }).notNull(),
   targetUsd: numeric("target_usd", { precision: 12, scale: 2 }).notNull(),
-  achievedUsd: numeric("achieved_usd", { precision: 12, scale: 2 }).notNull().default("0"),
+  achievedUsd: numeric("achieved_usd", { precision: 12, scale: 2 })
+    .notNull()
+    .default("0"),
   metGoal: boolean("met_goal").notNull().default(false),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
 });
 
 /** Seller streaks - consecutive days meeting goal. */
 export const sellerStreaks = pgTable("seller_streaks", {
-  id: uuid("id").default(sql`gen_random_uuid()`).primaryKey(),
-  businessId: uuid("business_id").notNull().references(() => businesses.id),
-  userId: uuid("user_id").notNull().references(() => users.id),
+  id: uuid("id")
+    .default(sql`gen_random_uuid()`)
+    .primaryKey(),
+  businessId: uuid("business_id")
+    .notNull()
+    .references(() => businesses.id),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id),
   currentStreak: integer("current_streak").notNull().default(0),
   bestStreak: integer("best_streak").notNull().default(0),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
 });

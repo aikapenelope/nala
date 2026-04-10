@@ -5,7 +5,7 @@
  * to look up users, businesses, and verify PINs.
  */
 
-import { eq, and } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import type { Database } from "./client";
 import { users, businesses } from "./schema";
 
@@ -49,7 +49,7 @@ export async function incrementPinFailedAttempts(
   await db
     .update(users)
     .set({
-      pinFailedAttempts: users.pinFailedAttempts,
+      pinFailedAttempts: sql`${users.pinFailedAttempts} + 1`,
       pinLockedUntil: lockUntil ?? null,
       updatedAt: new Date(),
     })
