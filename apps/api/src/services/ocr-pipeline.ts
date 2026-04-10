@@ -125,9 +125,10 @@ export async function extractInvoiceFromImage(
  * Validate math consistency of extracted invoice data.
  * Checks: qty * unitPrice = lineTotal for each item, sum = total.
  */
-export function validateInvoiceMath(
-  invoice: OcrInvoice,
-): { itemWarnings: boolean[]; totalWarning: boolean } {
+export function validateInvoiceMath(invoice: OcrInvoice): {
+  itemWarnings: boolean[];
+  totalWarning: boolean;
+} {
   const itemWarnings = invoice.items.map((item) => {
     const expected = item.quantity * item.unitPrice;
     return Math.abs(expected - item.lineTotal) > 0.01;

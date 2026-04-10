@@ -50,18 +50,22 @@ const listProductsQuery = z.object({
  * - Pagination with page/limit
  * - Returns semaphore color for each product
  */
-inventory.get("/products", zValidator("query", listProductsQuery), async (c) => {
-  // TODO: Query products from DB with filters
-  // const { search, categoryId, status, page, limit } = c.req.valid("query");
-  // const offset = (page - 1) * limit;
+inventory.get(
+  "/products",
+  zValidator("query", listProductsQuery),
+  async (c) => {
+    // TODO: Query products from DB with filters
+    // const { search, categoryId, status, page, limit } = c.req.valid("query");
+    // const offset = (page - 1) * limit;
 
-  return c.json({
-    products: [],
-    total: 0,
-    page: 1,
-    limit: 50,
-  });
-});
+    return c.json({
+      products: [],
+      total: 0,
+      page: 1,
+      limit: 50,
+    });
+  },
+);
 
 /** GET /products/:id - Get single product with its variants. */
 inventory.get("/products/:id", async (c) => {
@@ -121,10 +125,7 @@ inventory.post(
 /** PATCH /products/variants/:id - Update a variant. */
 inventory.patch(
   "/products/variants/:id",
-  zValidator(
-    "json",
-    createVariantSchema.omit({ productId: true }).partial(),
-  ),
+  zValidator("json", createVariantSchema.omit({ productId: true }).partial()),
   async (c) => {
     // TODO: Update variant, record price changes
     // const _id = c.req.param("id");

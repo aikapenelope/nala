@@ -84,9 +84,27 @@ reports.get("/reports/weekly", zValidator("query", periodQuery), async (c) => {
 reports.get("/reports/profitability", async (c) => {
   const data = {
     products: [
-      { name: "Pan Campesino", margin: 47, rotation: 85, contribution: 30, score: 92 },
-      { name: "Café con Leche", margin: 60, rotation: 42, contribution: 10, score: 78 },
-      { name: "Queso Blanco", margin: 33, rotation: 15, contribution: 11, score: 55 },
+      {
+        name: "Pan Campesino",
+        margin: 47,
+        rotation: 85,
+        contribution: 30,
+        score: 92,
+      },
+      {
+        name: "Café con Leche",
+        margin: 60,
+        rotation: 42,
+        contribution: 10,
+        score: 78,
+      },
+      {
+        name: "Queso Blanco",
+        margin: 33,
+        rotation: 15,
+        contribution: 11,
+        score: 55,
+      },
     ],
   };
 

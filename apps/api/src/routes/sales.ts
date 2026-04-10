@@ -79,50 +79,46 @@ salesRoutes.get("/sales/:id", async (c) => {
  * 5. If fiado: create accounts_receivable entry
  * 6. Log activity
  */
-salesRoutes.post(
-  "/sales",
-  zValidator("json", createSaleSchema),
-  async (c) => {
-    const data = c.req.valid("json");
-    const user = c.get("user");
-    const rate = await getCurrentRate();
+salesRoutes.post("/sales", zValidator("json", createSaleSchema), async (c) => {
+  const data = c.req.valid("json");
+  const user = c.get("user");
+  const rate = await getCurrentRate();
 
-    // Calculate totals
-    const itemsWithTotals = data.items.map((item) => ({
-      ...item,
-      lineTotal: calculateLineTotal(
-        item.quantity,
-        item.unitPrice,
-        item.discountPercent,
-      ),
-    }));
+  // Calculate totals
+  const itemsWithTotals = data.items.map((item) => ({
+    ...item,
+    lineTotal: calculateLineTotal(
+      item.quantity,
+      item.unitPrice,
+      item.discountPercent,
+    ),
+  }));
 
-    const totalUsd = calculateSaleTotal(data.items, data.discountPercent);
-    const totalBs = Math.round(totalUsd * rate.rateBcv * 100) / 100;
+  const totalUsd = calculateSaleTotal(data.items, data.discountPercent);
+  const totalBs = Math.round(totalUsd * rate.rateBcv * 100) / 100;
 
-    // TODO: When DB is connected:
-    // 1. Begin transaction
-    // 2. Insert sale record
-    // 3. Insert sale_items
-    // 4. Insert sale_payments
-    // 5. Decrement product stock for each item
-    // 6. If payment method is "fiado", create accounts_receivable
-    // 7. Log activity
-    // 8. Commit transaction
+  // TODO: When DB is connected:
+  // 1. Begin transaction
+  // 2. Insert sale record
+  // 3. Insert sale_items
+  // 4. Insert sale_payments
+  // 5. Decrement product stock for each item
+  // 6. If payment method is "fiado", create accounts_receivable
+  // 7. Log activity
+  // 8. Commit transaction
 
-    return c.json({
-      message: "Sale created (placeholder - DB not connected)",
-      sale: {
-        userId: user.id,
-        totalUsd,
-        totalBs,
-        exchangeRate: rate.rateBcv,
-        items: itemsWithTotals,
-        payments: data.payments,
-      },
-    });
-  },
-);
+  return c.json({
+    message: "Sale created (placeholder - DB not connected)",
+    sale: {
+      userId: user.id,
+      totalUsd,
+      totalBs,
+      exchangeRate: rate.rateBcv,
+      items: itemsWithTotals,
+      payments: data.payments,
+    },
+  });
+});
 
 /**
  * POST /sales/:id/void - Void a sale.

@@ -16,7 +16,9 @@ export async function sendWhatsAppMessage(
   const accessToken = process.env.WA_ACCESS_TOKEN;
 
   if (!phoneNumberId || !accessToken) {
-    console.warn("WhatsApp not configured: WA_PHONE_NUMBER_ID or WA_ACCESS_TOKEN missing");
+    console.warn(
+      "WhatsApp not configured: WA_PHONE_NUMBER_ID or WA_ACCESS_TOKEN missing",
+    );
     return false;
   }
 

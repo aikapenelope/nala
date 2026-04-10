@@ -103,7 +103,8 @@ whatsapp.post("/", async (c) => {
     if (action.type === "unknown") {
       await sendWhatsAppMessage(
         phone,
-        action.response ?? "No entendí tu mensaje. Intenta algo como: cuánto vendí hoy",
+        action.response ??
+          "No entendí tu mensaje. Intenta algo como: cuánto vendí hoy",
       );
       return c.json({ status: "unknown_action" });
     }

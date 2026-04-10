@@ -8,13 +8,15 @@
  * Requires: authMiddleware must run first to set `businessId` on context.
  */
 
+import { sql } from "drizzle-orm";
 import type { Context, Next } from "hono";
+import { getDb } from "../db";
 
 /**
  * Tenant middleware - sets RLS context per request.
  *
- * In development (no DATABASE_URL), skips the DB call.
- * In production, executes SET on the PostgreSQL connection.
+ * Executes SET on the PostgreSQL connection so all subsequent
+ * queries in this request are scoped to the current business.
  */
 export async function tenantMiddleware(c: Context, next: Next) {
   const businessId = c.get("businessId") as string | undefined;
@@ -23,12 +25,13 @@ export async function tenantMiddleware(c: Context, next: Next) {
     return c.json({ error: "Business context required" }, 400);
   }
 
-  // TODO: When DB is connected, execute:
-  // await db.execute(sql`SET app.current_business_id = ${businessId}`);
-  //
-  // This activates RLS for all subsequent queries in this request.
-  // Each request gets its own connection from the pool, so the SET
-  // only affects this request's queries.
+  const db = getDb();
+
+  // Set the RLS variable for this request's queries.
+  // This activates row-level security policies defined in init.sql.
+  await db.execute(
+    sql`SELECT set_config('app.current_business_id', ${businessId}, false)`,
+  );
 
   await next();
 }
