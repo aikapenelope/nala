@@ -1,0 +1,27 @@
+@import "tailwindcss";
+
+/*
+ * Nova design tokens and custom styles.
+ * Tailwind CSS v4 uses CSS-first configuration.
+ */
+
+@theme {
+  --color-nova-primary: #1e40af;
+  --color-nova-primary-light: #3b82f6;
+  --color-nova-primary-dark: #1e3a8a;
+  --color-nova-success: #16a34a;
+  --color-nova-warning: #d97706;
+  --color-nova-danger: #dc2626;
+  --color-nova-gray: #6b7280;
+
+  /* Stock semaphore colors */
+  --color-stock-green: #16a34a;
+  --color-stock-yellow: #d97706;
+  --color-stock-red: #dc2626;
+  --color-stock-gray: #9ca3af;
+
+  /* Aging colors for accounts */
+  --color-aging-green: #16a34a;
+  --color-aging-yellow: #d97706;
+  --color-aging-red: #dc2626;
+}
