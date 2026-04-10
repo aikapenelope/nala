@@ -4,7 +4,6 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main]
 
 jobs:
   check:
@@ -44,24 +43,14 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # Typecheck all packages (shared, db, api)
       - name: Typecheck packages
         run: npx turbo typecheck --filter=@nova/shared --filter=@nova/db --filter=@nova/api
 
-      # Lint all packages
       - name: Lint
         run: npx turbo lint
 
-      # Build all packages (includes Nuxt build with type checking)
       - name: Build
         run: npx turbo build
         env:
           DATABASE_URL: postgresql://nova:test@localhost:5432/nova_test
           REDIS_URL: redis://localhost:6379
-
-      # Future: run tests when they exist
-      # - name: Test
-      #   run: npx turbo test
-      #   env:
-      #     DATABASE_URL: postgresql://nova:test@localhost:5432/nova_test
-      #     REDIS_URL: redis://localhost:6379

@@ -22,6 +22,7 @@ import { inventory } from "./routes/inventory";
 import { salesRoutes } from "./routes/sales";
 import { customersRoutes } from "./routes/customers";
 import { reports } from "./routes/reports";
+import { accounting } from "./routes/accounting";
 import { authMiddleware } from "./middleware/auth";
 import { tenantMiddleware } from "./middleware/tenant";
 import type { AppEnv } from "./types";
@@ -66,6 +67,9 @@ api.route("/", customersRoutes);
 
 // Reports routes
 api.route("/", reports);
+
+// Accounting and OCR routes
+api.route("/", accounting);
 
 app.route("/api", api);
 
