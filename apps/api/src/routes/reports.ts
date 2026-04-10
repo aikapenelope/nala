@@ -10,15 +10,88 @@
  * GET /reports/financial      - P&L simplified
  *
  * Each report returns: data + AI narrative + period info.
+ * All queries are real DB aggregations. No mock data.
  */
 
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
+import { eq, and, sql, gte, lte, desc } from "drizzle-orm";
+import {
+  sales,
+  saleItems,
+  salePayments,
+  products,
+  customers,
+  accountsReceivable,
+  expenses,
+  users,
+} from "@nova/db";
+import { DEAD_STOCK_DAYS, AGING_THRESHOLDS } from "@nova/shared";
 import { generateNarrative } from "../services/ai-narrative";
 import type { AppEnv } from "../types";
 
 const reports = new Hono<AppEnv>();
+
+// ============================================================
+// Helpers
+// ============================================================
+
+/** Parse period query into UTC date range. */
+function parsePeriodRange(period: string, from?: string, to?: string) {
+  const now = new Date();
+  const todayStr = now.toISOString().split("T")[0];
+
+  let start: Date;
+  let end: Date;
+
+  switch (period) {
+    case "today":
+      start = new Date(`${todayStr}T00:00:00.000Z`);
+      end = new Date(`${todayStr}T23:59:59.999Z`);
+      break;
+    case "week": {
+      const dayOfWeek = now.getUTCDay();
+      const mondayOffset = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+      const monday = new Date(now);
+      monday.setUTCDate(now.getUTCDate() - mondayOffset);
+      start = new Date(monday.toISOString().split("T")[0] + "T00:00:00.000Z");
+      end = new Date(`${todayStr}T23:59:59.999Z`);
+      break;
+    }
+    case "month": {
+      const monthStr = todayStr.slice(0, 7); // YYYY-MM
+      start = new Date(`${monthStr}-01T00:00:00.000Z`);
+      end = new Date(`${todayStr}T23:59:59.999Z`);
+      break;
+    }
+    case "last_month": {
+      const lastMonth = new Date(now);
+      lastMonth.setUTCMonth(lastMonth.getUTCMonth() - 1);
+      const lmStr = lastMonth.toISOString().split("T")[0].slice(0, 7);
+      start = new Date(`${lmStr}-01T00:00:00.000Z`);
+      // Last day of last month = day 0 of current month
+      const lastDay = new Date(now.getUTCFullYear(), now.getUTCMonth(), 0);
+      end = new Date(lastDay.toISOString().split("T")[0] + "T23:59:59.999Z");
+      break;
+    }
+    case "custom":
+      if (!from || !to) {
+        // Default to today if custom without dates
+        start = new Date(`${todayStr}T00:00:00.000Z`);
+        end = new Date(`${todayStr}T23:59:59.999Z`);
+      } else {
+        start = new Date(`${from}T00:00:00.000Z`);
+        end = new Date(`${to}T23:59:59.999Z`);
+      }
+      break;
+    default:
+      start = new Date(`${todayStr}T00:00:00.000Z`);
+      end = new Date(`${todayStr}T23:59:59.999Z`);
+  }
+
+  return { start, end };
+}
 
 /** Common period query param. */
 const periodQuery = z.object({
@@ -29,85 +102,333 @@ const periodQuery = z.object({
   to: z.string().optional(),
 });
 
+// ============================================================
+// Reports
+// ============================================================
+
 /** GET /reports/daily - Today's summary with comparisons. */
 reports.get("/reports/daily", zValidator("query", periodQuery), async (c) => {
-  // TODO: Query today's sales, compare with yesterday and same day last week
+  const db = c.get("db");
+  const businessId = c.get("businessId");
+
+  const todayStr = new Date().toISOString().split("T")[0];
+  const todayStart = new Date(`${todayStr}T00:00:00.000Z`);
+  const todayEnd = new Date(`${todayStr}T23:59:59.999Z`);
+
+  // Yesterday
+  const yesterday = new Date(todayStart);
+  yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+  const yesterdayStr = yesterday.toISOString().split("T")[0];
+  const yesterdayStart = new Date(`${yesterdayStr}T00:00:00.000Z`);
+  const yesterdayEnd = new Date(`${yesterdayStr}T23:59:59.999Z`);
+
+  // Same day last week
+  const lastWeek = new Date(todayStart);
+  lastWeek.setUTCDate(lastWeek.getUTCDate() - 7);
+  const lastWeekStr = lastWeek.toISOString().split("T")[0];
+  const lastWeekStart = new Date(`${lastWeekStr}T00:00:00.000Z`);
+  const lastWeekEnd = new Date(`${lastWeekStr}T23:59:59.999Z`);
+
+  const completedCond = eq(sales.status, "completed");
+  const bizCond = eq(sales.businessId, businessId);
+
+  // Today's totals
+  const [todayTotals] = await db
+    .select({
+      totalSales: sql<number>`COALESCE(SUM(${sales.totalUsd}::numeric), 0)::float`,
+      totalCount: sql<number>`count(*)::int`,
+    })
+    .from(sales)
+    .where(
+      and(
+        bizCond,
+        completedCond,
+        gte(sales.createdAt, todayStart),
+        lte(sales.createdAt, todayEnd),
+      ),
+    );
+
+  // Yesterday's total
+  const [yesterdayTotals] = await db
+    .select({
+      totalSales: sql<number>`COALESCE(SUM(${sales.totalUsd}::numeric), 0)::float`,
+    })
+    .from(sales)
+    .where(
+      and(
+        bizCond,
+        completedCond,
+        gte(sales.createdAt, yesterdayStart),
+        lte(sales.createdAt, yesterdayEnd),
+      ),
+    );
+
+  // Same day last week total
+  const [lastWeekTotals] = await db
+    .select({
+      totalSales: sql<number>`COALESCE(SUM(${sales.totalUsd}::numeric), 0)::float`,
+    })
+    .from(sales)
+    .where(
+      and(
+        bizCond,
+        completedCond,
+        gte(sales.createdAt, lastWeekStart),
+        lte(sales.createdAt, lastWeekEnd),
+      ),
+    );
+
+  const totalSales = todayTotals?.totalSales ?? 0;
+  const totalCount = todayTotals?.totalCount ?? 0;
+  const avgTicket =
+    totalCount > 0 ? Math.round((totalSales / totalCount) * 100) / 100 : 0;
+
+  const yesterdaySales = yesterdayTotals?.totalSales ?? 0;
+  const lastWeekSales = lastWeekTotals?.totalSales ?? 0;
+
+  const vsPreviousDay =
+    yesterdaySales > 0
+      ? Math.round(((totalSales - yesterdaySales) / yesterdaySales) * 100)
+      : 0;
+  const vsSameDayLastWeek =
+    lastWeekSales > 0
+      ? Math.round(((totalSales - lastWeekSales) / lastWeekSales) * 100)
+      : 0;
+
+  // Top products today
+  const topProducts = await db
+    .select({
+      name: products.name,
+      qty: sql<number>`SUM(${saleItems.quantity})::int`,
+      total: sql<number>`SUM(${saleItems.lineTotal}::numeric)::float`,
+    })
+    .from(saleItems)
+    .innerJoin(sales, eq(saleItems.saleId, sales.id))
+    .innerJoin(products, eq(saleItems.productId, products.id))
+    .where(
+      and(
+        bizCond,
+        completedCond,
+        gte(sales.createdAt, todayStart),
+        lte(sales.createdAt, todayEnd),
+      ),
+    )
+    .groupBy(products.name)
+    .orderBy(desc(sql`SUM(${saleItems.lineTotal}::numeric)`))
+    .limit(5);
+
+  // Sales by payment method today
+  const methodBreakdown = await db
+    .select({
+      method: salePayments.method,
+      total: sql<number>`SUM(${salePayments.amountUsd}::numeric)::float`,
+    })
+    .from(salePayments)
+    .innerJoin(sales, eq(salePayments.saleId, sales.id))
+    .where(
+      and(
+        bizCond,
+        completedCond,
+        gte(sales.createdAt, todayStart),
+        lte(sales.createdAt, todayEnd),
+      ),
+    )
+    .groupBy(salePayments.method);
+
+  const salesByMethod: Record<string, number> = {};
+  for (const row of methodBreakdown) {
+    salesByMethod[row.method] = row.total;
+  }
+
   const data = {
-    totalSales: 420.0,
-    totalCount: 23,
-    avgTicket: 18.26,
-    vsPreviousDay: 12,
-    vsSameDayLastWeek: 8,
-    topProducts: [
-      { name: "Pan Campesino", qty: 85, total: 127.5 },
-      { name: "Café con Leche", qty: 42, total: 42.0 },
-    ],
-    salesByMethod: { efectivo: 285, pago_movil: 85, binance: 30, fiado: 20 },
+    totalSales,
+    totalCount,
+    avgTicket,
+    vsPreviousDay,
+    vsSameDayLastWeek,
+    topProducts,
+    salesByMethod,
   };
 
-  const narrative = await generateNarrative({
-    type: "daily_summary",
-    data,
-  });
+  const narrative = await generateNarrative({ type: "daily_summary", data });
 
   return c.json({ data, narrative, period: "today" });
 });
 
 /** GET /reports/weekly - Weekly/monthly trends. */
 reports.get("/reports/weekly", zValidator("query", periodQuery), async (c) => {
+  const query = c.req.valid("query");
+  const db = c.get("db");
+  const businessId = c.get("businessId");
+  const { start, end } = parsePeriodRange(query.period, query.from, query.to);
+
+  const completedCond = eq(sales.status, "completed");
+  const bizCond = eq(sales.businessId, businessId);
+
+  // Total for the period
+  const [periodTotals] = await db
+    .select({
+      totalSales: sql<number>`COALESCE(SUM(${sales.totalUsd}::numeric), 0)::float`,
+      totalCount: sql<number>`count(*)::int`,
+    })
+    .from(sales)
+    .where(
+      and(
+        bizCond,
+        completedCond,
+        gte(sales.createdAt, start),
+        lte(sales.createdAt, end),
+      ),
+    );
+
+  // Daily breakdown
+  const dailyBreakdown = await db
+    .select({
+      day: sql<string>`TO_CHAR(${sales.createdAt} AT TIME ZONE 'UTC', 'Dy')`,
+      amount: sql<number>`COALESCE(SUM(${sales.totalUsd}::numeric), 0)::float`,
+    })
+    .from(sales)
+    .where(
+      and(
+        bizCond,
+        completedCond,
+        gte(sales.createdAt, start),
+        lte(sales.createdAt, end),
+      ),
+    )
+    .groupBy(
+      sql`TO_CHAR(${sales.createdAt} AT TIME ZONE 'UTC', 'Dy')`,
+      sql`DATE(${sales.createdAt})`,
+    )
+    .orderBy(sql`DATE(${sales.createdAt})`);
+
+  // Previous period for comparison
+  const periodDays = Math.ceil(
+    (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24),
+  );
+  const prevStart = new Date(
+    start.getTime() - periodDays * 24 * 60 * 60 * 1000,
+  );
+  const prevEnd = new Date(start.getTime() - 1);
+
+  const [prevTotals] = await db
+    .select({
+      totalSales: sql<number>`COALESCE(SUM(${sales.totalUsd}::numeric), 0)::float`,
+    })
+    .from(sales)
+    .where(
+      and(
+        bizCond,
+        completedCond,
+        gte(sales.createdAt, prevStart),
+        lte(sales.createdAt, prevEnd),
+      ),
+    );
+
+  const totalSales = periodTotals?.totalSales ?? 0;
+  const prevSales = prevTotals?.totalSales ?? 0;
+  const vsPrevPeriod =
+    prevSales > 0
+      ? Math.round(((totalSales - prevSales) / prevSales) * 100)
+      : 0;
+
+  // Best day and top product
+  const bestDay = dailyBreakdown.reduce(
+    (best, d) => (d.amount > (best?.amount ?? 0) ? d : best),
+    dailyBreakdown[0],
+  );
+
+  const [topProduct] = await db
+    .select({
+      name: products.name,
+      total: sql<number>`SUM(${saleItems.lineTotal}::numeric)::float`,
+    })
+    .from(saleItems)
+    .innerJoin(sales, eq(saleItems.saleId, sales.id))
+    .innerJoin(products, eq(saleItems.productId, products.id))
+    .where(
+      and(
+        bizCond,
+        completedCond,
+        gte(sales.createdAt, start),
+        lte(sales.createdAt, end),
+      ),
+    )
+    .groupBy(products.name)
+    .orderBy(desc(sql`SUM(${saleItems.lineTotal}::numeric)`))
+    .limit(1);
+
   const data = {
-    totalSales: 3270.0,
-    totalCount: 156,
-    vsLastWeek: 8,
-    dailyBreakdown: [
-      { day: "Lu", amount: 420 },
-      { day: "Ma", amount: 350 },
-      { day: "Mi", amount: 520 },
-      { day: "Ju", amount: 300 },
-      { day: "Vi", amount: 620 },
-      { day: "Sa", amount: 780 },
-      { day: "Do", amount: 280 },
-    ],
-    bestDay: "Sa",
-    topProduct: "Pan Campesino",
+    totalSales,
+    totalCount: periodTotals?.totalCount ?? 0,
+    vsPrevPeriod,
+    dailyBreakdown,
+    bestDay: bestDay?.day ?? null,
+    topProduct: topProduct?.name ?? null,
   };
 
-  const narrative = await generateNarrative({
-    type: "weekly_summary",
-    data,
-  });
+  const narrative = await generateNarrative({ type: "weekly_summary", data });
 
-  return c.json({ data, narrative, period: c.req.valid("query").period });
+  return c.json({ data, narrative, period: query.period });
 });
 
 /** GET /reports/profitability - Product profitability analysis. */
 reports.get("/reports/profitability", async (c) => {
-  const data = {
-    products: [
-      {
-        name: "Pan Campesino",
-        margin: 47,
-        rotation: 85,
-        contribution: 30,
-        score: 92,
-      },
-      {
-        name: "Café con Leche",
-        margin: 60,
-        rotation: 42,
-        contribution: 10,
-        score: 78,
-      },
-      {
-        name: "Queso Blanco",
-        margin: 33,
-        rotation: 15,
-        contribution: 11,
-        score: 55,
-      },
-    ],
-  };
+  const db = c.get("db");
+  const businessId = c.get("businessId");
 
+  // Last 30 days
+  const since = new Date();
+  since.setUTCDate(since.getUTCDate() - 30);
+
+  const profitability = await db
+    .select({
+      name: products.name,
+      cost: products.cost,
+      price: products.price,
+      qtySold: sql<number>`COALESCE(SUM(${saleItems.quantity}), 0)::int`,
+      revenue: sql<number>`COALESCE(SUM(${saleItems.lineTotal}::numeric), 0)::float`,
+    })
+    .from(products)
+    .leftJoin(saleItems, eq(products.id, saleItems.productId))
+    .leftJoin(
+      sales,
+      and(
+        eq(saleItems.saleId, sales.id),
+        eq(sales.status, "completed"),
+        gte(sales.createdAt, since),
+      ),
+    )
+    .where(
+      and(eq(products.businessId, businessId), eq(products.isActive, true)),
+    )
+    .groupBy(products.id, products.name, products.cost, products.price)
+    .orderBy(desc(sql`COALESCE(SUM(${saleItems.lineTotal}::numeric), 0)`))
+    .limit(20);
+
+  const totalRevenue = profitability.reduce((s, p) => s + p.revenue, 0);
+
+  const productData = profitability.map((p) => {
+    const cost = Number(p.cost);
+    const price = Number(p.price);
+    const margin = price > 0 ? Math.round(((price - cost) / price) * 100) : 0;
+    const contribution =
+      totalRevenue > 0 ? Math.round((p.revenue / totalRevenue) * 100) : 0;
+    // Score: weighted combination of margin and contribution
+    const score = Math.round(
+      margin * 0.4 + contribution * 0.3 + Math.min(p.qtySold, 100) * 0.3,
+    );
+
+    return {
+      name: p.name,
+      margin,
+      rotation: p.qtySold,
+      contribution,
+      score,
+    };
+  });
+
+  const data = { products: productData };
   const narrative = await generateNarrative({
     type: "product_profitability",
     data,
@@ -116,14 +437,30 @@ reports.get("/reports/profitability", async (c) => {
   return c.json({ data, narrative });
 });
 
-/** GET /reports/inventory - Inventory movement. */
+/** GET /reports/inventory - Inventory status. */
 reports.get("/reports/inventory", async (c) => {
+  const db = c.get("db");
+  const businessId = c.get("businessId");
+
+  const [totals] = await db
+    .select({
+      totalProducts: sql<number>`count(*)::int`,
+      totalValue: sql<number>`COALESCE(SUM(${products.stock} * ${products.cost}::numeric), 0)::float`,
+      lowStock: sql<number>`SUM(CASE WHEN ${products.stock} <= ${products.stockMin} AND ${products.stock} > ${products.stockCritical} THEN 1 ELSE 0 END)::int`,
+      criticalStock: sql<number>`SUM(CASE WHEN ${products.stock} <= ${products.stockCritical} THEN 1 ELSE 0 END)::int`,
+      deadStock: sql<number>`SUM(CASE WHEN ${products.lastSoldAt} IS NOT NULL AND ${products.lastSoldAt} < NOW() - INTERVAL '${sql.raw(String(DEAD_STOCK_DAYS))} days' THEN 1 ELSE 0 END)::int`,
+    })
+    .from(products)
+    .where(
+      and(eq(products.businessId, businessId), eq(products.isActive, true)),
+    );
+
   const data = {
-    totalProducts: 150,
-    totalValue: 4500.0,
-    movements: { entries: 45, exits: 320, adjustments: 3 },
-    lowStock: 3,
-    deadStock: 5,
+    totalProducts: totals?.totalProducts ?? 0,
+    totalValue: totals?.totalValue ?? 0,
+    lowStock: totals?.lowStock ?? 0,
+    criticalStock: totals?.criticalStock ?? 0,
+    deadStock: totals?.deadStock ?? 0,
   };
 
   const narrative = await generateNarrative({
@@ -136,38 +473,105 @@ reports.get("/reports/inventory", async (c) => {
 
 /** GET /reports/receivable - Accounts receivable aging. */
 reports.get("/reports/receivable", async (c) => {
+  const db = c.get("db");
+  const businessId = c.get("businessId");
+
+  const receivables = await db
+    .select({
+      customerName: customers.name,
+      balanceUsd: accountsReceivable.balanceUsd,
+      createdAt: accountsReceivable.createdAt,
+    })
+    .from(accountsReceivable)
+    .innerJoin(customers, eq(accountsReceivable.customerId, customers.id))
+    .where(
+      and(
+        eq(accountsReceivable.businessId, businessId),
+        eq(accountsReceivable.status, "pending"),
+      ),
+    )
+    .orderBy(desc(accountsReceivable.createdAt));
+
+  let green = 0;
+  let yellow = 0;
+  let red = 0;
+  const now = Date.now();
+
+  const topDebtors: Array<{ name: string; amount: number; days: number }> = [];
+
+  for (const r of receivables) {
+    const days = Math.floor(
+      (now - r.createdAt.getTime()) / (1000 * 60 * 60 * 24),
+    );
+    const amount = Number(r.balanceUsd);
+
+    if (days > AGING_THRESHOLDS.yellow) {
+      red += amount;
+    } else if (days > AGING_THRESHOLDS.green) {
+      yellow += amount;
+    } else {
+      green += amount;
+    }
+
+    topDebtors.push({ name: r.customerName, amount, days });
+  }
+
+  // Sort by amount descending, take top 10
+  topDebtors.sort((a, b) => b.amount - a.amount);
+
   const data = {
-    total: 285.0,
-    aging: { green: 100, yellow: 120, red: 65 },
-    topDebtors: [
-      { name: "Pedro López", amount: 100, days: 45 },
-      { name: "Juan Pérez", amount: 65, days: 35 },
-    ],
+    total: Math.round((green + yellow + red) * 100) / 100,
+    aging: {
+      green: Math.round(green * 100) / 100,
+      yellow: Math.round(yellow * 100) / 100,
+      red: Math.round(red * 100) / 100,
+    },
+    topDebtors: topDebtors.slice(0, 10),
   };
 
-  const narrative = await generateNarrative({
-    type: "receivable_aging",
-    data,
-  });
+  const narrative = await generateNarrative({ type: "receivable_aging", data });
 
   return c.json({ data, narrative });
 });
 
 /** GET /reports/sellers - Sales by seller ranking. */
-reports.get("/reports/sellers", async (c) => {
-  const data = {
-    sellers: [
-      { name: "María García", sales: 180, total: 2100, avgTicket: 11.67 },
-      { name: "Pedro Rodríguez", sales: 120, total: 1800, avgTicket: 15.0 },
-    ],
-  };
+reports.get("/reports/sellers", zValidator("query", periodQuery), async (c) => {
+  const query = c.req.valid("query");
+  const db = c.get("db");
+  const businessId = c.get("businessId");
+  const { start, end } = parsePeriodRange(query.period, query.from, query.to);
 
-  const narrative = await generateNarrative({
-    type: "sales_by_seller",
-    data,
-  });
+  const sellerStats = await db
+    .select({
+      name: users.name,
+      salesCount: sql<number>`count(*)::int`,
+      total: sql<number>`COALESCE(SUM(${sales.totalUsd}::numeric), 0)::float`,
+    })
+    .from(sales)
+    .innerJoin(users, eq(sales.userId, users.id))
+    .where(
+      and(
+        eq(sales.businessId, businessId),
+        eq(sales.status, "completed"),
+        gte(sales.createdAt, start),
+        lte(sales.createdAt, end),
+      ),
+    )
+    .groupBy(users.id, users.name)
+    .orderBy(desc(sql`SUM(${sales.totalUsd}::numeric)`));
 
-  return c.json({ data, narrative });
+  const sellerData = sellerStats.map((s) => ({
+    name: s.name,
+    sales: s.salesCount,
+    total: Math.round(s.total * 100) / 100,
+    avgTicket:
+      s.salesCount > 0 ? Math.round((s.total / s.salesCount) * 100) / 100 : 0,
+  }));
+
+  const data = { sellers: sellerData };
+  const narrative = await generateNarrative({ type: "sales_by_seller", data });
+
+  return c.json({ data, narrative, period: query.period });
 });
 
 /** GET /reports/financial - Simplified P&L. */
@@ -175,14 +579,76 @@ reports.get(
   "/reports/financial",
   zValidator("query", periodQuery),
   async (c) => {
+    const query = c.req.valid("query");
+    const db = c.get("db");
+    const businessId = c.get("businessId");
+    const { start, end } = parsePeriodRange(query.period, query.from, query.to);
+
+    // Revenue: sum of completed sales
+    const [revResult] = await db
+      .select({
+        revenue: sql<number>`COALESCE(SUM(${sales.totalUsd}::numeric), 0)::float`,
+      })
+      .from(sales)
+      .where(
+        and(
+          eq(sales.businessId, businessId),
+          eq(sales.status, "completed"),
+          gte(sales.createdAt, start),
+          lte(sales.createdAt, end),
+        ),
+      );
+
+    // Cost of goods: sum of (cost * quantity) for items in completed sales
+    const [cogsResult] = await db
+      .select({
+        cogs: sql<number>`COALESCE(SUM(${products.cost}::numeric * ${saleItems.quantity}), 0)::float`,
+      })
+      .from(saleItems)
+      .innerJoin(sales, eq(saleItems.saleId, sales.id))
+      .innerJoin(products, eq(saleItems.productId, products.id))
+      .where(
+        and(
+          eq(sales.businessId, businessId),
+          eq(sales.status, "completed"),
+          gte(sales.createdAt, start),
+          lte(sales.createdAt, end),
+        ),
+      );
+
+    // Expenses: sum of confirmed expenses in the period
+    const [expResult] = await db
+      .select({
+        expenses: sql<number>`COALESCE(SUM(${expenses.total}::numeric), 0)::float`,
+      })
+      .from(expenses)
+      .where(
+        and(
+          eq(expenses.businessId, businessId),
+          eq(expenses.status, "confirmed"),
+          gte(expenses.date, start),
+          lte(expenses.date, end),
+        ),
+      );
+
+    const revenue = revResult?.revenue ?? 0;
+    const costOfGoods = cogsResult?.cogs ?? 0;
+    const totalExpenses = expResult?.expenses ?? 0;
+    const grossProfit = revenue - costOfGoods;
+    const netProfit = grossProfit - totalExpenses;
+    const grossMargin =
+      revenue > 0 ? Math.round((grossProfit / revenue) * 1000) / 10 : 0;
+    const netMargin =
+      revenue > 0 ? Math.round((netProfit / revenue) * 1000) / 10 : 0;
+
     const data = {
-      revenue: 3270.0,
-      costOfGoods: 1960.0,
-      grossProfit: 1310.0,
-      expenses: 450.0,
-      netProfit: 860.0,
-      grossMargin: 40.1,
-      netMargin: 26.3,
+      revenue: Math.round(revenue * 100) / 100,
+      costOfGoods: Math.round(costOfGoods * 100) / 100,
+      grossProfit: Math.round(grossProfit * 100) / 100,
+      expenses: Math.round(totalExpenses * 100) / 100,
+      netProfit: Math.round(netProfit * 100) / 100,
+      grossMargin,
+      netMargin,
     };
 
     const narrative = await generateNarrative({
@@ -190,7 +656,7 @@ reports.get(
       data,
     });
 
-    return c.json({ data, narrative, period: c.req.valid("query").period });
+    return c.json({ data, narrative, period: query.period });
   },
 );
 
