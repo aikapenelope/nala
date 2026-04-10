@@ -16,6 +16,14 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 import { health } from "./routes/health";
+import { auth } from "./routes/auth";
+import { onboarding } from "./routes/onboarding";
+import { inventory } from "./routes/inventory";
+import { salesRoutes } from "./routes/sales";
+import { customersRoutes } from "./routes/customers";
+import { reports } from "./routes/reports";
+import { accounting } from "./routes/accounting";
+import { whatsapp } from "./routes/whatsapp";
 import { authMiddleware } from "./middleware/auth";
 import { tenantMiddleware } from "./middleware/tenant";
 import type { AppEnv } from "./types";
@@ -35,6 +43,9 @@ app.use(
 
 // Public routes (no auth required)
 app.route("/health", health);
+app.route("/auth", auth);
+app.route("/onboarding", onboarding);
+app.route("/webhooks/whatsapp", whatsapp);
 
 // Protected API routes with typed context variables
 const api = new Hono<AppEnv>();
@@ -46,6 +57,21 @@ api.get("/me", (c) => {
   const user = c.get("user");
   return c.json({ user });
 });
+
+// Inventory routes (products, categories, variants)
+api.route("/", inventory);
+
+// Sales routes (sales, exchange rate, quotations)
+api.route("/", salesRoutes);
+
+// Customer and accounts routes
+api.route("/", customersRoutes);
+
+// Reports routes
+api.route("/", reports);
+
+// Accounting and OCR routes
+api.route("/", accounting);
 
 app.route("/api", api);
 
