@@ -23,6 +23,7 @@ import { salesRoutes } from "./routes/sales";
 import { customersRoutes } from "./routes/customers";
 import { reports } from "./routes/reports";
 import { accounting } from "./routes/accounting";
+import { whatsapp } from "./routes/whatsapp";
 import { authMiddleware } from "./middleware/auth";
 import { tenantMiddleware } from "./middleware/tenant";
 import type { AppEnv } from "./types";
@@ -44,6 +45,7 @@ app.use(
 app.route("/health", health);
 app.route("/auth", auth);
 app.route("/onboarding", onboarding);
+app.route("/webhooks/whatsapp", whatsapp);
 
 // Protected API routes with typed context variables
 const api = new Hono<AppEnv>();
