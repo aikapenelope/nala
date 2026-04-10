@@ -3,34 +3,82 @@
  * Checkout page - payment method selection and sale confirmation.
  *
  * Flow:
- * 1. Shows sale total in USD and Bs. (BCV rate)
- * 2. User selects payment method (7 methods with large icons)
- * 3. If fiado: must select a customer
- * 4. Confirm → sale registered → receipt option
+ * 1. Reads ticket items from sessionStorage (set by POS screen)
+ * 2. Fetches exchange rate from GET /api/exchange-rate
+ * 3. User selects payment method
+ * 4. If fiado: must select a customer
+ * 5. Confirm -> POST /api/sales -> receipt option
  *
- * 7 payment methods for Venezuela:
- * Efectivo, Pago Móvil, Binance, Zinli, Transferencia, Zelle, Fiado
+ * Connected to:
+ * - GET /api/exchange-rate
+ * - POST /api/sales
  */
 
 import { usdToBs } from "@nova/shared";
 import type { PaymentMethod } from "@nova/shared";
 
 const router = useRouter();
+const { $api } = useApi();
 
-/** Mock exchange rate. Will come from API in production. */
-const exchangeRate = ref(36.5);
+/** Exchange rate from API. */
+const exchangeRate = ref(0);
+const rateError = ref("");
 
-/** Sale total passed from the POS screen (via query or state). */
-const totalUsd = ref(15.5);
+/** Ticket items from POS screen. */
+interface CheckoutItem {
+  productId: string;
+  name: string;
+  quantity: number;
+  unitPrice: number;
+  discountPercent: number;
+}
+
+const items = ref<CheckoutItem[]>([]);
+const totalUsd = ref(0);
 
 const selectedMethod = ref<PaymentMethod | null>(null);
 const reference = ref("");
 const selectedCustomerId = ref<string | null>(null);
 const isSubmitting = ref(false);
 const saleComplete = ref(false);
+const saleError = ref("");
 
 /** Total in Bs. */
-const totalBs = computed(() => usdToBs(totalUsd.value, exchangeRate.value));
+const totalBs = computed(() =>
+  exchangeRate.value > 0 ? usdToBs(totalUsd.value, exchangeRate.value) : 0,
+);
+
+/** Load ticket data and exchange rate on mount. */
+onMounted(async () => {
+  if (!import.meta.client) return;
+
+  // Read ticket from sessionStorage
+  const storedItems = sessionStorage.getItem("nova:checkout:items");
+  const storedTotal = sessionStorage.getItem("nova:checkout:total");
+
+  if (!storedItems || !storedTotal) {
+    // No ticket data -- redirect back to POS
+    router.push("/sales");
+    return;
+  }
+
+  try {
+    items.value = JSON.parse(storedItems);
+    totalUsd.value = Number(storedTotal);
+  } catch {
+    router.push("/sales");
+    return;
+  }
+
+  // Fetch exchange rate
+  try {
+    const rate = await $api<{ rateBcv: number }>("/api/exchange-rate");
+    exchangeRate.value = rate.rateBcv;
+  } catch {
+    rateError.value =
+      "Tasa de cambio no disponible. Las ventas se registran solo en USD.";
+  }
+});
 
 /** Payment methods with display info. */
 const paymentMethods: Array<{
@@ -42,7 +90,7 @@ const paymentMethods: Array<{
   { value: "efectivo", label: "Efectivo", icon: "💵", needsReference: false },
   {
     value: "pago_movil",
-    label: "Pago Móvil",
+    label: "Pago Movil",
     icon: "📱",
     needsReference: true,
   },
@@ -74,22 +122,47 @@ const isFiado = computed(() => selectedMethod.value === "fiado");
 const canSubmit = computed(() => {
   if (!selectedMethod.value) return false;
   if (isFiado.value && !selectedCustomerId.value) return false;
+  if (items.value.length === 0) return false;
   return true;
 });
 
-/** Submit the sale. */
+/** Submit the sale to the API. */
 async function confirmSale() {
   if (!canSubmit.value || !selectedMethod.value) return;
 
   isSubmitting.value = true;
+  saleError.value = "";
 
   try {
-    // TODO: Call POST /api/sales with items from POS screen state
-    // For now, simulate success
-    await new Promise((resolve) => setTimeout(resolve, 800));
+    await $api("/api/sales", {
+      method: "POST",
+      body: {
+        items: items.value.map((item) => ({
+          productId: item.productId,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          discountPercent: item.discountPercent,
+        })),
+        payments: [
+          {
+            method: selectedMethod.value,
+            amountUsd: totalUsd.value,
+            reference: reference.value || undefined,
+          },
+        ],
+        customerId: selectedCustomerId.value || undefined,
+        discountPercent: 0,
+      },
+    });
+
+    // Clear ticket from sessionStorage
+    sessionStorage.removeItem("nova:checkout:items");
+    sessionStorage.removeItem("nova:checkout:total");
+
     saleComplete.value = true;
-  } catch {
-    // Error handling
+  } catch (err) {
+    const fetchError = err as { data?: { error?: string } };
+    saleError.value = fetchError.data?.error ?? "Error al registrar la venta";
   } finally {
     isSubmitting.value = false;
   }
@@ -97,8 +170,10 @@ async function confirmSale() {
 
 /** Send receipt via WhatsApp (wa.me link). */
 function sendWhatsAppReceipt() {
+  const bsText =
+    exchangeRate.value > 0 ? ` (Bs.${totalBs.value.toFixed(2)})` : "";
   const text = encodeURIComponent(
-    `Recibo Nova\nTotal: $${totalUsd.value.toFixed(2)} (Bs.${totalBs.value.toFixed(2)})\nMétodo: ${selectedMethod.value}\nGracias por su compra!`,
+    `Recibo Nova\nTotal: $${totalUsd.value.toFixed(2)}${bsText}\nMetodo: ${selectedMethod.value}\nGracias por su compra!`,
   );
   window.open(`https://wa.me/?text=${text}`, "_blank");
 }
@@ -117,7 +192,9 @@ function newSale() {
       <h1 class="text-2xl font-bold text-gray-900">Venta registrada</h1>
       <p class="mt-2 text-lg text-gray-500">
         ${{ totalUsd.toFixed(2) }}
-        <span class="text-sm">(Bs.{{ totalBs.toFixed(2) }})</span>
+        <span v-if="exchangeRate > 0" class="text-sm">
+          (Bs.{{ totalBs.toFixed(2) }})
+        </span>
       </p>
 
       <div class="mt-8 space-y-3">
@@ -144,14 +221,17 @@ function newSale() {
         <p class="text-4xl font-bold text-gray-900">
           ${{ totalUsd.toFixed(2) }}
         </p>
-        <p class="mt-1 text-sm text-gray-400">
+        <p v-if="exchangeRate > 0" class="mt-1 text-sm text-gray-400">
           Bs.{{ totalBs.toFixed(2) }} · Tasa {{ exchangeRate.toFixed(2) }}
+        </p>
+        <p v-if="rateError" class="mt-1 text-xs text-yellow-600">
+          {{ rateError }}
         </p>
       </div>
 
       <!-- Payment method selector -->
       <div class="mb-4">
-        <p class="mb-3 text-sm font-semibold text-gray-700">Método de pago</p>
+        <p class="mb-3 text-sm font-semibold text-gray-700">Metodo de pago</p>
         <div class="grid grid-cols-4 gap-2">
           <button
             v-for="method in paymentMethods"
@@ -180,7 +260,7 @@ function newSale() {
         <input
           v-model="reference"
           type="text"
-          placeholder="Número de referencia"
+          placeholder="Numero de referencia"
           class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-nova-primary focus:outline-none"
         />
       </div>
@@ -190,17 +270,21 @@ function newSale() {
         <p class="mb-2 text-sm font-medium text-yellow-800">
           Fiado requiere seleccionar un cliente
         </p>
-        <!-- TODO: Customer search/select component -->
         <input
           v-model="selectedCustomerId"
           type="text"
-          placeholder="Buscar cliente..."
+          placeholder="ID del cliente..."
           class="w-full rounded-lg border border-yellow-300 px-3 py-2 text-sm focus:border-yellow-500 focus:outline-none"
         />
         <p class="mt-1 text-xs text-yellow-600">
-          Se generará una cuenta por cobrar automáticamente
+          Se generara una cuenta por cobrar automaticamente
         </p>
       </div>
+
+      <!-- Error -->
+      <p v-if="saleError" class="mb-4 text-sm text-red-500">
+        {{ saleError }}
+      </p>
 
       <!-- Confirm button -->
       <button

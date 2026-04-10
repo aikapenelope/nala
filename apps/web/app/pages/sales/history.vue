@@ -2,79 +2,71 @@
 /**
  * Sales history page.
  *
- * Desktop: filterable table with date, seller, payment method, product.
- * Mobile: card list grouped by date.
- *
- * Features:
- * - Filter by date range, seller, payment method
- * - Sale detail on tap
- * - Void sale with owner PIN (admin only)
- * - Offline queue indicator
+ * Connected to:
+ * - GET /api/sales?date=&method=&page=&limit=
+ * - POST /api/sales/:id/void
  */
 
 const { isDesktop } = useDevice();
 const { isAdmin } = useNovaAuth();
+const { $api } = useApi();
 
 const dateFilter = ref("");
 const methodFilter = ref<string | null>(null);
+const isLoading = ref(true);
+const loadError = ref("");
 
-/** Pending offline sales count. */
-const pendingCount = ref(0);
+/** Sale type from API. */
+interface Sale {
+  id: string;
+  createdAt: string;
+  userId: string;
+  totalUsd: string;
+  totalBs: string | null;
+  status: "completed" | "voided";
+}
 
-/** Mock sales for UI development. */
-const sales = ref([
-  {
-    id: "s1",
-    date: "2026-04-15T14:30:00Z",
-    seller: "María García",
-    items: 3,
-    totalUsd: 12.5,
-    totalBs: 456.25,
-    method: "efectivo",
-    status: "completed" as const,
-  },
-  {
-    id: "s2",
-    date: "2026-04-15T11:15:00Z",
-    seller: "Pedro Rodríguez",
-    items: 1,
-    totalUsd: 4.5,
-    totalBs: 164.25,
-    method: "pago_movil",
-    status: "completed" as const,
-  },
-  {
-    id: "s3",
-    date: "2026-04-15T09:45:00Z",
-    seller: "María García",
-    items: 5,
-    totalUsd: 28.0,
-    totalBs: 1022.0,
-    method: "fiado",
-    status: "completed" as const,
-  },
-  {
-    id: "s4",
-    date: "2026-04-14T16:00:00Z",
-    seller: "Pedro Rodríguez",
-    items: 2,
-    totalUsd: 8.0,
-    totalBs: 292.0,
-    method: "binance",
-    status: "voided" as const,
-  },
-]);
+const salesList = ref<Sale[]>([]);
+const totalSales = ref(0);
+const page = ref(1);
+const limit = 50;
 
-/** Payment method display labels. */
-const methodLabels: Record<string, string> = {
-  efectivo: "Efectivo",
-  pago_movil: "Pago Móvil",
-  binance: "Binance",
-  zinli: "Zinli",
-  transferencia: "Transferencia",
-  zelle: "Zelle",
-  fiado: "Fiado",
-};
+/** Fetch sales from API. */
+async function fetchSales() {
+  isLoading.value = true;
+  loadError.value = "";
+
+  try {
+    const params = new URLSearchParams();
+    if (dateFilter.value) params.set("date", dateFilter.value);
+    if (methodFilter.value) params.set("method", methodFilter.value);
+    params.set("page", String(page.value));
+    params.set("limit", String(limit));
+
+    const result = await $api<{
+      sales: Sale[];
+      total: number;
+    }>(`/api/sales?${params.toString()}`);
+
+    salesList.value = result.sales;
+    totalSales.value = result.total;
+  } catch (err) {
+    const message =
+      err instanceof Error ? err.message : "Error cargando ventas";
+    loadError.value = message;
+  } finally {
+    isLoading.value = false;
+  }
+}
+
+onMounted(() => {
+  fetchSales();
+});
+
+watch([dateFilter, methodFilter], () => {
+  page.value = 1;
+  fetchSales();
+});
 
 /** Format date for display. */
 function formatDate(iso: string): string {
@@ -86,32 +78,34 @@ function formatDate(iso: string): string {
   });
 }
 
-/** Filtered sales. */
-const filteredSales = computed(() => {
-  return sales.value.filter((s) => {
-    if (methodFilter.value && s.method !== methodFilter.value) return false;
-    if (dateFilter.value) {
-      const saleDate = s.date.split("T")[0];
-      if (saleDate !== dateFilter.value) return false;
-    }
-    return true;
-  });
-});
-
-/** Show void confirmation modal. */
+/** Void sale flow. */
 const showVoidModal = ref(false);
 const voidingSaleId = ref<string | null>(null);
+const voidError = ref("");
 
 function requestVoid(saleId: string) {
   voidingSaleId.value = saleId;
   showVoidModal.value = true;
+  voidError.value = "";
 }
 
-function handleVoidConfirmed() {
-  if (voidingSaleId.value) {
-    const sale = sales.value.find((s) => s.id === voidingSaleId.value);
+async function handleVoidConfirmed() {
+  if (!voidingSaleId.value) return;
+
+  try {
+    await $api(`/api/sales/${voidingSaleId.value}/void`, {
+      method: "POST",
+      body: { reason: "Anulada por el dueno" },
+    });
+
+    // Update local state
+    const sale = salesList.value.find((s) => s.id === voidingSaleId.value);
     if (sale) sale.status = "voided";
+  } catch (err) {
+    const fetchError = err as { data?: { error?: string } };
+    voidError.value = fetchError.data?.error ?? "Error al anular la venta";
   }
+
   showVoidModal.value = false;
   voidingSaleId.value = null;
 }
@@ -130,20 +124,6 @@ function handleVoidConfirmed() {
       </NuxtLink>
     </div>
 
-    <!-- Offline queue indicator -->
-    <div
-      v-if="pendingCount > 0"
-      class="mb-4 flex items-center gap-2 rounded-lg bg-yellow-50 px-4 py-2"
-    >
-      <span class="h-2 w-2 animate-pulse rounded-full bg-yellow-500" />
-      <span class="text-sm text-yellow-700">
-        {{ pendingCount }} venta{{ pendingCount > 1 ? "s" : "" }} pendiente{{
-          pendingCount > 1 ? "s" : ""
-        }}
-        de sincronizar
-      </span>
-    </div>
-
     <!-- Filters -->
     <div class="mb-4 flex gap-3">
       <input
@@ -155,9 +135,9 @@ function handleVoidConfirmed() {
         v-model="methodFilter"
         class="rounded-lg border border-gray-300 px-3 py-2 text-sm"
       >
-        <option :value="null">Todos los métodos</option>
+        <option :value="null">Todos los metodos</option>
         <option value="efectivo">Efectivo</option>
-        <option value="pago_movil">Pago Móvil</option>
+        <option value="pago_movil">Pago Movil</option>
         <option value="binance">Binance</option>
         <option value="zinli">Zinli</option>
         <option value="transferencia">Transferencia</option>
@@ -166,44 +146,113 @@ function handleVoidConfirmed() {
       </select>
     </div>
 
-    <!-- Desktop: Table -->
-    <div v-if="isDesktop" class="overflow-hidden rounded-xl bg-white shadow-sm">
-      <table class="w-full text-left text-sm">
-        <thead class="border-b border-gray-200 bg-gray-50">
-          <tr>
-            <th class="px-4 py-3 font-medium text-gray-500">Fecha</th>
-            <th class="px-4 py-3 font-medium text-gray-500">Vendedor</th>
-            <th class="px-4 py-3 font-medium text-gray-500">Items</th>
-            <th class="px-4 py-3 font-medium text-gray-500">Método</th>
-            <th class="px-4 py-3 font-medium text-gray-500 text-right">
-              Total
-            </th>
-            <th class="px-4 py-3 font-medium text-gray-500">Estado</th>
-            <th v-if="isAdmin" class="px-4 py-3" />
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-gray-100">
-          <tr
-            v-for="sale in filteredSales"
-            :key="sale.id"
-            class="hover:bg-gray-50"
-            :class="{ 'opacity-50': sale.status === 'voided' }"
-          >
-            <td class="px-4 py-3 text-gray-700">
-              {{ formatDate(sale.date) }}
-            </td>
-            <td class="px-4 py-3 text-gray-700">{{ sale.seller }}</td>
-            <td class="px-4 py-3 text-gray-500">{{ sale.items }}</td>
-            <td class="px-4 py-3 text-gray-500">
-              {{ methodLabels[sale.method] ?? sale.method }}
-            </td>
-            <td class="px-4 py-3 text-right font-medium text-gray-900">
-              ${{ sale.totalUsd.toFixed(2) }}
-              <span class="text-xs text-gray-400">
-                Bs.{{ sale.totalBs.toFixed(2) }}
-              </span>
-            </td>
-            <td class="px-4 py-3">
+    <!-- Void error -->
+    <p v-if="voidError" class="mb-4 text-sm text-red-500">{{ voidError }}</p>
+
+    <!-- Loading -->
+    <div v-if="isLoading" class="py-12 text-center text-gray-400">
+      Cargando ventas...
+    </div>
+
+    <!-- Error -->
+    <div
+      v-else-if="loadError"
+      class="rounded-xl bg-red-50 p-6 text-center text-sm text-red-600"
+    >
+      {{ loadError }}
+      <button
+        class="mt-2 block w-full text-xs font-medium text-red-700 underline"
+        @click="fetchSales"
+      >
+        Reintentar
+      </button>
+    </div>
+
+    <!-- Empty -->
+    <div
+      v-else-if="salesList.length === 0"
+      class="py-12 text-center text-gray-400"
+    >
+      No hay ventas{{ dateFilter ? " en esta fecha" : "" }}
+    </div>
+
+    <template v-else>
+      <!-- Desktop: Table -->
+      <div
+        v-if="isDesktop"
+        class="overflow-hidden rounded-xl bg-white shadow-sm"
+      >
+        <table class="w-full text-left text-sm">
+          <thead class="border-b border-gray-200 bg-gray-50">
+            <tr>
+              <th class="px-4 py-3 font-medium text-gray-500">Fecha</th>
+              <th class="px-4 py-3 text-right font-medium text-gray-500">
+                Total
+              </th>
+              <th class="px-4 py-3 font-medium text-gray-500">Estado</th>
+              <th v-if="isAdmin" class="px-4 py-3" />
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-100">
+            <tr
+              v-for="sale in salesList"
+              :key="sale.id"
+              class="hover:bg-gray-50"
+              :class="{ 'opacity-50': sale.status === 'voided' }"
+            >
+              <td class="px-4 py-3 text-gray-700">
+                {{ formatDate(sale.createdAt) }}
+              </td>
+              <td class="px-4 py-3 text-right font-medium text-gray-900">
+                ${{ Number(sale.totalUsd).toFixed(2) }}
+                <span v-if="sale.totalBs" class="text-xs text-gray-400">
+                  Bs.{{ Number(sale.totalBs).toFixed(2) }}
+                </span>
+              </td>
+              <td class="px-4 py-3">
+                <span
+                  class="rounded-full px-2 py-0.5 text-xs font-medium"
+                  :class="
+                    sale.status === 'voided'
+                      ? 'bg-red-100 text-red-700'
+                      : 'bg-green-100 text-green-700'
+                  "
+                >
+                  {{ sale.status === "voided" ? "Anulada" : "Completada" }}
+                </span>
+              </td>
+              <td v-if="isAdmin" class="px-4 py-3">
+                <button
+                  v-if="sale.status === 'completed'"
+                  class="text-xs text-red-500 hover:text-red-700"
+                  @click="requestVoid(sale.id)"
+                >
+                  Anular
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Mobile: Card list -->
+      <div v-else class="space-y-2">
+        <div
+          v-for="sale in salesList"
+          :key="sale.id"
+          class="rounded-xl bg-white p-4 shadow-sm"
+          :class="{ 'opacity-50': sale.status === 'voided' }"
+        >
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="font-medium text-gray-900">
+                ${{ Number(sale.totalUsd).toFixed(2) }}
+              </p>
+              <p class="text-xs text-gray-500">
+                {{ formatDate(sale.createdAt) }}
+              </p>
+            </div>
+            <div class="flex items-center gap-2">
               <span
                 class="rounded-full px-2 py-0.5 text-xs font-medium"
                 :class="
@@ -214,58 +263,31 @@ function handleVoidConfirmed() {
               >
                 {{ sale.status === "voided" ? "Anulada" : "Completada" }}
               </span>
-            </td>
-            <td v-if="isAdmin" class="px-4 py-3">
               <button
-                v-if="sale.status === 'completed'"
-                class="text-xs text-red-500 hover:text-red-700"
+                v-if="isAdmin && sale.status === 'completed'"
+                class="text-xs text-red-500"
                 @click="requestVoid(sale.id)"
               >
                 Anular
               </button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-
-    <!-- Mobile: Card list -->
-    <div v-else class="space-y-2">
-      <div
-        v-for="sale in filteredSales"
-        :key="sale.id"
-        class="rounded-xl bg-white p-4 shadow-sm"
-        :class="{ 'opacity-50': sale.status === 'voided' }"
-      >
-        <div class="flex items-center justify-between">
-          <div>
-            <p class="font-medium text-gray-900">
-              ${{ sale.totalUsd.toFixed(2) }}
-            </p>
-            <p class="text-xs text-gray-500">
-              {{ formatDate(sale.date) }} · {{ sale.seller }}
-            </p>
-          </div>
-          <div class="text-right">
-            <span
-              class="rounded-full px-2 py-0.5 text-xs font-medium"
-              :class="
-                sale.status === 'voided'
-                  ? 'bg-red-100 text-red-700'
-                  : 'bg-green-100 text-green-700'
-              "
-            >
-              {{ methodLabels[sale.method] ?? sale.method }}
-            </span>
+            </div>
           </div>
         </div>
       </div>
-    </div>
+
+      <!-- Pagination -->
+      <p
+        v-if="totalSales > limit"
+        class="mt-4 text-center text-xs text-gray-400"
+      >
+        Mostrando {{ salesList.length }} de {{ totalSales }} ventas
+      </p>
+    </template>
 
     <!-- Owner PIN modal for voiding -->
     <SharedOwnerPinModal
       v-model="showVoidModal"
-      action-label="Anular esta venta requiere PIN del dueño"
+      action-label="Anular esta venta requiere PIN del dueno"
       @verified="handleVoidConfirmed"
     />
   </div>

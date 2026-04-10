@@ -2,21 +2,25 @@
 /**
  * Product creation/edit form.
  *
- * Desktop: full form with all fields visible.
- * Mobile: stacked form with sections.
- *
- * Supports:
- * - Basic info: name, description, category, SKU, barcode
- * - Pricing: cost, price (margin auto-calculated)
- * - Stock: current stock, min threshold, critical threshold
- * - Variants: add talla/color/referencia combinations
- * - Image upload (placeholder for MinIO integration)
+ * Connected to:
+ * - GET /api/products/:id (load existing product for editing)
+ * - POST /api/products (create new product)
+ * - PATCH /api/products/:id (update existing product)
+ * - POST /api/products/:id/variants (add variant)
+ * - GET /api/categories (load category options)
  */
 
 definePageMeta({ middleware: ["admin-only"] });
 
 const route = useRoute();
-const isEditing = computed(() => route.params.id !== "new");
+const router = useRouter();
+const { $api } = useApi();
+
+const productId = computed(() => {
+  const id = route.params.id as string;
+  return id === "new" ? null : id;
+});
+const isEditing = computed(() => productId.value !== null);
 
 const form = reactive({
   name: "",
@@ -32,6 +36,9 @@ const form = reactive({
   hasVariants: false,
   expiresAt: "",
 });
+
+/** Categories from API. */
+const categories = ref<Array<{ id: string; name: string }>>([]);
 
 /** Computed margin percentage. */
 const marginPercent = computed(() => {
@@ -66,7 +73,6 @@ function removeAttributeKey(key: string) {
   variantAttributeKeys.value = variantAttributeKeys.value.filter(
     (k) => k !== key,
   );
-  // Remove attribute from all variants by rebuilding attributes object
   for (const v of variants.value) {
     const newAttrs: Record<string, string> = {};
     for (const [k, val] of Object.entries(v.attributes)) {
@@ -96,7 +102,89 @@ function removeVariant(id: string) {
 }
 
 const isSubmitting = ref(false);
+const isLoadingProduct = ref(false);
 const error = ref("");
+
+/** Load categories and existing product data. */
+onMounted(async () => {
+  // Load categories
+  try {
+    const result = await $api<{
+      categories: Array<{ id: string; name: string }>;
+    }>("/api/categories");
+    categories.value = result.categories;
+  } catch {
+    // Non-critical: category dropdown will be empty
+  }
+
+  // Load existing product for editing
+  if (productId.value) {
+    isLoadingProduct.value = true;
+    try {
+      const result = await $api<{
+        product: {
+          name: string;
+          description: string | null;
+          categoryId: string | null;
+          sku: string | null;
+          barcode: string | null;
+          cost: string;
+          price: string;
+          stock: number;
+          stockMin: number;
+          stockCritical: number;
+          hasVariants: boolean;
+          expiresAt: string | null;
+        };
+        variants: Array<{
+          id: string;
+          attributes: Record<string, string>;
+          sku: string | null;
+          cost: string;
+          price: string;
+          stock: number;
+        }>;
+      }>(`/api/products/${productId.value}`);
+
+      const p = result.product;
+      form.name = p.name;
+      form.description = p.description ?? "";
+      form.categoryId = p.categoryId ?? "";
+      form.sku = p.sku ?? "";
+      form.barcode = p.barcode ?? "";
+      form.cost = Number(p.cost);
+      form.price = Number(p.price);
+      form.stock = p.stock;
+      form.stockMin = p.stockMin;
+      form.stockCritical = p.stockCritical;
+      form.hasVariants = p.hasVariants;
+      form.expiresAt = p.expiresAt ? (p.expiresAt.split("T")[0] ?? "") : "";
+
+      if (result.variants.length > 0) {
+        variants.value = result.variants.map((v) => ({
+          id: v.id,
+          attributes: v.attributes as Record<string, string>,
+          sku: v.sku ?? "",
+          cost: Number(v.cost),
+          price: Number(v.price),
+          stock: v.stock,
+        }));
+
+        // Extract attribute keys from first variant
+        const firstVariant = result.variants[0];
+        if (firstVariant?.attributes) {
+          variantAttributeKeys.value = Object.keys(
+            firstVariant.attributes as Record<string, string>,
+          );
+        }
+      }
+    } catch {
+      error.value = "Error cargando producto";
+    } finally {
+      isLoadingProduct.value = false;
+    }
+  }
+});
 
 async function submitForm() {
   if (!form.name.trim() || form.price <= 0) {
@@ -108,11 +196,55 @@ async function submitForm() {
   error.value = "";
 
   try {
-    // TODO: Call API to create/update product
-    // If hasVariants, also create variants
-    await navigateTo("/inventory");
-  } catch {
-    error.value = "Error al guardar el producto";
+    const body = {
+      name: form.name.trim(),
+      description: form.description || undefined,
+      categoryId: form.categoryId || undefined,
+      sku: form.sku || undefined,
+      barcode: form.barcode || undefined,
+      cost: form.cost,
+      price: form.price,
+      stock: form.stock,
+      stockMin: form.stockMin,
+      stockCritical: form.stockCritical,
+      hasVariants: form.hasVariants,
+      expiresAt: form.expiresAt
+        ? new Date(form.expiresAt).toISOString()
+        : undefined,
+    };
+
+    if (isEditing.value) {
+      await $api(`/api/products/${productId.value}`, {
+        method: "PATCH",
+        body,
+      });
+    } else {
+      const result = await $api<{ product: { id: string } }>("/api/products", {
+        method: "POST",
+        body,
+      });
+
+      // Create variants for new product
+      if (form.hasVariants && variants.value.length > 0) {
+        for (const v of variants.value) {
+          await $api(`/api/products/${result.product.id}/variants`, {
+            method: "POST",
+            body: {
+              attributes: v.attributes,
+              sku: v.sku || undefined,
+              cost: v.cost,
+              price: v.price,
+              stock: v.stock,
+            },
+          });
+        }
+      }
+    }
+
+    router.push("/inventory");
+  } catch (err) {
+    const fetchError = err as { data?: { error?: string } };
+    error.value = fetchError.data?.error ?? "Error al guardar el producto";
   } finally {
     isSubmitting.value = false;
   }
@@ -134,11 +266,16 @@ async function submitForm() {
       </NuxtLink>
     </div>
 
-    <form @submit.prevent="submitForm" class="space-y-6">
+    <!-- Loading existing product -->
+    <div v-if="isLoadingProduct" class="py-12 text-center text-gray-400">
+      Cargando producto...
+    </div>
+
+    <form v-else class="space-y-6" @submit.prevent="submitForm">
       <!-- Basic info -->
       <div class="rounded-xl bg-white p-5 shadow-sm">
         <h2 class="mb-4 text-sm font-semibold text-gray-700">
-          Información básica
+          Informacion basica
         </h2>
 
         <div class="space-y-4">
@@ -154,13 +291,26 @@ async function submitForm() {
           </div>
 
           <div>
-            <label class="mb-1 block text-sm text-gray-600">Descripción</label>
+            <label class="mb-1 block text-sm text-gray-600">Descripcion</label>
             <textarea
               v-model="form.description"
               rows="2"
-              placeholder="Descripción opcional"
+              placeholder="Descripcion opcional"
               class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-nova-primary focus:outline-none"
             />
+          </div>
+
+          <div>
+            <label class="mb-1 block text-sm text-gray-600">Categoria</label>
+            <select
+              v-model="form.categoryId"
+              class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-nova-primary focus:outline-none"
+            >
+              <option value="">Sin categoria</option>
+              <option v-for="cat in categories" :key="cat.id" :value="cat.id">
+                {{ cat.name }}
+              </option>
+            </select>
           </div>
 
           <div class="grid grid-cols-2 gap-4">
@@ -175,7 +325,7 @@ async function submitForm() {
             </div>
             <div>
               <label class="mb-1 block text-sm text-gray-600">
-                Código de barras
+                Codigo de barras
               </label>
               <input
                 v-model="form.barcode"
@@ -243,7 +393,7 @@ async function submitForm() {
           </div>
           <div>
             <label class="mb-1 block text-sm text-gray-600">
-              Mínimo (amarillo)
+              Minimo (amarillo)
             </label>
             <input
               v-model.number="form.stockMin"
@@ -254,7 +404,7 @@ async function submitForm() {
           </div>
           <div>
             <label class="mb-1 block text-sm text-gray-600">
-              Crítico (rojo)
+              Critico (rojo)
             </label>
             <input
               v-model.number="form.stockCritical"
@@ -287,9 +437,8 @@ async function submitForm() {
           </label>
         </div>
 
-        <!-- Variant management (shown when hasVariants is true) -->
+        <!-- Variant management -->
         <div v-if="form.hasVariants" class="mt-4 space-y-4">
-          <!-- Attribute keys -->
           <div>
             <label class="mb-1 block text-xs text-gray-500">
               Atributos de variante
@@ -328,7 +477,6 @@ async function submitForm() {
             </div>
           </div>
 
-          <!-- Variant rows -->
           <div v-if="variants.length > 0" class="space-y-2">
             <div
               v-for="variant in variants"

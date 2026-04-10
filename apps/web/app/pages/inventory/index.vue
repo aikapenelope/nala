@@ -5,83 +5,93 @@
  * Desktop: table with columns (name, SKU, stock, cost, price, margin, status).
  * Mobile: list with cards and semaphore indicator.
  *
- * Features:
- * - Search by name with autocompletado
- * - Filter by category and stock status
- * - Semaphore: green (OK), yellow (low), red (critical), gray (dead stock)
+ * Connected to: GET /api/products?search=&status=&page=&limit=
  */
 
-import { calculateStockSemaphore } from "@nova/shared";
 import type { StockSemaphore } from "@nova/shared";
 
 const { isDesktop } = useDevice();
 const { isAdmin } = useNovaAuth();
+const { $api } = useApi();
 
 const searchQuery = ref("");
-const selectedCategory = ref<string | null>(null);
 const selectedStatus = ref<StockSemaphore | null>(null);
+const isLoading = ref(true);
+const loadError = ref("");
 
-/** Mock products for UI development. Will be replaced by API calls. */
-const products = ref([
-  {
-    id: "1",
-    name: "Harina PAN 1kg",
-    sku: "HP-001",
-    stock: 5,
-    stockMin: 10,
-    stockCritical: 3,
-    cost: 1.5,
-    price: 2.0,
-    category: "Abarrotes",
-    lastSoldAt: new Date().toISOString(),
-  },
-  {
-    id: "2",
-    name: "Aceite Diana 1L",
-    sku: "AD-001",
-    stock: 12,
-    stockMin: 10,
-    stockCritical: 3,
-    cost: 3.0,
-    price: 4.5,
-    category: "Abarrotes",
-    lastSoldAt: new Date().toISOString(),
-  },
-  {
-    id: "3",
-    name: "Queso Blanco",
-    sku: "QB-001",
-    stock: 2,
-    stockMin: 5,
-    stockCritical: 2,
-    cost: 2.0,
-    price: 3.0,
-    category: "Lácteos",
-    lastSoldAt: new Date().toISOString(),
-  },
-  {
-    id: "4",
-    name: "Servilletas XL",
-    sku: "SX-001",
-    stock: 50,
-    stockMin: 10,
-    stockCritical: 3,
-    cost: 0.5,
-    price: 1.0,
-    category: "Limpieza",
-    lastSoldAt: "2026-01-15T00:00:00Z",
-  },
-]);
-
-/** Get semaphore color for a product. */
-function getSemaphore(p: (typeof products.value)[0]): StockSemaphore {
-  return calculateStockSemaphore(
-    p.stock,
-    p.stockMin,
-    p.stockCritical,
-    p.lastSoldAt,
-  );
+/** Product type from API response. */
+interface Product {
+  id: string;
+  name: string;
+  sku: string | null;
+  stock: number;
+  stockMin: number;
+  stockCritical: number;
+  cost: string;
+  price: string;
+  categoryId: string | null;
+  lastSoldAt: string | null;
+  semaphore: StockSemaphore;
 }
+
+const products = ref<Product[]>([]);
+const totalProducts = ref(0);
+const page = ref(1);
+const limit = 50;
+
+/** Debounce timer for search. */
+let searchTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** Fetch products from API. */
+async function fetchProducts() {
+  isLoading.value = true;
+  loadError.value = "";
+
+  try {
+    const params = new URLSearchParams();
+    if (searchQuery.value) params.set("search", searchQuery.value);
+    if (selectedStatus.value) params.set("status", selectedStatus.value);
+    params.set("page", String(page.value));
+    params.set("limit", String(limit));
+
+    const result = await $api<{
+      products: Product[];
+      total: number;
+      page: number;
+      limit: number;
+    }>(`/api/products?${params.toString()}`);
+
+    products.value = result.products;
+    totalProducts.value = result.total;
+  } catch (err) {
+    const message =
+      err instanceof Error ? err.message : "Error cargando inventario";
+    loadError.value = message;
+  } finally {
+    isLoading.value = false;
+  }
+}
+
+/** Debounced search. */
+function onSearchInput() {
+  if (searchTimer) clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => {
+    page.value = 1;
+    fetchProducts();
+  }, 300);
+}
+
+/** Filter change triggers immediate fetch. */
+function onStatusChange() {
+  page.value = 1;
+  fetchProducts();
+}
+
+watch(selectedStatus, onStatusChange);
+
+onMounted(() => {
+  fetchProducts();
+});
 
 /** Semaphore color CSS classes. */
 const semaphoreColors: Record<StockSemaphore, string> = {
@@ -95,34 +105,17 @@ const semaphoreColors: Record<StockSemaphore, string> = {
 const semaphoreLabels: Record<StockSemaphore, string> = {
   green: "OK",
   yellow: "Bajo",
-  red: "Crítico",
+  red: "Critico",
   gray: "Sin movimiento",
 };
 
 /** Calculate margin percentage. */
-function margin(cost: number, price: number): string {
-  if (price === 0) return "0";
-  return (((price - cost) / price) * 100).toFixed(0);
+function margin(cost: string, price: string): string {
+  const c = Number(cost);
+  const p = Number(price);
+  if (p === 0) return "0";
+  return (((p - c) / p) * 100).toFixed(0);
 }
-
-/** Filtered products based on search and filters. */
-const filteredProducts = computed(() => {
-  return products.value.filter((p) => {
-    if (
-      searchQuery.value &&
-      !p.name.toLowerCase().includes(searchQuery.value.toLowerCase())
-    ) {
-      return false;
-    }
-    if (selectedCategory.value && p.category !== selectedCategory.value) {
-      return false;
-    }
-    if (selectedStatus.value && getSemaphore(p) !== selectedStatus.value) {
-      return false;
-    }
-    return true;
-  });
-});
 </script>
 
 <template>
@@ -146,108 +139,154 @@ const filteredProducts = computed(() => {
         type="text"
         placeholder="Buscar producto..."
         class="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-nova-primary focus:outline-none"
+        @input="onSearchInput"
       />
       <select
         v-model="selectedStatus"
         class="rounded-lg border border-gray-300 px-3 py-2 text-sm"
       >
         <option :value="null">Todos</option>
-        <option value="red">Crítico</option>
+        <option value="red">Critico</option>
         <option value="yellow">Bajo</option>
         <option value="green">OK</option>
         <option value="gray">Sin movimiento</option>
       </select>
     </div>
 
-    <!-- Desktop: Table view -->
-    <div v-if="isDesktop" class="overflow-hidden rounded-xl bg-white shadow-sm">
-      <table class="w-full text-left text-sm">
-        <thead class="border-b border-gray-200 bg-gray-50">
-          <tr>
-            <th class="px-4 py-3 font-medium text-gray-500">Estado</th>
-            <th class="px-4 py-3 font-medium text-gray-500">Producto</th>
-            <th class="px-4 py-3 font-medium text-gray-500">SKU</th>
-            <th class="px-4 py-3 font-medium text-gray-500 text-right">
-              Stock
-            </th>
-            <th
-              v-if="isAdmin"
-              class="px-4 py-3 font-medium text-gray-500 text-right"
-            >
-              Costo
-            </th>
-            <th class="px-4 py-3 font-medium text-gray-500 text-right">
-              Precio
-            </th>
-            <th
-              v-if="isAdmin"
-              class="px-4 py-3 font-medium text-gray-500 text-right"
-            >
-              Margen
-            </th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-gray-100">
-          <tr
-            v-for="product in filteredProducts"
-            :key="product.id"
-            class="cursor-pointer hover:bg-gray-50"
-          >
-            <td class="px-4 py-3">
-              <span
-                class="inline-block h-3 w-3 rounded-full"
-                :class="semaphoreColors[getSemaphore(product)]"
-                :title="semaphoreLabels[getSemaphore(product)]"
-              />
-            </td>
-            <td class="px-4 py-3 font-medium text-gray-900">
-              {{ product.name }}
-            </td>
-            <td class="px-4 py-3 text-gray-500">{{ product.sku }}</td>
-            <td class="px-4 py-3 text-right text-gray-900">
-              {{ product.stock }}
-            </td>
-            <td v-if="isAdmin" class="px-4 py-3 text-right text-gray-500">
-              ${{ product.cost.toFixed(2) }}
-            </td>
-            <td class="px-4 py-3 text-right text-gray-900">
-              ${{ product.price.toFixed(2) }}
-            </td>
-            <td v-if="isAdmin" class="px-4 py-3 text-right text-gray-500">
-              {{ margin(product.cost, product.price) }}%
-            </td>
-          </tr>
-        </tbody>
-      </table>
+    <!-- Loading -->
+    <div v-if="isLoading" class="py-12 text-center text-gray-400">
+      Cargando inventario...
     </div>
 
-    <!-- Mobile: Card list -->
-    <div v-else class="space-y-3">
-      <NuxtLink
-        v-for="product in filteredProducts"
-        :key="product.id"
-        :to="`/inventory/${product.id}`"
-        class="flex items-center gap-3 rounded-xl bg-white p-4 shadow-sm"
+    <!-- Error -->
+    <div
+      v-else-if="loadError"
+      class="rounded-xl bg-red-50 p-6 text-center text-sm text-red-600"
+    >
+      {{ loadError }}
+      <button
+        class="mt-2 block w-full text-xs font-medium text-red-700 underline"
+        @click="fetchProducts"
       >
-        <!-- Semaphore dot -->
-        <span
-          class="h-3 w-3 flex-shrink-0 rounded-full"
-          :class="semaphoreColors[getSemaphore(product)]"
-        />
+        Reintentar
+      </button>
+    </div>
 
-        <!-- Product info -->
-        <div class="flex-1 min-w-0">
-          <p class="truncate font-medium text-gray-900">{{ product.name }}</p>
-          <p class="text-xs text-gray-500">{{ product.stock }} en stock</p>
-        </div>
-
-        <!-- Price -->
-        <div class="text-right">
-          <p class="font-medium text-gray-900">
-            ${{ product.price.toFixed(2) }}
-          </p>
-        </div>
+    <!-- Empty state -->
+    <div
+      v-else-if="products.length === 0"
+      class="py-12 text-center text-gray-400"
+    >
+      <p>No hay productos{{ searchQuery ? " que coincidan" : "" }}</p>
+      <NuxtLink
+        v-if="isAdmin && !searchQuery"
+        to="/inventory/new"
+        class="mt-2 inline-block text-sm text-nova-primary hover:underline"
+      >
+        Crear primer producto
       </NuxtLink>
     </div>
+
+    <template v-else>
+      <!-- Desktop: Table view -->
+      <div
+        v-if="isDesktop"
+        class="overflow-hidden rounded-xl bg-white shadow-sm"
+      >
+        <table class="w-full text-left text-sm">
+          <thead class="border-b border-gray-200 bg-gray-50">
+            <tr>
+              <th class="px-4 py-3 font-medium text-gray-500">Estado</th>
+              <th class="px-4 py-3 font-medium text-gray-500">Producto</th>
+              <th class="px-4 py-3 font-medium text-gray-500">SKU</th>
+              <th class="px-4 py-3 text-right font-medium text-gray-500">
+                Stock
+              </th>
+              <th
+                v-if="isAdmin"
+                class="px-4 py-3 text-right font-medium text-gray-500"
+              >
+                Costo
+              </th>
+              <th class="px-4 py-3 text-right font-medium text-gray-500">
+                Precio
+              </th>
+              <th
+                v-if="isAdmin"
+                class="px-4 py-3 text-right font-medium text-gray-500"
+              >
+                Margen
+              </th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-100">
+            <tr
+              v-for="product in products"
+              :key="product.id"
+              class="cursor-pointer hover:bg-gray-50"
+              @click="navigateTo(`/inventory/${product.id}`)"
+            >
+              <td class="px-4 py-3">
+                <span
+                  class="inline-block h-3 w-3 rounded-full"
+                  :class="semaphoreColors[product.semaphore]"
+                  :title="semaphoreLabels[product.semaphore]"
+                />
+              </td>
+              <td class="px-4 py-3 font-medium text-gray-900">
+                {{ product.name }}
+              </td>
+              <td class="px-4 py-3 text-gray-500">{{ product.sku ?? "-" }}</td>
+              <td class="px-4 py-3 text-right text-gray-900">
+                {{ product.stock }}
+              </td>
+              <td v-if="isAdmin" class="px-4 py-3 text-right text-gray-500">
+                ${{ Number(product.cost).toFixed(2) }}
+              </td>
+              <td class="px-4 py-3 text-right text-gray-900">
+                ${{ Number(product.price).toFixed(2) }}
+              </td>
+              <td v-if="isAdmin" class="px-4 py-3 text-right text-gray-500">
+                {{ margin(product.cost, product.price) }}%
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Mobile: Card list -->
+      <div v-else class="space-y-3">
+        <NuxtLink
+          v-for="product in products"
+          :key="product.id"
+          :to="`/inventory/${product.id}`"
+          class="flex items-center gap-3 rounded-xl bg-white p-4 shadow-sm"
+        >
+          <span
+            class="h-3 w-3 flex-shrink-0 rounded-full"
+            :class="semaphoreColors[product.semaphore]"
+          />
+          <div class="min-w-0 flex-1">
+            <p class="truncate font-medium text-gray-900">
+              {{ product.name }}
+            </p>
+            <p class="text-xs text-gray-500">{{ product.stock }} en stock</p>
+          </div>
+          <div class="text-right">
+            <p class="font-medium text-gray-900">
+              ${{ Number(product.price).toFixed(2) }}
+            </p>
+          </div>
+        </NuxtLink>
+      </div>
+
+      <!-- Pagination info -->
+      <p
+        v-if="totalProducts > limit"
+        class="mt-4 text-center text-xs text-gray-400"
+      >
+        Mostrando {{ products.length }} de {{ totalProducts }} productos
+      </p>
+    </template>
   </div>
 </template>
