@@ -20,6 +20,7 @@ import { auth } from "./routes/auth";
 import { onboarding } from "./routes/onboarding";
 import { inventory } from "./routes/inventory";
 import { salesRoutes } from "./routes/sales";
+import { customersRoutes } from "./routes/customers";
 import { authMiddleware } from "./middleware/auth";
 import { tenantMiddleware } from "./middleware/tenant";
 import type { AppEnv } from "./types";
@@ -58,6 +59,9 @@ api.route("/", inventory);
 
 // Sales routes (sales, exchange rate, quotations)
 api.route("/", salesRoutes);
+
+// Customer and accounts routes
+api.route("/", customersRoutes);
 
 app.route("/api", api);
 
