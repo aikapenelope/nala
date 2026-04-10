@@ -8,7 +8,7 @@
 import { Hono } from "hono";
 import { sql } from "drizzle-orm";
 import type { HealthCheckResponse } from "@nova/shared";
-import { getDb } from "../db";
+import { tryGetDb } from "../db";
 import { getRedis } from "../redis";
 
 export const health = new Hono();
@@ -17,27 +17,41 @@ health.get("/", async (c) => {
   let dbOk = false;
   let redisOk = false;
 
-  // Test database connectivity
-  try {
-    const db = getDb();
-    await db.execute(sql`SELECT 1`);
-    dbOk = true;
-  } catch {
-    // DB not available
+  // Test database connectivity (graceful when DB not configured)
+  const db = tryGetDb();
+  if (db) {
+    try {
+      await db.execute(sql`SELECT 1`);
+      dbOk = true;
+    } catch {
+      // DB connection failed
+    }
   }
 
   // Test Redis connectivity
-  try {
-    const redis = getRedis();
-    if (redis) {
+  const redis = getRedis();
+  if (redis) {
+    try {
       await redis.ping();
       redisOk = true;
+    } catch {
+      // Redis connection failed
     }
-  } catch {
-    // Redis not available
   }
 
-  const status = dbOk ? (redisOk ? "ok" : "degraded") : "error";
+  // Status logic:
+  // - "ok" when DB is connected (Redis is optional)
+  // - "degraded" when DB is connected but Redis is not
+  // - "error" when DB is not connected
+  let status: HealthCheckResponse["status"];
+  if (!db) {
+    // DB not configured at all (dev mode) - report as ok
+    status = "ok";
+  } else if (dbOk) {
+    status = redisOk ? "ok" : "degraded";
+  } else {
+    status = "error";
+  }
 
   const response: HealthCheckResponse = {
     status,

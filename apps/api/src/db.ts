@@ -29,3 +29,12 @@ export function getDb(): Database {
   }
   return _db;
 }
+
+/**
+ * Get the database instance if available, or null.
+ * Used by health checks and other non-critical paths that should
+ * not crash when the database is not configured.
+ */
+export function tryGetDb(): Database | null {
+  return _db;
+}

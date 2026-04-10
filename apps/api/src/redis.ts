@@ -12,6 +12,9 @@ let _redis: Redis | null = null;
 /**
  * Initialize the Redis connection.
  * Returns null if REDIS_URL is not configured (dev fallback).
+ *
+ * Connects eagerly so failures surface at startup rather than
+ * on the first request.
  */
 export function initRedis(): Redis | null {
   if (_redis) return _redis;
@@ -24,7 +27,10 @@ export function initRedis(): Redis | null {
 
   _redis = new Redis(url, {
     maxRetriesPerRequest: 3,
-    lazyConnect: true,
+    retryStrategy(times) {
+      // Exponential backoff capped at 3 seconds
+      return Math.min(times * 200, 3000);
+    },
   });
 
   _redis.on("error", (err) => {
