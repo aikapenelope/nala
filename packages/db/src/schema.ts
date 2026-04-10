@@ -1,8 +1,7 @@
 /**
  * Drizzle ORM schema for Nova.
  *
- * Phase 6: adds accounting_accounts, accounting_entries, expenses,
- * expense_items, product_aliases for OCR matching.
+ * Phase 8: adds seller_goals, seller_streaks for gamification.
  * RLS policies are applied via init.sql (not Drizzle).
  */
 
@@ -644,3 +643,29 @@ export const productAliases = pgTable(
     index("idx_aliases_business_supplier").on(table.businessId, table.supplierId),
   ],
 );
+
+// ============================================================
+// Phase 8 tables: Gamification
+// ============================================================
+
+/** Seller daily goals. */
+export const sellerGoals = pgTable("seller_goals", {
+  id: uuid("id").default(sql`gen_random_uuid()`).primaryKey(),
+  businessId: uuid("business_id").notNull().references(() => businesses.id),
+  userId: uuid("user_id").notNull().references(() => users.id),
+  date: timestamp("date", { withTimezone: true }).notNull(),
+  targetUsd: numeric("target_usd", { precision: 12, scale: 2 }).notNull(),
+  achievedUsd: numeric("achieved_usd", { precision: 12, scale: 2 }).notNull().default("0"),
+  metGoal: boolean("met_goal").notNull().default(false),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** Seller streaks - consecutive days meeting goal. */
+export const sellerStreaks = pgTable("seller_streaks", {
+  id: uuid("id").default(sql`gen_random_uuid()`).primaryKey(),
+  businessId: uuid("business_id").notNull().references(() => businesses.id),
+  userId: uuid("user_id").notNull().references(() => users.id),
+  currentStreak: integer("current_streak").notNull().default(0),
+  bestStreak: integer("best_streak").notNull().default(0),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
