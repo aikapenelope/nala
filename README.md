@@ -125,6 +125,7 @@ Nala no es un sistema contable. Es un puente: genera la información que el cont
 | [14 - Experiencia desktop vs móvil](docs/14-experiencia-desktop-vs-movil.md) | Cómo lo hacen Square/Shopify/Lightspeed, datos de uso real, wireframes de cada pantalla, tabla de funcionalidades por dispositivo, principios de diseño, implementación técnica |
 | [15 - Catálogo, stack técnico, estrategia offline](docs/15-catalogo-stack-offline.md) | Página de catálogo para clientes, Nuxt 4 decisión final, por qué IndexedDB, por qué Hono, online-first con cache agresivo |
 | [16 - Fina vs Nala + estructura dashboard](docs/16-fina-vs-nala-dashboard-estructura.md) | Comparación feature por feature, qué dejamos fuera y por qué, wireframes del dashboard desktop/móvil, estructura de navegación completa con flujos |
+| [17 - Dashboard rediseño basado en investigación](docs/17-dashboard-rediseno-investigacion.md) | Patrones de Square/Shopify/F1Studioz 2026, progressive disclosure, alertas accionables, qué quitar y qué dejar del dashboard, principios de diseño |
 
 ## Licencia
 
