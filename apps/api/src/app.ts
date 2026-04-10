@@ -19,6 +19,7 @@ import { health } from "./routes/health";
 import { auth } from "./routes/auth";
 import { onboarding } from "./routes/onboarding";
 import { inventory } from "./routes/inventory";
+import { salesRoutes } from "./routes/sales";
 import { authMiddleware } from "./middleware/auth";
 import { tenantMiddleware } from "./middleware/tenant";
 import type { AppEnv } from "./types";
@@ -54,6 +55,9 @@ api.get("/me", (c) => {
 
 // Inventory routes (products, categories, variants)
 api.route("/", inventory);
+
+// Sales routes (sales, exchange rate, quotations)
+api.route("/", salesRoutes);
 
 app.route("/api", api);
 
