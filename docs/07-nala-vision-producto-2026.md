@@ -393,7 +393,7 @@ La IA no es un módulo. Es una capa que enriquece cada pantalla del producto.
 
 | Capa | Tecnología | Por qué |
 |---|---|---|
-| Frontend | Nuxt 3 (Vue) PWA | SSR + offline-first. Responsive nativo. TypeScript. Ligero |
+| Frontend | Nuxt 4 (Vue 3) PWA | SSR + offline-first. Responsive nativo. TypeScript. Ligero |
 | DB local | IndexedDB (Dexie.js) | Almacenamiento offline, sincronización |
 | Backend | Node.js + Hono/Fastify | Rápido, TypeScript, ligero |
 | Base de datos | PostgreSQL + pgvector | Relacional sólido, búsqueda semántica futura |

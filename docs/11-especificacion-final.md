@@ -176,7 +176,7 @@ Desde la PWA (cámara nativa, resolución completa). No por WhatsApp (comprime i
 
 | Capa | Tecnología | Justificación |
 |---|---|---|
-| Frontend | SvelteKit (Svelte 5) o Nuxt 3 (Vue) -- decisión al iniciar dev. PWA con Service Workers | SvelteKit: 5-8KB runtime (4-6x menos que Nuxt). Carga en 0.2s en 3G. Svelte 5 runes = menos boilerplate. Nuxt si el equipo conoce Vue |
+| Frontend | Nuxt 4 (Vue 3), PWA con Service Workers | v4.4.2 (Mar 2026). Estable. Ecosistema maduro. Equipo lo conoce por Aurora. GitLab, BMW, Alibaba usan Vue |
 | DB local | IndexedDB (Dexie.js) | Cache local en el navegador. Permite respuesta instantánea y cola de ventas sin internet. No reemplaza PostgreSQL |
 | Backend | Hono, TypeScript | Ultra-ligero (14KB). Más rápido que Express (15 años, lento) y Fastify. TypeScript-first. Multi-runtime |
 | Base de datos | PostgreSQL + pg_trgm + pgvector | Relacional sólido. Fuzzy matching para OCR. Búsqueda semántica futura |
@@ -410,7 +410,7 @@ Multi-sucursal con transferencias de inventario. API REST pública. Tienda onlin
 | WhatsApp | Cloud API directo, sin BSP | Setup en 30-60 min. 1,000 conversaciones servicio/mes gratis. Sin fee de BSP |
 | LLM provider | OpenRouter (primary) + Groq (fallback) | OpenRouter: un API key para GPT-4o-mini, Claude, Gemini. Groq: inferencia ultra-rápida con Llama 3 como fallback si OpenRouter falla |
 | Contabilidad | Puente, no módulo | Exportación con formato contable + envío por WhatsApp. No libro mayor ni balance |
-| Frontend | SvelteKit (Svelte 5) o Nuxt 3 (Vue) | SvelteKit: 5-8KB runtime, 0.2s en 3G. Nuxt si el equipo conoce Vue. Decisión al iniciar dev |
+| Frontend | Nuxt 4 (Vue 3) | v4.4.2 estable. Ecosistema maduro, equipo lo conoce, contratación fácil |
 | Base de datos | PostgreSQL + pg_trgm + pgvector | Fuzzy matching para OCR aliases. Búsqueda semántica futura |
 | Hosting | Hetzner | Económico. Infra existente con Coolify/Traefik |
 | Monolito vs micro | Monolito (v1) | Un solo deploy. Sin complejidad distribuida. Microservicios en v2+ si hay necesidad |

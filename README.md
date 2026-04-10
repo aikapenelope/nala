@@ -76,7 +76,7 @@ Nala no es un sistema contable. Es un puente: genera la información que el cont
 
 | Capa | Tecnología |
 |---|---|
-| Frontend | SvelteKit (Svelte 5) o Nuxt 3 (Vue) -- decisión al iniciar dev. PWA con Service Workers |
+| Frontend | Nuxt 4 (Vue 3), PWA con Service Workers |
 | DB local | IndexedDB (Dexie.js) -- cache local + cola de operaciones offline |
 | Backend | Hono (TypeScript, 14KB, ultra-rápido) |
 | Base de datos | PostgreSQL, pgvector |

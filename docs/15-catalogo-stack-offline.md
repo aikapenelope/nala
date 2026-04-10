@@ -77,30 +77,17 @@ Cada negocio en Nala tiene una URL pública con su catálogo de productos. El co
 
 ## 2. Stack Técnico: Justificación de Cada Decisión
 
-### Frontend: SvelteKit (cambio de Nuxt 3)
+### Frontend: Nuxt 4 (Vue 3) -- Decisión Final
 
-**Decisión revisada.** Nuxt 3 (Vue) se eligió inicialmente por familiaridad con Aurora. Pero la investigación muestra que SvelteKit es objetivamente mejor para Nala:
+**Nuxt 4 es la versión estable actual** (v4.4.2, marzo 2026). No Nuxt 3. Nuxt 4 salió en julio 2025 con mejor estructura de proyecto, TypeScript mejorado, Vue Router v5, y CLI más rápido.
 
-| Aspecto | SvelteKit (Svelte 5) | Nuxt 3 (Vue 3) | Next.js (React) |
-|---|---|---|---|
-| JS enviado al browser | ~5-8KB | ~28-32KB | ~40-50KB |
-| Descarga en 3G | ~0.2s | ~0.8s | ~1.2s |
-| Boilerplate | Mínimo (runes) | Medio (Composition API) | Alto (hooks, RSC) |
-| Build tool | Vite | Vite | Turbopack |
-| PWA support | Service Workers nativos | Vía módulos | Config manual |
-| Ecosistema | Creciendo | Grande | Enorme |
+SvelteKit se evaluó como alternativa (5-8KB runtime vs 28-32KB de Nuxt, carga más rápida en 3G). Pero la decisión final es **Nuxt 4** por:
 
-**Por qué SvelteKit gana para Nala:**
-
-1. **5-8KB vs 28-32KB de runtime.** En un Android de $100 con 3G en Venezuela, eso es 0.2s vs 0.8s de carga. La diferencia entre "instantáneo" y "espera un momento"
-2. **Menos código para lo mismo.** Un componente Svelte tiene ~40% menos líneas que el equivalente en Vue. Menos código = menos bugs = desarrollo más rápido
-3. **Svelte 5 runes.** `$state`, `$derived`, `$effect` son más explícitos y simples que `ref()`, `reactive()`, `computed()` de Vue
-4. **Compilador, no runtime.** Svelte compila los componentes a JavaScript vanilla. No hay Virtual DOM. Las actualizaciones del DOM son directas y más rápidas
-5. **Vite nativo.** Mismo build tool que Nuxt, pero sin la capa de abstracción de Vue
-
-**El riesgo:** Ecosistema más pequeño. Menos desarrolladores Svelte que Vue en el mercado. Pero para un backoffice que no necesita miles de plugins, el ecosistema es suficiente.
-
-**Decisión final:** Si el equipo conoce Vue, usar Nuxt 3. Si empezamos de cero sin preferencia, usar SvelteKit. Documentamos ambas opciones y decidimos al iniciar desarrollo.
+1. **Ya lo conocemos** (Aurora está en Nuxt). Cero curva de aprendizaje = semanas ahorradas
+2. **Ecosistema maduro.** Más librerías, más plugins, más respuestas a problemas
+3. **Contratación fácil.** 10x más devs Vue que Svelte en el mercado
+4. **Producción probada.** GitLab, BMW, Alibaba, Nintendo usan Vue
+5. **Para un backoffice, la diferencia de runtime (0.2s vs 0.8s) no es deal-breaker.** La velocidad de desarrollo sí lo es
 
 ### DB local: IndexedDB (vía Dexie.js)
 

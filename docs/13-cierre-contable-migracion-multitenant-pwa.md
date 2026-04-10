@@ -217,7 +217,7 @@ async function tenantMiddleware(req, res, next) {
 
 ### No son dos productos
 
-Es **una sola aplicación Nuxt 3** que se adapta al dispositivo con CSS responsive + componentes condicionales. Un solo codebase. Un solo deploy. Un solo URL.
+Es **una sola aplicación Nuxt 4** que se adapta al dispositivo con CSS responsive + componentes condicionales. Un solo codebase. Un solo deploy. Un solo URL.
 
 - En desktop: layout con sidebar + área principal ancha
 - En móvil: layout con tabs inferiores + cards apiladas
