@@ -14,17 +14,17 @@ No todos los comerciantes registran cada venta en el sistema. En la realidad de 
 
 Forzar al usuario a registrar todo no funciona. Se va a otro sistema más simple o vuelve al cuaderno. La estrategia es hacer que registrar sea tan rápido que no haya razón para no hacerlo, y complementar con cuadre de caja para cerrar el gap.
 
-### Flujo de cierre diario en Nala
+### Flujo de cierre diario en Nova
 
 **Paso 1: Cuadre de caja (el usuario cuenta el efectivo)**
 
-Al final del día, el dueño o cajero toca "Cerrar día". Nala pregunta:
+Al final del día, el dueño o cajero toca "Cerrar día". Nova pregunta:
 
 ```
 ¿Cuánto efectivo hay en caja? [________]
 ```
 
-El usuario cuenta los billetes y pone el número. Nala compara:
+El usuario cuenta los billetes y pone el número. Nova compara:
 
 ```
 Efectivo contado:           $500
@@ -37,19 +37,19 @@ Diferencia:                 +$20
 
 **Paso 2: Resolver la diferencia**
 
-Si hay diferencia (casi siempre la hay), Nala ofrece opciones:
+Si hay diferencia (casi siempre la hay), Nova ofrece opciones:
 
-| Situación | Nala sugiere |
+| Situación | Nova sugiere |
 |---|---|
 | Efectivo contado > esperado (+$20) | "Hay $20 más de lo esperado. ¿Son ventas no registradas?" → Sí: registra venta genérica por $20 en efectivo. No: registra como "diferencia de caja" |
 | Efectivo contado < esperado (-$15) | "Faltan $15. ¿Hubo un gasto no registrado?" → Sí: registra gasto. No: registra como "faltante de caja" |
 | Efectivo contado = esperado | "Caja cuadrada. Todo bien." |
 
-Las diferencias de caja quedan registradas en el log de actividad con fecha, hora, usuario, y monto. Si hay faltantes frecuentes, Nala alerta al dueño.
+Las diferencias de caja quedan registradas en el log de actividad con fecha, hora, usuario, y monto. Si hay faltantes frecuentes, Nova alerta al dueño.
 
 **Paso 3: Cierre automático**
 
-Después del cuadre, Nala automáticamente:
+Después del cuadre, Nova automáticamente:
 
 1. Genera resumen del día (ventas por método de pago, gastos, ganancia estimada)
 2. Genera asientos contables del día (ventas → cuenta 4101, gastos → cuenta 6XXX, etc.)
@@ -60,7 +60,7 @@ Después del cuadre, Nala automáticamente:
 
 **Paso 4: Cierre mensual (para el contador)**
 
-Al final del mes, el dueño toca "Enviar al contador". Nala genera:
+Al final del mes, el dueño toca "Enviar al contador". Nova genera:
 
 - Excel con todos los asientos del mes (incluyendo diferencias de caja)
 - Resumen de ventas por método de pago
@@ -95,7 +95,7 @@ El contador recibe un paquete completo. Las diferencias de caja están documenta
 ### Qué NO se migra
 
 - **Historial de ventas:** No tiene sentido. Se empieza de cero. El historial viejo queda en el sistema anterior como referencia
-- **Configuración:** Cada sistema tiene su propia estructura. Es más rápido re-configurar en el onboarding de Nala (5 minutos) que intentar mapear configuraciones
+- **Configuración:** Cada sistema tiene su propia estructura. Es más rápido re-configurar en el onboarding de Nova (5 minutos) que intentar mapear configuraciones
 - **Asientos contables:** El contador ya tiene eso en su sistema. No se duplica
 
 ### Flujo de importación
@@ -104,7 +104,7 @@ El contador recibe un paquete completo. Las diferencias de caja están documenta
 1. Usuario toca "Importar datos" en Configuración
 2. Selecciona tipo: Productos / Clientes / Proveedores
 3. Sube archivo (CSV, Excel, XLS, XLSX)
-4. Nala detecta columnas por nombre de header:
+4. Nova detecta columnas por nombre de header:
    - "Producto" o "Nombre" o "Descripción" → nombre
    - "Precio" o "PVP" o "Precio Venta" → precio
    - "Costo" o "Precio Compra" → costo
@@ -143,7 +143,7 @@ Una sola base de datos PostgreSQL para todos los tenants. Cada tabla tiene colum
 
 **Por qué pool y no schema-per-tenant o database-per-tenant:**
 
-| Modelo | Costo infra | Complejidad ops | Aislamiento | Para Nala |
+| Modelo | Costo infra | Complejidad ops | Aislamiento | Para Nova |
 |---|---|---|---|---|
 | Database per tenant | Alto (una DB por negocio) | Alta (miles de DBs) | Máximo | No. Inviable con miles de negocios |
 | Schema per tenant | Medio | Alta (migraciones por schema) | Alto | No. Complejidad de mantenimiento |

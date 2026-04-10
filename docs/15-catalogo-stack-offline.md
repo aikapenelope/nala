@@ -6,18 +6,18 @@
 
 ### La idea
 
-Cada negocio en Nala tiene una URL pública con su catálogo de productos. El comerciante comparte el link por WhatsApp, redes sociales, o impreso en el local. El cliente ve productos con fotos y precios, selecciona lo que quiere, deja sus datos, y el pedido le llega al comerciante.
+Cada negocio en Nova tiene una URL pública con su catálogo de productos. El comerciante comparte el link por WhatsApp, redes sociales, o impreso en el local. El cliente ve productos con fotos y precios, selecciona lo que quiere, deja sus datos, y el pedido le llega al comerciante.
 
 ### Por qué sí funciona
 
 - Miles de negocios venezolanos ya venden por WhatsApp enviando fotos una por una. Esto lo automatiza
 - WhatsApp Business tiene "WhatsApp Shop" con catálogo integrado, lo que valida que el concepto funciona
 - No es e-commerce. No hay pago online, no hay carrito complejo, no hay logística. Es un formulario de pedido que genera un contacto
-- El comerciante no necesita saber nada de tecnología. El catálogo se genera automáticamente desde su inventario en Nala
+- El comerciante no necesita saber nada de tecnología. El catálogo se genera automáticamente desde su inventario en Nova
 
 ### Cómo funciona
 
-**URL:** `nala.app/tienda/bodega-juan` (o dominio personalizado en v2)
+**URL:** `nova.app/tienda/bodega-juan` (o dominio personalizado en v2)
 
 **Lo que ve el cliente (página pública, no necesita cuenta):**
 
@@ -57,7 +57,7 @@ Cada negocio en Nala tiene una URL pública con su catálogo de productos. El co
 └─────────────────────────────────────┘
 ```
 
-**Lo que recibe el comerciante en Nala:**
+**Lo que recibe el comerciante en Nova:**
 
 - Notificación push: "Nuevo pedido de María García: Harina PAN x2, Aceite Diana x1. Total: $8.50"
 - El pedido aparece en una sección "Pedidos" con estado: Nuevo → Confirmado → Entregado
@@ -112,7 +112,7 @@ Un negocio con 500 productos, 200 clientes, y 50 ventas del día necesita ~5-10M
 
 ```javascript
 // IndexedDB crudo (horrible)
-const request = indexedDB.open('NalaDB', 1);
+const request = indexedDB.open('NovaDB', 1);
 request.onupgradeneeded = (event) => {
   const db = event.target.result;
   const store = db.createObjectStore('products', { keyPath: 'id' });
@@ -131,7 +131,7 @@ En esto:
 
 ```javascript
 // Con Dexie.js (limpio)
-const db = new Dexie('NalaDB');
+const db = new Dexie('NovaDB');
 db.version(1).stores({ products: 'id, name, sku, categoryId' });
 const products = await db.products.toArray();
 ```

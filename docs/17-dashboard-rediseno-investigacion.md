@@ -8,11 +8,11 @@
 
 Lo más relevante que hizo Square:
 
-1. **Modos por tipo de negocio.** Durante el onboarding preguntan qué tipo de negocio eres y pre-configuran toda la interfaz. Feature discovery subió 80%. Nala ya hace esto (pre-configurar por tipo de negocio en onboarding). Confirmado como patrón correcto.
+1. **Modos por tipo de negocio.** Durante el onboarding preguntan qué tipo de negocio eres y pre-configuran toda la interfaz. Feature discovery subió 80%. Nova ya hace esto (pre-configurar por tipo de negocio en onboarding). Confirmado como patrón correcto.
 
 2. **Dashboard app separada del POS.** Square tiene dos apps: POS (para vender) y Dashboard (para analizar). En el Dashboard app móvil, curaron solo las herramientas de backoffice más esenciales. No metieron todo. Seleccionaron lo que un dueño necesita ver en el celular.
 
-3. **Daily sales summary email** (marzo 2026). Nuevo feature: email diario con métricas, comparativas de tendencias, e insights accionables para "optimizar operaciones del día siguiente". Nala ya tiene esto por WhatsApp + push. Confirmado.
+3. **Daily sales summary email** (marzo 2026). Nuevo feature: email diario con métricas, comparativas de tendencias, e insights accionables para "optimizar operaciones del día siguiente". Nova ya tiene esto por WhatsApp + push. Confirmado.
 
 4. **Offline payments mejorados** (abril 2026). "Offline payments will now trigger more reliably -- whether it's a full internet outage or just a dropped connection." Confirma que offline es importante incluso en EEUU.
 
@@ -42,7 +42,7 @@ Resumen primero. Detalle solo cuando el usuario lo pide. No al revés.
 
 ---
 
-## Qué Cambiar en el Dashboard de Nala
+## Qué Cambiar en el Dashboard de Nova
 
 ### Problema del diseño anterior
 

@@ -1,10 +1,10 @@
-# Nala
+# Nova
 
 Backoffice operativo para comerciantes y PyMEs. Fácil como un cuaderno, potente como un ERP, inteligente como un socio que sabe de números.
 
-## Qué es Nala
+## Qué es Nova
 
-Nala es el sistema nervioso central de un negocio pequeño. Ventas, inventario, clientes, cuentas, reportes y contabilidad en un solo lugar. Funciona en escritorio, en el celular y por WhatsApp. Funciona sin internet. Tiene inteligencia integrada en cada pantalla que le dice al dueño qué hacer sin que pregunte.
+Nova es el sistema nervioso central de un negocio pequeño. Ventas, inventario, clientes, cuentas, reportes y contabilidad en un solo lugar. Funciona en escritorio, en el celular y por WhatsApp. Funciona sin internet. Tiene inteligencia integrada en cada pantalla que le dice al dueño qué hacer sin que pregunte.
 
 No es un POS. No es un software contable. No es un CRM. Es el backoffice completo que conecta todo lo que un comerciante necesita para operar su negocio día a día.
 
@@ -14,7 +14,7 @@ El dueño-operador: la persona que abre el negocio a las 6am, atiende clientes, 
 
 ## Por qué existe
 
-Los sistemas administrativos actuales en este mercado son de dos tipos: demasiado simples (un cuaderno digital sin inteligencia) o demasiado complejos (ERPs que nadie entiende). Nala es potente porque es fácil de usar, no a pesar de serlo.
+Los sistemas administrativos actuales en este mercado son de dos tipos: demasiado simples (un cuaderno digital sin inteligencia) o demasiado complejos (ERPs que nadie entiende). Nova es potente porque es fácil de usar, no a pesar de serlo.
 
 ## Principios de diseño
 
@@ -48,7 +48,7 @@ Perfil automático con historial de compras, frecuencia, ticket promedio, produc
 2 roles: Dueño (ve todo, configura todo) y Empleado (solo vende y consulta, no ve costos ni reportes financieros). Cada usuario con PIN propio para accountability. Log de actividad completo. Gamificación para vendedores (ranking, metas, rachas). Cierre de día automático con cuadre de caja. 2FA por email. Backups automáticos.
 
 ### Contabilidad (puente al contador)
-Nala no es un sistema contable. Es un puente: genera la información que el contador necesita en el formato que su sistema entiende. Exportación automática en Excel con formato de libro diario (fecha, cuenta, debe, haber). Catálogo de cuentas pre-configurado por tipo de negocio que el contador ajusta una vez. Botón "Enviar al contador" que genera el paquete (ventas, gastos, P&L) y abre WhatsApp con el archivo. Libros de compras y ventas en formato SENIAT.
+Nova no es un sistema contable. Es un puente: genera la información que el contador necesita en el formato que su sistema entiende. Exportación automática en Excel con formato de libro diario (fecha, cuenta, debe, haber). Catálogo de cuentas pre-configurado por tipo de negocio que el contador ajusta una vez. Botón "Enviar al contador" que genera el paquete (ventas, gastos, P&L) y abre WhatsApp con el archivo. Libros de compras y ventas en formato SENIAT.
 
 ### WhatsApp bidireccional
 **Salida:** Resúmenes diarios, alertas, cobros a clientes, reportes al contador, campañas, recibos.
@@ -124,8 +124,12 @@ Nala no es un sistema contable. Es un puente: genera la información que el cont
 | [13 - Cierre contable, migración, multi-tenant, PWA](docs/13-cierre-contable-migracion-multitenant-pwa.md) | Cuadre de caja con gap de ventas no registradas, importación desde legacy, PostgreSQL RLS, PWA como centro de acción vs desktop como centro de análisis |
 | [14 - Experiencia desktop vs móvil](docs/14-experiencia-desktop-vs-movil.md) | Cómo lo hacen Square/Shopify/Lightspeed, datos de uso real, wireframes de cada pantalla, tabla de funcionalidades por dispositivo, principios de diseño, implementación técnica |
 | [15 - Catálogo, stack técnico, estrategia offline](docs/15-catalogo-stack-offline.md) | Página de catálogo para clientes, Nuxt 4 decisión final, por qué IndexedDB, por qué Hono, online-first con cache agresivo |
-| [16 - Fina vs Nala + estructura dashboard](docs/16-fina-vs-nala-dashboard-estructura.md) | Comparación feature por feature, qué dejamos fuera y por qué, wireframes del dashboard desktop/móvil, estructura de navegación completa con flujos |
+| [16 - Fina vs Nova + estructura dashboard](docs/16-fina-vs-nala-dashboard-estructura.md) | Comparación feature por feature, qué dejamos fuera y por qué, wireframes del dashboard desktop/móvil, estructura de navegación completa con flujos |
 | [17 - Dashboard rediseño basado en investigación](docs/17-dashboard-rediseno-investigacion.md) | Patrones de Square/Shopify/F1Studioz 2026, progressive disclosure, alertas accionables, qué quitar y qué dejar del dashboard, principios de diseño |
+| [18 - Roadmap de desarrollo y producción](docs/18-roadmap-desarrollo-produccion.md) | 10 fases de desarrollo (18 semanas), estructura monorepo, CI/CD, testing, monitoreo, prácticas de producción |
+| [19 - WhatsApp arquitectura y seguridad](docs/19-whatsapp-arquitectura-seguridad.md) | Alcance exacto (qué sí y qué no por WhatsApp), flujo completo de un mensaje, identificación por teléfono, seguridad, código del webhook, cuándo implementar |
+| [20 - Sistema de PIN y modos Admin/Empleado](docs/20-sistema-pin-modos-admin-empleado.md) | Acceso por Clerk (dueño) vs PIN (empleado), dispositivo compartido, cambio rápido de usuario, qué ve cada modo, acciones que requieren PIN del dueño, código de implementación |
+| **[21 - Fases de desarrollo definitivas](docs/21-fases-desarrollo-definitivas.md)** | **10 fases con tareas exactas, tests por fase, CI con GitHub Actions, cuándo hacer deploy a staging, timeline de 18 semanas** |
 
 ## Licencia
 

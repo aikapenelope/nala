@@ -17,7 +17,7 @@ Fina no tiene sistema de roles. Todos los usuarios ven todo. La única distinci�
 - **Toast:** Roles más granulares pero es para restaurantes con 20+ empleados
 - **Shopify POS:** Staff con permisos por PIN. Cada empleado tiene un PIN y permisos configurables
 
-### La decisión para Nala
+### La decisión para Nova
 
 **2 roles: Dueño y Empleado.** Razones:
 
@@ -53,15 +53,15 @@ Fina → Exportar Excel → Enviar por WhatsApp al contador → Contador transcr
 
 El contador recibe un Excel genérico que no tiene formato contable. Tiene que interpretar qué es cada línea, asignar cuentas contables, y transcribir todo. Esto genera errores, demoras, y el dueño termina pagando más horas al contador.
 
-### El flujo mejorado para Nala
+### El flujo mejorado para Nova
 
 ```
-Nala → Genera Excel con formato contable (ya tiene cuentas asignadas) → Botón "Enviar al contador" → WhatsApp con archivo adjunto → Contador importa directo en su sistema
+Nova → Genera Excel con formato contable (ya tiene cuentas asignadas) → Botón "Enviar al contador" → WhatsApp con archivo adjunto → Contador importa directo en su sistema
 ```
 
 **Paso a paso:**
 
-1. **Setup (una sola vez):** Cuando el negocio se registra, Nala pre-configura un catálogo de cuentas contables basado en el tipo de negocio (panadería, ferretería, restaurante, etc.). Las cuentas más comunes ya están asignadas:
+1. **Setup (una sola vez):** Cuando el negocio se registra, Nova pre-configura un catálogo de cuentas contables basado en el tipo de negocio (panadería, ferretería, restaurante, etc.). Las cuentas más comunes ya están asignadas:
    - Ventas en efectivo → 4101
    - Ventas por transferencia → 4102
    - Costo de mercancía vendida → 5101
@@ -69,9 +69,9 @@ Nala → Genera Excel con formato contable (ya tiene cuentas asignadas) → Bot�
    - Gastos de servicios → 6202
    - etc.
 
-2. **Día a día (automático):** Cada venta, gasto y pago que se registra en Nala se traduce automáticamente a un asiento contable. El usuario no hace nada. No ve asientos. No sabe qué es un "debe" y un "haber".
+2. **Día a día (automático):** Cada venta, gasto y pago que se registra en Nova se traduce automáticamente a un asiento contable. El usuario no hace nada. No ve asientos. No sabe qué es un "debe" y un "haber".
 
-3. **Fin de mes (un botón):** El dueño toca "Enviar al contador". Nala genera:
+3. **Fin de mes (un botón):** El dueño toca "Enviar al contador". Nova genera:
    - Excel con formato de libro diario (fecha, cuenta, debe, haber, descripción, referencia)
    - Resumen de ventas por método de pago
    - Resumen de gastos por categoría
@@ -104,7 +104,7 @@ Nala → Genera Excel con formato contable (ya tiene cuentas asignadas) → Bot�
 
 ### Cómo funciona técnicamente
 
-La WhatsApp Cloud API es una API REST que Meta hospeda. Nala no hospeda WhatsApp. Nala se conecta a la API de Meta a través de un BSP (Business Solution Provider) o directamente.
+La WhatsApp Cloud API es una API REST que Meta hospeda. Nova no hospeda WhatsApp. Nova se conecta a la API de Meta a través de un BSP (Business Solution Provider) o directamente.
 
 **Arquitectura:**
 
@@ -112,24 +112,24 @@ La WhatsApp Cloud API es una API REST que Meta hospeda. Nala no hospeda WhatsApp
 ┌─────────────┐     ┌──────────────┐     ┌─────────────────┐     ┌──────────────┐
 │  Usuario     │────▶│  WhatsApp    │────▶│  Meta Cloud API │────▶│  Webhook     │
 │  (su celular)│◀────│  (app)       │◀────│  (servidores    │◀────│  (servidor   │
-│              │     │              │     │   de Meta)      │     │   de Nala)   │
+│              │     │              │     │   de Meta)      │     │   de Nova)   │
 └─────────────┘     └──────────────┘     └─────────────────┘     └──────┬───────┘
                                                                         │
                                                                         ▼
                                                                  ┌──────────────┐
-                                                                 │  Nala Backend│
+                                                                 │  Nova Backend│
                                                                  │  (API +      │
                                                                  │   LLM +      │
                                                                  │   PostgreSQL)│
                                                                  └──────────────┘
 ```
 
-**Flujo de un mensaje entrante (usuario → Nala):**
+**Flujo de un mensaje entrante (usuario → Nova):**
 
-1. El usuario envía "cuánto vendí hoy" al número de WhatsApp de Nala
+1. El usuario envía "cuánto vendí hoy" al número de WhatsApp de Nova
 2. WhatsApp entrega el mensaje a los servidores de Meta (Cloud API)
-3. Meta envía un webhook HTTP POST al servidor de Nala con el payload del mensaje
-4. El servidor de Nala recibe el webhook, extrae el texto del mensaje
+3. Meta envía un webhook HTTP POST al servidor de Nova con el payload del mensaje
+4. El servidor de Nova recibe el webhook, extrae el texto del mensaje
 5. El texto se envía al LLM (GPT-4o-mini) con el contexto del negocio del usuario para interpretar la intención
 6. El LLM devuelve una acción estructurada: `{ action: "query_sales", period: "today" }`
 7. El backend ejecuta la query en PostgreSQL
@@ -137,7 +137,7 @@ La WhatsApp Cloud API es una API REST que Meta hospeda. Nala no hospeda WhatsApp
 9. El backend llama a la API de Meta para enviar la respuesta al usuario
 10. El usuario recibe: "$420 en 23 ventas. 12% más que el martes pasado"
 
-**Flujo de un mensaje saliente (Nala → usuario):**
+**Flujo de un mensaje saliente (Nova → usuario):**
 
 1. El cron de cierre diario (9pm) se ejecuta en el backend
 2. Genera el resumen del día para cada negocio activo
@@ -148,8 +148,8 @@ La WhatsApp Cloud API es una API REST que Meta hospeda. Nala no hospeda WhatsApp
 
 | Componente | Qué hace | Dónde vive |
 |---|---|---|
-| **Webhook endpoint** | Recibe mensajes de Meta. HTTPS obligatorio con SSL válido | Servidor Nala (Hetzner) detrás de Traefik |
-| **Message processor** | Parsea el webhook, identifica al usuario, extrae el mensaje | Servicio Node.js en el backend de Nala |
+| **Webhook endpoint** | Recibe mensajes de Meta. HTTPS obligatorio con SSL válido | Servidor Nova (Hetzner) detrás de Traefik |
+| **Message processor** | Parsea el webhook, identifica al usuario, extrae el mensaje | Servicio Node.js en el backend de Nova |
 | **LLM router** | Envía el mensaje al LLM, recibe la intención, ejecuta la acción | Servicio Node.js que llama a OpenAI/Anthropic API |
 | **WhatsApp sender** | Envía mensajes de vuelta vía Meta Cloud API | Módulo del backend que hace POST a graph.facebook.com |
 | **Message queue** | Cola para mensajes salientes (resúmenes, alertas, campañas) | Redis (ya lo tenemos) |
@@ -159,7 +159,7 @@ La WhatsApp Cloud API es una API REST que Meta hospeda. Nala no hospeda WhatsApp
 
 - **Cuenta de Facebook Business** (gratis)
 - **App en Meta for Developers** (gratis)
-- **Número de teléfono** dedicado para Nala (no puede estar registrado en WhatsApp personal)
+- **Número de teléfono** dedicado para Nova (no puede estar registrado en WhatsApp personal)
 - **Verificación de negocio** en Facebook Business (básica, no enterprise)
 - **Plantillas de mensaje** aprobadas por Meta para mensajes salientes (marketing, utility)
 - **Webhook URL** con HTTPS y SSL válido
@@ -258,7 +258,7 @@ async function extractInvoiceData(imageBuffer: Buffer, businessProducts: Product
 
 ```
 ┌──────────────┐     ┌──────────────────────────────────┐     ┌──────────────┐
-│  PWA         │     │  Nala Backend                    │     │  PostgreSQL  │
+│  PWA         │     │  Nova Backend                    │     │  PostgreSQL  │
 │  (cámara)    │────▶│                                  │────▶│              │
 │              │     │  1. Recibe imagen                │     │  Gasto       │
 │  Foto full   │     │  2. Carga productos del negocio  │     │  registrado  │
@@ -364,7 +364,7 @@ PWA muestra al usuario:
 
 - Los productos con match (✅) se registran como gasto Y actualizan inventario automáticamente
 - Los productos sin match (⚠️) abren el formulario de registro de producto nuevo pre-llenado con los datos de la factura (nombre, costo, cantidad). El usuario solo completa lo que falta (categoría, precio de venta) y guarda
-- El match se aprende: la próxima vez que aparezca "AZUCAR 1KG" en una factura de este proveedor, Nala lo matchea automáticamente con el producto que el usuario creó
+- El match se aprende: la próxima vez que aparezca "AZUCAR 1KG" en una factura de este proveedor, Nova lo matchea automáticamente con el producto que el usuario creó
 
 ### Escenario 2: Productos con SKU (ropa, electrónica)
 

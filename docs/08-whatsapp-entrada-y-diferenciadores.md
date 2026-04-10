@@ -1,6 +1,6 @@
-# Nala: WhatsApp como Entrada + Diferenciadores Adicionales
+# Nova: WhatsApp como Entrada + Diferenciadores Adicionales
 
-> Addendum al documento de visión. WhatsApp no solo es salida, también es entrada. Y features adicionales que hacen que Nala destaque.
+> Addendum al documento de visión. WhatsApp no solo es salida, también es entrada. Y features adicionales que hacen que Nova destaque.
 
 ---
 
@@ -10,7 +10,7 @@
 
 La versión anterior asumía que necesitábamos la verificación multi-tenant de Meta (el proceso complicado que está en curso). Eso es para ser **BSP** (Business Solution Provider) -- es decir, para ofrecer WhatsApp API a terceros.
 
-Pero para que **Nala use la API para sí misma** (un solo número de WhatsApp de Nala), el proceso es mucho más simple:
+Pero para que **Nova use la API para sí misma** (un solo número de WhatsApp de Nova), el proceso es mucho más simple:
 
 | Requisito | Detalle |
 |---|---|
@@ -27,21 +27,21 @@ Pero para que **Nala use la API para sí misma** (un solo número de WhatsApp de
 | Tipo de mensaje | Quién inicia | Costo (LATAM aprox.) |
 |---|---|---|
 | Service (soporte) | El usuario escribe primero | 1,000/mes GRATIS, luego ~$0.003-0.01 |
-| Utility (transaccional) | Nala envía | ~$0.005-0.02 por mensaje |
-| Marketing (promocional) | Nala envía | ~$0.03-0.07 por mensaje |
-| Authentication (OTP) | Nala envía | ~$0.02-0.04 por mensaje |
+| Utility (transaccional) | Nova envía | ~$0.005-0.02 por mensaje |
+| Marketing (promocional) | Nova envía | ~$0.03-0.07 por mensaje |
+| Authentication (OTP) | Nova envía | ~$0.02-0.04 por mensaje |
 
 **Las primeras 1,000 conversaciones de servicio al mes son gratis.** Esto cubre la mayoría de los casos de entrada para un negocio pequeño.
 
 ---
 
-## 2. Cómo Funciona WhatsApp Como Entrada en Nala
+## 2. Cómo Funciona WhatsApp Como Entrada en Nova
 
-El dueño del negocio le escribe al número de WhatsApp de Nala y el sistema ejecuta la acción. No es un chatbot genérico. Es un **asistente que entiende comandos naturales** y los traduce en operaciones reales dentro del sistema.
+El dueño del negocio le escribe al número de WhatsApp de Nova y el sistema ejecuta la acción. No es un chatbot genérico. Es un **asistente que entiende comandos naturales** y los traduce en operaciones reales dentro del sistema.
 
 ### Comandos por WhatsApp
 
-| El usuario escribe | Nala responde | Qué pasa en el sistema |
+| El usuario escribe | Nova responde | Qué pasa en el sistema |
 |---|---|---|
 | "cuánto vendí hoy" | "$420 en 23 ventas. 12% más que el martes pasado. Top: Pan Campesino (85u)" | Consulta de ventas del día |
 | "cuánto me debe Juan" | "Juan Pérez te debe $65. Última compra: hace 12 días. ¿Le envío recordatorio?" | Consulta de cuenta por cobrar |
@@ -59,10 +59,10 @@ El dueño del negocio le escribe al número de WhatsApp de Nala y el sistema eje
 ### Cómo se implementa
 
 - **LLM (GPT-4o-mini / Claude Haiku)** parsea el mensaje del usuario y lo convierte en una acción estructurada
-- **Function calling** ejecuta la acción en el backend de Nala (misma API que usa la app web)
+- **Function calling** ejecuta la acción en el backend de Nova (misma API que usa la app web)
 - **Confirmación** antes de cualquier acción que modifique datos (ventas, precios, gastos)
 - **Contexto de conversación** se mantiene por 5 minutos (para flujos de "¿le envío recordatorio?" → "sí")
-- **Fallback:** Si Nala no entiende, responde: "No entendí. Puedes preguntarme sobre ventas, inventario, clientes o cuentas. O abre la app para más opciones"
+- **Fallback:** Si Nova no entiende, responde: "No entendí. Puedes preguntarme sobre ventas, inventario, clientes o cuentas. O abre la app para más opciones"
 
 ### Qué SÍ se puede hacer por WhatsApp
 
@@ -86,7 +86,7 @@ El dueño del negocio le escribe al número de WhatsApp de Nala y el sistema eje
 
 ### La experiencia dual
 
-El dueño tiene dos formas de interactuar con Nala:
+El dueño tiene dos formas de interactuar con Nova:
 
 | Situación | Usa |
 |---|---|
@@ -103,20 +103,20 @@ El dueño tiene dos formas de interactuar con Nala:
 
 ---
 
-## 3. Diferenciadores Adicionales para que Nala Destaque
+## 3. Diferenciadores Adicionales para que Nova Destaque
 
 ### 3.1 Foto = Dato (OCR Inteligente)
 
-**Qué es:** Tomar foto de cualquier documento y que Nala extraiga los datos automáticamente.
+**Qué es:** Tomar foto de cualquier documento y que Nova extraiga los datos automáticamente.
 
-| Foto de... | Nala extrae | Acción |
+| Foto de... | Nova extrae | Acción |
 |---|---|---|
 | Factura de proveedor | Proveedor, monto, items, fecha | Registra gasto + actualiza inventario |
 | Recibo de pago | Monto, referencia, banco | Registra pago recibido en cuenta del cliente |
 | Lista de productos (papel) | Nombres, precios, cantidades | Carga productos al inventario |
 | Nota de entrega | Items entregados, cantidades | Confirma recepción de mercancía |
 
-**Funciona por WhatsApp** (enviar foto al número de Nala) **y en la app** (botón de cámara).
+**Funciona por WhatsApp** (enviar foto al número de Nova) **y en la app** (botón de cámara).
 
 **Implementación:** Google Vision API o AWS Textract para OCR + LLM para interpretar el contenido y mapearlo a campos del sistema.
 
@@ -124,7 +124,7 @@ El dueño tiene dos formas de interactuar con Nala:
 
 ### 3.2 Modo Negocio Cerrado (Night Mode)
 
-**Qué es:** Cuando el negocio cierra, Nala automáticamente:
+**Qué es:** Cuando el negocio cierra, Nova automáticamente:
 
 1. Genera el cierre de caja (cuadre automático)
 2. Envía resumen del día al dueño (push + WhatsApp)
@@ -139,9 +139,9 @@ El dueño tiene dos formas de interactuar con Nala:
 
 ### 3.3 Benchmark Anónimo ("¿Cómo voy vs otros?")
 
-**Qué es:** Comparar el rendimiento del negocio con otros negocios similares en Nala (datos anonimizados y agregados).
+**Qué es:** Comparar el rendimiento del negocio con otros negocios similares en Nova (datos anonimizados y agregados).
 
-| Métrica | Tu negocio | Promedio panaderías en Nala |
+| Métrica | Tu negocio | Promedio panaderías en Nova |
 |---|---|---|
 | Ticket promedio | $3.20 | $2.80 |
 | Margen bruto | 45% | 38% |
@@ -156,14 +156,14 @@ El dueño tiene dos formas de interactuar con Nala:
 
 ### 3.4 Asistente de Compras al Proveedor
 
-**Qué es:** Nala genera automáticamente la lista de compras que el dueño necesita hacer al proveedor.
+**Qué es:** Nova genera automáticamente la lista de compras que el dueño necesita hacer al proveedor.
 
 **Flujo:**
 
-1. Nala analiza: stock actual + velocidad de venta + día de la semana + historial
+1. Nova analiza: stock actual + velocidad de venta + día de la semana + historial
 2. Genera lista: "Esta semana necesitas pedir: 10 sacos Harina PAN ($150), 5kg Queso ($40), 20 paq Servilletas ($10). Total estimado: $200"
 3. El dueño revisa y ajusta si quiere
-4. Nala genera mensaje para el proveedor y abre WhatsApp: "Hola Distribuidora X, necesito: 10 sacos Harina PAN, 5kg Queso..."
+4. Nova genera mensaje para el proveedor y abre WhatsApp: "Hola Distribuidora X, necesito: 10 sacos Harina PAN, 5kg Queso..."
 5. Cuando llega la mercancía, el dueño toca "Recibido" y el inventario se actualiza
 
 **Por qué destaca:** Cierra el ciclo completo de inventario. No solo alerta que falta algo, sino que genera la orden y la envía.
@@ -189,8 +189,8 @@ El dueño tiene dos formas de interactuar con Nala:
 **Funcionalidades:**
 
 - Precios de productos siempre en USD (la referencia estable)
-- Al cobrar, Nala calcula automáticamente el equivalente en Bs. a tasa BCV del momento
-- Si el cliente paga en Bs., Nala registra el monto en Bs. Y el equivalente en USD
+- Al cobrar, Nova calcula automáticamente el equivalente en Bs. a tasa BCV del momento
+- Si el cliente paga en Bs., Nova registra el monto en Bs. Y el equivalente en USD
 - Reportes siempre muestran ambas monedas
 - Alerta si la tasa cambió más de 2% en un día: "La tasa BCV subió 3% hoy. Tus precios en Bs. se actualizaron automáticamente"
 - Historial de tasa aplicada por cada transacción (para el contador)
@@ -213,12 +213,12 @@ El dueño tiene dos formas de interactuar con Nala:
 
 ### 3.8 Modo Entrenamiento (Onboarding Interactivo)
 
-**Qué es:** En lugar de tutoriales en video, Nala enseña al usuario DENTRO de la app con datos reales.
+**Qué es:** En lugar de tutoriales en video, Nova enseña al usuario DENTRO de la app con datos reales.
 
 **Flujo:**
 
-1. El usuario nuevo abre Nala por primera vez
-2. Nala dice: "Vamos a registrar tu primera venta. Toca aquí"
+1. El usuario nuevo abre Nova por primera vez
+2. Nova dice: "Vamos a registrar tu primera venta. Toca aquí"
 3. El usuario toca, selecciona un producto de ejemplo
 4. "Ahora selecciona cómo pagó el cliente"
 5. "Listo. Esa fue tu primera venta. Así de fácil"
@@ -237,8 +237,8 @@ El dueño tiene dos formas de interactuar con Nala:
 
 1. El dueño toca "Compartir catálogo" en la app
 2. Selecciona categoría (o todos los productos)
-3. Nala genera una página web ligera con los productos, fotos y precios (actualizada en tiempo real)
-4. El dueño comparte el link por WhatsApp: "Mira nuestros productos: nala.app/catalogo/panaderia-don-pedro"
+3. Nova genera una página web ligera con los productos, fotos y precios (actualizada en tiempo real)
+4. El dueño comparte el link por WhatsApp: "Mira nuestros productos: nova.app/catalogo/panaderia-don-pedro"
 5. El cliente ve el catálogo en su navegador (no necesita instalar nada)
 6. Opcionalmente: el cliente puede tocar "Pedir" y se abre un WhatsApp al negocio con el pedido prellenado
 
@@ -248,7 +248,7 @@ El dueño tiene dos formas de interactuar con Nala:
 
 ### 3.10 Alertas Predictivas de Flujo de Caja
 
-**Qué es:** Nala predice si el negocio va a tener problemas de efectivo en los próximos días.
+**Qué es:** Nova predice si el negocio va a tener problemas de efectivo en los próximos días.
 
 **Ejemplo:** "Basado en tus ventas promedio y los gastos programados, el viernes podrías tener un déficit de $80. Tienes $200 por cobrar que podrían cubrir eso. ¿Envío recordatorio de cobro a los 3 clientes con deuda más antigua?"
 
@@ -264,7 +264,7 @@ El dueño tiene dos formas de interactuar con Nala:
 
 ---
 
-## 4. Resumen de Diferenciadores Únicos de Nala
+## 4. Resumen de Diferenciadores Únicos de Nova
 
 | # | Diferenciador | Quién más lo tiene | Impacto |
 |---|---|---|---|
@@ -296,4 +296,4 @@ El pilar 1 del documento de visión se actualiza:
 - **WhatsApp (entrada):** Consultas rápidas, ventas simples, cobros, registrar gastos con foto. Para cuando estás fuera del negocio o quieres algo rápido.
 - **WhatsApp (salida):** Resúmenes, alertas, cobros a clientes, reportes al contador, campañas. Llegan solos.
 
-Las tres formas de interactuar con Nala son igualmente potentes. Ninguna es secundaria.
+Las tres formas de interactuar con Nova son igualmente potentes. Ninguna es secundaria.
