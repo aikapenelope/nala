@@ -55,17 +55,6 @@ export default defineNuxtConfig({
     },
   },
 
-  nitro: {
-    // Clerk's @clerk/shared package references a netlifyCacheHandler module
-    // that doesn't exist when using the node-server preset. Instead of
-    // externalizing the whole package (which causes version mismatches),
-    // we alias the problematic import to an empty module.
-    alias: {
-      "@clerk/shared/dist/runtime/netlifyCacheHandler.mjs": "unenv/runtime/mock/empty",
-      "@clerk/shared/dist/runtime/netlifyCacheHandler": "unenv/runtime/mock/empty",
-    },
-  },
-
   typescript: {
     strict: true,
     typeCheck: true,
