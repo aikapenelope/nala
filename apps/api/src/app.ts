@@ -2,10 +2,11 @@
  * Hono application setup with middleware and routes.
  *
  * Middleware chain:
- * 1. Logger - request/response logging
- * 2. CORS - cross-origin access for the frontend
- * 3. Auth - verify Clerk JWT or PIN (placeholder in Phase 0)
- * 4. Tenant - set RLS business context (placeholder in Phase 0)
+ * 1. Security - block scanner bots, security headers
+ * 2. Logger - request/response logging (only valid routes)
+ * 3. CORS - cross-origin access for the frontend
+ * 4. Auth - verify Clerk JWT or PIN
+ * 5. Tenant - set RLS business context
  *
  * Routes:
  * - /health - health check (no auth required)
@@ -15,6 +16,7 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
+import { secureHeaders } from "hono/secure-headers";
 import { health } from "./routes/health";
 import { auth, ownerPinRoute } from "./routes/auth";
 import { onboarding } from "./routes/onboarding";
@@ -30,8 +32,79 @@ import type { AppEnv } from "./types";
 
 export const app = new Hono();
 
-// Global middleware
+// ---------------------------------------------------------------------------
+// Security: block scanner bots early (before logging to reduce noise)
+// ---------------------------------------------------------------------------
+
+/** Paths that scanners probe. Return 404 immediately without logging. */
+const SCANNER_PATHS = new Set([
+  "/.env",
+  "/.git/config",
+  "/.git/HEAD",
+  "/.vscode/sftp.json",
+  "/wp-login.php",
+  "/wp-admin",
+  "/xmlrpc.php",
+  "/config.json",
+  "/info.php",
+  "/phpinfo.php",
+  "/telescope/requests",
+  "/actuator/env",
+  "/actuator/health",
+  "/swagger-ui.html",
+  "/swagger/index.html",
+  "/swagger/swagger-ui.html",
+  "/swagger.json",
+  "/swagger/v1/swagger.json",
+  "/v2/api-docs",
+  "/v3/api-docs",
+  "/api-docs/swagger.json",
+  "/trace.axd",
+  "/@vite/env",
+  "/debug/default/view",
+  "/webjars/swagger-ui/index.html",
+]);
+
+app.use("*", async (c, next) => {
+  const path = c.req.path;
+
+  // Block known scanner paths silently
+  if (SCANNER_PATHS.has(path)) {
+    return c.text("", 404);
+  }
+
+  // Block common scanner patterns
+  if (
+    path.endsWith(".php") ||
+    path.endsWith(".asp") ||
+    path.endsWith(".aspx") ||
+    path.endsWith(".jsp") ||
+    path.includes("/wp-") ||
+    path.includes("/wordpress") ||
+    path.includes("/cgi-bin")
+  ) {
+    return c.text("", 404);
+  }
+
+  await next();
+});
+
+// ---------------------------------------------------------------------------
+// Security headers
+// ---------------------------------------------------------------------------
+
+app.use("*", secureHeaders());
+
+// ---------------------------------------------------------------------------
+// Logger (only runs for legitimate requests, scanners are already blocked)
+// ---------------------------------------------------------------------------
+
 app.use("*", logger());
+
+// ---------------------------------------------------------------------------
+// CORS
+// ---------------------------------------------------------------------------
+
 app.use(
   "*",
   cors({
@@ -41,13 +114,19 @@ app.use(
   }),
 );
 
+// ---------------------------------------------------------------------------
 // Public routes (no auth required)
+// ---------------------------------------------------------------------------
+
 app.route("/health", health);
 app.route("/auth", auth);
 app.route("/onboarding", onboarding);
 app.route("/webhooks/whatsapp", whatsapp);
 
+// ---------------------------------------------------------------------------
 // Protected API routes with typed context variables
+// ---------------------------------------------------------------------------
+
 const api = new Hono<AppEnv>();
 api.use("*", authMiddleware);
 api.use("*", tenantMiddleware);
@@ -78,11 +157,14 @@ api.route("/", accounting);
 
 app.route("/api", api);
 
+// ---------------------------------------------------------------------------
 // Root
+// ---------------------------------------------------------------------------
+
 app.get("/", (c) => {
   return c.json({
     name: "Nova API",
-    version: "0.0.0",
+    version: "1.0.0",
     status: "running",
   });
 });
