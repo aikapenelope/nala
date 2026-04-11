@@ -55,15 +55,6 @@ export default defineNuxtConfig({
     },
   },
 
-  nitro: {
-    // Prevent Clerk's Netlify-specific runtime from being bundled.
-    // Without this, the node-server preset fails with ERR_MODULE_NOT_FOUND
-    // for @clerk/shared/dist/runtime/netlifyCacheHandler.mjs
-    externals: {
-      inline: ["@clerk/shared"],
-    },
-  },
-
   typescript: {
     strict: true,
     typeCheck: true,
