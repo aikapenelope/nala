@@ -19,7 +19,7 @@ ARG NODE_VERSION=22-slim
 FROM node:${NODE_VERSION} AS deps
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    openssl ca-certificates curl \
+    openssl ca-certificates curl python3 make g++ \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -30,8 +30,10 @@ COPY apps/web/package.json ./apps/web/
 COPY packages/shared/package.json ./packages/shared/
 COPY packages/db/package.json ./packages/db/
 
-# Clean install to resolve native binaries for linux
-RUN rm -rf node_modules package-lock.json && npm install --no-audit --no-fund
+# Use npm ci to install exact versions from lockfile.
+# This preserves @clerk/* version consistency between build and runtime.
+# Native binaries (esbuild, etc.) are resolved for linux automatically by npm ci.
+RUN npm ci --no-audit --no-fund
 
 # ============================================
 # Stage 2: Build all packages
@@ -112,9 +114,8 @@ ENV PORT=3000
 COPY --from=builder --chown=node:node /app/apps/web/.output ./.output
 
 # Nitro's index.mjs imports @clerk/shared runtime files as external modules.
-# These are not included in .output by the bundler. Copy the full package
-# from the build stage. Remove any partial files Nitro left first to avoid
-# COPY conflicts between files and directories.
+# Copy the exact same @clerk packages that were used during the build.
+# The rm ensures no partial files from Nitro conflict with the COPY.
 RUN rm -rf ./.output/server/node_modules/@clerk
 COPY --from=builder /app/node_modules/@clerk ./.output/server/node_modules/@clerk
 
