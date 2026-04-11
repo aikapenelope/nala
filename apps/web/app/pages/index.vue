@@ -44,6 +44,12 @@ const lowStockCount = ref(0);
 
 /** Exchange rate. */
 const exchangeRate = ref<number | null>(null);
+const euroRate = ref<number | null>(null);
+const showRateEditor = ref(false);
+const rateInputUsd = ref("");
+const rateInputEur = ref("");
+const rateSaving = ref(false);
+const rateSaveError = ref("");
 
 /** Smart alerts from API. */
 interface Alert {
@@ -114,7 +120,7 @@ async function loadDashboard() {
 
       $api<{ alerts: Alert[] }>("/api/reports/alerts"),
 
-      $api<{ rateBcv: number }>("/api/exchange-rate"),
+      $api<{ rateBcv: number; rateEur: number | null }>("/api/exchange-rate"),
 
       $api<{ sales: Array<{ totalUsd: string; createdAt: string }> }>(
         "/api/sales?limit=1",
@@ -156,6 +162,7 @@ async function loadDashboard() {
     // Exchange rate
     if (rateResult.status === "fulfilled") {
       exchangeRate.value = rateResult.value.rateBcv;
+      euroRate.value = rateResult.value.rateEur;
     }
 
     // Last sale
@@ -225,6 +232,49 @@ function timeAgo(iso: string): string {
   return `hace ${Math.floor(hours / 24)}d`;
 }
 
+/** Save exchange rate from the editor. */
+async function saveRate() {
+  const usd = Number(rateInputUsd.value);
+  const eur = rateInputEur.value ? Number(rateInputEur.value) : undefined;
+
+  if (!usd || usd <= 0) {
+    rateSaveError.value = "La tasa del dolar debe ser mayor a 0";
+    return;
+  }
+  if (eur !== undefined && eur <= 0) {
+    rateSaveError.value = "La tasa del euro debe ser mayor a 0";
+    return;
+  }
+
+  rateSaving.value = true;
+  rateSaveError.value = "";
+
+  try {
+    const result = await $api<{ rateBcv: number; rateEur: number | null }>(
+      "/api/exchange-rate",
+      {
+        method: "POST",
+        body: { rateBcv: usd, rateEur: eur },
+      },
+    );
+    exchangeRate.value = result.rateBcv;
+    euroRate.value = result.rateEur;
+    showRateEditor.value = false;
+  } catch (err) {
+    const fetchError = err as { data?: { error?: string } };
+    rateSaveError.value = fetchError.data?.error ?? "Error guardando tasa";
+  } finally {
+    rateSaving.value = false;
+  }
+}
+
+function openRateEditor() {
+  rateInputUsd.value = exchangeRate.value?.toFixed(2) ?? "";
+  rateInputEur.value = euroRate.value?.toFixed(2) ?? "";
+  rateSaveError.value = "";
+  showRateEditor.value = true;
+}
+
 /** Alerts to show: all on desktop, max 2 on mobile. */
 const visibleAlerts = computed(() => {
   if (isMobile.value) return alerts.value.slice(0, 1);
@@ -260,13 +310,78 @@ const visibleAlerts = computed(() => {
 
     <template v-else>
       <!-- ============================================ -->
-      <!-- BCV Rate (header area)                       -->
+      <!-- BCV Rate (header area, tappable by owner)    -->
       <!-- ============================================ -->
       <div
-        v-if="exchangeRate"
-        class="mb-3 flex items-center justify-end text-xs text-gray-400"
+        class="mb-3 flex items-center justify-end gap-3 text-xs text-gray-400"
       >
-        <span>Bs. {{ exchangeRate.toFixed(2) }} / USD</span>
+        <template v-if="exchangeRate">
+          <span>USD {{ exchangeRate.toFixed(2) }}</span>
+          <span v-if="euroRate">· EUR {{ euroRate.toFixed(2) }}</span>
+        </template>
+        <span v-else class="text-yellow-600">Tasa no configurada</span>
+        <button
+          v-if="isAdmin"
+          class="rounded bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-500 hover:bg-gray-200"
+          @click="openRateEditor"
+        >
+          {{ exchangeRate ? "Cambiar" : "Configurar" }}
+        </button>
+      </div>
+
+      <!-- Rate editor modal -->
+      <div
+        v-if="showRateEditor"
+        class="mb-4 rounded-xl border border-nova-primary/20 bg-blue-50 p-4"
+      >
+        <h3 class="mb-3 text-sm font-semibold text-gray-700">
+          Tasa de cambio BCV
+        </h3>
+        <div class="flex gap-3">
+          <div class="flex-1">
+            <label class="mb-1 block text-xs text-gray-500">Dolar (USD)</label>
+            <input
+              v-model="rateInputUsd"
+              type="number"
+              step="0.01"
+              min="0"
+              placeholder="477.14"
+              class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-nova-primary focus:outline-none"
+            />
+          </div>
+          <div class="flex-1">
+            <label class="mb-1 block text-xs text-gray-500">Euro (EUR)</label>
+            <input
+              v-model="rateInputEur"
+              type="number"
+              step="0.01"
+              min="0"
+              placeholder="560.04"
+              class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-nova-primary focus:outline-none"
+            />
+          </div>
+        </div>
+        <p v-if="rateSaveError" class="mt-2 text-xs text-red-500">
+          {{ rateSaveError }}
+        </p>
+        <div class="mt-3 flex gap-2">
+          <button
+            class="flex-1 rounded-lg border border-gray-300 py-2 text-xs font-medium text-gray-600"
+            @click="showRateEditor = false"
+          >
+            Cancelar
+          </button>
+          <button
+            class="flex-1 rounded-lg bg-nova-primary py-2 text-xs font-medium text-white disabled:opacity-50"
+            :disabled="rateSaving"
+            @click="saveRate"
+          >
+            {{ rateSaving ? "Guardando..." : "Guardar tasa" }}
+          </button>
+        </div>
+        <p class="mt-2 text-[10px] text-gray-400">
+          Consulta la tasa oficial en bcv.org.ve
+        </p>
       </div>
 
       <!-- ============================================ -->
