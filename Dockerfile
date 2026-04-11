@@ -111,10 +111,12 @@ ENV PORT=3000
 
 COPY --from=builder --chown=node:node /app/apps/web/.output ./.output
 
-# Clerk's Nitro integration references netlifyCacheHandler.mjs which only
-# exists for the Netlify preset. Create an empty stub so Node can resolve it.
-RUN mkdir -p ./.output/server/node_modules/@clerk/shared/dist/runtime && \
-    echo 'export default {}' > ./.output/server/node_modules/@clerk/shared/dist/runtime/netlifyCacheHandler.mjs
+# Nitro's index.mjs imports @clerk/shared runtime files as external modules.
+# These are not included in .output by the bundler. Copy the full package
+# from the build stage. Remove any partial files Nitro left first to avoid
+# COPY conflicts between files and directories.
+RUN rm -rf ./.output/server/node_modules/@clerk
+COPY --from=builder /app/node_modules/@clerk ./.output/server/node_modules/@clerk
 
 USER node
 
