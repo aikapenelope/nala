@@ -107,6 +107,10 @@ ENV PORT=3000
 
 COPY --from=builder --chown=node:node /app/apps/web/.output ./.output
 
+# @clerk/shared has runtime files that Nitro's bundler references but doesn't
+# include in .output. Copy the full package so node can resolve them.
+COPY --from=builder --chown=node:node /app/node_modules/@clerk/shared ./.output/server/node_modules/@clerk/shared
+
 USER node
 
 EXPOSE 3000
