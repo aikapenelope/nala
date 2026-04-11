@@ -77,29 +77,13 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3001
 
-# Copy built API + dependencies
-COPY --from=builder --chown=node:node /app/apps/api/dist ./apps/api/dist
-COPY --from=builder --chown=node:node /app/apps/api/package.json ./apps/api/
-COPY --from=builder --chown=node:node /app/packages/shared/dist ./packages/shared/dist
-COPY --from=builder --chown=node:node /app/packages/shared/package.json ./packages/shared/
-COPY --from=builder --chown=node:node /app/packages/db/dist ./packages/db/dist
-COPY --from=builder --chown=node:node /app/packages/db/package.json ./packages/db/
+# Copy full source + node_modules (tsx runs TypeScript directly, no tsc build needed)
+COPY --from=builder --chown=node:node /app/apps/api ./apps/api
+COPY --from=builder --chown=node:node /app/packages/shared ./packages/shared
+COPY --from=builder --chown=node:node /app/packages/db ./packages/db
 COPY --from=builder --chown=node:node /app/package.json ./
-
-# Copy node_modules (production deps)
-COPY --from=deps --chown=node:node /app/node_modules ./node_modules
-
-# Drizzle: schema + config + drizzle-kit for automatic schema sync on deploy
-COPY --from=builder --chown=node:node /app/packages/db/src/schema.ts ./packages/db/src/schema.ts
-COPY --from=builder --chown=node:node /app/packages/db/drizzle.config.ts ./packages/db/drizzle.config.ts
-COPY --from=builder --chown=node:node /app/node_modules/drizzle-kit ./node_modules/drizzle-kit
-COPY --from=builder --chown=node:node /app/node_modules/drizzle-orm ./node_modules/drizzle-orm
-COPY --from=builder --chown=node:node /app/node_modules/postgres ./node_modules/postgres
-COPY --from=builder --chown=node:node /app/node_modules/esbuild ./node_modules/esbuild
-COPY --from=builder --chown=node:node /app/node_modules/@esbuild ./node_modules/@esbuild
-
-# RLS policies SQL
-COPY --from=builder --chown=node:node /app/packages/db/init.sql ./packages/db/init.sql
+COPY --from=builder --chown=node:node /app/tsconfig.base.json ./
+COPY --from=builder --chown=node:node /app/node_modules ./node_modules
 
 # Entrypoint: sync schema + apply RLS + start server
 COPY --chown=node:node entrypoint-api.sh ./entrypoint-api.sh

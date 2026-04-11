@@ -32,5 +32,6 @@ if [ -n "$DATABASE_URL" ] && [ -f "packages/db/init.sql" ]; then
 fi
 
 # Step 3: Start the API server
+# Uses tsx to run TypeScript directly (avoids ESM module resolution issues with tsc output)
 echo "[entrypoint] Starting Nova API on port ${PORT:-3001}..."
-exec node apps/api/dist/index.js
+exec node ./node_modules/tsx/dist/cli.mjs apps/api/src/index.ts
