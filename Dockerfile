@@ -108,6 +108,11 @@ ENV PORT=3000
 
 COPY --from=builder --chown=node:node /app/apps/web/.output ./.output
 
+# Clerk's Nitro integration references netlifyCacheHandler.mjs which only
+# exists for the Netlify preset. Create an empty stub so Node can resolve it.
+RUN mkdir -p ./.output/server/node_modules/@clerk/shared/dist/runtime && \
+    echo 'export default {}' > ./.output/server/node_modules/@clerk/shared/dist/runtime/netlifyCacheHandler.mjs
+
 USER node
 
 EXPOSE 3000
