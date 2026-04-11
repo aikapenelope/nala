@@ -108,12 +108,6 @@ ENV PORT=3000
 
 COPY --from=builder --chown=node:node /app/apps/web/.output ./.output
 
-# @clerk/shared is externalized in nitro config (not bundled by Rollup).
-# Node resolves it from node_modules at runtime.
-# Remove any partial @clerk files Nitro left, then copy the full packages.
-RUN rm -rf ./.output/server/node_modules/@clerk
-COPY --from=builder --chown=node:node /app/node_modules/@clerk ./.output/server/node_modules/@clerk
-
 USER node
 
 EXPOSE 3000

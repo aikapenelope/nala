@@ -56,12 +56,13 @@ export default defineNuxtConfig({
   },
 
   nitro: {
-    // Mark @clerk/shared as external so Nitro doesn't try to bundle it.
-    // Clerk's package has conditional runtime imports (netlifyCacheHandler)
-    // that Rollup can't resolve statically. By externalizing it, Node
-    // resolves the module from node_modules at runtime instead.
-    externals: {
-      external: ["@clerk/shared"],
+    // Clerk's @clerk/shared package references a netlifyCacheHandler module
+    // that doesn't exist when using the node-server preset. Instead of
+    // externalizing the whole package (which causes version mismatches),
+    // we alias the problematic import to an empty module.
+    alias: {
+      "@clerk/shared/dist/runtime/netlifyCacheHandler.mjs": "unenv/runtime/mock/empty",
+      "@clerk/shared/dist/runtime/netlifyCacheHandler": "unenv/runtime/mock/empty",
     },
   },
 
