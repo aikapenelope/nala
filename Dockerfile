@@ -94,6 +94,9 @@ USER node
 
 EXPOSE 3001
 
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+  CMD curl -f http://127.0.0.1:3001/health || exit 1
+
 CMD ["./entrypoint-api.sh"]
 
 # ============================================
@@ -116,5 +119,8 @@ RUN mkdir -p ./.output/server/node_modules/@clerk/shared/dist/runtime && \
 USER node
 
 EXPOSE 3000
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+  CMD node -e "fetch('http://127.0.0.1:3000/').then(r=>{if(!r.ok)throw r.status}).catch(()=>process.exit(1))"
 
 CMD ["node", ".output/server/index.mjs"]
