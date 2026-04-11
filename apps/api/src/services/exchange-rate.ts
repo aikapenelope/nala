@@ -1,18 +1,15 @@
 /**
  * BCV exchange rate service.
  *
- * Reads the current exchange rate from Redis cache or the database.
- * The rate is populated externally (cron job, admin UI, or manual update).
+ * Rates are set manually by the business owner from the dashboard.
+ * Supports USD and EUR (the two currencies used in Venezuelan commerce).
  *
- * This service does NOT fetch rates from external APIs. BCV has no official
- * API, and community scrapers are unreliable (Cloudflare blocks, rate limits).
- * Instead, the rate is set via:
- * 1. POST /api/exchange-rate (admin endpoint, future sprint)
- * 2. Redis cache key "nova:exchange_rate:current"
- * 3. exchange_rates DB table
+ * Storage: exchange_rates table (history) + Redis cache (fast reads).
+ * The `rate_bcv` column stores USD rate, `rate_parallel` stores EUR rate.
  *
- * If no rate is available, the service throws an error. This prevents
- * sales from being recorded with incorrect Bs amounts.
+ * No external API calls. The owner enters the rate they see on bcv.org.ve
+ * or whatever source they trust. This is the pattern used by Aurora and
+ * most Venezuelan commerce apps in 2026.
  */
 
 import { desc } from "drizzle-orm";
@@ -24,25 +21,24 @@ const REDIS_KEY = "nova:exchange_rate:current";
 
 /** Exchange rate info returned to callers. */
 export interface ExchangeRateInfo {
+  /** Bs per 1 USD (BCV official rate). */
   rateBcv: number;
-  rateParallel: number | null;
+  /** Bs per 1 EUR (BCV official rate). Null if not set. */
+  rateEur: number | null;
   date: string;
   updatedAt: string;
+  source: "manual";
 }
 
 /**
  * Get the current exchange rate.
  *
  * Lookup order:
- * 1. Redis cache (fastest, set by cron or admin)
+ * 1. Redis cache (fastest)
  * 2. Database exchange_rates table (latest entry)
  * 3. Error - no rate available
- *
- * Throws if no rate is found anywhere. Callers should handle this
- * and return an appropriate error to the client.
  */
 export async function getCurrentRate(): Promise<ExchangeRateInfo> {
-  // 1. Try Redis cache
   const redis = getRedis();
   if (redis) {
     try {
@@ -55,7 +51,6 @@ export async function getCurrentRate(): Promise<ExchangeRateInfo> {
     }
   }
 
-  // 2. Try database (latest exchange rate entry)
   const db = tryGetDb();
   if (db) {
     try {
@@ -68,69 +63,66 @@ export async function getCurrentRate(): Promise<ExchangeRateInfo> {
       if (latest) {
         const info: ExchangeRateInfo = {
           rateBcv: Number(latest.rateBcv),
-          rateParallel: latest.rateParallel
-            ? Number(latest.rateParallel)
-            : null,
+          rateEur: latest.rateParallel ? Number(latest.rateParallel) : null,
           date: latest.date.toISOString().split("T")[0],
           updatedAt: latest.createdAt.toISOString(),
+          source: "manual",
         };
 
-        // Populate Redis cache for next request (5 min TTL as bridge)
         if (redis) {
           try {
             await redis.set(REDIS_KEY, JSON.stringify(info), "EX", 300);
           } catch {
-            // Non-critical cache write failure
+            // Non-critical
           }
         }
 
         return info;
       }
     } catch {
-      // DB error - fall through to error
+      // DB error
     }
   }
 
-  // 3. No rate available anywhere
   throw new Error(
-    "Exchange rate not available. Set the rate via the admin endpoint " +
-      "or insert a row into the exchange_rates table.",
+    "Tasa de cambio no configurada. Ve a Configuracion para establecer la tasa del dia.",
   );
 }
 
 /**
- * Set the current exchange rate in Redis cache and DB.
+ * Set the current exchange rate (manual, by the business owner).
  *
- * Used by admin endpoints and cron jobs to update the rate.
- * Stores in both Redis (for fast reads) and DB (for persistence/history).
+ * Inserts a new row in exchange_rates (keeps history) and updates Redis cache.
  */
 export async function setCurrentRate(
   rateBcv: number,
-  rateParallel?: number,
+  rateEur?: number,
 ): Promise<ExchangeRateInfo> {
   if (rateBcv <= 0) {
-    throw new Error("Exchange rate must be positive");
+    throw new Error("La tasa del dolar debe ser mayor a 0");
+  }
+  if (rateEur !== undefined && rateEur <= 0) {
+    throw new Error("La tasa del euro debe ser mayor a 0");
   }
 
   const now = new Date();
   const info: ExchangeRateInfo = {
     rateBcv,
-    rateParallel: rateParallel ?? null,
+    rateEur: rateEur ?? null,
     date: now.toISOString().split("T")[0],
     updatedAt: now.toISOString(),
+    source: "manual",
   };
 
-  // Store in DB for persistence
   const db = tryGetDb();
   if (db) {
     await db.insert(exchangeRates).values({
       date: now,
       rateBcv: String(rateBcv),
-      rateParallel: rateParallel ? String(rateParallel) : null,
+      rateParallel: rateEur ? String(rateEur) : null,
     });
   }
 
-  // Store in Redis for fast reads (24h TTL)
   const redis = getRedis();
   if (redis) {
     await redis.set(REDIS_KEY, JSON.stringify(info), "EX", 86400);

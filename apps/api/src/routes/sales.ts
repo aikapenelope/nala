@@ -37,7 +37,7 @@ import {
   accountingAccounts,
   customers,
 } from "@nova/db";
-import { getCurrentRate } from "../services/exchange-rate";
+import { getCurrentRate, setCurrentRate } from "../services/exchange-rate";
 import type { AppEnv } from "../types";
 
 const salesRoutes = new Hono<AppEnv>();
@@ -57,6 +57,44 @@ salesRoutes.get("/exchange-rate", async (c) => {
     return c.json({ error: message }, 503);
   }
 });
+
+/**
+ * POST /exchange-rate - Set exchange rate (owner only).
+ *
+ * The owner enters the BCV rate they see on bcv.org.ve.
+ * Supports USD and EUR. Stores in DB (history) and Redis (cache).
+ */
+const setRateSchema = z.object({
+  rateBcv: z.number().positive("La tasa del dolar debe ser mayor a 0"),
+  rateEur: z
+    .number()
+    .positive("La tasa del euro debe ser mayor a 0")
+    .optional(),
+});
+
+salesRoutes.post(
+  "/exchange-rate",
+  zValidator("json", setRateSchema),
+  async (c) => {
+    const user = c.get("user");
+
+    // Only owners can set the exchange rate
+    if (user.role !== "owner") {
+      return c.json({ error: "Solo el dueno puede cambiar la tasa" }, 403);
+    }
+
+    const { rateBcv, rateEur } = c.req.valid("json");
+
+    try {
+      const rate = await setCurrentRate(rateBcv, rateEur);
+      return c.json(rate);
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Error guardando tasa";
+      return c.json({ error: message }, 400);
+    }
+  },
+);
 
 // ============================================================
 // Sales
