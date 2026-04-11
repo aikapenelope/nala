@@ -6,18 +6,36 @@ export default defineConfig({
   target: "node22",
   outDir: "dist",
   clean: true,
-  // Bundle everything into a single file except node built-ins
-  // and packages that need to stay external (native modules)
+  // Bundle app code but keep Node built-ins and native packages external
   noExternal: [/(.*)/],
   external: [
-    // Node built-ins
+    // Node built-ins (ioredis, postgres, bcryptjs use these)
+    "events",
+    "stream",
+    "net",
+    "tls",
+    "dns",
+    "fs",
+    "path",
+    "os",
+    "crypto",
+    "buffer",
+    "util",
+    "url",
+    "http",
+    "https",
+    "zlib",
+    "string_decoder",
+    "querystring",
+    "child_process",
+    "assert",
+    "constants",
     "node:*",
-    // Native modules that can't be bundled
+    // Native packages that can't be bundled
     "postgres",
     "bcryptjs",
     "ioredis",
   ],
-  // Don't generate declaration files (not needed for runtime)
   dts: false,
   sourcemap: true,
 });
