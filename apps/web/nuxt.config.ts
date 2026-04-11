@@ -55,6 +55,16 @@ export default defineNuxtConfig({
     },
   },
 
+  nitro: {
+    // Mark @clerk/shared as external so Nitro doesn't try to bundle it.
+    // Clerk's package has conditional runtime imports (netlifyCacheHandler)
+    // that Rollup can't resolve statically. By externalizing it, Node
+    // resolves the module from node_modules at runtime instead.
+    externals: {
+      external: ["@clerk/shared"],
+    },
+  },
+
   typescript: {
     strict: true,
     typeCheck: true,

@@ -77,12 +77,13 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3001
 
-# Copy full source + node_modules (tsx runs TypeScript directly, no tsc build needed)
-COPY --from=builder --chown=node:node /app/apps/api ./apps/api
-COPY --from=builder --chown=node:node /app/packages/shared ./packages/shared
-COPY --from=builder --chown=node:node /app/packages/db ./packages/db
+# Copy bundled API (single file from tsup) + external dependencies
+COPY --from=builder --chown=node:node /app/apps/api/dist ./apps/api/dist
+COPY --from=builder --chown=node:node /app/apps/api/package.json ./apps/api/
+COPY --from=builder --chown=node:node /app/packages/db/src/schema.ts ./packages/db/src/schema.ts
+COPY --from=builder --chown=node:node /app/packages/db/drizzle.config.ts ./packages/db/drizzle.config.ts
+COPY --from=builder --chown=node:node /app/packages/db/init.sql ./packages/db/init.sql
 COPY --from=builder --chown=node:node /app/package.json ./
-COPY --from=builder --chown=node:node /app/tsconfig.base.json ./
 COPY --from=builder --chown=node:node /app/node_modules ./node_modules
 
 # Entrypoint: sync schema + apply RLS + start server
@@ -107,9 +108,9 @@ ENV PORT=3000
 
 COPY --from=builder --chown=node:node /app/apps/web/.output ./.output
 
-# @clerk/shared has runtime files that Nitro's bundler references but doesn't
-# include in .output. Copy the full package so node can resolve them.
-COPY --from=builder --chown=node:node /app/node_modules/@clerk/shared ./.output/server/node_modules/@clerk/shared
+# @clerk/shared is externalized in nitro config (not bundled by Rollup).
+# Node resolves it from node_modules at runtime. Copy the full clerk packages.
+COPY --from=builder --chown=node:node /app/node_modules/@clerk ./.output/server/node_modules/@clerk
 
 USER node
 
