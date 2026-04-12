@@ -3,13 +3,10 @@
  * Settings hub page (owner only).
  *
  * Links to sub-sections:
- * - Business info (name, type, logo)
- * - Team management (employees, PINs)
- * - Payment methods
- * - Exchange rate
- *
- * Sprint 2: placeholder with navigation cards.
- * Full implementation in a future sprint.
+ * - Team management (employees, PINs) -- available
+ * - Business info (name, type, logo) -- coming soon
+ * - Payment methods -- coming soon
+ * - Exchange rate -- coming soon
  */
 
 import { Store, Users, CreditCard, ArrowLeftRight } from "lucide-vue-next";
@@ -23,20 +20,22 @@ interface SettingsSection {
   icon: Component;
   label: string;
   description: string;
+  to?: string;
   available: boolean;
 }
 
 const sections: SettingsSection[] = [
   {
-    icon: Store,
-    label: "Negocio",
-    description: "Nombre, tipo de negocio, informacion general",
-    available: false,
-  },
-  {
     icon: Users,
     label: "Equipo",
     description: "Empleados, PINs, permisos",
+    to: "/settings/team",
+    available: true,
+  },
+  {
+    icon: Store,
+    label: "Negocio",
+    description: "Nombre, tipo de negocio, informacion general",
     available: false,
   },
   {
@@ -62,9 +61,11 @@ const sections: SettingsSection[] = [
     </p>
 
     <div class="space-y-3">
-      <div
+      <component
+        :is="section.to ? 'NuxtLink' : 'div'"
         v-for="section in sections"
         :key="section.label"
+        :to="section.to"
         class="flex items-center gap-4 rounded-xl bg-white p-4 shadow-sm"
         :class="
           section.available ? 'cursor-pointer hover:bg-gray-50' : 'opacity-60'
@@ -85,7 +86,7 @@ const sections: SettingsSection[] = [
         >
           Proximamente
         </span>
-      </div>
+      </component>
     </div>
   </div>
 </template>
