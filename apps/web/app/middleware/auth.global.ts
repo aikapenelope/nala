@@ -1,17 +1,17 @@
 /**
  * Global authentication middleware.
  *
- * Implements the Square-inspired auth flow from AUTH-FLOW-ANALYSIS.md:
+ * Implements the auth flow from AUTH-REFACTOR-PLAN.md:
  *
- * 1. NovaUser in state?           -> allow (already authenticated)
+ * 1. NovaUser in state?           -> allow (already identified)
  * 2. Route is public?             -> allow
- * 3. Clerk signed in, no NovaUser -> redirect to /auth/resolve (calls /api/me)
- * 4. Device has businessId?       -> redirect to /auth/pin (shared device)
+ * 3. Clerk signed in, no NovaUser -> redirect to /auth/resolve
+ * 4. Device has cached roster?    -> redirect to /auth/pin (shared device)
  * 5. Nothing                      -> redirect to /landing (new device)
  *
- * The key insight from Square: a configured device (one where the owner
- * logged in at least once) should always show the PIN screen, never the
- * landing page. The device stays bound to the business via localStorage.
+ * The key change from the old middleware: step 4 checks for a cached
+ * team roster (not just a businessId). If the roster exists, the device
+ * was configured by the owner and employees can use PIN to identify.
  */
 
 /** Routes accessible without authentication. */
@@ -25,9 +25,9 @@ const PUBLIC_ROUTES = [
 ];
 
 export default defineNuxtRouteMiddleware((to) => {
-  const { isAuthenticated, getDeviceBusinessId } = useNovaAuth();
+  const { isAuthenticated } = useNovaAuth();
 
-  // 1. Already authenticated -- allow
+  // 1. Already identified -- allow
   if (isAuthenticated.value) {
     return;
   }
@@ -52,11 +52,10 @@ export default defineNuxtRouteMiddleware((to) => {
     }
   }
 
-  // 4. Device has businessId (owner logged in before) -- show PIN screen
-  //    This is the Square pattern: the tablet always shows PIN, not landing.
+  // 4. Device has cached roster (owner configured it before) -> PIN screen
   if (import.meta.client) {
-    const deviceBusinessId = getDeviceBusinessId();
-    if (deviceBusinessId) {
+    const { hasRoster } = useTeamRoster();
+    if (hasRoster()) {
       return navigateTo("/auth/pin");
     }
   }

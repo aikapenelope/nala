@@ -3,13 +3,18 @@
  *
  * Provides a typed `$api` function that wraps `$fetch` with:
  * - Automatic base URL from runtime config (NUXT_PUBLIC_API_BASE)
- * - Clerk JWT token in Authorization header (when authenticated)
- * - Business ID header for PIN-authenticated sessions
+ * - Clerk JWT token in Authorization header (device authentication)
+ * - X-Acting-As header when an employee is identified via PIN
  * - Consistent error handling
  *
  * IMPORTANT: useAuth() is called once during composable setup (not inside
  * the $api function) because Vue composables that use inject() must be
  * called during the setup phase, not in event handlers.
+ *
+ * Auth model (AUTH-REFACTOR-PLAN.md):
+ * - Clerk JWT authenticates the device (owner signed in once)
+ * - X-Acting-As identifies which employee is using the device
+ * - The backend resolves the acting user and sets permissions accordingly
  *
  * Usage:
  *   const { $api } = useApi();
@@ -30,8 +35,6 @@ export function useApi() {
   if (import.meta.client) {
     try {
       const { getToken } = useAuth();
-      // getToken is a ComputedRef<GetToken>. We read .value at call time
-      // inside $api, but we capture the ref here during setup.
       clerkGetToken = async () => {
         const tokenFn = getToken.value;
         if (!tokenFn) return null;
@@ -45,8 +48,8 @@ export function useApi() {
   /**
    * Make an authenticated API request.
    *
-   * Automatically attaches the Clerk JWT token if available.
-   * For PIN-authenticated sessions, attaches the businessId header.
+   * Always attaches the Clerk JWT (device auth).
+   * If an employee is acting (PIN-identified), attaches X-Acting-As.
    */
   async function $api<T = unknown>(
     path: string,
@@ -56,7 +59,7 @@ export function useApi() {
       ...(opts?.headers as Record<string, string> | undefined),
     };
 
-    // Attach Clerk JWT if available
+    // Attach Clerk JWT (device authentication)
     if (clerkGetToken) {
       try {
         const token = await clerkGetToken();
@@ -68,10 +71,14 @@ export function useApi() {
       }
     }
 
-    // Attach businessId from Nova auth state for PIN sessions
-    const novaUser = useState<{ businessId?: string } | null>("nova-user");
-    if (novaUser.value?.businessId) {
-      headers["X-Business-Id"] = novaUser.value.businessId;
+    // Attach X-Acting-As if an employee is identified via PIN.
+    // The nova-user state contains the currently acting user (owner or employee).
+    // If it's an employee (set via PIN screen), the backend needs to know.
+    const novaUser = useState<{ id?: string; role?: string } | null>(
+      "nova-user",
+    );
+    if (novaUser.value?.id) {
+      headers["X-Acting-As"] = novaUser.value.id;
     }
 
     return $fetch<T>(path, {

@@ -15,6 +15,7 @@
     "@clerk/nuxt": "^2.1.2",
     "@nova/shared": "*",
     "@vite-pwa/nuxt": "^1.0.0",
+    "bcryptjs": "^3.0.3",
     "dexie": "^4.0.11",
     "lucide-vue-next": "^1.0.0",
     "nuxt": "^4.4.2",
@@ -25,6 +26,7 @@
   "devDependencies": {
     "@nuxt/eslint": "^1.4.1",
     "@tailwindcss/vite": "^4.1.7",
+    "@types/bcryptjs": "^2.4.6",
     "eslint": "^9.27.0",
     "tailwindcss": "^4.1.7",
     "typescript": "^5.8.3",
