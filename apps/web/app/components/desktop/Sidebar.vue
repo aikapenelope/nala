@@ -3,34 +3,43 @@
  * Desktop sidebar navigation.
  * Shows all sections for admin, restricted set for employees.
  * Visible only on desktop (>1025px).
+ *
+ * Uses Lucide Vue icons instead of text placeholders.
  */
+
+import {
+  Home,
+  ShoppingCart,
+  Package,
+  Users,
+  Wallet,
+  BarChart3,
+  FileText,
+  Settings,
+} from "lucide-vue-next";
+import type { Component } from "vue";
 
 interface NavItem {
   to: string;
-  icon: string;
+  icon: Component;
   label: string;
   adminOnly: boolean;
 }
 
 const navItems: NavItem[] = [
-  { to: "/", icon: "home", label: "Inicio", adminOnly: false },
-  { to: "/sales", icon: "shopping-cart", label: "Vender", adminOnly: false },
-  {
-    to: "/inventory",
-    icon: "package",
-    label: "Inventario",
-    adminOnly: false,
-  },
-  { to: "/clients", icon: "users", label: "Clientes", adminOnly: false },
-  { to: "/accounts", icon: "wallet", label: "Cuentas", adminOnly: true },
-  { to: "/reports", icon: "bar-chart", label: "Reportes", adminOnly: true },
+  { to: "/", icon: Home, label: "Inicio", adminOnly: false },
+  { to: "/sales", icon: ShoppingCart, label: "Vender", adminOnly: false },
+  { to: "/inventory", icon: Package, label: "Inventario", adminOnly: false },
+  { to: "/clients", icon: Users, label: "Clientes", adminOnly: false },
+  { to: "/accounts", icon: Wallet, label: "Cuentas", adminOnly: true },
+  { to: "/reports", icon: BarChart3, label: "Reportes", adminOnly: true },
   {
     to: "/accounting",
-    icon: "file-text",
+    icon: FileText,
     label: "Contabilidad",
     adminOnly: true,
   },
-  { to: "/settings", icon: "settings", label: "Config.", adminOnly: true },
+  { to: "/settings", icon: Settings, label: "Config.", adminOnly: true },
 ];
 
 const { isAdmin, user } = useNovaAuth();
@@ -56,7 +65,7 @@ const visibleItems = computed(() =>
         class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 hover:text-nova-primary"
         active-class="bg-blue-50 text-nova-primary"
       >
-        <span class="text-base">{{ item.icon }}</span>
+        <component :is="item.icon" :size="18" class="flex-shrink-0" />
         <span>{{ item.label }}</span>
       </NuxtLink>
     </nav>

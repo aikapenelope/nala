@@ -11,6 +11,10 @@
  */
 
 const { isDesktop } = useDevice();
+const { user } = useNovaAuth();
+
+/** Show business name from auth state, fallback to "Nova". */
+const businessName = computed(() => user.value?.businessName || "Nova");
 </script>
 
 <template>
@@ -18,7 +22,7 @@ const { isDesktop } = useDevice();
   <div v-if="isDesktop" class="flex h-screen">
     <DesktopSidebar />
     <div class="flex flex-1 flex-col overflow-hidden">
-      <SharedAppHeader business-name="Nova" />
+      <SharedAppHeader :business-name="businessName" />
       <main class="flex-1 overflow-y-auto bg-gray-50 p-6">
         <slot />
       </main>
@@ -27,7 +31,7 @@ const { isDesktop } = useDevice();
 
   <!-- Mobile layout: header + content + bottom tabs -->
   <div v-else class="flex min-h-screen flex-col">
-    <SharedAppHeader business-name="Nova" />
+    <SharedAppHeader :business-name="businessName" />
     <main class="flex-1 bg-gray-50 p-4 pb-20">
       <slot />
     </main>

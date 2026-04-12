@@ -19,6 +19,7 @@ export interface NovaUser {
   name: string;
   role: UserRole;
   businessId: string;
+  businessName: string;
   clerkId?: string;
 }
 
@@ -175,6 +176,7 @@ export function useNovaAuth() {
           name: string;
           role: string;
           businessId: string;
+          businessName: string;
           clerkId?: string;
         };
       }>("/api/me");
@@ -185,6 +187,7 @@ export function useNovaAuth() {
           name: result.user.name,
           role: result.user.role as "owner" | "employee",
           businessId: result.user.businessId,
+          businessName: result.user.businessName,
           clerkId: result.user.clerkId,
         });
         return { status: "ok" };

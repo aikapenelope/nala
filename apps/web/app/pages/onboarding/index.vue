@@ -86,12 +86,8 @@ async function createBusiness() {
       name: result.user.name,
       role: result.user.role as "owner" | "employee",
       businessId: result.user.businessId,
+      businessName: result.business.name,
     });
-
-    // Store businessId for PIN screen
-    if (import.meta.client) {
-      localStorage.setItem("nova:businessId", result.business.id);
-    }
 
     step.value = 3;
   } catch (err) {
