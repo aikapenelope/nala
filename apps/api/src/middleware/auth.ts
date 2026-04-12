@@ -19,6 +19,7 @@ import { getDb } from "../db";
 export interface AuthUser {
   id: string;
   businessId: string;
+  businessName: string;
   name: string;
   role: "owner" | "employee";
   clerkId?: string;
@@ -59,6 +60,7 @@ export async function authMiddleware(c: Context, next: Next) {
     c.set("user", {
       id: "dev-user-001",
       businessId: "dev-business-001",
+      businessName: "Dev Business",
       name: "Dev User",
       role: "owner",
       clerkId: "dev-clerk-001",
@@ -128,6 +130,7 @@ export async function authMiddleware(c: Context, next: Next) {
   const user: AuthUser = {
     id: dbUser.id,
     businessId: dbUser.businessId,
+    businessName: business.name,
     name: dbUser.name,
     role: dbUser.role as "owner" | "employee",
     clerkId: clerkUserId,

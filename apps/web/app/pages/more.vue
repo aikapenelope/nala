@@ -1,0 +1,157 @@
+<script setup lang="ts">
+/**
+ * "More" page for mobile navigation.
+ *
+ * Provides access to sections not in the bottom tabs:
+ * - Sales history
+ * - Accounts (owner only)
+ * - Day close (owner only)
+ * - Reports (owner only)
+ * - Accounting (owner only)
+ * - Settings (owner only)
+ *
+ * Also shows the current user info and a switch-user option.
+ */
+
+import {
+  History,
+  Wallet,
+  CalendarCheck,
+  BarChart3,
+  FileText,
+  Settings,
+  ArrowRightLeft,
+  LogOut,
+} from "lucide-vue-next";
+import type { Component } from "vue";
+
+const { isAdmin, user, clearUser } = useNovaAuth();
+
+interface MenuItem {
+  to: string;
+  icon: Component;
+  label: string;
+  description: string;
+  adminOnly: boolean;
+}
+
+const menuItems: MenuItem[] = [
+  {
+    to: "/sales/history",
+    icon: History,
+    label: "Historial de ventas",
+    description: "Ver todas las ventas realizadas",
+    adminOnly: false,
+  },
+  {
+    to: "/accounts",
+    icon: Wallet,
+    label: "Cuentas",
+    description: "Por cobrar y por pagar",
+    adminOnly: true,
+  },
+  {
+    to: "/accounts/day-close",
+    icon: CalendarCheck,
+    label: "Cierre de caja",
+    description: "Cuadre del dia",
+    adminOnly: true,
+  },
+  {
+    to: "/reports",
+    icon: BarChart3,
+    label: "Reportes",
+    description: "Ventas, inventario, rentabilidad",
+    adminOnly: true,
+  },
+  {
+    to: "/accounting",
+    icon: FileText,
+    label: "Contabilidad",
+    description: "Asientos y exportacion contable",
+    adminOnly: true,
+  },
+  {
+    to: "/settings",
+    icon: Settings,
+    label: "Configuracion",
+    description: "Negocio, empleados, preferencias",
+    adminOnly: true,
+  },
+];
+
+const visibleItems = computed(() =>
+  menuItems.filter((item) => !item.adminOnly || isAdmin.value),
+);
+
+/** Switch user: clear current session and go to PIN screen. */
+function switchUser() {
+  clearUser();
+  navigateTo("/auth/pin");
+}
+</script>
+
+<template>
+  <div>
+    <h1 class="mb-4 text-xl font-bold text-gray-900">Mas</h1>
+
+    <!-- Current user card -->
+    <div class="mb-6 rounded-xl bg-white p-4 shadow-sm">
+      <div class="flex items-center gap-3">
+        <span
+          class="flex h-10 w-10 items-center justify-center rounded-full text-sm font-bold text-white"
+          :class="isAdmin ? 'bg-nova-primary' : 'bg-gray-400'"
+        >
+          {{ user?.name?.charAt(0) ?? "?" }}
+        </span>
+        <div class="flex-1">
+          <p class="font-medium text-gray-900">
+            {{ user?.name ?? "Sin usuario" }}
+          </p>
+          <p class="text-xs text-gray-500">
+            {{ isAdmin ? "Dueno" : "Empleado" }}
+          </p>
+        </div>
+      </div>
+
+      <!-- User actions -->
+      <div class="mt-3 flex gap-2">
+        <button
+          class="flex flex-1 items-center justify-center gap-2 rounded-lg border border-gray-200 py-2 text-xs font-medium text-gray-600"
+          @click="switchUser"
+        >
+          <ArrowRightLeft :size="14" />
+          Cambiar usuario
+        </button>
+        <Show when="signed-in">
+          <button
+            class="flex flex-1 items-center justify-center gap-2 rounded-lg border border-gray-200 py-2 text-xs font-medium text-gray-600"
+          >
+            <LogOut :size="14" />
+            <SignOutButton />
+          </button>
+        </Show>
+      </div>
+    </div>
+
+    <!-- Menu items -->
+    <div class="space-y-2">
+      <NuxtLink
+        v-for="item in visibleItems"
+        :key="item.to"
+        :to="item.to"
+        class="flex items-center gap-4 rounded-xl bg-white p-4 shadow-sm transition-colors active:bg-gray-50"
+      >
+        <div
+          class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-gray-100"
+        >
+          <component :is="item.icon" :size="20" class="text-gray-600" />
+        </div>
+        <div>
+          <p class="text-sm font-medium text-gray-900">{{ item.label }}</p>
+          <p class="text-xs text-gray-500">{{ item.description }}</p>
+        </div>
+      </NuxtLink>
+    </div>
+  </div>
+</template>
