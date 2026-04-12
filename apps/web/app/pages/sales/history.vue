@@ -78,24 +78,44 @@ function formatDate(iso: string): string {
   });
 }
 
-/** Void sale flow. */
+/** Void sale flow: reason input -> PIN verification -> API call. */
+const showReasonModal = ref(false);
 const showVoidModal = ref(false);
 const voidingSaleId = ref<string | null>(null);
+const voidReason = ref("");
 const voidError = ref("");
 
+/** Common void reasons for quick selection. */
+const commonReasons = [
+  "Error en el monto",
+  "Cliente cancelo la compra",
+  "Producto equivocado",
+  "Duplicado",
+];
+
+/** Step 1: Show reason input. */
 function requestVoid(saleId: string) {
   voidingSaleId.value = saleId;
-  showVoidModal.value = true;
+  voidReason.value = "";
   voidError.value = "";
+  showReasonModal.value = true;
 }
 
+/** Step 2: Reason entered, now ask for PIN. */
+function confirmReason() {
+  if (!voidReason.value.trim()) return;
+  showReasonModal.value = false;
+  showVoidModal.value = true;
+}
+
+/** Step 3: PIN verified, send void request. */
 async function handleVoidConfirmed() {
   if (!voidingSaleId.value) return;
 
   try {
     await $api(`/api/sales/${voidingSaleId.value}/void`, {
       method: "POST",
-      body: { reason: "Anulada por el dueno" },
+      body: { reason: voidReason.value.trim() },
     });
 
     // Update local state
@@ -108,6 +128,7 @@ async function handleVoidConfirmed() {
 
   showVoidModal.value = false;
   voidingSaleId.value = null;
+  voidReason.value = "";
 }
 </script>
 
@@ -284,7 +305,66 @@ async function handleVoidConfirmed() {
       </p>
     </template>
 
-    <!-- Owner PIN modal for voiding -->
+    <!-- Step 1: Void reason modal -->
+    <Teleport to="body">
+      <div
+        v-if="showReasonModal"
+        class="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+        @click.self="showReasonModal = false"
+      >
+        <div class="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
+          <h3 class="mb-1 text-lg font-semibold text-gray-900">
+            Motivo de anulacion
+          </h3>
+          <p class="mb-4 text-sm text-gray-500">
+            Indica por que se anula esta venta
+          </p>
+
+          <!-- Quick reason buttons -->
+          <div class="mb-3 flex flex-wrap gap-2">
+            <button
+              v-for="reason in commonReasons"
+              :key="reason"
+              class="rounded-full border px-3 py-1 text-xs transition-colors"
+              :class="
+                voidReason === reason
+                  ? 'border-nova-primary bg-blue-50 text-nova-primary'
+                  : 'border-gray-200 text-gray-600 hover:border-gray-300'
+              "
+              @click="voidReason = reason"
+            >
+              {{ reason }}
+            </button>
+          </div>
+
+          <!-- Custom reason input -->
+          <textarea
+            v-model="voidReason"
+            rows="2"
+            placeholder="O escribe el motivo..."
+            class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-nova-primary focus:outline-none"
+          />
+
+          <div class="mt-4 flex gap-3">
+            <button
+              class="flex-1 rounded-lg border border-gray-300 py-2 text-sm font-medium text-gray-700"
+              @click="showReasonModal = false"
+            >
+              Cancelar
+            </button>
+            <button
+              class="flex-1 rounded-lg bg-red-600 py-2 text-sm font-medium text-white disabled:opacity-50"
+              :disabled="!voidReason.trim()"
+              @click="confirmReason"
+            >
+              Continuar
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- Step 2: Owner PIN modal for voiding -->
     <SharedOwnerPinModal
       v-model="showVoidModal"
       action-label="Anular esta venta requiere PIN del dueno"

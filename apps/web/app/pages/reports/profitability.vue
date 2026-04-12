@@ -7,6 +7,7 @@ definePageMeta({ middleware: ["admin-only"] });
 const { $api } = useApi();
 const isLoading = ref(true);
 const narrative = ref("");
+const period = ref("month");
 const productData = ref<
   Array<{
     name: string;
@@ -17,12 +18,13 @@ const productData = ref<
   }>
 >([]);
 
-onMounted(async () => {
+async function fetchReport() {
+  isLoading.value = true;
   try {
     const result = await $api<{
       data: { products: typeof productData.value };
       narrative: string;
-    }>("/api/reports/profitability");
+    }>(`/api/reports/profitability?period=${period.value}`);
     productData.value = result.data.products;
     narrative.value = result.narrative;
   } catch {
@@ -30,10 +32,17 @@ onMounted(async () => {
   } finally {
     isLoading.value = false;
   }
-});
+}
+
+onMounted(fetchReport);
+watch(period, fetchReport);
 </script>
 <template>
-  <SharedReportLayout title="Rentabilidad por producto" :narrative="narrative">
+  <SharedReportLayout
+    v-model="period"
+    title="Rentabilidad por producto"
+    :narrative="narrative"
+  >
     <div v-if="isLoading" class="py-12 text-center text-gray-400">
       Cargando...
     </div>
