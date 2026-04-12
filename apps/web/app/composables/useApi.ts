@@ -7,6 +7,10 @@
  * - Business ID header for PIN-authenticated sessions
  * - Consistent error handling
  *
+ * IMPORTANT: useAuth() is called once during composable setup (not inside
+ * the $api function) because Vue composables that use inject() must be
+ * called during the setup phase, not in event handlers.
+ *
  * Usage:
  *   const { $api } = useApi();
  *   const data = await $api('/api/products');
@@ -18,6 +22,25 @@ import type { NitroFetchOptions } from "nitropack";
 export function useApi() {
   const config = useRuntimeConfig();
   const apiBase = config.public.apiBase as string;
+
+  // Capture Clerk's getToken during setup (not inside $api).
+  // useAuth() uses inject() internally, which only works during setup.
+  let clerkGetToken: (() => Promise<string | null>) | null = null;
+
+  if (import.meta.client) {
+    try {
+      const { getToken } = useAuth();
+      // getToken is a ComputedRef<GetToken>. We read .value at call time
+      // inside $api, but we capture the ref here during setup.
+      clerkGetToken = async () => {
+        const tokenFn = getToken.value;
+        if (!tokenFn) return null;
+        return await tokenFn();
+      };
+    } catch {
+      // Clerk not initialized -- clerkGetToken stays null
+    }
+  }
 
   /**
    * Make an authenticated API request.
@@ -34,19 +57,14 @@ export function useApi() {
     };
 
     // Attach Clerk JWT if available
-    if (import.meta.client) {
+    if (clerkGetToken) {
       try {
-        // @clerk/nuxt provides useAuth() where getToken is a ComputedRef<GetToken>
-        const { getToken } = useAuth();
-        const tokenFn = getToken.value;
-        if (tokenFn) {
-          const token = await tokenFn();
-          if (token) {
-            headers["Authorization"] = `Bearer ${token}`;
-          }
+        const token = await clerkGetToken();
+        if (token) {
+          headers["Authorization"] = `Bearer ${token}`;
         }
       } catch {
-        // Clerk not initialized or not on a page with auth -- skip
+        // Token retrieval failed -- proceed without auth header
       }
     }
 
