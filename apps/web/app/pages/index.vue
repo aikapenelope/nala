@@ -24,7 +24,7 @@
  */
 
 const { isMobile, isDesktop } = useDevice();
-const { isAdmin, isAuthenticated } = useNovaAuth();
+const { isAdmin } = useNovaAuth();
 const { $api } = useApi();
 
 /** Loading and error state. */
@@ -197,12 +197,9 @@ onMounted(() => {
     });
   }
 
-  if (isAuthenticated.value) {
-    loadDashboard();
-  } else {
-    // Redirect unauthenticated users to landing page
-    navigateTo("/landing");
-  }
+  // Global auth middleware handles unauthenticated redirect.
+  // If we reach here, the user is authenticated.
+  loadDashboard();
 });
 
 /** Day name for trend comparison. */
@@ -301,11 +298,6 @@ const visibleAlerts = computed(() => {
       >
         Reintentar
       </button>
-    </div>
-
-    <!-- Not authenticated: redirect to landing -->
-    <div v-else-if="!isAuthenticated" class="py-12 text-center text-gray-500">
-      <p>Redirigiendo...</p>
     </div>
 
     <template v-else>

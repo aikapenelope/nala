@@ -20,7 +20,7 @@ definePageMeta({ layout: false });
 
       <SignIn
         :routing="'hash'"
-        :redirect-url="'/'"
+        :redirect-url="'/auth/resolve'"
         :appearance="{
           elements: {
             rootBox: 'mx-auto',
