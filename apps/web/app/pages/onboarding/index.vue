@@ -12,6 +12,8 @@
 import { PIN_LENGTH } from "@nova/shared";
 import type { BusinessType } from "@nova/shared";
 
+definePageMeta({ layout: false });
+
 const router = useRouter();
 const { setUser } = useNovaAuth();
 const { $api } = useApi();
