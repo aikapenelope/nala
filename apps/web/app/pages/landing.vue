@@ -23,13 +23,13 @@ definePageMeta({ layout: false });
       <span class="text-xl font-bold text-nova-primary">Nova</span>
       <div class="flex items-center gap-4">
         <NuxtLink
-          to="/auth/pin"
+          to="/auth/login"
           class="text-sm text-gray-600 hover:text-gray-900"
         >
           Iniciar sesion
         </NuxtLink>
         <NuxtLink
-          to="/onboarding"
+          to="/auth/signup"
           class="rounded-lg bg-nova-primary px-4 py-2 text-sm font-medium text-white"
         >
           Crear cuenta gratis
@@ -55,7 +55,7 @@ definePageMeta({ layout: false });
         class="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center"
       >
         <NuxtLink
-          to="/onboarding"
+          to="/auth/signup"
           class="rounded-xl bg-nova-primary px-8 py-3 text-lg font-semibold text-white shadow-lg shadow-nova-primary/25 transition-transform hover:scale-105"
         >
           Empezar gratis
@@ -251,7 +251,7 @@ definePageMeta({ layout: false });
             </li>
           </ul>
           <NuxtLink
-            to="/onboarding"
+            to="/auth/signup"
             class="mt-8 block rounded-xl bg-nova-primary py-3 text-center font-semibold text-white"
           >
             Crear cuenta gratis
