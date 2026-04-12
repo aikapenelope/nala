@@ -19,7 +19,7 @@ import {
   MAX_PIN_ATTEMPTS,
   PIN_LOCKOUT_MINUTES,
 } from "@nova/shared";
-import { users } from "@nova/db";
+import { users, findBusinessById } from "@nova/db";
 import { getDb } from "../db";
 import type { AuthUser } from "../middleware/auth";
 import type { AppEnv } from "../types";
@@ -96,9 +96,13 @@ auth.post("/pin", zValidator("json", pinSchema), async (c) => {
           .where(eq(users.id, user.id));
       }
 
+      // Fetch business name for the response
+      const business = await findBusinessById(db, user.businessId);
+
       const authUser: AuthUser = {
         id: user.id,
         businessId: user.businessId,
+        businessName: business?.name ?? "",
         name: user.name,
         role: user.role as "owner" | "employee",
         clerkId: user.clerkId ?? undefined,
