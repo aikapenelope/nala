@@ -85,6 +85,12 @@ function getSegments(c: Customer): CustomerSegment[] {
   <div>
     <div class="mb-4 flex items-center justify-between">
       <h1 class="text-xl font-bold text-gray-900">Clientes</h1>
+      <NuxtLink
+        to="/clients/new"
+        class="rounded-lg bg-nova-primary px-4 py-2 text-sm font-medium text-white"
+      >
+        + Cliente
+      </NuxtLink>
     </div>
 
     <div class="mb-4 flex gap-3">

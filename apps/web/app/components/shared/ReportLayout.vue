@@ -2,6 +2,14 @@
 /**
  * Reusable report layout component.
  * Provides: period selector, export buttons, AI narrative slot, content slot.
+ *
+ * The period is exposed via v-model so parent report pages can react
+ * to period changes and refetch their data.
+ *
+ * Usage:
+ *   <SharedReportLayout v-model="period" title="..." :narrative="...">
+ *     <ReportContent />
+ *   </SharedReportLayout>
  */
 
 defineProps<{
@@ -9,7 +17,8 @@ defineProps<{
   narrative?: string;
 }>();
 
-const period = ref("today");
+const period = defineModel<string>({ default: "today" });
+
 const periods = [
   { value: "today", label: "Hoy" },
   { value: "week", label: "Esta semana" },
@@ -19,17 +28,17 @@ const periods = [
 
 function exportPdf() {
   // TODO: Generate PDF with jsPDF
-  alert("Exportación PDF próximamente");
+  alert("Exportacion PDF proximamente");
 }
 
 function exportExcel() {
   // TODO: Generate Excel with SheetJS
-  alert("Exportación Excel próximamente");
+  alert("Exportacion Excel proximamente");
 }
 
 function sendToAccountant() {
   const text = encodeURIComponent(
-    "Hola, aquí está el reporte contable de este período.",
+    "Hola, aqui esta el reporte contable de este periodo.",
   );
   window.open(`https://wa.me/?text=${text}`, "_blank");
 }
