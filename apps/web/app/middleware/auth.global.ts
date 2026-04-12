@@ -18,6 +18,7 @@
 const PUBLIC_ROUTES = [
   "/landing",
   "/auth/login",
+  "/auth/signup",
   "/auth/pin",
   "/auth/resolve",
   "/onboarding",
