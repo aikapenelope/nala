@@ -16,6 +16,7 @@ import * as XLSX from "xlsx";
 definePageMeta({ middleware: ["admin-only"] });
 
 const { isDesktop } = useDevice();
+const { $api } = useApi();
 
 /** Import steps. */
 type ImportStep = "upload" | "preview" | "importing" | "done";
@@ -112,18 +113,66 @@ const validationErrors = computed(() => {
 /** Preview rows (first 5). */
 const previewRows = computed(() => rows.value.slice(0, 5));
 
-/** Start import. */
+/** Import progress tracking. */
+const importedCount = ref(0);
+const importErrors = ref<Array<{ row: number; name: string; error: string }>>(
+  [],
+);
+
+/**
+ * Import products by sending each mapped row to POST /api/products.
+ * Uses sequential requests to avoid overwhelming the API and to
+ * provide accurate progress feedback.
+ */
 async function startImport() {
   step.value = "importing";
+  importedCount.value = 0;
+  importErrors.value = [];
 
-  // TODO: Send mapped rows to API for bulk insert
-  // await $fetch('/api/products/import', {
-  //   method: 'POST',
-  //   body: { rows: rows.value, columnMap: columnMap.value }
-  // });
+  const map = columnMap.value;
 
-  // Simulate import delay
-  await new Promise((resolve) => setTimeout(resolve, 1500));
+  for (let i = 0; i < rows.value.length; i++) {
+    const row = rows.value[i];
+    if (!row) continue;
+
+    const nameVal = map.name ? row[map.name]?.trim() : "";
+    const priceVal = map.price ? Number(row[map.price]) : 0;
+
+    // Skip rows with missing required fields
+    if (!nameVal || isNaN(priceVal) || priceVal <= 0) {
+      importErrors.value.push({
+        row: i + 2, // +2 for header row + 0-index
+        name: nameVal || "(sin nombre)",
+        error: !nameVal ? "Nombre vacio" : "Precio invalido",
+      });
+      continue;
+    }
+
+    try {
+      await $api("/api/products", {
+        method: "POST",
+        body: {
+          name: nameVal,
+          sku: map.sku ? row[map.sku]?.trim() || undefined : undefined,
+          price: priceVal,
+          cost: map.cost ? Number(row[map.cost]) || 0 : 0,
+          stock: map.stock ? Math.floor(Number(row[map.stock]) || 0) : 0,
+          barcode: map.barcode
+            ? row[map.barcode]?.trim() || undefined
+            : undefined,
+        },
+      });
+      importedCount.value++;
+    } catch (err) {
+      const fetchError = err as { data?: { error?: string } };
+      importErrors.value.push({
+        row: i + 2,
+        name: nameVal,
+        error: fetchError.data?.error ?? "Error del servidor",
+      });
+    }
+  }
+
   step.value = "done";
 }
 </script>
@@ -257,18 +306,56 @@ async function startImport() {
         v-else-if="step === 'importing'"
         class="rounded-xl bg-white p-8 text-center shadow-sm"
       >
-        <p class="text-gray-500">Importando productos...</p>
+        <div
+          class="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-2 border-nova-primary border-t-transparent"
+        />
+        <p class="text-gray-500">
+          Importando productos... {{ importedCount }}/{{ rows.length }}
+        </p>
+        <div
+          class="mx-auto mt-3 h-2 w-48 overflow-hidden rounded-full bg-gray-100"
+        >
+          <div
+            class="h-full rounded-full bg-nova-primary transition-all"
+            :style="{
+              width: `${(importedCount / Math.max(rows.length, 1)) * 100}%`,
+            }"
+          />
+        </div>
       </div>
 
       <!-- Step 4: Done -->
-      <div v-else class="rounded-xl bg-white p-8 text-center shadow-sm">
-        <p class="text-2xl">✓</p>
-        <p class="mt-2 font-semibold text-gray-900">
-          {{ rows.length }} productos importados
-        </p>
+      <div v-else class="rounded-xl bg-white p-8 shadow-sm">
+        <div class="text-center">
+          <p class="text-2xl">✓</p>
+          <p class="mt-2 font-semibold text-gray-900">
+            {{ importedCount }} productos importados
+          </p>
+          <p v-if="importErrors.length > 0" class="mt-1 text-sm text-red-500">
+            {{ importErrors.length }} errores
+          </p>
+        </div>
+
+        <!-- Error details -->
+        <div
+          v-if="importErrors.length > 0"
+          class="mt-4 max-h-40 overflow-y-auto rounded-lg bg-red-50 p-3"
+        >
+          <p class="mb-2 text-xs font-medium text-red-700">
+            Filas con errores:
+          </p>
+          <div
+            v-for="err in importErrors"
+            :key="err.row"
+            class="text-xs text-red-600"
+          >
+            Fila {{ err.row }}: {{ err.name }} - {{ err.error }}
+          </div>
+        </div>
+
         <NuxtLink
           to="/inventory"
-          class="mt-4 inline-block rounded-xl bg-nova-primary px-6 py-2 text-sm font-medium text-white"
+          class="mt-6 block rounded-xl bg-nova-primary py-2 text-center text-sm font-medium text-white"
         >
           Ver inventario
         </NuxtLink>

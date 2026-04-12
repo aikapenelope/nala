@@ -27,7 +27,12 @@ import {
   expenses,
   users,
 } from "@nova/db";
-import { DEAD_STOCK_DAYS, AGING_THRESHOLDS } from "@nova/shared";
+import {
+  DEAD_STOCK_DAYS,
+  AGING_THRESHOLDS,
+  rankSellers,
+  goalProgress,
+} from "@nova/shared";
 import { generateNarrative } from "../services/ai-narrative";
 import type { AppEnv } from "../types";
 
@@ -829,6 +834,139 @@ reports.get("/reports/alerts", async (c) => {
   alerts.sort((a, b) => severityOrder[a.severity] - severityOrder[b.severity]);
 
   return c.json({ alerts });
+});
+
+// ============================================================
+// Gamification
+// ============================================================
+
+/** Default daily sales goal in USD (configurable per business in the future). */
+const DEFAULT_DAILY_GOAL_USD = 100;
+
+/**
+ * GET /reports/gamification - Seller rankings, goal progress, and streaks.
+ *
+ * Returns today's seller performance with:
+ * - Ranked list by total sales
+ * - Goal progress percentage for each seller
+ * - Streak: consecutive days meeting the daily goal (last 30 days)
+ */
+reports.get("/reports/gamification", async (c) => {
+  const db = c.get("db");
+  const businessId = c.get("businessId");
+
+  // Today's boundaries (UTC)
+  const now = new Date();
+  const todayStr = now.toISOString().split("T")[0];
+  const todayStart = new Date(`${todayStr}T00:00:00.000Z`);
+  const todayEnd = new Date(`${todayStr}T23:59:59.999Z`);
+
+  // Today's sales per seller
+  const todayStats = await db
+    .select({
+      userId: sales.userId,
+      name: users.name,
+      salesCount: sql<number>`count(*)::int`,
+      totalUsd: sql<number>`COALESCE(SUM(${sales.totalUsd}::numeric), 0)::float`,
+    })
+    .from(sales)
+    .innerJoin(users, eq(sales.userId, users.id))
+    .where(
+      and(
+        eq(users.businessId, businessId),
+        gte(sales.createdAt, todayStart),
+        lte(sales.createdAt, todayEnd),
+        eq(sales.status, "completed"),
+      ),
+    )
+    .groupBy(sales.userId, users.name);
+
+  // Rank sellers using shared utility
+  const ranked = rankSellers(
+    todayStats.map((s) => ({
+      userId: s.userId,
+      name: s.name,
+      salesCount: s.salesCount,
+      totalUsd: s.totalUsd,
+    })),
+  );
+
+  // Add goal progress
+  const withGoals = ranked.map((s) => ({
+    ...s,
+    goalTarget: DEFAULT_DAILY_GOAL_USD,
+    goalPercent: goalProgress(s.totalUsd, DEFAULT_DAILY_GOAL_USD),
+  }));
+
+  // Calculate streaks: for each seller, count consecutive days meeting the goal
+  // looking back up to 30 days
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+  const dailyTotals = await db
+    .select({
+      userId: sales.userId,
+      day: sql<string>`DATE(${sales.createdAt})::text`,
+      totalUsd: sql<number>`COALESCE(SUM(${sales.totalUsd}::numeric), 0)::float`,
+    })
+    .from(sales)
+    .innerJoin(users, eq(sales.userId, users.id))
+    .where(
+      and(
+        eq(users.businessId, businessId),
+        gte(sales.createdAt, thirtyDaysAgo),
+        eq(sales.status, "completed"),
+      ),
+    )
+    .groupBy(sales.userId, sql`DATE(${sales.createdAt})`);
+
+  // Build streak map: userId -> { currentStreak, bestStreak }
+  const streakMap: Record<
+    string,
+    { currentStreak: number; bestStreak: number }
+  > = {};
+
+  // Group daily totals by user
+  const byUser: Record<string, Array<{ day: string; total: number }>> = {};
+  for (const row of dailyTotals) {
+    if (!byUser[row.userId]) byUser[row.userId] = [];
+    byUser[row.userId].push({ day: row.day, total: row.totalUsd });
+  }
+
+  for (const [userId, days] of Object.entries(byUser)) {
+    // Sort days descending (most recent first)
+    days.sort((a, b) => b.day.localeCompare(a.day));
+
+    let currentStreak = 0;
+    let bestStreak = 0;
+    let streak = 0;
+
+    for (const d of days) {
+      if (d.total >= DEFAULT_DAILY_GOAL_USD) {
+        streak++;
+        bestStreak = Math.max(bestStreak, streak);
+      } else {
+        if (streak > 0 && currentStreak === 0) currentStreak = streak;
+        streak = 0;
+      }
+    }
+    // If the streak is still going (never broken), set currentStreak
+    if (streak > 0 && currentStreak === 0) currentStreak = streak;
+    bestStreak = Math.max(bestStreak, streak);
+
+    streakMap[userId] = { currentStreak, bestStreak };
+  }
+
+  const result = withGoals.map((s) => ({
+    ...s,
+    currentStreak: streakMap[s.userId]?.currentStreak ?? 0,
+    bestStreak: streakMap[s.userId]?.bestStreak ?? 0,
+  }));
+
+  return c.json({
+    sellers: result,
+    dailyGoal: DEFAULT_DAILY_GOAL_USD,
+  });
 });
 
 export { reports };

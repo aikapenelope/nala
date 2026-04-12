@@ -25,8 +25,16 @@ import {
   createVariantSchema,
   createCategorySchema,
   calculateStockSemaphore,
+  predictStockDepletion,
 } from "@nova/shared";
-import { products, productVariants, categories, priceHistory } from "@nova/db";
+import {
+  products,
+  productVariants,
+  categories,
+  priceHistory,
+  saleItems,
+  sales,
+} from "@nova/db";
 import type { AppEnv } from "../types";
 
 const inventory = new Hono<AppEnv>();
@@ -135,7 +143,36 @@ inventory.get(
       .from(products)
       .where(and(...conditions));
 
-    // Add semaphore color to response
+    // Fetch sales velocity for predictions (total qty sold per product in last 30 days)
+    const productIds = rows.map((p) => p.id);
+    const salesVelocity: Record<string, number> = {};
+
+    if (productIds.length > 0) {
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+      const velocityRows = await db
+        .select({
+          productId: saleItems.productId,
+          totalQty: sql<number>`COALESCE(SUM(${saleItems.quantity}), 0)::int`,
+        })
+        .from(saleItems)
+        .innerJoin(sales, eq(saleItems.saleId, sales.id))
+        .where(
+          and(
+            sql`${saleItems.productId} = ANY(${productIds})`,
+            sql`${sales.createdAt} >= ${thirtyDaysAgo}`,
+            eq(sales.status, "completed"),
+          ),
+        )
+        .groupBy(saleItems.productId);
+
+      for (const v of velocityRows) {
+        salesVelocity[v.productId] = v.totalQty;
+      }
+    }
+
+    // Add semaphore color and depletion prediction to response
     const enriched = rows.map((p) => ({
       ...p,
       semaphore: calculateStockSemaphore(
@@ -143,6 +180,10 @@ inventory.get(
         p.stockMin,
         p.stockCritical,
         p.lastSoldAt?.toISOString() ?? null,
+      ),
+      daysUntilDepletion: predictStockDepletion(
+        p.stock,
+        salesVelocity[p.id] ?? 0,
       ),
     }));
 
