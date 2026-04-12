@@ -5,11 +5,13 @@
  * 1. Security - block scanner bots, security headers
  * 2. Logger - request/response logging (only valid routes)
  * 3. CORS - cross-origin access for the frontend
- * 4. Auth - verify Clerk JWT or PIN
+ * 4. Auth - verify Clerk JWT + resolve X-Acting-As
  * 5. Tenant - set RLS business context
  *
  * Routes:
  * - /health - health check (no auth required)
+ * - /onboarding - business creation (Clerk JWT required, handled internally)
+ * - /webhooks/whatsapp - Meta webhook (no auth)
  * - /api/* - protected API routes (auth + tenant required)
  */
 
@@ -18,7 +20,7 @@ import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 import { secureHeaders } from "hono/secure-headers";
 import { health } from "./routes/health";
-import { auth, ownerPinRoute } from "./routes/auth";
+import { ownerPinRoute } from "./routes/auth";
 import { onboarding } from "./routes/onboarding";
 import { inventory } from "./routes/inventory";
 import { salesRoutes } from "./routes/sales";
@@ -125,7 +127,6 @@ app.use(
 // ---------------------------------------------------------------------------
 
 app.route("/health", health);
-app.route("/auth", auth);
 app.route("/onboarding", onboarding);
 app.route("/webhooks/whatsapp", whatsapp);
 
