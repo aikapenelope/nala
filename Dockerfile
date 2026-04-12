@@ -116,8 +116,11 @@ COPY --from=builder --chown=node:node /app/apps/web/.output ./.output
 # Nitro's index.mjs imports @clerk/shared runtime files as external modules.
 # Copy the exact same @clerk packages that were used during the build.
 # The rm ensures no partial files from Nitro conflict with the COPY.
-RUN rm -rf ./.output/server/node_modules/@clerk
-COPY --from=builder /app/node_modules/@clerk ./.output/server/node_modules/@clerk
+# Nitro externalizes @clerk/shared runtime files. The web needs @clerk/shared@4.x
+# (from @clerk/nuxt) but the top-level node_modules has @clerk/shared@3.x (from
+# @clerk/backend in the API). Copy the correct 4.x version from the nested location.
+RUN rm -rf ./.output/server/node_modules/@clerk/shared
+COPY --from=builder /app/node_modules/@clerk/nuxt/node_modules/@clerk/shared ./.output/server/node_modules/@clerk/shared
 
 USER node
 
