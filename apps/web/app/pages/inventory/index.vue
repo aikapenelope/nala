@@ -32,6 +32,7 @@ interface Product {
   categoryId: string | null;
   lastSoldAt: string | null;
   semaphore: StockSemaphore;
+  daysUntilDepletion: number | null;
 }
 
 const products = ref<Product[]>([]);
@@ -202,6 +203,9 @@ function margin(cost: string, price: string): string {
               <th class="px-4 py-3 text-right font-medium text-gray-500">
                 Stock
               </th>
+              <th class="px-4 py-3 text-right font-medium text-gray-500">
+                Duracion
+              </th>
               <th
                 v-if="isAdmin"
                 class="px-4 py-3 text-right font-medium text-gray-500"
@@ -240,6 +244,15 @@ function margin(cost: string, price: string): string {
               <td class="px-4 py-3 text-right text-gray-900">
                 {{ product.stock }}
               </td>
+              <td class="px-4 py-3 text-right text-xs text-gray-500">
+                <template v-if="product.daysUntilDepletion === 0">
+                  <span class="font-medium text-red-600">Agotado</span>
+                </template>
+                <template v-else-if="product.daysUntilDepletion !== null">
+                  ~{{ product.daysUntilDepletion }}d
+                </template>
+                <template v-else>-</template>
+              </td>
               <td v-if="isAdmin" class="px-4 py-3 text-right text-gray-500">
                 ${{ Number(product.cost).toFixed(2) }}
               </td>
@@ -270,7 +283,20 @@ function margin(cost: string, price: string): string {
             <p class="truncate font-medium text-gray-900">
               {{ product.name }}
             </p>
-            <p class="text-xs text-gray-500">{{ product.stock }} en stock</p>
+            <p class="text-xs text-gray-500">
+              {{ product.stock }} en stock
+              <template
+                v-if="
+                  product.daysUntilDepletion !== null &&
+                  product.daysUntilDepletion > 0
+                "
+              >
+                · ~{{ product.daysUntilDepletion }}d
+              </template>
+              <template v-else-if="product.daysUntilDepletion === 0">
+                · <span class="text-red-600">Agotado</span>
+              </template>
+            </p>
           </div>
           <div class="text-right">
             <p class="font-medium text-gray-900">
