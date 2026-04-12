@@ -10,6 +10,7 @@ const { $api } = useApi();
 const isLoading = ref(true);
 const loadError = ref("");
 const narrative = ref("");
+const period = ref("today");
 
 const data = ref({
   totalSales: 0,
@@ -28,7 +29,7 @@ async function fetchReport() {
     const result = await $api<{
       data: typeof data.value;
       narrative: string;
-    }>("/api/reports/daily");
+    }>(`/api/reports/daily?period=${period.value}`);
     data.value = result.data;
     narrative.value = result.narrative;
   } catch (err) {
@@ -40,6 +41,7 @@ async function fetchReport() {
 }
 
 onMounted(fetchReport);
+watch(period, fetchReport);
 
 const methodEntries = computed(() => {
   const entries = Object.entries(data.value.salesByMethod);
@@ -63,7 +65,11 @@ const methodLabels: Record<string, string> = {
 </script>
 
 <template>
-  <SharedReportLayout title="Resumen del dia" :narrative="narrative">
+  <SharedReportLayout
+    v-model="period"
+    title="Resumen del dia"
+    :narrative="narrative"
+  >
     <div v-if="isLoading" class="py-12 text-center text-gray-400">
       Cargando...
     </div>
