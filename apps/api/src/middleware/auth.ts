@@ -1,18 +1,30 @@
 /**
  * Authentication middleware.
  *
- * Verifies Clerk JWT tokens and looks up the user in the database
- * to populate the request context with user info and businessId.
+ * Verifies Clerk JWT tokens and resolves the active user for the request.
  *
- * In development mode (NODE_ENV=development without CLERK_SECRET_KEY),
- * uses a dev-only mock user. This is gated behind an explicit env check
- * so it cannot accidentally run in production.
+ * Two modes of operation:
+ *
+ * 1. **Owner direct** (no X-Acting-As header):
+ *    JWT -> look up owner by clerkId -> set as active user.
+ *
+ * 2. **Employee acting** (X-Acting-As: <userId> header):
+ *    JWT -> look up owner by clerkId (validates device auth) ->
+ *    look up acting user by ID -> validate same business ->
+ *    set acting user as active user.
+ *
+ * This implements the "Clerk authenticates the device, PIN identifies
+ * the user" pattern from AUTH-REFACTOR-PLAN.md. The PIN verification
+ * happens locally on the frontend; the backend only needs to know
+ * which user is acting via the header.
  *
  * After auth, sets `user`, `businessId`, and `db` on the Hono context.
  */
 
 import { verifyToken } from "@clerk/backend";
 import { findUserByClerkId, findBusinessById } from "@nova/db";
+import { eq, and } from "drizzle-orm";
+import { users } from "@nova/db";
 import type { Context, Next } from "hono";
 import { getDb } from "../db";
 
@@ -43,8 +55,9 @@ async function verifyClerkJwt(token: string): Promise<string | null> {
 /**
  * Auth middleware for protected API routes.
  *
- * Production: verifies Clerk JWT, looks up user in DB, validates business exists.
- * Development: allows a mock user ONLY when NODE_ENV=development AND CLERK_SECRET_KEY is not set.
+ * 1. Verify Clerk JWT -> identify the device owner
+ * 2. If X-Acting-As header present -> resolve the acting employee
+ * 3. Set the resolved user (owner or employee) on the context
  */
 export async function authMiddleware(c: Context, next: Next) {
   const db = getDb();
@@ -53,9 +66,6 @@ export async function authMiddleware(c: Context, next: Next) {
   const clerkSecretKey = process.env.CLERK_SECRET_KEY;
 
   // Development-only mock user.
-  // Requires BOTH conditions: NODE_ENV=development AND no CLERK_SECRET_KEY.
-  // In production, config.ts already exits if CLERK_SECRET_KEY is missing,
-  // so this branch is unreachable in production.
   if (!clerkSecretKey && process.env.NODE_ENV === "development") {
     c.set("user", {
       id: "dev-user-001",
@@ -70,17 +80,15 @@ export async function authMiddleware(c: Context, next: Next) {
     return;
   }
 
-  // If we get here without CLERK_SECRET_KEY, something is wrong.
   if (!clerkSecretKey) {
     return c.json(
-      {
-        error: "Server misconfiguration: authentication not available",
-      },
+      { error: "Server misconfiguration: authentication not available" },
       500,
     );
   }
 
-  // Require Authorization header
+  // --- Step 1: Verify Clerk JWT (device authentication) ---
+
   const authHeader = c.req.header("Authorization");
   if (!authHeader?.startsWith("Bearer ")) {
     return c.json({ error: "Authorization header required" }, 401);
@@ -93,10 +101,10 @@ export async function authMiddleware(c: Context, next: Next) {
     return c.json({ error: "Invalid or expired token" }, 401);
   }
 
-  // Look up user in DB by Clerk ID
-  const dbUser = await findUserByClerkId(db, clerkUserId);
+  // Look up the device owner (the Clerk account holder)
+  const ownerUser = await findUserByClerkId(db, clerkUserId);
 
-  if (!dbUser) {
+  if (!ownerUser) {
     return c.json(
       {
         error: "User not found. Complete onboarding first.",
@@ -106,13 +114,11 @@ export async function authMiddleware(c: Context, next: Next) {
     );
   }
 
-  if (!dbUser.isActive) {
+  if (!ownerUser.isActive) {
     return c.json({ error: "Account is deactivated" }, 403);
   }
 
-  // Validate that the business actually exists in the database.
-  // This prevents stale businessId references from causing silent failures.
-  const business = await findBusinessById(db, dbUser.businessId);
+  const business = await findBusinessById(db, ownerUser.businessId);
   if (!business) {
     return c.json(
       {
@@ -127,17 +133,55 @@ export async function authMiddleware(c: Context, next: Next) {
     return c.json({ error: "Business is deactivated" }, 403);
   }
 
-  const user: AuthUser = {
-    id: dbUser.id,
-    businessId: dbUser.businessId,
-    businessName: business.name,
-    name: dbUser.name,
-    role: dbUser.role as "owner" | "employee",
-    clerkId: clerkUserId,
-  };
+  // --- Step 2: Check for X-Acting-As (employee identification) ---
 
-  c.set("user", user);
-  c.set("businessId", user.businessId);
+  const actingAsUserId = c.req.header("X-Acting-As");
+  let activeUser: AuthUser;
+
+  if (actingAsUserId && actingAsUserId !== ownerUser.id) {
+    // An employee is acting on this device. Look them up and validate
+    // they belong to the same business as the device owner.
+    const [actingUser] = await db
+      .select()
+      .from(users)
+      .where(
+        and(
+          eq(users.id, actingAsUserId),
+          eq(users.businessId, ownerUser.businessId),
+          eq(users.isActive, true),
+        ),
+      )
+      .limit(1);
+
+    if (!actingUser) {
+      return c.json(
+        { error: "Acting user not found or not in this business" },
+        403,
+      );
+    }
+
+    activeUser = {
+      id: actingUser.id,
+      businessId: actingUser.businessId,
+      businessName: business.name,
+      name: actingUser.name,
+      role: actingUser.role as "owner" | "employee",
+      clerkId: actingUser.clerkId ?? undefined,
+    };
+  } else {
+    // Owner is acting directly
+    activeUser = {
+      id: ownerUser.id,
+      businessId: ownerUser.businessId,
+      businessName: business.name,
+      name: ownerUser.name,
+      role: ownerUser.role as "owner" | "employee",
+      clerkId: clerkUserId,
+    };
+  }
+
+  c.set("user", activeUser);
+  c.set("businessId", activeUser.businessId);
 
   await next();
 }
