@@ -26,6 +26,7 @@ import { customersRoutes } from "./routes/customers";
 import { reports } from "./routes/reports";
 import { accounting } from "./routes/accounting";
 import { whatsapp } from "./routes/whatsapp";
+import { team } from "./routes/team";
 import { authMiddleware } from "./middleware/auth";
 import { tenantMiddleware } from "./middleware/tenant";
 import type { AppEnv } from "./types";
@@ -110,7 +111,12 @@ app.use(
   cors({
     origin: process.env.CORS_ORIGIN?.split(",") ?? ["http://localhost:3000"],
     allowMethods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
-    allowHeaders: ["Content-Type", "Authorization", "X-Business-Id"],
+    allowHeaders: [
+      "Content-Type",
+      "Authorization",
+      "X-Business-Id",
+      "X-Acting-As",
+    ],
   }),
 );
 
@@ -139,6 +145,9 @@ api.get("/me", (c) => {
 
 // Owner PIN verification (protected - uses businessId from session)
 api.route("/", ownerPinRoute);
+
+// Team management (roster download, user switching)
+api.route("/", team);
 
 // Inventory routes (products, categories, variants)
 api.route("/", inventory);
