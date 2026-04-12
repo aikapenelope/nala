@@ -149,6 +149,61 @@ export function useNovaAuth() {
     }
   }
 
+  /**
+   * Resolve the Nova user from the backend after Clerk login.
+   *
+   * Calls GET /api/me with the Clerk JWT to look up the user in
+   * Nova's database. If the user exists, sets the NovaUser state.
+   *
+   * @returns Object with the resolved user, or an error code:
+   *   - "ok": user resolved successfully
+   *   - "not_found": Clerk user has no Nova account (needs onboarding)
+   *   - "error": network or server error
+   */
+  async function resolveClerkUser(): Promise<{
+    status: "ok" | "not_found" | "error";
+  }> {
+    try {
+      const result = await $api<{
+        user: {
+          id: string;
+          name: string;
+          role: string;
+          businessId: string;
+          clerkId?: string;
+        };
+      }>("/api/me");
+
+      if (result.user) {
+        setUser({
+          id: result.user.id,
+          name: result.user.name,
+          role: result.user.role as "owner" | "employee",
+          businessId: result.user.businessId,
+          clerkId: result.user.clerkId,
+        });
+        return { status: "ok" };
+      }
+
+      return { status: "error" };
+    } catch (err) {
+      const fetchError = err as {
+        statusCode?: number;
+        data?: { code?: string };
+      };
+
+      // 404 with USER_NOT_FOUND means Clerk user hasn't onboarded
+      if (
+        fetchError.statusCode === 404 &&
+        fetchError.data?.code === "USER_NOT_FOUND"
+      ) {
+        return { status: "not_found" };
+      }
+
+      return { status: "error" };
+    }
+  }
+
   /** Clear the current user (logout). */
   function clearUser() {
     novaUser.value = null;
@@ -164,6 +219,7 @@ export function useNovaAuth() {
     isEmployee,
     setUser,
     restoreUser,
+    resolveClerkUser,
     switchUser,
     verifyOwnerPin,
     clearUser,
