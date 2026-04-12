@@ -15,8 +15,32 @@ import type { BusinessType } from "@nova/shared";
 definePageMeta({ layout: false });
 
 const router = useRouter();
-const { setUser } = useNovaAuth();
+const { setUser, isAuthenticated } = useNovaAuth();
 const { $api } = useApi();
+
+/**
+ * Guard: require a Clerk session before showing onboarding.
+ * If the user already has a NovaUser (completed onboarding), go to dashboard.
+ * If no Clerk session, redirect to sign-up first.
+ */
+onMounted(() => {
+  if (isAuthenticated.value) {
+    router.replace("/");
+    return;
+  }
+
+  if (import.meta.client) {
+    try {
+      const { isSignedIn } = useAuth();
+      if (!isSignedIn.value) {
+        router.replace("/auth/signup");
+      }
+    } catch {
+      // Clerk not ready -- allow page to render, the API call will fail
+      // with a clear error if there's no session
+    }
+  }
+});
 
 const step = ref(1);
 const businessType = ref<BusinessType | null>(null);
