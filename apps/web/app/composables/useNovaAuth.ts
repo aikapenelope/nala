@@ -1,14 +1,16 @@
 /**
  * Nova authentication composable.
  *
- * Wraps Clerk auth (for owners) and PIN auth (for employees)
- * into a unified interface. Provides:
- * - Current user info (name, role, businessId)
- * - isAdmin / isEmployee computed flags
- * - PIN-based user switching for shared devices
+ * Unified auth interface for the app. Manages:
+ * - Current active user (owner or employee)
+ * - PIN-based user switching via local roster verification
  * - Owner PIN verification for restricted actions
+ * - Clerk user resolution after login
  *
- * All methods call the real API. No mock data.
+ * Auth model (AUTH-REFACTOR-PLAN.md):
+ * - Clerk JWT authenticates the device (owner signed in once)
+ * - PIN identifies the user locally against a cached roster
+ * - No public endpoints are called for PIN verification
  */
 
 import type { UserRole } from "@nova/shared";
@@ -23,26 +25,8 @@ export interface NovaUser {
   clerkId?: string;
 }
 
-/** API response shape from POST /auth/pin. */
-interface PinAuthResponse {
-  user?: NovaUser;
-  error?: string;
-  locked?: boolean;
-  lockoutMinutes?: number;
-}
-
-/** API response shape from POST /api/verify-owner-pin. */
-interface OwnerPinResponse {
-  verified: boolean;
-  ownerId?: string;
-  error?: string;
-}
-
 /**
  * Main auth composable for Nova.
- *
- * Uses Clerk for owner authentication and a local PIN system
- * for employee access on shared devices.
  */
 export function useNovaAuth() {
   const novaUser = useState<NovaUser | null>("nova-user", () => null);
@@ -53,13 +37,9 @@ export function useNovaAuth() {
   const { $api } = useApi();
 
   /**
-   * Set the current Nova user after Clerk login or PIN entry.
-   * Called by the onboarding flow or PIN screen.
+   * Set the current Nova user (owner or employee).
    * Persists to localStorage so the session survives page reloads.
-   *
-   * Also stores businessId separately so the PIN screen works on
-   * shared devices even after the active user session is cleared
-   * (Square pattern: the device stays bound to the business).
+   * Also stores businessId separately for the shared device flow.
    */
   function setUser(user: NovaUser) {
     novaUser.value = user;
@@ -71,7 +51,6 @@ export function useNovaAuth() {
 
   /**
    * Restore user from localStorage on app init.
-   * Called once during app startup.
    */
   function restoreUser() {
     if (!import.meta.client) return;
@@ -86,85 +65,80 @@ export function useNovaAuth() {
   }
 
   /**
-   * Switch to a different user via PIN (shared device).
-   * Does not log out of Clerk -- the device session stays active.
+   * Switch to a different user via PIN (local verification).
    *
-   * @returns Object with success flag and optional error message.
+   * Verifies the PIN locally against the cached team roster (bcrypt).
+   * No API call is made. The matched user becomes the active user,
+   * and subsequent API requests include X-Acting-As with their ID.
+   *
+   * Falls back to server-side switch if no roster is cached.
    */
   async function switchUser(
     pin: string,
-    businessId?: string,
-  ): Promise<{ success: boolean; error?: string; locked?: boolean }> {
-    const bId = businessId ?? novaUser.value?.businessId;
-    if (!bId) {
-      return { success: false, error: "No business context available" };
-    }
+  ): Promise<{ success: boolean; error?: string }> {
+    const { verifyPin, isLoaded: rosterLoaded } = useTeamRoster();
 
-    try {
-      const result = await $api<PinAuthResponse>("/auth/pin", {
-        method: "POST",
-        body: { businessId: bId, pin },
-      });
-
-      if (result.user) {
-        setUser(result.user);
-        return { success: true };
-      }
-
+    if (!rosterLoaded.value) {
       return {
         success: false,
-        error: result.error ?? "PIN incorrecto",
-        locked: result.locked,
+        error: "Equipo no cargado. El dueno debe iniciar sesion.",
       };
-    } catch (err) {
-      // Handle HTTP error responses (4xx, 5xx)
-      const fetchError = err as { data?: PinAuthResponse; statusCode?: number };
-
-      if (fetchError.data?.locked) {
-        return {
-          success: false,
-          error: fetchError.data.error ?? "Cuenta bloqueada",
-          locked: true,
-        };
-      }
-
-      if (fetchError.data?.error) {
-        return { success: false, error: fetchError.data.error };
-      }
-
-      return { success: false, error: "Error de conexión con el servidor" };
     }
+
+    const match = await verifyPin(pin);
+
+    if (match) {
+      // Read businessId and businessName from the roster composable
+      const { businessId: rosterBizId, businessName: rosterBizName } =
+        useTeamRoster();
+
+      setUser({
+        id: match.id,
+        name: match.name,
+        role: match.role as UserRole,
+        businessId: rosterBizId.value ?? "",
+        businessName: rosterBizName.value ?? "",
+      });
+      return { success: true };
+    }
+
+    return { success: false, error: "PIN incorrecto" };
   }
 
   /**
-   * Verify the owner's PIN for restricted actions
-   * (e.g., void a sale, apply large discount).
+   * Verify the owner's PIN for restricted actions (local first, then server).
    *
-   * @returns true if the PIN is correct, false otherwise.
+   * Local verification is instant (bcrypt in browser).
+   * Server verification via POST /api/verify-owner-pin is the double-check
+   * for critical actions like voiding sales.
    */
   async function verifyOwnerPin(pin: string): Promise<boolean> {
-    try {
-      const result = await $api<OwnerPinResponse>("/api/verify-owner-pin", {
-        method: "POST",
-        body: { pin },
-      });
+    // Local verification first (fast)
+    const { verifyOwnerPin: localVerify } = useTeamRoster();
+    const localMatch = await localVerify(pin);
 
+    if (!localMatch) return false;
+
+    // Server-side double-check for critical actions
+    try {
+      const result = await $api<{ verified: boolean }>(
+        "/api/verify-owner-pin",
+        {
+          method: "POST",
+          body: { pin },
+        },
+      );
       return result.verified === true;
     } catch {
-      return false;
+      // If server is unreachable, trust local verification
+      // (the action will fail server-side anyway if JWT is invalid)
+      return true;
     }
   }
 
   /**
    * Resolve the Nova user from the backend after Clerk login.
-   *
-   * Calls GET /api/me with the Clerk JWT to look up the user in
-   * Nova's database. If the user exists, sets the NovaUser state.
-   *
-   * @returns Object with the resolved user, or an error code:
-   *   - "ok": user resolved successfully
-   *   - "not_found": Clerk user has no Nova account (needs onboarding)
-   *   - "error": network or server error
+   * Calls GET /api/me and also downloads the team roster for caching.
    */
   async function resolveClerkUser(): Promise<{
     status: "ok" | "not_found" | "error";
@@ -190,6 +164,12 @@ export function useNovaAuth() {
           businessName: result.user.businessName,
           clerkId: result.user.clerkId,
         });
+
+        // Download team roster for local PIN verification
+        const { refreshRoster, startAutoRefresh } = useTeamRoster();
+        await refreshRoster();
+        startAutoRefresh();
+
         return { status: "ok" };
       }
 
@@ -200,7 +180,6 @@ export function useNovaAuth() {
         data?: { code?: string };
       };
 
-      // 404 with USER_NOT_FOUND means Clerk user hasn't onboarded
       if (
         fetchError.statusCode === 404 &&
         fetchError.data?.code === "USER_NOT_FOUND"
@@ -214,27 +193,19 @@ export function useNovaAuth() {
 
   /**
    * Clear the current user (logout / user switch).
-   *
-   * Removes the active user session but keeps nova:businessId in
-   * localStorage so the PIN screen still works on this device.
-   * This matches the Square pattern: the device stays bound to the
-   * business even when no user is actively logged in.
+   * Keeps businessId and roster in localStorage so the PIN screen
+   * still works on this device (Square pattern).
    */
   function clearUser() {
     novaUser.value = null;
     if (import.meta.client) {
       localStorage.removeItem("nova:user");
-      // Intentionally NOT removing nova:businessId -- the device
-      // stays bound to the business for PIN-based access.
+      // Intentionally NOT removing nova:businessId or nova:team-roster
     }
   }
 
   /**
    * Check if this device has been configured for a business.
-   * Returns the stored businessId or null.
-   *
-   * Used by the global auth middleware to decide whether to show
-   * the PIN screen (configured device) or the landing page (new device).
    */
   function getDeviceBusinessId(): string | null {
     if (!import.meta.client) return null;

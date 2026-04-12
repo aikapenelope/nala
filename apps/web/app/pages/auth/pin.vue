@@ -1,18 +1,17 @@
 <script setup lang="ts">
 /**
- * PIN entry screen for employee authentication on shared devices.
+ * PIN entry screen for employee identification on shared devices.
+ *
+ * Auth model (AUTH-REFACTOR-PLAN.md):
+ * - The device is already authenticated via Clerk (owner signed in once)
+ * - The PIN only identifies which employee is using the device
+ * - PIN verification happens LOCALLY against the cached team roster
+ * - No API call is made for PIN entry
  *
  * Shown when:
- * - The device has an active Clerk session (owner logged in once)
+ * - The device has a cached roster (owner configured it before)
  * - An employee needs to identify themselves to start working
- * - A user taps "Switch user" in the header
- *
- * Design: Large numeric keypad (60px buttons), 4 dots indicator,
- * employee name shortcuts at the bottom.
- *
- * Connected to:
- * - POST /auth/pin (via useNovaAuth.switchUser)
- * - GET /auth/employees?businessId=...
+ * - A user taps "Switch user" in the sidebar/header
  */
 
 import { PIN_LENGTH } from "@nova/shared";
@@ -21,54 +20,25 @@ definePageMeta({ layout: false });
 
 const router = useRouter();
 const { switchUser } = useNovaAuth();
-const { $api } = useApi();
+const { roster, isLoaded, loadFromCache, businessName } = useTeamRoster();
 
 const pin = ref("");
 const error = ref("");
-const isLocked = ref(false);
-const isLoading = ref(false);
+const isVerifying = ref(false);
 
-/** Employee list for quick-select shortcuts. */
-const employees = ref<Array<{ id: string; name: string; role: string }>>([]);
-
-/** Business ID from localStorage (set during onboarding or previous session). */
-const businessId = ref<string | null>(null);
-
-/** Load business ID and employee list on mount. */
-onMounted(async () => {
-  if (!import.meta.client) return;
-
-  // Restore businessId from the stored Nova user or localStorage
-  const storedUser = localStorage.getItem("nova:user");
-  if (storedUser) {
-    try {
-      const parsed = JSON.parse(storedUser);
-      businessId.value = parsed.businessId ?? null;
-    } catch {
-      // Corrupted data, ignore
-    }
-  }
-
-  if (!businessId.value) {
-    businessId.value = localStorage.getItem("nova:businessId");
-  }
-
-  // Load employee list for shortcuts
-  if (businessId.value) {
-    try {
-      const result = await $api<{
-        employees: Array<{ id: string; name: string; role: string }>;
-      }>(`/auth/employees?businessId=${businessId.value}`);
-      employees.value = result.employees;
-    } catch {
-      // Non-critical: shortcuts won't show
-    }
-  }
+/** Load roster from cache on mount. */
+onMounted(() => {
+  loadFromCache();
 });
+
+/** Employee list from the cached roster (for quick-select shortcuts). */
+const employees = computed(() =>
+  roster.value.map((e) => ({ id: e.id, name: e.name, role: e.role })),
+);
 
 /** Handle digit press on the keypad. */
 function pressDigit(digit: string) {
-  if (isLocked.value || isLoading.value) return;
+  if (isVerifying.value) return;
   if (pin.value.length >= PIN_LENGTH) return;
 
   error.value = "";
@@ -86,48 +56,35 @@ function deleteDigit() {
   error.value = "";
 }
 
-/** Submit PIN for verification. */
+/** Submit PIN for local verification. */
 async function submitPin() {
   if (pin.value.length !== PIN_LENGTH) return;
-  if (!businessId.value) {
-    error.value = "No hay negocio configurado. Inicia como dueño primero.";
+
+  if (!isLoaded.value) {
+    error.value =
+      "Este dispositivo no esta configurado. El dueno debe iniciar sesion primero.";
     pin.value = "";
     return;
   }
 
-  isLoading.value = true;
+  isVerifying.value = true;
   error.value = "";
 
   try {
-    const result = await switchUser(pin.value, businessId.value);
+    const result = await switchUser(pin.value);
 
     if (result.success) {
-      // Navigate to dashboard on successful PIN entry
       router.push("/");
       return;
     }
 
-    if (result.locked) {
-      isLocked.value = true;
-      error.value = result.error ?? "Cuenta bloqueada";
-      // Auto-unlock after 5 minutes
-      setTimeout(
-        () => {
-          isLocked.value = false;
-          error.value = "";
-        },
-        5 * 60 * 1000,
-      );
-    } else {
-      error.value = result.error ?? "PIN incorrecto";
-    }
-
+    error.value = result.error ?? "PIN incorrecto";
     pin.value = "";
   } catch {
-    error.value = "Error de conexión";
+    error.value = "Error de verificacion";
     pin.value = "";
   } finally {
-    isLoading.value = false;
+    isVerifying.value = false;
   }
 }
 
@@ -143,9 +100,11 @@ const keypadRows = [
   <div
     class="flex min-h-screen flex-col items-center justify-center bg-gray-50 px-4"
   >
-    <!-- Business name -->
+    <!-- Business name from roster -->
     <div class="mb-8 text-center">
-      <h1 class="text-2xl font-bold text-nova-primary">Nova</h1>
+      <h1 class="text-2xl font-bold text-nova-primary">
+        {{ businessName ?? "Nova" }}
+      </h1>
       <p class="mt-1 text-sm text-gray-500">Ingresa tu PIN</p>
     </div>
 
@@ -164,13 +123,8 @@ const keypadRows = [
     </div>
 
     <!-- Error message -->
-    <p v-if="error" class="mb-4 text-sm font-medium text-red-500">
+    <p v-if="error" class="mb-4 text-center text-sm font-medium text-red-500">
       {{ error }}
-    </p>
-
-    <!-- Locked message -->
-    <p v-if="isLocked" class="mb-4 text-sm text-red-500">
-      Demasiados intentos. Espera 5 minutos.
     </p>
 
     <!-- Numeric keypad -->
@@ -184,14 +138,14 @@ const keypadRows = [
           v-for="digit in row"
           :key="digit"
           class="flex h-16 w-16 items-center justify-center rounded-full bg-white text-2xl font-semibold text-gray-800 shadow-sm transition-colors active:bg-gray-100"
-          :disabled="isLocked || isLoading"
+          :disabled="isVerifying"
           @click="pressDigit(digit)"
         >
           {{ digit }}
         </button>
       </div>
 
-      <!-- Bottom row: delete, 0, submit -->
+      <!-- Bottom row: delete, 0, empty -->
       <div class="flex justify-center gap-3">
         <button
           class="flex h-16 w-16 items-center justify-center rounded-full text-xl text-gray-500"
@@ -201,7 +155,7 @@ const keypadRows = [
         </button>
         <button
           class="flex h-16 w-16 items-center justify-center rounded-full bg-white text-2xl font-semibold text-gray-800 shadow-sm transition-colors active:bg-gray-100"
-          :disabled="isLocked || isLoading"
+          :disabled="isVerifying"
           @click="pressDigit('0')"
         >
           0
@@ -210,18 +164,18 @@ const keypadRows = [
       </div>
     </div>
 
-    <!-- Employee shortcuts -->
+    <!-- Employee shortcuts from cached roster -->
     <div
       v-if="employees.length > 0"
       class="mt-8 flex flex-wrap justify-center gap-2"
     >
-      <button
+      <span
         v-for="emp in employees"
         :key="emp.id"
         class="rounded-full bg-gray-100 px-3 py-1 text-xs text-gray-600"
       >
         {{ emp.name }}
-      </button>
+      </span>
     </div>
 
     <!-- Link to owner login -->
@@ -230,7 +184,7 @@ const keypadRows = [
         to="/auth/login"
         class="text-sm text-nova-primary hover:underline"
       >
-        Iniciar como dueño
+        Iniciar como dueno
       </NuxtLink>
     </div>
   </div>
