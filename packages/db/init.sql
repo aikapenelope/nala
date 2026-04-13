@@ -131,18 +131,6 @@ DROP POLICY IF EXISTS expenses_tenant_isolation ON expenses;
 CREATE POLICY expenses_tenant_isolation ON expenses
   USING (business_id = current_business_id());
 
--- Seller goals
-ALTER TABLE seller_goals ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS seller_goals_tenant_isolation ON seller_goals;
-CREATE POLICY seller_goals_tenant_isolation ON seller_goals
-  USING (business_id = current_business_id());
-
--- Seller streaks
-ALTER TABLE seller_streaks ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS seller_streaks_tenant_isolation ON seller_streaks;
-CREATE POLICY seller_streaks_tenant_isolation ON seller_streaks
-  USING (business_id = current_business_id());
-
 -- Product aliases
 ALTER TABLE product_aliases ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS product_aliases_tenant_isolation ON product_aliases;

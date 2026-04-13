@@ -16,7 +16,6 @@ import {
   periodChange,
 } from "../predictions";
 import {
-  goalProgress,
   rankSellers,
 } from "../gamification";
 import {
@@ -98,16 +97,6 @@ describe("periodChange", () => {
     const result = periodChange(90, 100);
     expect(result.positive).toBe(false);
     expect(result.percent).toBe(10);
-  });
-});
-
-describe("goalProgress", () => {
-  it("calculates percentage", () => {
-    expect(goalProgress(50, 100)).toBe(50);
-  });
-
-  it("caps at 100", () => {
-    expect(goalProgress(150, 100)).toBe(100);
   });
 });
 
