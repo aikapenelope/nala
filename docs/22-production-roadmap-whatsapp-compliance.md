@@ -1,22 +1,20 @@
 # Nova: Roadmap de Produccion
 
-> Ultima actualizacion: Abril 2026 (post PR #67)
-> Estado: Nova corriendo en produccion (nova-api.aikalabs.cc). DB, Redis, Clerk conectados.
-> WhatsApp Business API eliminado. Catalogo publico, rate limiting, y error boundary implementados.
+> Ultima actualizacion: Abril 2026 (post PRs #66, #67, #69)
+> Estado: Nova corriendo en produccion. DB, Redis, Clerk conectados. CI verde.
 
 ---
 
 ## Estado de la Infraestructura
 
-Nova ya esta desplegado y funcionando:
-
 ```
 API:  https://nova-api.aikalabs.cc/health -> {"status":"ok","services":{"database":true,"redis":true}}
 Web:  https://nova.aikalabs.cc
-ESC:  aikapenelope-org/platform-infra/nova (DATABASE_URL, REDIS_URL, CORS_ORIGIN, etc.)
+ESC:  aikapenelope-org/platform-infra/nova
+CI:   GitHub Actions — typecheck + lint + test + build en cada push/PR (PostgreSQL 16 + Redis 7 como services)
 ```
 
-Para verificar que la DB esta viva:
+Verificar que la DB esta viva:
 
 ```bash
 curl -s https://nova-api.aikalabs.cc/health | jq .
@@ -24,146 +22,99 @@ curl -s https://nova-api.aikalabs.cc/health | jq .
 
 ---
 
-## Decision WhatsApp (eliminado)
+## Decisiones Tomadas
 
-La WhatsApp Business API fue eliminada del codigo en PR #67. Razones:
+### WhatsApp Business API (eliminado, PR #67)
 
-1. **Compliance Meta 2026**: el diseno original (LLM interpreter) viola la prohibicion de chatbots de proposito general
-2. **Numero unico multi-tenant**: no funciona para SaaS multi-tenant sin ser BSP de Meta
-3. **Modo developer**: max 250 mensajes, sin templates aprobados, inviable para MVP
-4. **Vector de ataque**: webhook publico sin auth expone datos de negocios
+1. **Compliance Meta 2026**: el diseno original (LLM interpreter para consultas del dueno) viola la prohibicion de chatbots de proposito general
+2. **Numero unico multi-tenant**: un solo numero de WA para todos los tenants no funciona. Ser BSP de Meta es un proceso enterprise aparte
+3. **Modo developer**: max 250 mensajes, 5 numeros verificados, sin templates aprobados
+4. **Vector de ataque**: webhook publico sin auth expone datos de negocios a prompt injection y enumeracion
 
-**Reemplazos:**
+**Reemplazos implementados:**
 - Metricas del dueno -> PWA mobile (ya es mobile-first)
-- Catalogo compartible -> pagina web publica `/catalogo/{slug}` con links `wa.me/`
-- Cobros a clientes -> links `wa.me/` desde la PWA (ya existia)
-- Notificaciones -> Web Push + email (pendiente)
+- Catalogo compartible -> pagina web publica `/catalogo/{slug}` con links `wa.me/` (PR #67)
+- Cobros a clientes -> links `wa.me/` desde la PWA (ya existia en routes/customers.ts)
+
+**Reemplazos pendientes:**
+- Notificaciones al dueno -> Web Push + email (ver seccion pendientes)
+
+### Gamificacion (eliminado, PR #69)
+
+Las tablas `seller_goals` y `seller_streaks` nunca se usaban. El endpoint `/reports/gamification` calculaba todo on-the-fly desde `sales`. El componente `EmployeePerformance.vue` no estaba conectado al dashboard.
+
+Para que la gamificacion funcione en produccion necesitaria: hooks en el flujo de ventas, cron de rachas, metas configurables por negocio, UI de configuracion, y manejo de edge cases. Eso es un feature completo que se puede agregar cuando haya negocios con multiples empleados activos.
+
+**Se mantiene**: ranking de vendedores en `/reports/sellers` (funciona, es un reporte simple).
 
 ---
 
-## Decision Gamificacion (eliminado)
+## Hecho (14 items)
 
-### Que era
-
-Sistema de ranking, metas diarias, y rachas para vendedores:
-- Ranking diario por ventas
-- Meta del dia con barra de progreso
-- Racha de dias consecutivos cumpliendo la meta
-- Widget de rendimiento para empleados
-
-### Que existe en el codigo
-
-| Componente | Que hace | Conectado? |
+| Item | PR/Origen | Verificado en CI |
 |---|---|---|
-| `@nova/shared/gamification.ts` | Funciones puras: `rankSellers()`, `goalProgress()` | Si, usadas por el API |
-| `GET /reports/gamification` | Endpoint que calcula ranking + goals + streaks on-the-fly desde la tabla `sales` | Si, funciona |
-| `reports/sellers.vue` | Pagina que muestra ranking + metas + rachas | Si, consume el endpoint |
-| `EmployeePerformance.vue` | Widget para dashboard del empleado | No conectado al dashboard |
-| Tablas `seller_goals`, `seller_streaks` | Tablas para persistir metas y rachas | **Nunca usadas**. El endpoint calcula todo on-the-fly |
-
-### Analisis de complejidad
-
-**Lo que ya funciona sin esfuerzo adicional:**
-- El ranking de vendedores (`/reports/sellers`) ya funciona. Es una query simple a la tabla `sales` agrupada por usuario. Esto es un reporte, no gamificacion.
-- La funcion `goalProgress()` es una division. Trivial.
-
-**Lo que falta para que sea "gamificacion" real:**
-- Persistir metas diarias configurables por negocio (actualmente hardcoded a $100)
-- Actualizar `sellerGoals` automaticamente al crear cada venta (hook en POST /sales)
-- Calcular y persistir rachas en `sellerStreaks` (cron de cierre de dia)
-- Mostrar `EmployeePerformance` en el dashboard cuando un empleado inicia sesion
-- Notificaciones de logros ("Primera venta del dia", "Meta cumplida")
-- Configuracion por negocio (activar/desactivar, cambiar meta)
-
-**Complejidad que agrega:**
-- Hook en el flujo de ventas (el endpoint mas critico) para actualizar goals
-- Cron job para calcular rachas diarias
-- Logica de configuracion por negocio
-- UI de configuracion para el dueno
-- 2 tablas extra que necesitan RLS, tests, y mantenimiento
-- Edge cases: que pasa si el dueno cambia la meta a mitad del dia? Si un empleado se desactiva?
-
-### Recomendacion: eliminar
-
-El ranking de vendedores por periodo ya funciona como reporte (`/reports/sellers`). Eso es util y no requiere infraestructura adicional.
-
-La gamificacion real (metas, rachas, logros, notificaciones) agrega complejidad significativa al flujo de ventas y al sistema de cron jobs por un beneficio marginal en el MVP. Es un feature de v2 cuando haya negocios con multiples empleados activos.
-
-**Que eliminar:**
-- Tablas `seller_goals` y `seller_streaks` del schema
-- RLS policies de esas tablas en `init.sql`
-- Componente `EmployeePerformance.vue`
-- Seccion de gamificacion en `reports/sellers.vue` (mantener el ranking)
-- Funciones `goalProgress()` y tipos `SellerStreak` de `@nova/shared`
-- Endpoint `/reports/gamification` (el ranking ya esta en `/reports/sellers`)
-
-**Que mantener:**
-- `rankSellers()` en `@nova/shared` (usado por `/reports/sellers`)
-- Reporte de vendedores con ranking, ventas, ticket promedio
+| Eliminar WhatsApp Business API (routes, services, constants, env vars) | #67 | Si |
+| Catalogo publico: API `GET /catalog/:slug` + pagina `/catalogo/[slug]` + schema (slug, whatsappNumber) | #67 | Si |
+| Rate limiting Redis (publico 60/min, auth 120/min, write 30/min) con fallback in-memory | #67 | Si |
+| Error boundary global (`error.vue`) para 404s y errores no manejados | #67 | Si |
+| Eliminar gamificacion (tablas, RLS, endpoint, componente, funciones) | #69 | Si |
+| Structured logging JSON (method, path, status, ms, requestId, userId, businessId) | #69 | Si |
+| Validacion de env vars frontend (plugin Nuxt para NUXT_PUBLIC_API_BASE) | #69 | Si |
+| Tests: 17 tests en 5 archivos (health, auth, catalog, sales, rate-limit) | #69 | Si |
+| Validacion de env vars backend al boot (config.ts) | Ya existia | Si |
+| CORS configurable por entorno (CORS_ORIGIN env var) | Ya existia | Si |
+| Health check profundo (DB + Redis, retorna status/degraded/error) | Ya existia | Si |
+| Crear DB "nova" + deploy en Hetzner | Infra ops | Verificado via curl |
+| Dockerfile multi-stage (API + Web) verificado con codigo actual | #69 | Paths validados |
+| CI pipeline: typecheck + lint + test + build con PostgreSQL 16 + Redis 7 | Ya existia | 3 runs exitosos |
 
 ---
 
-## Roadmap: Estado Actual
+## Pendiente
 
-### Hecho (8 items)
+### Ops manuales (2 items)
 
-| Item | Como |
-|---|---|
-| Eliminar WhatsApp Business API | PR #67 |
-| Catalogo publico (API + pagina + schema) | PR #67 |
-| Rate limiting Redis (pub/auth/write) | PR #67 |
-| Error boundary global (error.vue) | PR #67 |
-| Env validation al boot | Ya existia (config.ts) |
-| CORS configurable | Ya existia (app.ts) |
-| Health check profundo (DB + Redis) | Ya existia (health.ts) |
-| Crear DB + deploy en Hetzner | Ya hecho (nova-api.aikalabs.cc funcionando) |
+| Item | Que hacer | Bloquea deploy? |
+|---|---|---|
+| Iconos PWA | Crear icon-192x192.png y icon-512x512.png en `apps/web/public/`. Sin estos la PWA no se instala en Android/iOS | No (la app web funciona, solo la instalacion PWA falla) |
+| Tasa de cambio inicial | El dueno la configura desde la PWA al primer uso. `POST /api/exchange-rate` ya existe. Sin tasa, las ventas fallan con 503 | No (es config de primer uso) |
 
-### Pendiente: Ops manuales
+### Prioridad alta (7 items)
 
-| Item | Que hacer |
-|---|---|
-| Iconos PWA | Crear icon-192x192.png y icon-512x512.png en apps/web/public/ |
-| Tasa de cambio inicial | El dueno la configura desde la PWA (POST /api/exchange-rate ya existe) |
+Estos items son necesarios para que Nova funcione correctamente en produccion con usuarios reales.
 
-### Pendiente: Codigo prioridad alta
+| # | Item | Que es | Que hacer |
+|---|---|---|---|
+| 1 | **Web Push notifications** | Alertas de stock critico y anomalias llegan al dueno sin que abra la app. La PWA ya usa `@vite-pwa/nuxt` pero las notificaciones push no estan configuradas | Configurar Web Push API: pedir permiso, almacenar suscripciones, enviar notificaciones cuando un producto baja de stock_critical o se detecta anomalia |
+| 2 | **Email transaccional** | Resumen diario, resumen semanal, reporte al contador. Actualmente no hay forma de enviar emails | Integrar Resend (100/dia gratis). Crear `services/email.ts`. Cron o boton manual para resumenes. Boton "Enviar al contador" genera PDF y lo envia |
+| 3 | **Exportacion PDF** | Los reportes no se pueden descargar ni enviar. El contador necesita libro de ventas en formato SENIAT | Generar PDFs server-side con `pdfmake`. Endpoints `GET /api/reports/{type}/export?format=pdf`. Reporte diario, semanal, P&L, libro de ventas |
+| 4 | **Exportacion Excel** | Los reportes no se pueden exportar a Excel. `xlsx` ya esta en dependencias del frontend | Endpoints `GET /api/reports/{type}/export?format=xlsx`. Usar `xlsx` para generar archivos |
+| 5 | **Import Excel (conectar)** | `inventory/import.vue` parsea archivos Excel/CSV localmente pero no hace POST para crear productos | Conectar a `POST /api/products` en batch. Validacion de columnas, preview antes de importar, reporte de errores por fila |
+| 6 | **Segmentos de clientes** | La tabla `customerSegments` existe pero no hay logica que calcule segmentos automaticamente | Implementar calculo: VIP (>10 compras + ticket alto), frecuente (>5 en 30d), en riesgo (30-60d sin compra), inactivo (60d+), con deuda, nuevo. Ejecutar al crear venta o como cron diario |
+| 7 | **ReportLayout period selector** | El selector de periodo en `ReportLayout.vue` no emite eventos. Los reportes siempre cargan el periodo default | Conectar el v-model del selector para que los reportes reaccionen al cambio de periodo |
 
-| Item | Descripcion |
-|---|---|
-| Eliminar gamificacion | Tablas, RLS, componente, endpoint /reports/gamification. Mantener ranking en /reports/sellers |
-| Structured logging | JSON logging con request ID, user ID, business ID |
-| Env vars frontend | Validar NUXT_PUBLIC_API_BASE al arrancar Nuxt |
-| Tests de ventas | POST /api/sales: stock, fiado, descuento, anulacion |
-| Tests de auth | Clerk JWT, X-Acting-As, dev mode |
-| Tests RLS | Negocio A no ve datos de B |
-| Tests catalogo | GET /catalog/:slug, 404s, productos inactivos |
-| Dockerfile verificacion | Probar build Docker con codigo actual |
+### Prioridad media (5 items)
 
-### Pendiente: Codigo prioridad media
+Mejoran la calidad y mantenibilidad pero no bloquean funcionalidad core.
 
-| Item | Descripcion |
-|---|---|
-| Web Push | Alertas de stock critico via service worker |
-| Email transaccional | Resend: resumen diario, reporte al contador |
-| Exportacion PDF | Reportes, libro de ventas SENIAT |
-| Exportacion Excel | Endpoint /reports/{type}/export |
-| Segmentos de clientes | Calculo automatico de VIP, frecuente, en riesgo |
-| Import Excel (conectar) | inventory/import.vue -> POST /api/products batch |
-| Seed datos iniciales | Cuentas contables, categorias por tipo de negocio |
-| ReportLayout period selector | Conectar selector de periodo a los reportes |
+| # | Item | Que es | Que hacer |
+|---|---|---|---|
+| 8 | **Seed de datos iniciales** | No hay datos pre-configurados para negocios nuevos. El onboarding crea un negocio vacio | Crear seed con: catalogo de cuentas contables por tipo de negocio (ferreteria, bodega, tienda de ropa), categorias default, unidades de medida comunes (unidad, caja, kg, litro) |
+| 9 | **Prediccion de flujo de caja** | No hay proyeccion de ingresos/gastos futuros | Proyectar ingresos (promedio ventas por dia de semana), sumar gastos fijos y cuentas por pagar, alertar si algun dia el balance proyectado es negativo |
+| 10 | **Error tracking (Sentry)** | Los errores en produccion no se capturan ni notifican. Solo se ven en logs de Coolify | Integrar `@sentry/node` en Hono y `@sentry/vue` en Nuxt. Capturar errores no manejados con contexto (userId, businessId, requestId) |
+| 11 | **Uptime monitoring** | No hay alertas si la API o el frontend se caen | Configurar Uptime Kuma (ya en el control plane) para monitorear `/health`, frontend, y catalogo |
+| 12 | **Migraciones Drizzle versionadas** | `entrypoint-api.sh` ejecuta `drizzle-kit push --force` en cada deploy. Esto es destructivo y puede perder datos | Migrar a `drizzle-kit generate` + `drizzle-kit migrate` con archivos de migracion versionados en el repo |
 
-### Pendiente: Codigo prioridad baja
+### Prioridad baja (4 items)
 
-| Item | Descripcion |
-|---|---|
-| Prediccion flujo de caja | Proyectar ingresos/gastos, alertar deficit |
-| Error tracking (Sentry) | @sentry/node + @sentry/vue |
-| Metricas basicas | Negocios activos, ventas/dia, errores/hora |
-| Uptime monitoring | Configurar Uptime Kuma |
-| PgBouncer + RLS | set_config session vs transaction mode |
-| Service Worker offline | Verificar que @vite-pwa/nuxt intercepta navegacion offline |
-| Migraciones Drizzle | Migrar de push a generate + migrate |
-| CI/CD automatico | Push a main -> staging, tag v* -> produccion |
-| E2E smoke tests | Playwright: login, producto, venta, dashboard, catalogo |
+Optimizaciones para escala futura.
+
+| # | Item | Que es | Que hacer |
+|---|---|---|---|
+| 13 | **PgBouncer + RLS** | `set_config` con `false` (session-level) puede no funcionar con PgBouncer en modo transaction. Actualmente Nova usa conexion directa (puerto 5432) | Evaluar si el trafico justifica PgBouncer. Si si, migrar a `set_config(..., true)` con transacciones explicitas |
+| 14 | **Service Worker offline** | `@vite-pwa/nuxt` esta configurado pero no verificado. La cola offline (`useOfflineQueue`) existe en codigo pero no se ha probado sin internet | Verificar que el SW intercepta navegacion offline, muestra pagina cached, y la cola sincroniza al volver |
+| 15 | **CI/CD automatico** | El deploy a Coolify es manual. No hay pipeline de staging | Configurar: push a main -> deploy a staging, tag v* -> deploy a produccion, smoke tests post-deploy |
+| 16 | **E2E tests (Playwright)** | `e2e/smoke.spec.ts` existe pero esta vacio. No hay tests end-to-end | Escribir tests: login con Clerk, crear producto, registrar venta, ver dashboard, ver catalogo publico |
 
 ---
 
@@ -193,8 +144,8 @@ Coolify (Control Plane 10.0.1.10)
 
 | Documento | Que cambiar |
 |---|---|
-| **doc 08** | Seccion "WhatsApp como entrada" descartada. Diferenciador 1 eliminado. Diferenciador 10 (catalogo) se mantiene como pagina web |
-| **doc 19** | Documento completo descartado (webhook, LLM interpreter, executor) |
+| **doc 08** | Seccion "WhatsApp como entrada" descartada. Diferenciador 1 (WA bidireccional) eliminado. Diferenciador 10 (catalogo) se mantiene como pagina web publica |
+| **doc 19** | Documento completo descartado (webhook, LLM interpreter, executor ya no existen) |
 | **doc 11** | Actualizar seccion WhatsApp: solo links wa.me/ y catalogo publico |
-| **doc 21** | Fase 7 cambia: catalogo publico + Web Push + email en vez de webhook + LLM |
-| **PRODUCTION-ROADMAP.md** | Reemplazado por este documento (doc 22) |
+| **doc 21** | Fase 7 cambia: catalogo publico + Web Push + email en vez de webhook + LLM. Fase 8 (gamificacion) eliminada |
+| **PRODUCTION-ROADMAP.md** | Reemplazado por este documento (doc 22). Items 7-9 (WhatsApp) ya no aplican |
