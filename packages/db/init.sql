@@ -71,6 +71,12 @@ CREATE POLICY price_history_tenant_isolation ON price_history
 
 -- Exchange rates: global table (no business_id), no RLS needed
 
+-- Exchange rates (per-business, RLS enabled)
+ALTER TABLE exchange_rates ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS exchange_rates_tenant_isolation ON exchange_rates;
+CREATE POLICY exchange_rates_tenant_isolation ON exchange_rates
+  USING (business_id = current_business_id());
+
 -- Sales
 ALTER TABLE sales ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS sales_tenant_isolation ON sales;

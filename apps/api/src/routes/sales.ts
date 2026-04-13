@@ -48,8 +48,9 @@ const salesRoutes = new Hono<AppEnv>();
 
 /** GET /exchange-rate - Get current BCV exchange rate. */
 salesRoutes.get("/exchange-rate", async (c) => {
+  const businessId = c.get("businessId");
   try {
-    const rate = await getCurrentRate();
+    const rate = await getCurrentRate(businessId);
     return c.json(rate);
   } catch (err) {
     const message =
@@ -86,7 +87,7 @@ salesRoutes.post(
     const { rateBcv, rateEur } = c.req.valid("json");
 
     try {
-      const rate = await setCurrentRate(rateBcv, rateEur);
+      const rate = await setCurrentRate(user.businessId, rateBcv, rateEur);
       return c.json(rate);
     } catch (err) {
       const message =
@@ -220,7 +221,7 @@ salesRoutes.post("/sales", zValidator("json", createSaleSchema), async (c) => {
   // 1. Get exchange rate (fail early if unavailable)
   let rate;
   try {
-    rate = await getCurrentRate();
+    rate = await getCurrentRate(businessId);
   } catch (err) {
     const message =
       err instanceof Error ? err.message : "Exchange rate unavailable";
