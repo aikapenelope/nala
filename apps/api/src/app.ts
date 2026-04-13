@@ -16,8 +16,8 @@
 
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import { logger } from "hono/logger";
 import { secureHeaders } from "hono/secure-headers";
+import { structuredLogger } from "./middleware/structured-logger";
 import { health } from "./routes/health";
 import { catalog } from "./routes/catalog";
 import { ownerPinRoute } from "./routes/auth";
@@ -102,7 +102,7 @@ app.use("*", secureHeaders());
 // Logger (only runs for legitimate requests, scanners are already blocked)
 // ---------------------------------------------------------------------------
 
-app.use("*", logger());
+app.use("*", structuredLogger);
 
 // ---------------------------------------------------------------------------
 // CORS

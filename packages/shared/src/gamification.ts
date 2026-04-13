@@ -1,13 +1,8 @@
 /**
- * Gamification utilities - seller rankings, goals, streaks.
+ * Seller ranking utility.
+ *
+ * Used by the /reports/sellers endpoint to rank sellers by total sales.
  */
-
-import { z } from "zod";
-
-/** Daily goal for a seller. */
-export const dailyGoalSchema = z.object({
-  targetUsd: z.number().min(0),
-});
 
 /** Seller ranking entry. */
 export interface SellerRanking {
@@ -17,20 +12,6 @@ export interface SellerRanking {
   totalUsd: number;
   avgTicket: number;
   rank: number;
-}
-
-/** Seller streak info. */
-export interface SellerStreak {
-  userId: string;
-  currentStreak: number;
-  bestStreak: number;
-  metGoalToday: boolean;
-}
-
-/** Calculate goal progress as percentage (0-100). */
-export function goalProgress(currentUsd: number, targetUsd: number): number {
-  if (targetUsd <= 0) return 100;
-  return Math.min(100, Math.round((currentUsd / targetUsd) * 100));
 }
 
 /**

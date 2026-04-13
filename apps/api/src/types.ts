@@ -14,5 +14,6 @@ export interface AppEnv {
     user: AuthUser;
     businessId: string;
     db: Database;
+    requestId: string;
   };
 }
