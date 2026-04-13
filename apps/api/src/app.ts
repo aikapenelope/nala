@@ -11,7 +11,6 @@
  * Routes:
  * - /health - health check (no auth required)
  * - /onboarding - business creation (Clerk JWT required, handled internally)
- * - /webhooks/whatsapp - Meta webhook (no auth)
  * - /api/* - protected API routes (auth + tenant required)
  */
 
@@ -20,6 +19,7 @@ import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 import { secureHeaders } from "hono/secure-headers";
 import { health } from "./routes/health";
+import { catalog } from "./routes/catalog";
 import { ownerPinRoute } from "./routes/auth";
 import { onboarding } from "./routes/onboarding";
 import { inventory } from "./routes/inventory";
@@ -27,10 +27,10 @@ import { salesRoutes } from "./routes/sales";
 import { customersRoutes } from "./routes/customers";
 import { reports } from "./routes/reports";
 import { accounting } from "./routes/accounting";
-import { whatsapp } from "./routes/whatsapp";
 import { team } from "./routes/team";
 import { authMiddleware } from "./middleware/auth";
 import { tenantMiddleware } from "./middleware/tenant";
+import { publicRateLimit, apiRateLimit } from "./middleware/rate-limit";
 import type { AppEnv } from "./types";
 
 export const app = new Hono();
@@ -127,8 +127,9 @@ app.use(
 // ---------------------------------------------------------------------------
 
 app.route("/health", health);
+app.use("/catalog/*", publicRateLimit);
+app.route("/catalog", catalog);
 app.route("/onboarding", onboarding);
-app.route("/webhooks/whatsapp", whatsapp);
 
 // ---------------------------------------------------------------------------
 // Protected API routes with typed context variables
@@ -137,6 +138,7 @@ app.route("/webhooks/whatsapp", whatsapp);
 const api = new Hono<AppEnv>();
 api.use("*", authMiddleware);
 api.use("*", tenantMiddleware);
+api.use("*", apiRateLimit);
 
 // User info route
 api.get("/me", (c) => {

@@ -27,22 +27,33 @@ import { sql } from "drizzle-orm";
  * Businesses table - each row is a tenant.
  * All other tables reference this via business_id for RLS isolation.
  */
-export const businesses = pgTable("businesses", {
-  id: uuid("id")
-    .default(sql`gen_random_uuid()`)
-    .primaryKey(),
-  name: text("name").notNull(),
-  type: text("type").notNull().default("otro"),
-  phone: text("phone"),
-  address: text("address"),
-  isActive: boolean("is_active").notNull().default(true),
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-});
+export const businesses = pgTable(
+  "businesses",
+  {
+    id: uuid("id")
+      .default(sql`gen_random_uuid()`)
+      .primaryKey(),
+    name: text("name").notNull(),
+    type: text("type").notNull().default("otro"),
+    phone: text("phone"),
+    address: text("address"),
+
+    /** URL-friendly identifier for the public catalog page. */
+    slug: text("slug"),
+
+    /** Business WhatsApp number for "Order via WhatsApp" links on the catalog. */
+    whatsappNumber: text("whatsapp_number"),
+
+    isActive: boolean("is_active").notNull().default(true),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [uniqueIndex("idx_businesses_slug").on(table.slug)],
+);
 
 /**
  * Users table - owners (Clerk auth) and employees (PIN auth).

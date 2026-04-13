@@ -11,9 +11,6 @@ export const MAX_PIN_ATTEMPTS = 5;
 /** PIN lockout duration in minutes. */
 export const PIN_LOCKOUT_MINUTES = 5;
 
-/** WhatsApp rate limit: max messages per hour per user. */
-export const WA_RATE_LIMIT_PER_HOUR = 30;
-
 /** Days without movement to mark a product as "dead stock". */
 export const DEAD_STOCK_DAYS = 60;
 

@@ -22,6 +22,7 @@ const PUBLIC_ROUTES = [
   "/auth/pin",
   "/auth/resolve",
   "/onboarding",
+  "/catalogo",
 ];
 
 export default defineNuxtRouteMiddleware((to) => {
