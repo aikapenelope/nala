@@ -130,7 +130,7 @@ Nova no es un sistema contable. Es un puente: genera la información que el cont
 | [19 - WhatsApp arquitectura y seguridad](docs/19-whatsapp-arquitectura-seguridad.md) | Alcance exacto (qué sí y qué no por WhatsApp), flujo completo de un mensaje, identificación por teléfono, seguridad, código del webhook, cuándo implementar |
 | [20 - Sistema de PIN y modos Admin/Empleado](docs/20-sistema-pin-modos-admin-empleado.md) | Acceso por Clerk (dueño) vs PIN (empleado), dispositivo compartido, cambio rápido de usuario, qué ve cada modo, acciones que requieren PIN del dueño, código de implementación |
 | **[21 - Fases de desarrollo definitivas](docs/21-fases-desarrollo-definitivas.md)** | **10 fases con tareas exactas, tests por fase, CI con GitHub Actions, cuándo hacer deploy a staging, timeline de 18 semanas** |
-| **[22 - Roadmap produccion + WhatsApp compliance](docs/22-production-roadmap-whatsapp-compliance.md)** | **Analisis de compliance Meta 2026, rediseno de WhatsApp (eliminar LLM, catalogo publico), roadmap completo de produccion en 7 fases (10 semanas)** |
+| **[22 - Roadmap produccion + decision WhatsApp](docs/22-production-roadmap-whatsapp-compliance.md)** | **Analisis de compliance Meta 2026, eliminacion de WhatsApp Business API, catalogo publico como pagina web, notificaciones via Web Push/email, roadmap de produccion en 7 fases (10 semanas)** |
 
 ## Licencia
 
