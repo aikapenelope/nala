@@ -74,11 +74,38 @@ async function exportExcel() {
   }
 }
 
+/** Send report PDF to accountant via email. */
+const showEmailModal = ref(false);
+const accountantEmail = ref("");
+const sendingEmail = ref(false);
+
 function sendToAccountant() {
-  const text = encodeURIComponent(
-    "Hola, aqui esta el reporte contable de este periodo.",
-  );
-  window.open(`https://wa.me/?text=${text}`, "_blank");
+  showEmailModal.value = true;
+}
+
+async function confirmSendEmail() {
+  if (!accountantEmail.value || !props.exportPath) return;
+  sendingEmail.value = true;
+
+  // Derive reportType from exportPath: "/api/reports/daily" -> "daily"
+  const reportType = props.exportPath.split("/").pop() ?? "daily";
+
+  try {
+    await $api("/api/reports/send-email", {
+      method: "POST",
+      body: {
+        to: accountantEmail.value,
+        reportType,
+        period: period.value,
+      },
+    });
+    showEmailModal.value = false;
+    alert("Reporte enviado por email.");
+  } catch {
+    alert("Error enviando email. Verifica la direccion e intenta de nuevo.");
+  } finally {
+    sendingEmail.value = false;
+  }
 }
 </script>
 
@@ -135,6 +162,40 @@ function sendToAccountant() {
       >
         Enviar al contador
       </button>
+    </div>
+
+    <!-- Email modal -->
+    <div
+      v-if="showEmailModal"
+      class="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+      @click.self="showEmailModal = false"
+    >
+      <div class="mx-4 w-full max-w-sm rounded-xl bg-white p-6 shadow-lg">
+        <h3 class="mb-3 text-lg font-semibold text-gray-900">
+          Enviar reporte por email
+        </h3>
+        <input
+          v-model="accountantEmail"
+          type="email"
+          placeholder="contador@email.com"
+          class="mb-4 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+        />
+        <div class="flex gap-3">
+          <button
+            class="flex-1 rounded-lg border border-gray-300 py-2 text-sm font-medium text-gray-700"
+            @click="showEmailModal = false"
+          >
+            Cancelar
+          </button>
+          <button
+            class="flex-1 rounded-lg bg-green-600 py-2 text-sm font-medium text-white disabled:opacity-50"
+            :disabled="!accountantEmail || sendingEmail"
+            @click="confirmSendEmail"
+          >
+            {{ sendingEmail ? "Enviando..." : "Enviar" }}
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 </template>
