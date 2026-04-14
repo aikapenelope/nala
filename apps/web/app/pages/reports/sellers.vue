@@ -40,6 +40,7 @@ watch(period, fetchReport);
     v-model="period"
     title="Ventas por vendedor"
     :narrative="narrative"
+    export-path="/api/reports/sellers"
   >
     <div v-if="isLoading" class="py-12 text-center text-gray-400">
       Cargando...
