@@ -10,7 +10,7 @@
  * 5. Device has cached roster?    -> redirect to /auth/pin (shared device)
  * 6. Nothing                      -> redirect to /landing (new device)
  *
- * When on a tenant subdomain (e.g., bodegadonpedro.nova.aikalabs.cc):
+ * When on a tenant subdomain (e.g., bodegadonpedro.novaincs.com):
  * - Unauthenticated visitors see the public catalog
  * - Employees with cached roster see the PIN screen
  * - The subdomain identifies the business without localStorage

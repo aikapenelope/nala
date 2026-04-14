@@ -95,12 +95,12 @@ Tenancy:  Subdomain-per-tenant listo en codigo. Pendiente: dominio dedicado + DN
 
 | Paso | Que hacer |
 |---|---|
-| 1 | Comprar dominio dedicado (ej: novapp.com, usenova.com) |
-| 2 | Configurar DNS en Cloudflare: `*.novapp.com` CNAME `nova.aikalabs.cc` (proxied) |
-| 3 | Agregar `*.novapp.com` como dominio en Coolify (nova-web) |
-| 4 | Agregar env vars: `NUXT_PUBLIC_TENANT_DOMAIN=novapp.com` y `TENANT_DOMAIN=novapp.com` |
-| 5 | Configurar Clerk: agregar novapp.com como dominio permitido |
-| 6 | Verificar: `curl https://test.novapp.com` |
+| 1 | Comprar dominio dedicado (ej: novaincs.com, usenova.com) |
+| 2 | Configurar DNS en Cloudflare: `*.novaincs.com` CNAME `nova.aikalabs.cc` (proxied) |
+| 3 | Agregar `*.novaincs.com` como dominio en Coolify (nova-web) |
+| 4 | Agregar env vars: `NUXT_PUBLIC_TENANT_DOMAIN=novaincs.com` y `TENANT_DOMAIN=novaincs.com` |
+| 5 | Configurar Clerk: agregar novaincs.com como dominio permitido |
+| 6 | Verificar: `curl https://test.novaincs.com` |
 
 ### Ops manuales (2 items)
 
@@ -151,16 +151,16 @@ Coolify (Control Plane 10.0.1.10)
 |   +-- REDIS_URL -> 10.0.1.20:6379/4
 |   +-- CLERK_SECRET_KEY
 |   +-- CORS_ORIGIN -> https://nova.aikalabs.cc
-|   +-- TENANT_DOMAIN -> novapp.com (pendiente)
+|   +-- TENANT_DOMAIN -> novaincs.com (pendiente)
 |   +-- OPENROUTER_API_KEY (opcional)
 |
 +-- nova-web (Docker, puerto 3000)
 |   +-- NUXT_PUBLIC_API_BASE -> https://nova-api.aikalabs.cc
 |   +-- NUXT_PUBLIC_CLERK_PUBLISHABLE_KEY
-|   +-- NUXT_PUBLIC_TENANT_DOMAIN -> novapp.com (pendiente)
+|   +-- NUXT_PUBLIC_TENANT_DOMAIN -> novaincs.com (pendiente)
 |
 +-- Traefik (reverse proxy)
     +-- nova.aikalabs.cc -> nova-web:3000
     +-- nova-api.aikalabs.cc -> nova-api:3001
-    +-- *.novapp.com -> nova-web:3000 (pendiente)
+    +-- *.novaincs.com -> nova-web:3000 (pendiente)
 ```

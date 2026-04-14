@@ -10,7 +10,7 @@
 
 Comprar un dominio `.com` dedicado para los subdominios de tenant. Opciones:
 
-- `novapp.com`
+- `novaincs.com`
 - `usenova.com`
 - `getnova.com`
 - `nova-app.com`
@@ -19,7 +19,7 @@ Cualquier registrador funciona (Cloudflare Registrar, Namecheap, Google Domains)
 
 **Costo:** ~$10-15/ano.
 
-**Por que un dominio dedicado:** `bodegadonpedro.nova.aikalabs.cc` es un subdominio de tercer nivel. El SSL gratuito de Cloudflare (Universal SSL) solo cubre hasta primer nivel. Con un dominio dedicado, `bodegadonpedro.novapp.com` es primer nivel y el SSL es gratis.
+**Por que un dominio dedicado:** `bodegadonpedro.nova.aikalabs.cc` es un subdominio de tercer nivel. El SSL gratuito de Cloudflare (Universal SSL) solo cubre hasta primer nivel. Con un dominio dedicado, `bodegadonpedro.novaincs.com` es primer nivel y el SSL es gratis.
 
 ---
 
@@ -37,7 +37,7 @@ Destino: nova.aikalabs.cc
 Proxy:   Activado (nube naranja)
 ```
 
-**Registro 2: dominio raiz (para que novapp.com tambien funcione)**
+**Registro 2: dominio raiz (para que novaincs.com tambien funcione)**
 ```
 Tipo:    CNAME
 Nombre:  @
@@ -47,11 +47,11 @@ Proxy:   Activado (nube naranja)
 
 **Verificar que funciona:**
 ```bash
-dig +short bodegadonpedro.novapp.com
+dig +short bodegadonpedro.novaincs.com
 # Deberia mostrar IPs de Cloudflare (172.67.x.x o 104.21.x.x)
 ```
 
-**SSL:** Cloudflare genera certificado automaticamente para `*.novapp.com` porque es primer nivel. No hay que hacer nada extra.
+**SSL:** Cloudflare genera certificado automaticamente para `*.novaincs.com` porque es primer nivel. No hay que hacer nada extra.
 
 ---
 
@@ -63,23 +63,23 @@ Ir a Coolify Dashboard -> el servicio `nova-web`.
 
 En la seccion de dominios del servicio, agregar:
 ```
-*.novapp.com
+*.novaincs.com
 ```
 
 Coolify genera la regla de Traefik automaticamente. No necesitas editar archivos de Traefik.
 
-Si Coolify pide confirmacion o muestra un campo de "Custom Domain", escribir `*.novapp.com` y guardar.
+Si Coolify pide confirmacion o muestra un campo de "Custom Domain", escribir `*.novaincs.com` y guardar.
 
 **3b. Agregar variables de entorno al servicio nova-web**
 
 ```
-NUXT_PUBLIC_TENANT_DOMAIN=novapp.com
+NUXT_PUBLIC_TENANT_DOMAIN=novaincs.com
 ```
 
 **3c. Agregar variables de entorno al servicio nova-api**
 
 ```
-TENANT_DOMAIN=novapp.com
+TENANT_DOMAIN=novaincs.com
 ```
 
 **3d. Redesplegar ambos servicios**
@@ -95,7 +95,7 @@ Ir a Clerk Dashboard (dashboard.clerk.com) -> Settings -> Domains.
 
 **4a. Agregar el nuevo dominio**
 
-Agregar `novapp.com` como dominio permitido. Esto permite que Clerk comparta sesiones entre `novapp.com` y todos sus subdominios (`bodegadonpedro.novapp.com`, etc.).
+Agregar `novaincs.com` como dominio permitido. Esto permite que Clerk comparta sesiones entre `novaincs.com` y todos sus subdominios (`bodegadonpedro.novaincs.com`, etc.).
 
 **4b. Verificar DNS de Clerk**
 
@@ -109,13 +109,13 @@ Esperar 2-5 minutos para que DNS propague y Coolify redespliegue.
 
 **5a. Verificar DNS**
 ```bash
-dig +short test123.novapp.com
+dig +short test123.novaincs.com
 # Debe mostrar IPs de Cloudflare
 ```
 
 **5b. Verificar SSL**
 ```bash
-curl -s -o /dev/null -w "%{http_code}" https://test123.novapp.com
+curl -s -o /dev/null -w "%{http_code}" https://test123.novaincs.com
 # Debe retornar 200 o 302 (redirect al catalogo o landing)
 ```
 
@@ -123,7 +123,7 @@ curl -s -o /dev/null -w "%{http_code}" https://test123.novapp.com
 
 Si ya hay un negocio con slug en la DB:
 ```bash
-curl -s https://{slug}.novapp.com
+curl -s https://{slug}.novaincs.com
 # Debe mostrar el catalogo publico del negocio
 ```
 
@@ -139,28 +139,28 @@ curl -s https://nova.aikalabs.cc
 
 ## Paso 6: Verificar CORS
 
-Abrir el navegador en `https://bodegadonpedro.novapp.com` (o cualquier subdominio). Abrir DevTools -> Console. Si hay errores de CORS, verificar que `TENANT_DOMAIN=novapp.com` esta configurado en nova-api.
+Abrir el navegador en `https://bodegadonpedro.novaincs.com` (o cualquier subdominio). Abrir DevTools -> Console. Si hay errores de CORS, verificar que `TENANT_DOMAIN=novaincs.com` esta configurado en nova-api.
 
 ---
 
 ## Resumen de cambios por servicio
 
 ### Cloudflare (nuevo dominio)
-- `*.novapp.com` CNAME `nova.aikalabs.cc` (proxied)
-- `novapp.com` CNAME `nova.aikalabs.cc` (proxied)
+- `*.novaincs.com` CNAME `nova.aikalabs.cc` (proxied)
+- `novaincs.com` CNAME `nova.aikalabs.cc` (proxied)
 - Registros DNS de Clerk (si los pide)
 
 ### Coolify: nova-web
-- Dominio: agregar `*.novapp.com`
-- Env: `NUXT_PUBLIC_TENANT_DOMAIN=novapp.com`
+- Dominio: agregar `*.novaincs.com`
+- Env: `NUXT_PUBLIC_TENANT_DOMAIN=novaincs.com`
 - Redeploy
 
 ### Coolify: nova-api
-- Env: `TENANT_DOMAIN=novapp.com`
+- Env: `TENANT_DOMAIN=novaincs.com`
 - Redeploy
 
 ### Clerk Dashboard
-- Agregar `novapp.com` como dominio permitido
+- Agregar `novaincs.com` como dominio permitido
 - Verificar DNS si lo pide
 
 ---
@@ -171,8 +171,8 @@ Abrir el navegador en `https://bodegadonpedro.novapp.com` (o cualquier subdomini
 |---|---|---|
 | `dig` no resuelve | DNS no propagado | Esperar 5-10 min. Verificar que el registro esta proxied en Cloudflare |
 | SSL error (ERR_SSL) | Certificado no generado | Esperar 5-15 min. Cloudflare genera el cert automaticamente |
-| 404 en el subdominio | Coolify no tiene el wildcard | Verificar que `*.novapp.com` esta en los dominios del servicio nova-web |
-| CORS error en console | TENANT_DOMAIN no configurado en nova-api | Agregar `TENANT_DOMAIN=novapp.com` y redesplegar nova-api |
-| Clerk no funciona en subdominio | Dominio no agregado en Clerk | Agregar novapp.com en Clerk Dashboard -> Domains |
+| 404 en el subdominio | Coolify no tiene el wildcard | Verificar que `*.novaincs.com` esta en los dominios del servicio nova-web |
+| CORS error en console | TENANT_DOMAIN no configurado en nova-api | Agregar `TENANT_DOMAIN=novaincs.com` y redesplegar nova-api |
+| Clerk no funciona en subdominio | Dominio no agregado en Clerk | Agregar novaincs.com en Clerk Dashboard -> Domains |
 | Onboarding no pide slug | PR #73 no desplegado | Verificar que el ultimo deploy de nova-web incluye el commit de PR #73 |
 | Catalogo muestra "No se encontro" | Negocio no tiene slug en DB | Crear un negocio nuevo desde el onboarding (ahora pide slug) |

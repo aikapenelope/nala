@@ -49,7 +49,7 @@ export function useTenant() {
 
   const hasTenant = computed(() => tenantSlug.value !== null);
 
-  /** Full tenant URL (e.g., "https://bodegadonpedro.nova.aikalabs.cc"). */
+  /** Full tenant URL (e.g., "https://bodegadonpedro.novaincs.com"). */
   const tenantUrl = computed(() => {
     if (!tenantSlug.value) return null;
     return `https://${tenantSlug.value}.${tenantDomain}`;
