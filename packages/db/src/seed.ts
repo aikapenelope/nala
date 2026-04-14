@@ -23,7 +23,7 @@ async function seed() {
 
   console.log("Seeding database...");
 
-  // Create a sample business
+  // Create a sample business (slug required for public catalog)
   const [business] = await db
     .insert(businesses)
     .values({
@@ -31,6 +31,8 @@ async function seed() {
       type: "bodega",
       phone: "+58412-555-0001",
       address: "Av. Principal, Los Teques, Miranda",
+      slug: "bodega-don-pedro",
+      whatsappNumber: "+584125550001",
     })
     .returning();
 
