@@ -306,8 +306,9 @@ export const priceHistory = pgTable("price_history", {
 // ============================================================
 
 /**
- * Exchange rates - BCV and parallel rates per day.
- * Updated daily via cron job. Cached in Redis for fast access.
+ * Exchange rates - BCV and parallel rates per day per business.
+ * Each business sets their own rate manually from the dashboard.
+ * Cached in Redis per tenant for fast access.
  */
 export const exchangeRates = pgTable(
   "exchange_rates",
@@ -315,17 +316,26 @@ export const exchangeRates = pgTable(
     id: uuid("id")
       .default(sql`gen_random_uuid()`)
       .primaryKey(),
-    /** Date this rate applies to (one rate per day). */
+    /** Business that owns this rate. */
+    businessId: uuid("business_id")
+      .notNull()
+      .references(() => businesses.id),
+    /** Date this rate applies to (one rate per day per business). */
     date: timestamp("date", { withTimezone: true }).notNull(),
     /** Official BCV rate (Bs. per 1 USD). */
     rateBcv: numeric("rate_bcv", { precision: 12, scale: 4 }).notNull(),
-    /** Parallel/informal rate (optional, manually set by owner). */
+    /** EUR rate (optional, manually set by owner). */
     rateParallel: numeric("rate_parallel", { precision: 12, scale: 4 }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
   },
-  (table) => [uniqueIndex("idx_exchange_rates_date").on(table.date)],
+  (table) => [
+    uniqueIndex("idx_exchange_rates_business_date").on(
+      table.businessId,
+      table.date,
+    ),
+  ],
 );
 
 /**

@@ -1,23 +1,24 @@
 /**
- * BCV exchange rate service.
+ * BCV exchange rate service (per-tenant).
  *
- * Rates are set manually by the business owner from the dashboard.
+ * Rates are set manually by each business owner from the dashboard.
  * Supports USD and EUR (the two currencies used in Venezuelan commerce).
  *
- * Storage: exchange_rates table (history) + Redis cache (fast reads).
- * The `rate_bcv` column stores USD rate, `rate_parallel` stores EUR rate.
+ * Storage: exchange_rates table (history, per business) + Redis cache (fast reads, per tenant).
  *
  * No external API calls. The owner enters the rate they see on bcv.org.ve
- * or whatever source they trust. This is the pattern used by Aurora and
- * most Venezuelan commerce apps in 2026.
+ * or whatever source they trust.
  */
 
-import { desc } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { exchangeRates } from "@nova/db";
 import { getRedis } from "../redis";
 import { tryGetDb } from "../db";
 
-const REDIS_KEY = "nova:exchange_rate:current";
+/** Redis key scoped to a specific business. */
+function redisKey(businessId: string): string {
+  return `nova:${businessId}:exchange_rate:current`;
+}
 
 /** Exchange rate info returned to callers. */
 export interface ExchangeRateInfo {
@@ -31,18 +32,22 @@ export interface ExchangeRateInfo {
 }
 
 /**
- * Get the current exchange rate.
+ * Get the current exchange rate for a specific business.
  *
  * Lookup order:
- * 1. Redis cache (fastest)
- * 2. Database exchange_rates table (latest entry)
+ * 1. Redis cache (fastest, scoped to businessId)
+ * 2. Database exchange_rates table (latest entry for this business)
  * 3. Error - no rate available
  */
-export async function getCurrentRate(): Promise<ExchangeRateInfo> {
+export async function getCurrentRate(
+  businessId: string,
+): Promise<ExchangeRateInfo> {
   const redis = getRedis();
+  const key = redisKey(businessId);
+
   if (redis) {
     try {
-      const cached = await redis.get(REDIS_KEY);
+      const cached = await redis.get(key);
       if (cached) {
         return JSON.parse(cached) as ExchangeRateInfo;
       }
@@ -57,6 +62,7 @@ export async function getCurrentRate(): Promise<ExchangeRateInfo> {
       const [latest] = await db
         .select()
         .from(exchangeRates)
+        .where(eq(exchangeRates.businessId, businessId))
         .orderBy(desc(exchangeRates.date))
         .limit(1);
 
@@ -71,7 +77,7 @@ export async function getCurrentRate(): Promise<ExchangeRateInfo> {
 
         if (redis) {
           try {
-            await redis.set(REDIS_KEY, JSON.stringify(info), "EX", 300);
+            await redis.set(key, JSON.stringify(info), "EX", 300);
           } catch {
             // Non-critical
           }
@@ -90,11 +96,12 @@ export async function getCurrentRate(): Promise<ExchangeRateInfo> {
 }
 
 /**
- * Set the current exchange rate (manual, by the business owner).
+ * Set the current exchange rate for a specific business (manual, by the owner).
  *
  * Inserts a new row in exchange_rates (keeps history) and updates Redis cache.
  */
 export async function setCurrentRate(
+  businessId: string,
   rateBcv: number,
   rateEur?: number,
 ): Promise<ExchangeRateInfo> {
@@ -117,6 +124,7 @@ export async function setCurrentRate(
   const db = tryGetDb();
   if (db) {
     await db.insert(exchangeRates).values({
+      businessId,
       date: now,
       rateBcv: String(rateBcv),
       rateParallel: rateEur ? String(rateEur) : null,
@@ -125,7 +133,7 @@ export async function setCurrentRate(
 
   const redis = getRedis();
   if (redis) {
-    await redis.set(REDIS_KEY, JSON.stringify(info), "EX", 86400);
+    await redis.set(redisKey(businessId), JSON.stringify(info), "EX", 86400);
   }
 
   return info;
