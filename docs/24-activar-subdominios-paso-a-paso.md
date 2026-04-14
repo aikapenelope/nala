@@ -1,8 +1,8 @@
 # Nova: Activar Subdominios — Paso a Paso
 
 > Fecha: Abril 2026
-> Prerequisito: todo el codigo ya esta mergeado (PRs #66-#73). Solo falta configuracion.
-> Tiempo estimado: 30-45 minutos.
+> Estado: **COMPLETADO**. Dominio novaincs.com activo. Subdominios funcionando.
+> Pendiente: migrar Clerk de nova.aikalabs.cc a novaincs.com.
 
 ---
 
