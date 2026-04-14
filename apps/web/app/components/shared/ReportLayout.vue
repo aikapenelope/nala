@@ -52,9 +52,26 @@ async function exportPdf() {
   }
 }
 
-function exportExcel() {
-  // TODO: Sprint 4 - Generate Excel export
-  alert("Exportacion Excel proximamente");
+/** Download a report as Excel from the API. */
+async function exportExcel() {
+  if (!props.exportPath) {
+    alert("Exportacion Excel no disponible para este reporte");
+    return;
+  }
+  try {
+    const blob = await $api<Blob>(
+      `${props.exportPath}/export-xlsx?period=${period.value}`,
+      { responseType: "blob" },
+    );
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `reporte-${new Date().toISOString().split("T")[0]}.xlsx`;
+    a.click();
+    URL.revokeObjectURL(url);
+  } catch {
+    alert("Error generando Excel. Intenta de nuevo.");
+  }
 }
 
 function sendToAccountant() {
