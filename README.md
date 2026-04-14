@@ -1,137 +1,111 @@
 # Nova
 
-Backoffice operativo para comerciantes y PyMEs. Fácil como un cuaderno, potente como un ERP, inteligente como un socio que sabe de números.
+Backoffice operativo para comerciantes y PyMEs en Venezuela. Ventas, inventario, clientes, cuentas, reportes y contabilidad en un solo lugar.
 
-## Qué es Nova
+## Estado
 
-Nova es el sistema nervioso central de un negocio pequeño. Ventas, inventario, clientes, cuentas, reportes y contabilidad en un solo lugar. Funciona en escritorio, en el celular y por WhatsApp. Funciona sin internet. Tiene inteligencia integrada en cada pantalla que le dice al dueño qué hacer sin que pregunte.
+Nova esta corriendo en produccion:
 
-No es un POS. No es un software contable. No es un CRM. Es el backoffice completo que conecta todo lo que un comerciante necesita para operar su negocio día a día.
+```
+API:  https://nova-api.aikalabs.cc
+Web:  https://nova.aikalabs.cc
+CI:   GitHub Actions (typecheck + lint + 17 tests + build)
+```
+
+## Stack tecnico
+
+| Capa | Tecnologia |
+|---|---|
+| Frontend | Nuxt 4 (Vue 3), Tailwind 4, PWA con Service Workers |
+| DB local | IndexedDB (Dexie.js) — cache local + cola offline |
+| Backend | Hono (TypeScript) |
+| Base de datos | PostgreSQL 16 + pgvector, Row Level Security |
+| Cache | Redis 7 |
+| Auth | Clerk (JWT) + PIN local (bcrypt en browser) |
+| IA | OpenRouter (GPT-4o-mini), Groq (fallback) |
+| OCR | GPT-4o-mini vision via OpenRouter |
+| Hosting | Hetzner Cloud (Coolify) |
+| CI/CD | GitHub Actions |
+| Monorepo | Turborepo |
+
+## Arquitectura
+
+```
+apps/
+  api/     Hono REST API (40+ endpoints, structured JSON logging, rate limiting)
+  web/     Nuxt 4 SSR + PWA (27 paginas, subdomain-per-tenant)
+packages/
+  db/      Drizzle ORM schema (26 tablas, RLS policies)
+  shared/  Zod schemas, constantes, utilidades
+```
+
+### Multi-tenancy
+
+- **DB**: PostgreSQL RLS con `set_config('app.current_business_id', ...)` por request
+- **Auth**: Clerk JWT autentica el dispositivo, PIN identifica al empleado localmente
+- **Subdominios**: cada negocio tiene su URL publica (`negocio.{dominio}`) con catalogo integrado
+- **Cache**: Redis keys scopeadas por tenant (`nova:{businessId}:...`)
+
+### Autenticacion (patron Square)
+
+1. Dueno hace sign-in con Clerk (una vez por dispositivo)
+2. Empleados usan PIN de 4 digitos contra roster cacheado en localStorage (bcrypt)
+3. Backend recibe Clerk JWT + header X-Acting-As con userId del empleado
+4. No hay endpoints publicos de auth — PIN se verifica localmente
 
 ## Para quién es
 
-El dueño-operador: la persona que abre el negocio a las 6am, atiende clientes, cuenta inventario, cobra deudas, paga al proveedor y cierra caja a las 8pm. Ferreterías, tiendas de ropa, autopartes, peluquerías, bodegas, farmacias, tiendas de electrónica, librerías, cosméticos, distribuidoras de alimentos. PyMEs de 1 a 30 empleados en mercados emergentes, empezando por Venezuela. No restaurantes (la complejidad de mesas, recetas y cocina requiere un producto vertical dedicado).
+Ferreterias, bodegas, tiendas de ropa, autopartes, peluquerias, farmacias, tiendas de electronica, librerias, cosmeticos, distribuidoras. PyMEs de 1 a 30 empleados en Venezuela.
 
-## Por qué existe
+## Que hace
 
-Los sistemas administrativos actuales en este mercado son de dos tipos: demasiado simples (un cuaderno digital sin inteligencia) o demasiado complejos (ERPs que nadie entiende). Nova es potente porque es fácil de usar, no a pesar de serlo.
+- **Ventas**: registro en 3-4 toques, 7 metodos de pago, funciona offline
+- **Inventario**: variantes, semaforo de stock, prediccion de agotamiento, importacion Excel
+- **Clientes**: perfil automatico, cuentas por cobrar/pagar, cobro via wa.me/
+- **Reportes**: 7 reportes con narrativa IA, dashboard con progressive disclosure
+- **Contabilidad**: asientos automaticos, catalogo de cuentas por tipo de negocio, exportacion para el contador
+- **Catalogo publico**: pagina web por negocio con productos, precios, boton "Pedir por WhatsApp"
+- **Multi-empleado**: dueno + empleados con PIN, ranking de vendedores, cierre de dia
 
-## Principios de diseño
+## Desarrollo local
 
-- **Producto completo, experiencia simple.** Todas las capacidades de un sistema profesional. Cada feature presentado de la forma más simple posible. La potencia está disponible, no impuesta.
-- **Online-first con cache agresivo.** Los datos se cachean localmente en IndexedDB. La app responde instantáneamente desde cache y sincroniza con el servidor en background. Si se cae internet, las ventas se guardan en cola y se envían cuando vuelve. El usuario nunca ve un spinner ni un error de red. Cero cambios en infra -- todo el cache vive en el navegador.
-- **Inteligencia en cada pantalla.** La IA no es un módulo. Está integrada en inventario, ventas, clientes, reportes y cuentas. El usuario ve resultados, no algoritmos.
-- **Tres formas de acceso.** Desktop (centro de análisis y configuración), móvil PWA (centro de acción y captura de datos), WhatsApp (acceso rápido bidireccional). Una sola app, un solo codebase, prioridades diferentes por contexto. Patrón validado por Square (Dashboard vs POS App), Shopify (Admin vs POS) y Lightspeed (Backoffice vs App). Desktop para sesiones largas de análisis (reportes, inventario completo, configuración, exportación contable). Móvil para sesiones cortas de acción (vender en 3 toques, escanear facturas, cobrar por WhatsApp, consultar stock, recibir alertas).
-- **Multi-tenant con RLS.** Una sola base de datos PostgreSQL con Row Level Security. Un negocio nunca ve datos de otro. Escala a miles de tenants sin complejidad operativa.
+```bash
+# Requisitos: Node 22+, Docker (para PostgreSQL + Redis)
+git clone https://github.com/aikapenelope/nala.git
+cd nala
+npm ci
+docker compose up -d    # PostgreSQL 16 + Redis 7 + MinIO
+cp .env.example .env    # Configurar Clerk keys
+npm run dev             # Turborepo: API en :3001, Web en :3000
+```
 
-## Qué hace
-
-### Vender
-Registro de venta en 3-4 toques. Funciona offline. 7 métodos de pago (efectivo, Pago Móvil, Binance, Zinli, transferencia, Zelle, fiado). Seguimiento de vendedores. Descuentos por línea y por ticket. Escaneo de código de barras con la cámara. Cotizaciones con envío por WhatsApp.
-
-### Saber cuánto tengo
-Inventario con variantes (talla, color, referencia, modelo). Fechas de vencimiento. Semáforo de stock (verde, amarillo, rojo, gris). Predicción de agotamiento por producto. Análisis de rentabilidad (margen, rotación, score). Detección de productos muertos. Importación desde Excel. Conteo físico con escáner.
-
-### Saber cuánto me deben y debo
-Cuentas por cobrar y por pagar con código de color por antigüedad. Cobro por WhatsApp en un toque. Conciliación básica de pagos. Alertas predictivas de flujo de caja.
-
-### Saber cómo me fue
-Dashboard con ventas del día y comparativa automática. 7 reportes pre-construidos con gráficos, tablas y narrativa generada por IA. Resumen diario y semanal automático. Exportación PDF y Excel. Todos los montos en USD y Bs. con tasa BCV automática.
-
-### Cobrar y comunicar
-Cobros por WhatsApp con mensaje personalizado. Campañas por segmento de clientes. Envío de recibos digitales. Recordatorios automáticos. Catálogo de productos compartible por WhatsApp.
-
-### Conocer a mis clientes
-Perfil automático con historial de compras, frecuencia, ticket promedio, productos favoritos y saldo. Segmentos automáticos (VIP, frecuentes, en riesgo, nuevos, con deuda, inactivos). Badges visuales en toda la app.
-
-### Controlar el negocio
-2 roles: Dueño (ve todo, configura todo) y Empleado (solo vende y consulta, no ve costos ni reportes financieros). Cada usuario con PIN propio para accountability. Log de actividad completo. Gamificación para vendedores (ranking, metas, rachas). Cierre de día automático con cuadre de caja. 2FA por email. Backups automáticos.
-
-### Contabilidad (puente al contador)
-Nova no es un sistema contable. Es un puente: genera la información que el contador necesita en el formato que su sistema entiende. Exportación automática en Excel con formato de libro diario (fecha, cuenta, debe, haber). Catálogo de cuentas pre-configurado por tipo de negocio que el contador ajusta una vez. Botón "Enviar al contador" que genera el paquete (ventas, gastos, P&L) y abre WhatsApp con el archivo. Libros de compras y ventas en formato SENIAT.
-
-### WhatsApp bidireccional
-**Salida:** Resúmenes diarios, alertas, cobros a clientes, reportes al contador, campañas, recibos.
-**Entrada:** Consultar ventas, inventario, clientes. Registrar ventas simples. Actualizar precios. Lanzar cobros. Todo por chat, con confirmación antes de modificar datos. El OCR de facturas y recibos se hace desde la PWA (cámara nativa, resolución completa) porque WhatsApp comprime las imágenes y pierde calidad.
-
-## Diferenciadores
-
-| # | Feature | Detalle |
-|---|---|---|
-| 1 | WhatsApp bidireccional | Consultar, vender, cobrar y registrar gastos por chat. Sin necesidad de abrir la app |
-| 2 | Foto = Dato | OCR de facturas, recibos y listas desde la cámara de la PWA (resolución completa). La foto se convierte en dato registrado |
-| 3 | Cierre de día automático | Cuadre de caja, detección de discrepancias, resumen al dueño, asientos contables. Sin tocar nada |
-| 4 | Benchmark anónimo | Comparar rendimiento vs negocios similares en la plataforma (datos anonimizados) |
-| 5 | Asistente de compras | Genera la orden al proveedor basada en predicciones y la envía por WhatsApp |
-| 6 | Historial de precios | Alerta cuando el costo sube y el margen baja. Sugiere ajuste de precio |
-| 7 | Multi-moneda inteligente | Precios en USD, cobro en Bs. con tasa BCV automática. Historial de tasa por transacción |
-| 8 | Gamificación | Ranking de vendedores, metas diarias, rachas, logros. Motiva sin supervisión |
-| 9 | Onboarding interactivo | Aprende dentro de la app con datos reales. Sin tutoriales en video |
-| 10 | Catálogo compartible | Link a página web ligera con productos y precios. El cliente pide por WhatsApp |
-| 11 | Alertas predictivas de flujo de caja | Proyecta ingresos y gastos. Alerta si viene un déficit. Sugiere cobros |
-| 12 | Inteligencia en cada pantalla | Predicciones, comparativas, narrativas y alertas integradas donde se necesitan |
-| 13 | Online-first con cache agresivo | Respuesta instantánea desde cache local. Ventas en cola si no hay internet. Sincroniza en background |
-
-## Stack técnico
-
-| Capa | Tecnología |
-|---|---|
-| Frontend | Nuxt 4 (Vue 3), PWA con Service Workers |
-| DB local | IndexedDB (Dexie.js) -- cache local + cola de operaciones offline |
-| Backend | Hono (TypeScript, 14KB, ultra-rápido) |
-| Base de datos | PostgreSQL, pgvector |
-| Cache | Redis 7 (ya en data plane 10.0.1.20) |
-| Storage | MinIO (S3-compatible) |
-| IA | OpenRouter (GPT-4o-mini primary), Groq (fallback) |
-| WhatsApp | Meta Cloud API directo |
-| Notificaciones | Web Push API, Twilio (SMS fallback) |
-| OCR | GPT-4o-mini vision vía OpenRouter (v1), PaddleOCR self-hosted (v2+ a escala) |
-| Hosting | Hetzner |
-| CI/CD | GitHub Actions, Coolify |
-
-## Modelo de negocio
-
-| Plan | Precio | Incluye |
-|---|---|---|
-| Gratis | $0/mes | 1 negocio, 1 usuario, 50 productos, ventas ilimitadas, offline, dashboard, inventario |
-| Pro | $19/mes | 1 negocio, usuarios ilimitados (Dueño + Empleados con PIN), productos ilimitados, inteligencia, cobros WhatsApp, exportación contable, reportes completos |
-| Negocio | $35/mes | Todo Pro + soporte prioritario, onboarding asistido, campañas WhatsApp, segmentación, cotizaciones. Negocios adicionales: +$15/mes cada uno |
-
-## Roadmap
-
-**v1.0** -- Producto completo. PWA online-first con cache agresivo. Ventas, inventario, clientes, cuentas, reportes, contabilidad, roles, inteligencia integrada, WhatsApp bidireccional.
-
-**v2.0** -- Crecimiento. Integración Pago Móvil C2P. Campañas WhatsApp con segmentación. Cotizaciones con aprobación online. Programa de lealtad. Órdenes de compra a proveedores. OCR de recibos.
-
-**v3.0** -- Escala. Multi-sucursal. API REST pública. Tienda online básica. Expansión LATAM.
-
-## Documentación
+## Documentacion
 
 | Documento | Contenido |
 |---|---|
 | [01 - Features actuales de Fina](docs/01-fina-features-actuales.md) | Inventario completo de lo que ofrece Fina hoy |
-| [02 - Contexto Venezuela](docs/02-respuestas-contexto-venezuela.md) | APIs locales, WhatsApp sin Meta API, integración contable, POS descartado |
+| [02 - Contexto Venezuela](docs/02-respuestas-contexto-venezuela.md) | APIs locales, integracion contable, POS descartado |
 | [03 - Extras propuestos B-J](docs/03-extras-propuestos-B-a-J.md) | 38 features detallados con complejidad y prioridad |
-| [04 - Consolidado de features](docs/04-todos-los-features-consolidado.md) | 102 features (51 actuales + 50 nuevos + 1 mejora) con tabla de decisión |
-| [05 - Competidores y features modernos](docs/05-competidores-y-features-modernos.md) | Análisis de Square, Toast, Shopify, QuickBooks, Alegra y 12 features adicionales |
-| [06 - Por qué Fina gana con menos](docs/06-por-que-fina-gana-con-menos.md) | Análisis de simplicidad, contexto Venezuela, framework de decisión |
-| [07 - Visión de producto](docs/07-nala-vision-producto-2026.md) | Visión completa: experiencia escritorio/móvil, features v1.0, stack, roadmap |
-| [08 - WhatsApp entrada + diferenciadores](docs/08-whatsapp-entrada-y-diferenciadores.md) | WhatsApp bidireccional, OCR, cierre automático, benchmark, 13 diferenciadores |
-| [09 - Decisiones técnicas](docs/09-decisiones-tecnicas.md) | Roles (2 no 5), flujo contable, arquitectura WhatsApp en producción, OCR con GPT-4o-mini vision |
-| [10 - Build vs OSS base](docs/10-build-vs-oss-base.md) | Por qué construir desde cero. Patrones de UX adoptados de ERPNext, Loyverse, Square y Fina |
-| **[11 - Especificación final](docs/11-especificacion-final.md)** | **Documento definitivo: capacidades, arquitectura, modelo de datos, UX, stack, decisiones, roadmap** |
-| [12 - Pipeline OCR en detalle](docs/12-ocr-pipeline-detalle.md) | Flujo completo de lectura de facturas, matching, validación, código, fallos y costos LLM |
-| [13 - Cierre contable, migración, multi-tenant, PWA](docs/13-cierre-contable-migracion-multitenant-pwa.md) | Cuadre de caja con gap de ventas no registradas, importación desde legacy, PostgreSQL RLS, PWA como centro de acción vs desktop como centro de análisis |
-| [14 - Experiencia desktop vs móvil](docs/14-experiencia-desktop-vs-movil.md) | Cómo lo hacen Square/Shopify/Lightspeed, datos de uso real, wireframes de cada pantalla, tabla de funcionalidades por dispositivo, principios de diseño, implementación técnica |
-| [15 - Catálogo, stack técnico, estrategia offline](docs/15-catalogo-stack-offline.md) | Página de catálogo para clientes, Nuxt 4 decisión final, por qué IndexedDB, por qué Hono, online-first con cache agresivo |
-| [16 - Fina vs Nova + estructura dashboard](docs/16-fina-vs-nala-dashboard-estructura.md) | Comparación feature por feature, qué dejamos fuera y por qué, wireframes del dashboard desktop/móvil, estructura de navegación completa con flujos |
-| [17 - Dashboard rediseño basado en investigación](docs/17-dashboard-rediseno-investigacion.md) | Patrones de Square/Shopify/F1Studioz 2026, progressive disclosure, alertas accionables, qué quitar y qué dejar del dashboard, principios de diseño |
-| [18 - Roadmap de desarrollo y producción](docs/18-roadmap-desarrollo-produccion.md) | 10 fases de desarrollo (18 semanas), estructura monorepo, CI/CD, testing, monitoreo, prácticas de producción |
-| [19 - WhatsApp arquitectura y seguridad](docs/19-whatsapp-arquitectura-seguridad.md) | Alcance exacto (qué sí y qué no por WhatsApp), flujo completo de un mensaje, identificación por teléfono, seguridad, código del webhook, cuándo implementar |
-| [20 - Sistema de PIN y modos Admin/Empleado](docs/20-sistema-pin-modos-admin-empleado.md) | Acceso por Clerk (dueño) vs PIN (empleado), dispositivo compartido, cambio rápido de usuario, qué ve cada modo, acciones que requieren PIN del dueño, código de implementación |
-| **[21 - Fases de desarrollo definitivas](docs/21-fases-desarrollo-definitivas.md)** | **10 fases con tareas exactas, tests por fase, CI con GitHub Actions, cuándo hacer deploy a staging, timeline de 18 semanas** |
-| **[22 - Roadmap produccion + decision WhatsApp](docs/22-production-roadmap-whatsapp-compliance.md)** | **Analisis de compliance Meta 2026, eliminacion de WhatsApp Business API, catalogo publico como pagina web, notificaciones via Web Push/email, roadmap de produccion en 7 fases (10 semanas)** |
-| **[23 - Analisis subdomain-per-tenant](docs/23-subdomain-tenant-analysis.md)** | **Investigacion del patron subdomain-per-tenant (Shopify, Slack, Fina), analisis del codigo actual, impacto en PWA/Clerk/RLS, plan de implementacion en 5 sprints** |
+| [04 - Consolidado de features](docs/04-todos-los-features-consolidado.md) | 102 features con tabla de decision |
+| [05 - Competidores y features modernos](docs/05-competidores-y-features-modernos.md) | Analisis de Square, Toast, Shopify, QuickBooks, Alegra |
+| [06 - Por que Fina gana con menos](docs/06-por-que-fina-gana-con-menos.md) | Analisis de simplicidad, contexto Venezuela |
+| [07 - Vision de producto](docs/07-nala-vision-producto-2026.md) | Vision completa: experiencia escritorio/movil, features v1.0 |
+| [08 - WhatsApp entrada + diferenciadores](docs/08-whatsapp-entrada-y-diferenciadores.md) | ~~WhatsApp bidireccional~~ (descartado, ver doc 22). OCR, cierre automatico, diferenciadores |
+| [09 - Decisiones tecnicas](docs/09-decisiones-tecnicas.md) | Roles, flujo contable, OCR con GPT-4o-mini vision |
+| [10 - Build vs OSS base](docs/10-build-vs-oss-base.md) | Por que construir desde cero |
+| **[11 - Especificacion final](docs/11-especificacion-final.md)** | **Documento definitivo: capacidades, arquitectura, modelo de datos, UX, stack** |
+| [12 - Pipeline OCR en detalle](docs/12-ocr-pipeline-detalle.md) | Flujo completo de lectura de facturas |
+| [13 - Cierre contable, migracion, multi-tenant, PWA](docs/13-cierre-contable-migracion-multitenant-pwa.md) | Cuadre de caja, PostgreSQL RLS, PWA vs desktop |
+| [14 - Experiencia desktop vs movil](docs/14-experiencia-desktop-vs-movil.md) | Patrones Square/Shopify/Lightspeed, wireframes |
+| [15 - Catalogo, stack tecnico, estrategia offline](docs/15-catalogo-stack-offline.md) | Nuxt 4, IndexedDB, Hono, online-first |
+| [16 - Fina vs Nova + estructura dashboard](docs/16-fina-vs-nala-dashboard-estructura.md) | Comparacion feature por feature, wireframes dashboard |
+| [17 - Dashboard rediseno basado en investigacion](docs/17-dashboard-rediseno-investigacion.md) | Progressive disclosure, alertas accionables |
+| [18 - Roadmap de desarrollo y produccion](docs/18-roadmap-desarrollo-produccion.md) | 10 fases de desarrollo, CI/CD, testing |
+| [19 - WhatsApp arquitectura y seguridad](docs/19-whatsapp-arquitectura-seguridad.md) | ~~Descartado~~ (ver doc 22). Webhook y LLM interpreter eliminados |
+| [20 - Sistema de PIN y modos Admin/Empleado](docs/20-sistema-pin-modos-admin-empleado.md) | Clerk + PIN, dispositivo compartido, cambio de usuario |
+| [21 - Fases de desarrollo definitivas](docs/21-fases-desarrollo-definitivas.md) | 10 fases con tareas exactas, tests por fase |
+| **[22 - Roadmap de produccion](docs/22-production-roadmap-whatsapp-compliance.md)** | **Roadmap vigente. Decisiones WhatsApp/gamificacion, cambios realizados (PRs #66-#73), pendientes** |
+| **[23 - Analisis subdomain-per-tenant](docs/23-subdomain-tenant-analysis.md)** | **Investigacion Shopify/Slack/Fina, auditoria de codigo, plan de implementacion** |
 
 ## Licencia
 

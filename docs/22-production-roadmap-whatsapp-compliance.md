@@ -1,120 +1,143 @@
 # Nova: Roadmap de Produccion
 
-> Ultima actualizacion: Abril 2026 (post PRs #66, #67, #69)
-> Estado: Nova corriendo en produccion. DB, Redis, Clerk conectados. CI verde.
+> Ultima actualizacion: Abril 2026 (post PRs #66-#73)
+> Estado: Nova corriendo en produccion. Subdomain-per-tenant implementado. Pendiente: comprar dominio dedicado.
 
 ---
 
 ## Estado de la Infraestructura
 
 ```
-API:  https://nova-api.aikalabs.cc/health -> {"status":"ok","services":{"database":true,"redis":true}}
-Web:  https://nova.aikalabs.cc
-ESC:  aikapenelope-org/platform-infra/nova
-CI:   GitHub Actions — typecheck + lint + test + build en cada push/PR (PostgreSQL 16 + Redis 7 como services)
-```
-
-Verificar que la DB esta viva:
-
-```bash
-curl -s https://nova-api.aikalabs.cc/health | jq .
+API:      https://nova-api.aikalabs.cc/health -> {"status":"ok","services":{"database":true,"redis":true}}
+Web:      https://nova.aikalabs.cc
+ESC:      aikapenelope-org/platform-infra/nova
+CI:       GitHub Actions — typecheck + lint + test + build (PostgreSQL 16 + Redis 7)
+Tests:    17 tests en 5 archivos, CI verde
+Tenancy:  Subdomain-per-tenant listo en codigo. Pendiente: dominio dedicado + DNS
 ```
 
 ---
 
-## Decisiones Tomadas
+## Cambios Realizados (PRs #66-#73)
 
-### WhatsApp Business API (eliminado, PR #67)
+### PR #66: Roadmap + analisis WhatsApp compliance
+- Documento de roadmap de produccion (este documento)
+- Analisis de compliance Meta 2026 para WhatsApp Business API
 
-1. **Compliance Meta 2026**: el diseno original (LLM interpreter para consultas del dueno) viola la prohibicion de chatbots de proposito general
-2. **Numero unico multi-tenant**: un solo numero de WA para todos los tenants no funciona. Ser BSP de Meta es un proceso enterprise aparte
-3. **Modo developer**: max 250 mensajes, 5 numeros verificados, sin templates aprobados
-4. **Vector de ataque**: webhook publico sin auth expone datos de negocios a prompt injection y enumeracion
+### PR #67: Eliminar WhatsApp, catalogo publico, rate limiting, error boundary
+- **Eliminar WhatsApp Business API**: routes/whatsapp.ts, services/whatsapp-interpreter.ts, services/whatsapp-sender.ts, constantes WA_*, env vars WA_*
+- **Catalogo publico**: API `GET /catalog/:slug` + pagina `/catalogo/[slug].vue` + campos slug y whatsappNumber en businesses
+- **Rate limiting**: middleware Redis con sliding window (publico 60/min, auth 120/min, write 30/min) + fallback in-memory
+- **Error boundary**: `error.vue` global para 404s y errores no manejados
 
-**Reemplazos implementados:**
-- Metricas del dueno -> PWA mobile (ya es mobile-first)
-- Catalogo compartible -> pagina web publica `/catalogo/{slug}` con links `wa.me/` (PR #67)
-- Cobros a clientes -> links `wa.me/` desde la PWA (ya existia en routes/customers.ts)
+### PR #69: Eliminar gamificacion, structured logging, tests, config validation
+- **Eliminar gamificacion**: tablas seller_goals/seller_streaks, RLS policies, endpoint /reports/gamification, componente EmployeePerformance.vue, funciones goalProgress/dailyGoalSchema
+- **Structured logging**: JSON logger con method, path, status, ms, requestId, userId, businessId. Header X-Request-Id en cada response
+- **Tests**: 17 tests en 5 archivos (health, auth, catalog, sales, rate-limit)
+- **Config validation**: plugin Nuxt que valida NUXT_PUBLIC_API_BASE al arrancar
 
-**Reemplazos pendientes:**
-- Notificaciones al dueno -> Web Push + email (ver seccion pendientes)
+### PR #71: Analisis subdomain-per-tenant
+- Investigacion de Shopify, Slack, Notion, Linear, Square, Fina
+- Auditoria del codigo actual (5 puntos de resolucion de tenant)
+- Impacto en PWA, Clerk, RLS
+- Plan de implementacion en 5 sprints
 
-### Gamificacion (eliminado, PR #69)
+### PR #72: Fix aislamiento exchange_rates
+- **Bug fix**: tabla exchange_rates no tenia business_id. Todos los tenants compartian la misma tasa de cambio global
+- Agregar business_id a exchange_rates con FK a businesses
+- Cambiar unique index de (date) a (business_id, date)
+- Agregar RLS policy para exchange_rates
+- Scopear Redis cache key: `nova:{businessId}:exchange_rate:current`
+- Actualizar getCurrentRate() y setCurrentRate() para requerir businessId
 
-Las tablas `seller_goals` y `seller_streaks` nunca se usaban. El endpoint `/reports/gamification` calculaba todo on-the-fly desde `sales`. El componente `EmployeePerformance.vue` no estaba conectado al dashboard.
-
-Para que la gamificacion funcione en produccion necesitaria: hooks en el flujo de ventas, cron de rachas, metas configurables por negocio, UI de configuracion, y manejo de edge cases. Eso es un feature completo que se puede agregar cuando haya negocios con multiples empleados activos.
-
-**Se mantiene**: ranking de vendedores en `/reports/sellers` (funciona, es un reporte simple).
+### PR #73: Subdomain-per-tenant
+- **Nitro server middleware**: parsea subdominio del Host header, extrae tenant slug
+- **useTenant composable**: funciona en SSR y client, expone tenantSlug, hasTenant, tenantUrl
+- **Auth middleware subdomain-aware**: visitante en subdominio ve catalogo, empleado ve PIN screen
+- **Slug en onboarding**: campo auto-generado del nombre, verificacion de disponibilidad en tiempo real (debounced), preview de URL
+- **Endpoint check-slug**: `GET /onboarding/check-slug/:slug` con rate limiting
+- **CORS wildcard**: origin function acepta subdominios del TENANT_DOMAIN
+- **Slugs reservados**: onboarding rechaza www, api, admin, catalogo, etc.
 
 ---
 
-## Hecho (14 items)
+## Decisiones Arquitecturales
 
-| Item | PR/Origen | Verificado en CI |
-|---|---|---|
-| Eliminar WhatsApp Business API (routes, services, constants, env vars) | #67 | Si |
-| Catalogo publico: API `GET /catalog/:slug` + pagina `/catalogo/[slug]` + schema (slug, whatsappNumber) | #67 | Si |
-| Rate limiting Redis (publico 60/min, auth 120/min, write 30/min) con fallback in-memory | #67 | Si |
-| Error boundary global (`error.vue`) para 404s y errores no manejados | #67 | Si |
-| Eliminar gamificacion (tablas, RLS, endpoint, componente, funciones) | #69 | Si |
-| Structured logging JSON (method, path, status, ms, requestId, userId, businessId) | #69 | Si |
-| Validacion de env vars frontend (plugin Nuxt para NUXT_PUBLIC_API_BASE) | #69 | Si |
-| Tests: 17 tests en 5 archivos (health, auth, catalog, sales, rate-limit) | #69 | Si |
-| Validacion de env vars backend al boot (config.ts) | Ya existia | Si |
-| CORS configurable por entorno (CORS_ORIGIN env var) | Ya existia | Si |
-| Health check profundo (DB + Redis, retorna status/degraded/error) | Ya existia | Si |
-| Crear DB "nova" + deploy en Hetzner | Infra ops | Verificado via curl |
-| Dockerfile multi-stage (API + Web) verificado con codigo actual | #69 | Paths validados |
-| CI pipeline: typecheck + lint + test + build con PostgreSQL 16 + Redis 7 | Ya existia | 3 runs exitosos |
+### WhatsApp Business API (eliminado)
+- Compliance Meta 2026: LLM interpreter viola prohibicion de chatbots de proposito general
+- Numero unico multi-tenant no funciona sin ser BSP de Meta
+- Modo developer: max 250 mensajes, sin templates aprobados
+- Webhook publico = vector de ataque innecesario
+- **Reemplazo**: catalogo publico con links wa.me/, cobros via wa.me/ desde PWA
+
+### Gamificacion (eliminado)
+- Tablas nunca usadas, endpoint calculaba on-the-fly
+- Feature completo requiere hooks en ventas, cron, config por negocio
+- **Se mantiene**: ranking de vendedores en /reports/sellers
+
+### Subdomain-per-tenant (implementado)
+- Patron de Shopify, Slack, Fina (competidor directo)
+- Frontend-only: backend sigue resolviendo tenant via JWT
+- Cada subdominio = origen separado = mejor aislamiento offline
+- Clerk comparte sesiones entre subdominios del mismo root domain
+- **Pendiente**: comprar dominio dedicado (SSL gratis en primer nivel)
+
+### Exchange rates per-tenant (fix)
+- Tabla era global, ahora tiene business_id + RLS
+- Redis cache scopeado por tenant
 
 ---
 
 ## Pendiente
 
+### Activar subdominios (ops manual, 1 dia)
+
+| Paso | Que hacer |
+|---|---|
+| 1 | Comprar dominio dedicado (ej: novapp.com, usenova.com) |
+| 2 | Configurar DNS en Cloudflare: `*.novapp.com` CNAME `nova.aikalabs.cc` (proxied) |
+| 3 | Agregar `*.novapp.com` como dominio en Coolify (nova-web) |
+| 4 | Agregar env vars: `NUXT_PUBLIC_TENANT_DOMAIN=novapp.com` y `TENANT_DOMAIN=novapp.com` |
+| 5 | Configurar Clerk: agregar novapp.com como dominio permitido |
+| 6 | Verificar: `curl https://test.novapp.com` |
+
 ### Ops manuales (2 items)
 
-| Item | Que hacer | Bloquea deploy? |
-|---|---|---|
-| Iconos PWA | Crear icon-192x192.png y icon-512x512.png en `apps/web/public/`. Sin estos la PWA no se instala en Android/iOS | No (la app web funciona, solo la instalacion PWA falla) |
-| Tasa de cambio inicial | El dueno la configura desde la PWA al primer uso. `POST /api/exchange-rate` ya existe. Sin tasa, las ventas fallan con 503 | No (es config de primer uso) |
+| Item | Que hacer |
+|---|---|
+| Iconos PWA | Crear icon-192x192.png y icon-512x512.png en apps/web/public/ |
+| Tasa de cambio inicial | El dueno la configura desde la PWA (POST /api/exchange-rate ya existe) |
 
 ### Prioridad alta (7 items)
 
-Estos items son necesarios para que Nova funcione correctamente en produccion con usuarios reales.
-
-| # | Item | Que es | Que hacer |
-|---|---|---|---|
-| 1 | **Web Push notifications** | Alertas de stock critico y anomalias llegan al dueno sin que abra la app. La PWA ya usa `@vite-pwa/nuxt` pero las notificaciones push no estan configuradas | Configurar Web Push API: pedir permiso, almacenar suscripciones, enviar notificaciones cuando un producto baja de stock_critical o se detecta anomalia |
-| 2 | **Email transaccional** | Resumen diario, resumen semanal, reporte al contador. Actualmente no hay forma de enviar emails | Integrar Resend (100/dia gratis). Crear `services/email.ts`. Cron o boton manual para resumenes. Boton "Enviar al contador" genera PDF y lo envia |
-| 3 | **Exportacion PDF** | Los reportes no se pueden descargar ni enviar. El contador necesita libro de ventas en formato SENIAT | Generar PDFs server-side con `pdfmake`. Endpoints `GET /api/reports/{type}/export?format=pdf`. Reporte diario, semanal, P&L, libro de ventas |
-| 4 | **Exportacion Excel** | Los reportes no se pueden exportar a Excel. `xlsx` ya esta en dependencias del frontend | Endpoints `GET /api/reports/{type}/export?format=xlsx`. Usar `xlsx` para generar archivos |
-| 5 | **Import Excel (conectar)** | `inventory/import.vue` parsea archivos Excel/CSV localmente pero no hace POST para crear productos | Conectar a `POST /api/products` en batch. Validacion de columnas, preview antes de importar, reporte de errores por fila |
-| 6 | **Segmentos de clientes** | La tabla `customerSegments` existe pero no hay logica que calcule segmentos automaticamente | Implementar calculo: VIP (>10 compras + ticket alto), frecuente (>5 en 30d), en riesgo (30-60d sin compra), inactivo (60d+), con deuda, nuevo. Ejecutar al crear venta o como cron diario |
-| 7 | **ReportLayout period selector** | El selector de periodo en `ReportLayout.vue` no emite eventos. Los reportes siempre cargan el periodo default | Conectar el v-model del selector para que los reportes reaccionen al cambio de periodo |
+| # | Item | Descripcion |
+|---|---|---|
+| 1 | Web Push notifications | Alertas de stock critico via @vite-pwa/nuxt |
+| 2 | Email transaccional | Resend: boton "Enviar resumen" y "Enviar al contador" en PWA |
+| 3 | Exportacion PDF | Reportes, libro de ventas SENIAT, P&L |
+| 4 | Exportacion Excel | Endpoint /reports/{type}/export?format=xlsx |
+| 5 | Import Excel (conectar) | inventory/import.vue -> POST /api/products batch |
+| 6 | Segmentos de clientes | Calculo automatico: VIP, frecuente, en riesgo, inactivo |
+| 7 | ReportLayout period selector | Conectar selector de periodo a los reportes |
 
 ### Prioridad media (5 items)
 
-Mejoran la calidad y mantenibilidad pero no bloquean funcionalidad core.
-
-| # | Item | Que es | Que hacer |
-|---|---|---|---|
-| 8 | **Seed de datos iniciales** | No hay datos pre-configurados para negocios nuevos. El onboarding crea un negocio vacio | Crear seed con: catalogo de cuentas contables por tipo de negocio (ferreteria, bodega, tienda de ropa), categorias default, unidades de medida comunes (unidad, caja, kg, litro) |
-| 9 | **Prediccion de flujo de caja** | No hay proyeccion de ingresos/gastos futuros | Proyectar ingresos (promedio ventas por dia de semana), sumar gastos fijos y cuentas por pagar, alertar si algun dia el balance proyectado es negativo |
-| 10 | **Error tracking (Sentry)** | Los errores en produccion no se capturan ni notifican. Solo se ven en logs de Coolify | Integrar `@sentry/node` en Hono y `@sentry/vue` en Nuxt. Capturar errores no manejados con contexto (userId, businessId, requestId) |
-| 11 | **Uptime monitoring** | No hay alertas si la API o el frontend se caen | Configurar Uptime Kuma (ya en el control plane) para monitorear `/health`, frontend, y catalogo |
-| 12 | **Migraciones Drizzle versionadas** | `entrypoint-api.sh` ejecuta `drizzle-kit push --force` en cada deploy. Esto es destructivo y puede perder datos | Migrar a `drizzle-kit generate` + `drizzle-kit migrate` con archivos de migracion versionados en el repo |
+| # | Item | Descripcion |
+|---|---|---|
+| 8 | Seed de datos iniciales | Cuentas contables, categorias, unidades de medida por tipo de negocio |
+| 9 | Prediccion de flujo de caja | Proyectar ingresos/gastos, alertar deficit |
+| 10 | Error tracking (Sentry) | @sentry/node + @sentry/vue |
+| 11 | Uptime monitoring | Configurar Uptime Kuma |
+| 12 | Migraciones Drizzle versionadas | Migrar de push --force a generate + migrate |
 
 ### Prioridad baja (4 items)
 
-Optimizaciones para escala futura.
-
-| # | Item | Que es | Que hacer |
-|---|---|---|---|
-| 13 | **PgBouncer + RLS** | `set_config` con `false` (session-level) puede no funcionar con PgBouncer en modo transaction. Actualmente Nova usa conexion directa (puerto 5432) | Evaluar si el trafico justifica PgBouncer. Si si, migrar a `set_config(..., true)` con transacciones explicitas |
-| 14 | **Service Worker offline** | `@vite-pwa/nuxt` esta configurado pero no verificado. La cola offline (`useOfflineQueue`) existe en codigo pero no se ha probado sin internet | Verificar que el SW intercepta navegacion offline, muestra pagina cached, y la cola sincroniza al volver |
-| 15 | **CI/CD automatico** | El deploy a Coolify es manual. No hay pipeline de staging | Configurar: push a main -> deploy a staging, tag v* -> deploy a produccion, smoke tests post-deploy |
-| 16 | **E2E tests (Playwright)** | `e2e/smoke.spec.ts` existe pero esta vacio. No hay tests end-to-end | Escribir tests: login con Clerk, crear producto, registrar venta, ver dashboard, ver catalogo publico |
+| # | Item | Descripcion |
+|---|---|---|
+| 13 | PgBouncer + RLS | Evaluar cuando el trafico lo justifique |
+| 14 | Service Worker offline | Verificar que funciona sin internet |
+| 15 | CI/CD automatico | Push a main -> staging, tag -> produccion |
+| 16 | E2E tests (Playwright) | Login, producto, venta, dashboard, catalogo |
 
 ---
 
@@ -127,25 +150,16 @@ Coolify (Control Plane 10.0.1.10)
 |   +-- REDIS_URL -> 10.0.1.20:6379/4
 |   +-- CLERK_SECRET_KEY
 |   +-- CORS_ORIGIN -> https://nova.aikalabs.cc
-|   +-- OPENROUTER_API_KEY (opcional, para narrativas IA)
+|   +-- TENANT_DOMAIN -> novapp.com (pendiente)
+|   +-- OPENROUTER_API_KEY (opcional)
 |
 +-- nova-web (Docker, puerto 3000)
 |   +-- NUXT_PUBLIC_API_BASE -> https://nova-api.aikalabs.cc
 |   +-- NUXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+|   +-- NUXT_PUBLIC_TENANT_DOMAIN -> novapp.com (pendiente)
 |
 +-- Traefik (reverse proxy)
     +-- nova.aikalabs.cc -> nova-web:3000
     +-- nova-api.aikalabs.cc -> nova-api:3001
+    +-- *.novapp.com -> nova-web:3000 (pendiente)
 ```
-
----
-
-## Docs Anteriores que Necesitan Actualizacion
-
-| Documento | Que cambiar |
-|---|---|
-| **doc 08** | Seccion "WhatsApp como entrada" descartada. Diferenciador 1 (WA bidireccional) eliminado. Diferenciador 10 (catalogo) se mantiene como pagina web publica |
-| **doc 19** | Documento completo descartado (webhook, LLM interpreter, executor ya no existen) |
-| **doc 11** | Actualizar seccion WhatsApp: solo links wa.me/ y catalogo publico |
-| **doc 21** | Fase 7 cambia: catalogo publico + Web Push + email en vez de webhook + LLM. Fase 8 (gamificacion) eliminada |
-| **PRODUCTION-ROADMAP.md** | Reemplazado por este documento (doc 22). Items 7-9 (WhatsApp) ya no aplican |
