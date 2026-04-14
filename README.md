@@ -107,6 +107,7 @@ npm run dev             # Turborepo: API en :3001, Web en :3000
 | **[22 - Roadmap de produccion](docs/22-production-roadmap-whatsapp-compliance.md)** | **Roadmap vigente. Decisiones WhatsApp/gamificacion, cambios realizados (PRs #66-#73), pendientes** |
 | **[23 - Analisis subdomain-per-tenant](docs/23-subdomain-tenant-analysis.md)** | **Investigacion Shopify/Slack/Fina, auditoria de codigo, plan de implementacion** |
 | **[24 - Activar subdominios paso a paso](docs/24-activar-subdominios-paso-a-paso.md)** | **Guia operativa: comprar dominio, DNS, Coolify, Clerk, verificacion** |
+| **[25 - Auditoria y roadmap definitivo](docs/25-auditoria-y-roadmap-definitivo.md)** | **Auditoria de codigo, problemas encontrados, plan dia por dia (8 dias)** |
 
 ## Licencia
 

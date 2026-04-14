@@ -2,6 +2,7 @@
 
 > Ultima actualizacion: Abril 2026 (post PRs #66-#73)
 > Estado: Nova corriendo en produccion. Subdomain-per-tenant implementado. Pendiente: comprar dominio dedicado.
+> **Plan de ejecucion definitivo: [doc 25 - Auditoria y roadmap definitivo](25-auditoria-y-roadmap-definitivo.md)**
 
 ---
 
