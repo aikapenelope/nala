@@ -41,6 +41,7 @@ watch(period, fetchReport);
     v-model="period"
     title="Resumen financiero"
     :narrative="narrative"
+    export-path="/api/reports/financial"
   >
     <div v-if="isLoading" class="py-12 text-center text-gray-400">
       Cargando...

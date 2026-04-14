@@ -69,6 +69,7 @@ const methodLabels: Record<string, string> = {
     v-model="period"
     title="Resumen del dia"
     :narrative="narrative"
+    export-path="/api/reports/daily"
   >
     <div v-if="isLoading" class="py-12 text-center text-gray-400">
       Cargando...
