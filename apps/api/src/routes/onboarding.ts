@@ -30,11 +30,28 @@ import { getDb } from "../db";
 const onboarding = new Hono();
 
 /** Slug validation: lowercase alphanumeric + hyphens, 3-40 chars. */
+const RESERVED_SLUGS = new Set([
+  "www",
+  "api",
+  "admin",
+  "mail",
+  "ftp",
+  "staging",
+  "dev",
+  "app",
+  "dashboard",
+  "catalog",
+  "catalogo",
+  "health",
+  "onboarding",
+]);
+
 const slugSchema = z
   .string()
   .min(3)
   .max(40)
-  .regex(/^[a-z0-9][a-z0-9-]*[a-z0-9]$/, "Slug must be lowercase alphanumeric with hyphens");
+  .regex(/^[a-z0-9][a-z0-9-]*[a-z0-9]$/, "Slug must be lowercase alphanumeric with hyphens")
+  .refine((s) => !RESERVED_SLUGS.has(s), "This name is reserved");
 
 /** Schema for onboarding request. */
 const onboardingSchema = z.object({

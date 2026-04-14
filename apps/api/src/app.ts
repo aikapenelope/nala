@@ -111,7 +111,25 @@ app.use("*", structuredLogger);
 app.use(
   "*",
   cors({
-    origin: process.env.CORS_ORIGIN?.split(",") ?? ["http://localhost:3000"],
+    origin: (origin) => {
+      const allowed =
+        process.env.CORS_ORIGIN?.split(",") ?? ["http://localhost:3000"];
+
+      // Exact match (e.g., https://nova.aikalabs.cc)
+      if (allowed.includes(origin)) return origin;
+
+      // Wildcard match for tenant subdomains (e.g., https://bodega.novapp.com)
+      const tenantDomain = process.env.TENANT_DOMAIN;
+      if (
+        tenantDomain &&
+        (origin.endsWith(`.${tenantDomain}`) ||
+          origin === `https://${tenantDomain}`)
+      ) {
+        return origin;
+      }
+
+      return allowed[0] ?? "";
+    },
     allowMethods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
     allowHeaders: [
       "Content-Type",
@@ -129,6 +147,7 @@ app.use(
 app.route("/health", health);
 app.use("/catalog/*", publicRateLimit);
 app.route("/catalog", catalog);
+app.use("/onboarding/check-slug/*", publicRateLimit);
 app.route("/onboarding", onboarding);
 
 // ---------------------------------------------------------------------------
