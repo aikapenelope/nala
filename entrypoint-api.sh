@@ -5,21 +5,21 @@ set -e
 # Nova API Entrypoint
 #
 # Runs on every deploy before starting the server:
-# 1. drizzle-kit push: creates/updates tables from schema.ts
+# 1. drizzle-kit migrate: applies versioned SQL migrations
 # 2. init.sql: applies RLS policies (idempotent, safe to re-run)
 # 3. Starts the Hono API server
 # ============================================
 
-# Step 1: Sync database schema with Drizzle
-# Uses DATABASE_URL directly (port 5432, not PgBouncer)
-# drizzle-kit push only applies diffs - safe on every deploy
+# Step 1: Apply versioned Drizzle migrations
+# Uses DATABASE_URL directly (port 5432, not PgBouncer).
+# Only applies new migrations that haven't been run yet (safe on every deploy).
 if [ -n "$DATABASE_URL" ]; then
-  echo "[entrypoint] Running drizzle-kit push..."
-  cd packages/db && node ../../node_modules/drizzle-kit/bin.cjs push --force 2>&1
+  echo "[entrypoint] Running drizzle-kit migrate..."
+  cd packages/db && node ../../node_modules/drizzle-kit/bin.cjs migrate 2>&1
   cd /app
-  echo "[entrypoint] Schema sync complete."
+  echo "[entrypoint] Migrations complete."
 else
-  echo "[entrypoint] WARNING: DATABASE_URL not set, skipping schema sync."
+  echo "[entrypoint] WARNING: DATABASE_URL not set, skipping migrations."
 fi
 
 # Step 2: Apply RLS policies

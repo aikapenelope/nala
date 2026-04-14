@@ -1,7 +1,7 @@
 # Nova API + Web - Multi-stage Dockerfile for Coolify deployment.
 #
 # Builds both the API (Hono) and Web (Nuxt SSR) in a single image.
-# On startup, runs drizzle-kit push to sync schema + init.sql for RLS.
+# On startup, runs drizzle-kit migrate for versioned migrations + init.sql for RLS.
 #
 # Build args:
 #   NUXT_PUBLIC_API_BASE - API URL for the frontend (e.g. https://nova-api.aikalabs.cc)
@@ -84,6 +84,7 @@ COPY --from=builder --chown=node:node /app/apps/api/dist ./apps/api/dist
 COPY --from=builder --chown=node:node /app/apps/api/package.json ./apps/api/
 COPY --from=builder --chown=node:node /app/packages/db/src/schema.ts ./packages/db/src/schema.ts
 COPY --from=builder --chown=node:node /app/packages/db/drizzle.config.ts ./packages/db/drizzle.config.ts
+COPY --from=builder --chown=node:node /app/packages/db/drizzle ./packages/db/drizzle
 COPY --from=builder --chown=node:node /app/packages/db/init.sql ./packages/db/init.sql
 COPY --from=builder --chown=node:node /app/package.json ./
 COPY --from=builder --chown=node:node /app/node_modules ./node_modules
