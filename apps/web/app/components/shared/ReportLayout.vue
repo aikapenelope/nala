@@ -12,9 +12,11 @@
  *   </SharedReportLayout>
  */
 
-defineProps<{
+const props = defineProps<{
   title: string;
   narrative?: string;
+  /** API report path for export (e.g. "/api/reports/daily"). */
+  exportPath?: string;
 }>();
 
 const period = defineModel<string>({ default: "today" });
@@ -26,13 +28,32 @@ const periods = [
   { value: "last_month", label: "Mes anterior" },
 ];
 
-function exportPdf() {
-  // TODO: Generate PDF with jsPDF
-  alert("Exportacion PDF proximamente");
+const { $api } = useApi();
+
+/** Download a report as PDF from the API. */
+async function exportPdf() {
+  if (!props.exportPath) {
+    alert("Exportacion PDF no disponible para este reporte");
+    return;
+  }
+  try {
+    const blob = await $api<Blob>(
+      `${props.exportPath}/export?period=${period.value}&format=pdf`,
+      { responseType: "blob" },
+    );
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `reporte-${new Date().toISOString().split("T")[0]}.pdf`;
+    a.click();
+    URL.revokeObjectURL(url);
+  } catch {
+    alert("Error generando PDF. Intenta de nuevo.");
+  }
 }
 
 function exportExcel() {
-  // TODO: Generate Excel with SheetJS
+  // TODO: Sprint 4 - Generate Excel export
   alert("Exportacion Excel proximamente");
 }
 
