@@ -115,10 +115,10 @@ app.use(
       const allowed =
         process.env.CORS_ORIGIN?.split(",") ?? ["http://localhost:3000"];
 
-      // Exact match (e.g., https://nova.aikalabs.cc)
+      // Exact match (e.g., https://novaincs.com)
       if (allowed.includes(origin)) return origin;
 
-      // Wildcard match for tenant subdomains (e.g., https://bodega.novapp.com)
+      // Wildcard match for tenant subdomains (e.g., https://bodega.novaincs.com)
       const tenantDomain = process.env.TENANT_DOMAIN;
       if (
         tenantDomain &&

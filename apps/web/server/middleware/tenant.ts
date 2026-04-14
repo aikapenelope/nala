@@ -5,14 +5,14 @@
  * Sets `event.context.tenantSlug` for downstream use in SSR and API routes.
  *
  * Examples:
- *   bodegadonpedro.nova.aikalabs.cc -> tenantSlug = "bodegadonpedro"
- *   nova.aikalabs.cc                -> tenantSlug = null (main site)
- *   www.nova.aikalabs.cc            -> tenantSlug = null (ignored)
+ *   bodegadonpedro.novaincs.com -> tenantSlug = "bodegadonpedro"
+ *   novaincs.com                -> tenantSlug = null (main site)
+ *   www.novaincs.com            -> tenantSlug = null (ignored)
  *   localhost:3000                   -> tenantSlug = null (dev, no subdomain)
  *   bodega.localhost:3000            -> tenantSlug = "bodega" (dev with /etc/hosts)
  *
  * The tenant domain is configurable via NUXT_PUBLIC_TENANT_DOMAIN env var.
- * Default: "nova.aikalabs.cc" in production, "localhost" in development.
+ * Default: "novaincs.com" in production, "localhost" in development.
  */
 
 import { getRequestHeader, defineEventHandler } from "h3";
@@ -36,9 +36,9 @@ export default defineEventHandler((event) => {
 
   // Try to extract tenant slug from subdomain.
   // Pattern: {slug}.{tenantDomain}
-  // tenantDomain can be "nova.aikalabs.cc" or "localhost" (dev)
+  // tenantDomain can be "novaincs.com" or "localhost" (dev)
   const tenantDomain =
-    process.env.NUXT_PUBLIC_TENANT_DOMAIN ?? "nova.aikalabs.cc";
+    process.env.NUXT_PUBLIC_TENANT_DOMAIN ?? "novaincs.com";
 
   let tenantSlug: string | null = null;
 
