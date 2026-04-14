@@ -85,6 +85,7 @@ COPY --from=builder --chown=node:node /app/apps/api/package.json ./apps/api/
 COPY --from=builder --chown=node:node /app/packages/db/src/schema.ts ./packages/db/src/schema.ts
 COPY --from=builder --chown=node:node /app/packages/db/drizzle.config.ts ./packages/db/drizzle.config.ts
 COPY --from=builder --chown=node:node /app/packages/db/drizzle ./packages/db/drizzle
+COPY --from=builder --chown=node:node /app/packages/db/migrate.mjs ./packages/db/migrate.mjs
 COPY --from=builder --chown=node:node /app/packages/db/init.sql ./packages/db/init.sql
 COPY --from=builder --chown=node:node /app/package.json ./
 COPY --from=builder --chown=node:node /app/node_modules ./node_modules
