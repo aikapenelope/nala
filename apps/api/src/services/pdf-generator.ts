@@ -1,5 +1,5 @@
 /**
- * PDF generation service using pdfmake.
+ * PDF generation service using pdfmake (v0.3.x).
  *
  * Generates report PDFs for:
  * - Daily summary
@@ -11,14 +11,14 @@
  * - Summary metrics
  * - Data tables
  * - Footer with generation timestamp
+ *
+ * pdfmake is a CommonJS-only library. Since the API is bundled as ESM by tsup,
+ * we use Node.js `createRequire` to load it at runtime. The font paths are
+ * resolved relative to the working directory (/app in Docker).
  */
 
-/**
- * pdfmake types.
- *
- * We define minimal types here instead of using @types/pdfmake because
- * the type definitions don't match the actual module structure in Node.js.
- */
+import { createRequire } from "node:module";
+import { resolve } from "node:path";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 interface PdfContent {
@@ -39,32 +39,56 @@ interface PdfDocDefinition {
   defaultStyle?: Record<string, any>;
 }
 
+interface PdfMakeInstance {
+  fonts: Record<string, Record<string, string>>;
+  createPdf: (docDef: PdfDocDefinition) => { getBuffer: () => Promise<Uint8Array> };
+}
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
-// pdfmake exposes createPdf for browser; for Node.js we use the build directly.
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const PdfMake = require("pdfmake/build/pdfmake") as {
-  createPdf: (
-    docDef: PdfDocDefinition,
-    tableLayouts?: unknown,
-    fonts?: unknown,
-    vfs?: unknown,
-  ) => { getBuffer: (cb: (buffer: Uint8Array) => void) => void };
-};
+/**
+ * Lazily load pdfmake via createRequire (CJS compat in ESM bundle).
+ * Fonts are resolved from node_modules at runtime.
+ */
+let _pdfmake: PdfMakeInstance | null = null;
+function getPdfMake(): PdfMakeInstance {
+  if (_pdfmake) return _pdfmake;
+
+  const require = createRequire(import.meta.url);
+  const pdfmake = require("pdfmake") as PdfMakeInstance;
+
+  // Resolve Roboto font files shipped with pdfmake
+  const fontsDir = resolve(
+    process.cwd(),
+    "node_modules/pdfmake/build/fonts/Roboto",
+  );
+  pdfmake.fonts = {
+    Roboto: {
+      normal: `${fontsDir}/Roboto-Regular.ttf`,
+      bold: `${fontsDir}/Roboto-Medium.ttf`,
+      italics: `${fontsDir}/Roboto-Italic.ttf`,
+      bolditalics: `${fontsDir}/Roboto-MediumItalic.ttf`,
+    },
+  };
+
+  _pdfmake = pdfmake;
+  return pdfmake;
+}
 
 /**
  * Generate a PDF from a document definition.
  * Returns a Promise that resolves with the PDF as an ArrayBuffer
  * (compatible with Hono's c.body()).
  */
-function generatePdfBuffer(docDef: PdfDocDefinition): Promise<ArrayBuffer> {
-  return new Promise((resolve) => {
-    const pdf = PdfMake.createPdf(docDef);
-    pdf.getBuffer((buffer: Uint8Array) => {
-      const ab = buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength) as ArrayBuffer;
-      resolve(ab);
-    });
-  });
+async function generatePdfBuffer(
+  docDef: PdfDocDefinition,
+): Promise<ArrayBuffer> {
+  const pdfmake = getPdfMake();
+  const doc = pdfmake.createPdf(docDef);
+  const buffer = await doc.getBuffer();
+  return buffer.buffer.slice(
+    buffer.byteOffset,
+    buffer.byteOffset + buffer.byteLength,
+  ) as ArrayBuffer;
 }
 
 type Content = PdfContent;
