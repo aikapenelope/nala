@@ -120,9 +120,9 @@ const importErrors = ref<Array<{ row: number; name: string; error: string }>>(
 );
 
 /**
- * Import products by sending each mapped row to POST /api/products.
- * Uses sequential requests to avoid overwhelming the API and to
- * provide accurate progress feedback.
+ * Import products using the batch endpoint POST /api/products/batch.
+ * Validates rows client-side first, then sends all valid products
+ * in a single atomic transaction.
  */
 async function startImport() {
   step.value = "importing";
@@ -131,6 +131,16 @@ async function startImport() {
 
   const map = columnMap.value;
 
+  // Validate and map all rows
+  const validProducts: Array<{
+    name: string;
+    sku?: string;
+    barcode?: string;
+    price: number;
+    cost: number;
+    stock: number;
+  }> = [];
+
   for (let i = 0; i < rows.value.length; i++) {
     const row = rows.value[i];
     if (!row) continue;
@@ -138,39 +148,44 @@ async function startImport() {
     const nameVal = map.name ? row[map.name]?.trim() : "";
     const priceVal = map.price ? Number(row[map.price]) : 0;
 
-    // Skip rows with missing required fields
     if (!nameVal || isNaN(priceVal) || priceVal <= 0) {
       importErrors.value.push({
-        row: i + 2, // +2 for header row + 0-index
+        row: i + 2,
         name: nameVal || "(sin nombre)",
         error: !nameVal ? "Nombre vacio" : "Precio invalido",
       });
       continue;
     }
 
-    try {
-      await $api("/api/products", {
-        method: "POST",
-        body: {
-          name: nameVal,
-          sku: map.sku ? row[map.sku]?.trim() || undefined : undefined,
-          price: priceVal,
-          cost: map.cost ? Number(row[map.cost]) || 0 : 0,
-          stock: map.stock ? Math.floor(Number(row[map.stock]) || 0) : 0,
-          barcode: map.barcode
-            ? row[map.barcode]?.trim() || undefined
-            : undefined,
-        },
-      });
-      importedCount.value++;
-    } catch (err) {
-      const fetchError = err as { data?: { error?: string } };
-      importErrors.value.push({
-        row: i + 2,
-        name: nameVal,
-        error: fetchError.data?.error ?? "Error del servidor",
-      });
-    }
+    validProducts.push({
+      name: nameVal,
+      sku: map.sku ? row[map.sku]?.trim() || undefined : undefined,
+      barcode: map.barcode ? row[map.barcode]?.trim() || undefined : undefined,
+      price: priceVal,
+      cost: map.cost ? Number(row[map.cost]) || 0 : 0,
+      stock: map.stock ? Math.floor(Number(row[map.stock]) || 0) : 0,
+    });
+  }
+
+  if (validProducts.length === 0) {
+    step.value = "done";
+    return;
+  }
+
+  // Send all valid products in a single batch request
+  try {
+    const result = await $api<{ count: number }>("/api/products/batch", {
+      method: "POST",
+      body: { products: validProducts },
+    });
+    importedCount.value = result.count;
+  } catch (err) {
+    const fetchError = err as { data?: { error?: string } };
+    importErrors.value.push({
+      row: 0,
+      name: "Batch",
+      error: fetchError.data?.error ?? "Error importando productos",
+    });
   }
 
   step.value = "done";

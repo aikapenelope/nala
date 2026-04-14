@@ -22,6 +22,7 @@ import { eq, and, ilike, sql, desc } from "drizzle-orm";
 import {
   createProductSchema,
   updateProductSchema,
+  batchCreateProductsSchema,
   createVariantSchema,
   createCategorySchema,
   calculateStockSemaphore,
@@ -574,6 +575,59 @@ inventory.post(
       .returning();
 
     return c.json({ category }, 201);
+  },
+);
+
+/**
+ * POST /products/batch - Create multiple products in a single transaction.
+ *
+ * Used by the Excel import feature. Validates all products first,
+ * then inserts them atomically. If any product fails validation,
+ * the entire batch is rejected.
+ */
+inventory.post(
+  "/products/batch",
+  zValidator("json", batchCreateProductsSchema),
+  async (c) => {
+    const { products: items } = c.req.valid("json");
+    const db = c.get("db");
+    const businessId = c.get("businessId");
+
+    const result = await db.transaction(async (tx) => {
+      const created = [];
+
+      for (const item of items) {
+        const [product] = await tx
+          .insert(products)
+          .values({
+            businessId,
+            name: item.name,
+            sku: item.sku,
+            barcode: item.barcode,
+            cost: String(item.cost),
+            price: String(item.price),
+            stock: item.stock,
+          })
+          .returning();
+
+        // Log initial price in price history
+        await tx.insert(priceHistory).values({
+          businessId,
+          productId: product.id,
+          newCost: String(item.cost),
+          newPrice: String(item.price),
+        });
+
+        created.push(product);
+      }
+
+      return created;
+    });
+
+    return c.json(
+      { products: result, count: result.length },
+      201,
+    );
   },
 );
 

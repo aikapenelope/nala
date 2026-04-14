@@ -25,6 +25,23 @@ export const createProductSchema = z.object({
 /** Schema for updating an existing product. */
 export const updateProductSchema = createProductSchema.partial();
 
+/** Schema for batch-creating multiple products (Excel import). */
+export const batchCreateProductsSchema = z.object({
+  products: z
+    .array(
+      z.object({
+        name: z.string().min(1).max(200),
+        sku: z.string().max(50).optional(),
+        barcode: z.string().max(50).optional(),
+        cost: z.number().min(0).default(0),
+        price: z.number().min(0),
+        stock: z.number().int().min(0).default(0),
+      }),
+    )
+    .min(1)
+    .max(500),
+});
+
 /** Schema for creating a product variant. */
 export const createVariantSchema = z.object({
   productId: z.string().uuid(),
