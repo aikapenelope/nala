@@ -45,10 +45,16 @@ onMounted(() => {
 const step = ref(1);
 const businessType = ref<BusinessType | null>(null);
 const businessName = ref("");
+const businessSlug = ref("");
 const ownerName = ref("");
 const ownerPin = ref("");
 const isSubmitting = ref(false);
+const slugAvailable = ref<boolean | null>(null);
+const slugChecking = ref(false);
 const error = ref("");
+
+const config = useRuntimeConfig();
+const tenantDomain = config.public.tenantDomain as string;
 
 /** Business type options with visual labels. */
 const businessTypes: Array<{
@@ -74,10 +80,51 @@ function selectType(type: BusinessType) {
   step.value = 2;
 }
 
+/** Generate a URL-friendly slug from a business name. */
+function slugify(name: string): string {
+  return name
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "") // remove accents
+    .replace(/[^a-z0-9]+/g, "-") // replace non-alphanumeric with hyphens
+    .replace(/^-+|-+$/g, "") // trim leading/trailing hyphens
+    .slice(0, 40); // max length
+}
+
+/** Auto-generate slug when business name changes. */
+watch(businessName, (name) => {
+  businessSlug.value = slugify(name);
+  slugAvailable.value = null; // reset availability check
+});
+
+/** Check slug availability (debounced). */
+let slugCheckTimeout: ReturnType<typeof setTimeout> | null = null;
+watch(businessSlug, (slug) => {
+  slugAvailable.value = null;
+  if (slugCheckTimeout) clearTimeout(slugCheckTimeout);
+  if (!slug || slug.length < 3) return;
+
+  slugCheckTimeout = setTimeout(async () => {
+    slugChecking.value = true;
+    try {
+      const result = await $api<{ available: boolean }>(
+        `/onboarding/check-slug/${encodeURIComponent(slug)}`,
+      );
+      slugAvailable.value = result.available;
+    } catch {
+      slugAvailable.value = null;
+    } finally {
+      slugChecking.value = false;
+    }
+  }, 500);
+});
+
 /** Validate step 2 fields. */
 const canSubmit = computed(() => {
   return (
     businessName.value.trim().length > 0 &&
+    businessSlug.value.length >= 3 &&
+    slugAvailable.value !== false &&
     ownerName.value.trim().length > 0 &&
     ownerPin.value.length === PIN_LENGTH &&
     !isSubmitting.value
@@ -99,6 +146,7 @@ async function createBusiness() {
       body: {
         businessType: businessType.value,
         businessName: businessName.value.trim(),
+        businessSlug: businessSlug.value,
         ownerName: ownerName.value.trim(),
         ownerPin: ownerPin.value,
       },
@@ -187,6 +235,37 @@ function goToDashboard() {
 
           <div>
             <label class="mb-1 block text-left text-sm text-gray-600">
+              URL de tu negocio
+            </label>
+            <div class="flex items-center gap-0">
+              <input
+                v-model="businessSlug"
+                type="text"
+                placeholder="bodega-don-pedro"
+                class="w-full rounded-l-xl border border-r-0 border-gray-300 px-4 py-3 text-sm focus:border-nova-primary focus:outline-none focus:ring-2 focus:ring-nova-primary/20"
+              />
+              <span
+                class="whitespace-nowrap rounded-r-xl border border-gray-300 bg-gray-50 px-3 py-3 text-xs text-gray-400"
+              >
+                .{{ tenantDomain }}
+              </span>
+            </div>
+            <p class="mt-1 text-left text-xs text-gray-400">
+              <template v-if="slugChecking">Verificando...</template>
+              <template v-else-if="slugAvailable === true">
+                <span class="text-green-600">Disponible</span>
+              </template>
+              <template v-else-if="slugAvailable === false">
+                <span class="text-red-500">No disponible, elige otro</span>
+              </template>
+              <template v-else>
+                Tus clientes veran esta URL
+              </template>
+            </p>
+          </div>
+
+          <div>
+            <label class="mb-1 block text-left text-sm text-gray-600">
               Tu nombre
             </label>
             <input
@@ -243,6 +322,19 @@ function goToDashboard() {
           {{ businessName }} esta configurado. Nova pre-configuro categorias y
           cuentas contables para tu tipo de negocio.
         </p>
+
+        <div
+          v-if="businessSlug"
+          class="mx-auto mt-4 max-w-sm rounded-xl border border-gray-200 bg-gray-50 p-4"
+        >
+          <p class="text-xs text-gray-500">Tu URL publica</p>
+          <p class="mt-1 text-sm font-medium text-nova-primary">
+            {{ businessSlug }}.{{ tenantDomain }}
+          </p>
+          <p class="mt-1 text-xs text-gray-400">
+            Comparte este link con tus clientes para que vean tu catalogo
+          </p>
+        </div>
 
         <button
           class="mt-8 inline-block rounded-xl bg-nova-primary px-8 py-3 font-medium text-white"

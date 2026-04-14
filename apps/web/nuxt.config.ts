@@ -52,6 +52,8 @@ export default defineNuxtConfig({
     public: {
       /** Base URL of the Nova API. Override with NUXT_PUBLIC_API_BASE. */
       apiBase: "http://localhost:3001",
+      /** Domain for tenant subdomains. Override with NUXT_PUBLIC_TENANT_DOMAIN. */
+      tenantDomain: "nova.aikalabs.cc",
     },
   },
 
