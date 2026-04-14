@@ -16,6 +16,7 @@ import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { verifyToken } from "@clerk/backend";
+import { eq } from "drizzle-orm";
 import { businessTypeSchema, PIN_LENGTH } from "@nova/shared";
 import {
   businesses,
@@ -28,10 +29,35 @@ import { getDb } from "../db";
 
 const onboarding = new Hono();
 
+/** Slug validation: lowercase alphanumeric + hyphens, 3-40 chars. */
+const RESERVED_SLUGS = new Set([
+  "www",
+  "api",
+  "admin",
+  "mail",
+  "ftp",
+  "staging",
+  "dev",
+  "app",
+  "dashboard",
+  "catalog",
+  "catalogo",
+  "health",
+  "onboarding",
+]);
+
+const slugSchema = z
+  .string()
+  .min(3)
+  .max(40)
+  .regex(/^[a-z0-9][a-z0-9-]*[a-z0-9]$/, "Slug must be lowercase alphanumeric with hyphens")
+  .refine((s) => !RESERVED_SLUGS.has(s), "This name is reserved");
+
 /** Schema for onboarding request. */
 const onboardingSchema = z.object({
   businessType: businessTypeSchema,
   businessName: z.string().min(1).max(100),
+  businessSlug: slugSchema,
   ownerName: z.string().min(1).max(100),
   ownerPin: z.string().length(PIN_LENGTH),
 });
@@ -150,6 +176,25 @@ const DEFAULT_ACCOUNTS: Array<{
 ];
 
 /**
+ * GET /onboarding/check-slug/:slug - Check if a slug is available.
+ *
+ * Public endpoint (no auth required). Returns { available: boolean }.
+ * Used by the onboarding form for real-time slug validation.
+ */
+onboarding.get("/check-slug/:slug", async (c) => {
+  const slug = c.req.param("slug");
+  const db = getDb();
+
+  const [existing] = await db
+    .select({ id: businesses.id })
+    .from(businesses)
+    .where(eq(businesses.slug, slug))
+    .limit(1);
+
+  return c.json({ available: !existing });
+});
+
+/**
  * POST /onboarding - Create business + owner.
  *
  * Requires a valid Clerk session (the user just signed up).
@@ -160,7 +205,7 @@ const DEFAULT_ACCOUNTS: Array<{
  * 4. Pre-configured accounting chart
  */
 onboarding.post("/", zValidator("json", onboardingSchema), async (c) => {
-  const { businessType, businessName, ownerName, ownerPin } =
+  const { businessType, businessName, businessSlug, ownerName, ownerPin } =
     c.req.valid("json");
   const db = getDb();
 
@@ -222,6 +267,7 @@ onboarding.post("/", zValidator("json", onboardingSchema), async (c) => {
       .values({
         name: businessName,
         type: businessType,
+        slug: businessSlug,
       })
       .returning();
 

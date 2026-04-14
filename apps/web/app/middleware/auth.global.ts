@@ -1,17 +1,19 @@
 /**
  * Global authentication middleware.
  *
- * Implements the auth flow from AUTH-REFACTOR-PLAN.md:
+ * Implements the auth flow with subdomain-aware tenant detection:
  *
  * 1. NovaUser in state?           -> allow (already identified)
  * 2. Route is public?             -> allow
- * 3. Clerk signed in, no NovaUser -> redirect to /auth/resolve
- * 4. Device has cached roster?    -> redirect to /auth/pin (shared device)
- * 5. Nothing                      -> redirect to /landing (new device)
+ * 3. On tenant subdomain + no auth? -> show catalog (public storefront)
+ * 4. Clerk signed in, no NovaUser -> redirect to /auth/resolve
+ * 5. Device has cached roster?    -> redirect to /auth/pin (shared device)
+ * 6. Nothing                      -> redirect to /landing (new device)
  *
- * The key change from the old middleware: step 4 checks for a cached
- * team roster (not just a businessId). If the roster exists, the device
- * was configured by the owner and employees can use PIN to identify.
+ * When on a tenant subdomain (e.g., bodegadonpedro.nova.aikalabs.cc):
+ * - Unauthenticated visitors see the public catalog
+ * - Employees with cached roster see the PIN screen
+ * - The subdomain identifies the business without localStorage
  */
 
 /** Routes accessible without authentication. */
@@ -41,7 +43,22 @@ export default defineNuxtRouteMiddleware((to) => {
     return;
   }
 
-  // 3. Clerk signed in but NovaUser not resolved yet
+  // 3. On a tenant subdomain with no auth -> show public catalog
+  const { tenantSlug } = useTenant();
+  if (tenantSlug.value) {
+    // Check if there's a cached roster for this device first
+    if (import.meta.client) {
+      const { hasRoster } = useTeamRoster();
+      if (hasRoster()) {
+        return navigateTo("/auth/pin");
+      }
+    }
+
+    // No roster, no auth -> show the public catalog for this tenant
+    return navigateTo(`/catalogo/${tenantSlug.value}`);
+  }
+
+  // 4. Clerk signed in but NovaUser not resolved yet
   if (import.meta.client) {
     try {
       const { isSignedIn } = useAuth();
@@ -53,7 +70,7 @@ export default defineNuxtRouteMiddleware((to) => {
     }
   }
 
-  // 4. Device has cached roster (owner configured it before) -> PIN screen
+  // 5. Device has cached roster (owner configured it before) -> PIN screen
   if (import.meta.client) {
     const { hasRoster } = useTeamRoster();
     if (hasRoster()) {
@@ -61,6 +78,6 @@ export default defineNuxtRouteMiddleware((to) => {
     }
   }
 
-  // 5. New device, no auth at all -- show landing
+  // 6. New device, no auth at all -- show landing
   return navigateTo("/landing");
 });
