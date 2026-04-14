@@ -13,9 +13,23 @@ set -e
 # Step 1: Apply versioned Drizzle migrations
 # Uses DATABASE_URL directly (port 5432, not PgBouncer).
 # Only applies new migrations that haven't been run yet (safe on every deploy).
+#
+# Note: drizzle-kit migrate uses postgres.js which keeps the connection pool
+# open after finishing, causing the process to hang. We use a Node.js wrapper
+# that calls process.exit(0) after the migrate import resolves.
 if [ -n "$DATABASE_URL" ]; then
   echo "[entrypoint] Running drizzle-kit migrate..."
-  cd packages/db && node ../../node_modules/drizzle-kit/bin.cjs migrate 2>&1
+  cd packages/db && node -e "
+    import('drizzle-orm/postgres-js/migrator').then(async ({ migrate }) => {
+      const { default: postgres } = await import('postgres');
+      const { drizzle } = await import('drizzle-orm/postgres-js');
+      const sql = postgres(process.env.DATABASE_URL, { max: 1 });
+      const db = drizzle(sql);
+      await migrate(db, { migrationsFolder: './drizzle' });
+      await sql.end();
+      process.exit(0);
+    }).catch(err => { console.error(err); process.exit(1); });
+  " 2>&1
   cd /app
   echo "[entrypoint] Migrations complete."
 else
