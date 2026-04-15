@@ -134,11 +134,16 @@ export function useTeamRoster() {
   /**
    * Start periodic roster refresh (call once on app init).
    * Refreshes every 5 minutes to pick up employee changes.
+   * Returns a cleanup function to clear the interval.
    */
+  let refreshInterval: ReturnType<typeof setInterval> | null = null;
   function startAutoRefresh() {
     if (!import.meta.client) return;
 
-    setInterval(() => {
+    // Prevent duplicate intervals
+    if (refreshInterval) clearInterval(refreshInterval);
+
+    refreshInterval = setInterval(() => {
       // Only refresh if we have a roster (device is configured)
       if (isLoaded.value) {
         refreshRoster();
