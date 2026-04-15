@@ -1,179 +1,146 @@
 # Nova: Auditoria de Codigo y Roadmap Definitivo
 
-> Ultima actualizacion: Abril 2026 (post PRs #66-#77, dominio novaincs.com activo)
-> Codebase: 15,830 lineas, 26 tablas, 40+ endpoints, 27 paginas, 17 tests
+> Ultima actualizacion: 15 Abril 2026 (post PRs #79-#92)
+> Codebase: ~18,000 lineas, 26 tablas, 40+ endpoints, 30 paginas, 23 tests
 > Produccion: novaincs.com (web), api.novaincs.com (API), *.novaincs.com (subdominios tenant)
+> Stack: Nuxt 4.4 + Hono + PostgreSQL 16 + Redis 7 + Clerk + Drizzle ORM
 
 ---
 
-## Auditoria de Codigo
-
-### Lo que esta bien
-
-- **Arquitectura**: Nuxt 4 + Hono + PostgreSQL + Redis + Clerk. Monorepo Turborepo. Stack de produccion probado.
-- **Multi-tenancy**: RLS en PostgreSQL con set_config por request. 26 tablas con policies. Exchange rates scopeadas por tenant. Patron de Slack/Shopify.
-- **Auth**: Clerk + PIN local (bcrypt en browser). Patron de Square POS. No hay endpoints publicos de auth.
-- **Flujo de ventas**: POST /api/sales con transaccion atomica de 7 pasos (sale + items + payments + stock + fiado + accounting + log).
-- **Seguridad**: scanner blocking, secure headers, CORS wildcard para subdominios, rate limiting, structured JSON logging, slugs reservados.
-- **Subdominios**: tenant detection via Nitro middleware + HostRegexp en Traefik. Frontend-only, backend no cambia.
-
-### Problemas pendientes
-
-1. **`drizzle-kit push --force` en cada deploy** — puede perder datos si se renombra una columna
-2. **`set_config` session-level** — riesgo teorico a escala con requests concurrentes (no ahora)
-3. **Tests superficiales** — 17 tests de ruta, 0 de integracion con DB
-4. **Seed sin slug** — catalogo no funciona en dev local
-5. **Errores de DB** — cliente recibe 500 generico en vez de mensaje util
-
----
-
-## Completado
+## Estado actual: que esta hecho
 
 ### Infraestructura y dominio
 
-| Item | Estado |
-|---|---|
-| Comprar dominio novaincs.com | Hecho |
-| DNS en Cloudflare (A records: @, *, api -> 95.216.216.149) | Hecho |
-| Traefik HostRegexp para wildcard subdominios | Hecho |
-| Coolify: dominios + env vars (TENANT_DOMAIN, NUXT_PUBLIC_TENANT_DOMAIN) | Hecho |
-| Verificar: novaincs.com, api.novaincs.com, *.novaincs.com | Hecho y funcionando |
+| Item | PR | Estado |
+|---|---|---|
+| Dominio novaincs.com + DNS Cloudflare | #77 | Hecho |
+| Wildcard subdominios *.novaincs.com | #73 | Hecho |
+| Clerk migrado a novaincs.com | #77 | Hecho |
+| Migraciones Drizzle versionadas | #79, #82-84 | Hecho |
+| Deploy API + Web funcionando en Coolify | #85 | Hecho |
 
-### Codigo (PRs #66-#77)
+### Roadmap del doc 25 (dias 1-8)
 
-| PR | Que |
-|---|---|
-| #66 | Roadmap + analisis WhatsApp compliance |
-| #67 | Eliminar WhatsApp API, catalogo publico, rate limiting, error boundary |
-| #69 | Eliminar gamificacion, structured logging, tests, config validation |
-| #70 | Actualizar roadmap con status |
-| #71 | Analisis subdomain-per-tenant |
-| #72 | Fix aislamiento exchange_rates (business_id + RLS + Redis scoped) |
-| #73 | Subdomain-per-tenant (Nitro middleware, useTenant, slug onboarding, CORS wildcard, slugs reservados) |
-| #74 | Actualizar README, roadmap, env.example |
-| #75 | Guia paso a paso subdominios |
-| #76 | Auditoria de codigo + roadmap definitivo |
-| #77 | Set tenant domain a novaincs.com |
+| Dia | Tarea | PR(s) | Estado |
+|---|---|---|---|
+| 1 | Subdominios activos | #73, #77 | Hecho |
+| 2 | Migraciones Drizzle + seed fix | #79, #82, #83, #84 | Hecho |
+| 3-4 | Tests de integracion (sales, fiado, void, RLS) | #80 | Hecho |
+| 5 | Exportacion PDF (daily, weekly, financial) | #81, #85 | Hecho |
+| 6 | Exportacion Excel (daily, weekly, sellers, libro SENIAT) | #86 | Hecho |
+| 7 | Email transaccional (Resend + modal UI) | #87 | Hecho |
+| 8 | Import batch + ReportLayout period selector | #88 | Hecho |
 
----
+### Mejoras adicionales (post-roadmap)
 
-## Pendiente: Clerk en novaincs.com
-
-Clerk sigue configurado en `nova.aikalabs.cc`. El login funciona porque el frontend todavia usa las keys de Clerk de aikalabs.cc. Para completar la migracion:
-
-| Paso | Que hacer |
-|---|---|
-| 1 | Clerk Dashboard -> Domains -> Change domain a `novaincs.com` |
-| 2 | Agregar registros DNS de Clerk en Cloudflare (CNAME accounts -> accounts.clerk.services) |
-| 3 | Copiar nueva Publishable Key |
-| 4 | Actualizar NUXT_PUBLIC_CLERK_PUBLISHABLE_KEY en Coolify nova-web |
-| 5 | Actualizar CLERK_SECRET_KEY en Coolify nova-api (si cambio) |
-| 6 | Redeploy ambos servicios |
+| Mejora | PR | Estado |
+|---|---|---|
+| Auth: restore session on reload (fix critico) | #89 | Hecho |
+| Auth: 401 interceptor + banner sesion expirada | #91 | Hecho |
+| Auditoria de arquitectura (doc 26) | #90 | Hecho |
+| Split reports.ts en modulos (mantenibilidad) | #92 | Hecho |
 
 ---
 
-## Roadmap: que sigue
+## Que falta: pendiente
 
-### Dia 1 (siguiente): Clerk + migraciones Drizzle
+### Prioridad alta (afecta produccion)
 
-**Clerk migration:**
-- Cambiar dominio en Clerk a novaincs.com
-- Actualizar keys en Coolify
-- Verificar login
+| # | Tarea | Complejidad | Notas |
+|---|---|---|---|
+| 1 | **Errores de DB traducidos a mensajes utiles** | Baja | POST /sales devuelve 500 generico en unique constraint / FK violation. Capturar errores especificos de Postgres y retornar mensajes claros al usuario. |
+| 2 | **Sentry error tracking** | Baja | @sentry/node en API + @sentry/vue en web. Sin esto, los errores en produccion son invisibles. |
+| 3 | **Campo email del contador en settings** | Baja | El endpoint send-email existe pero no hay UI para guardar el email del contador en el negocio. Agregar campo `accountant_email` a tabla businesses + UI en settings. |
 
-**Migraciones Drizzle versionadas:**
-- Reemplazar `drizzle-kit push --force` en entrypoint-api.sh
-- Generar migracion inicial con `drizzle-kit generate`
-- Cambiar entrypoint a `drizzle-kit migrate`
+### Prioridad media (mejora el producto)
 
-### Dia 2-3: Tests de integracion
+| # | Tarea | Complejidad | Notas |
+|---|---|---|---|
+| 4 | **Segmentos de clientes** | Media | Calculo automatico: VIP (top 20% gasto), frecuente (>4 compras/mes), en riesgo (30+ dias sin compra), inactivo (90+ dias). Tabla customer_segments ya existe. |
+| 5 | **Prediccion flujo de caja** | Media | Proyectar ingresos/gastos basado en historico. Alertar deficit. Requiere datos de al menos 30 dias. |
+| 6 | **Uptime monitoring** | Baja | Configurar Uptime Kuma en el Control Plane para monitorear api.novaincs.com/health y novaincs.com. |
+| 7 | **Reducir roster refresh a 1 min** | Baja | Actualmente 5 min. Si el owner despide un empleado, el PIN viejo funciona 5 min. Reducir a 1 min. |
 
-| Test | Que verifica |
-|---|---|
-| Onboarding completo | Crear negocio + owner + categorias + accounts |
-| Flujo de venta | Producto -> venta -> stock decrementado |
-| Venta con fiado | Crea accounts_receivable, actualiza balance |
-| Anulacion de venta | Void restaura stock |
-| RLS aislamiento | Negocio A no ve datos de B |
-| Catalogo publico | GET /catalog/:slug correcto, 404 para inexistente |
+### Prioridad baja (backlog)
 
-### Dia 4: Exportacion PDF
-
-| Tarea | Archivo |
-|---|---|
-| Instalar pdfmake | apps/api/package.json |
-| Servicio de generacion PDF | services/pdf-generator.ts |
-| Endpoints export PDF | routes/reports.ts |
-| Boton "Descargar PDF" en reportes | reports/*.vue |
-
-### Dia 5: Exportacion Excel
-
-| Tarea | Archivo |
-|---|---|
-| Endpoints export xlsx | routes/reports.ts |
-| Libro de ventas formato SENIAT | routes/reports.ts |
-| Boton "Descargar Excel" en reportes | reports/*.vue |
-
-### Dia 6: Email transaccional
-
-| Tarea | Archivo |
-|---|---|
-| Integrar Resend | apps/api/package.json |
-| Servicio de email | services/email.ts |
-| Boton "Enviar por email" en reportes | reports/*.vue |
-| Campo email del contador en settings | settings/index.vue |
-| Boton "Enviar al contador" | reports/*.vue |
-
-### Dia 7: Import Excel + period selector + seed
-
-| Tarea | Archivo |
-|---|---|
-| Conectar import a POST /api/products batch | pages/inventory/import.vue, routes/inventory.ts |
-| Conectar selector de periodo en reportes | components/shared/ReportLayout.vue, reports/*.vue |
-| Agregar slug y whatsappNumber al seed | packages/db/src/seed.ts |
+| # | Tarea | Complejidad | Notas |
+|---|---|---|---|
+| 8 | Iconos PWA (192x192, 512x512) | Baja | Actualmente usa placeholders |
+| 9 | PgBouncer + RLS transaccional | Media | Solo necesario a escala. set_config session-level funciona con trafico actual. |
+| 10 | Service Worker offline verificado | Media | PWA registrada pero no verificada sin internet |
+| 11 | CI/CD automatico (push main -> staging) | Media | Actualmente deploy manual via Coolify webhook |
+| 12 | E2E tests Playwright | Alta | Login, producto, venta, dashboard. Requiere setup de Playwright + Clerk test mode. |
+| 13 | Catalogo: detectar subdominio y no repetir slug en URL | Baja | bodegadonpedro.novaincs.com/catalogo/bodegadonpedro es redundante |
 
 ---
 
-## Despues del dia 7
+## Problemas conocidos (documentados, no criticos)
 
-| Item | Prioridad |
-|---|---|
-| Segmentos de clientes (calculo automatico) | Media |
-| Sentry error tracking | Media |
-| Uptime monitoring (Uptime Kuma) | Media |
-| Prediccion de flujo de caja | Media |
-| Iconos PWA | Baja |
-| PgBouncer + RLS | Baja |
-| Service Worker offline verificado | Baja |
-| CI/CD automatico | Baja |
-| E2E tests Playwright | Baja |
+| Problema | Riesgo | Mitigacion actual |
+|---|---|---|
+| `set_config` session-level con pool | Teorico: RLS leak bajo carga concurrente | Trafico actual es bajo. Migrar a transacciones explicitas cuando justifique. |
+| PIN hashes en localStorage | Fisico: acceso al dispositivo expone hashes bcrypt | Aceptable para POS en tienda. bcrypt cost 10 hace brute force impractico. |
+| Clerk JWT expira silenciosamente | UX: empleado ve errores sin explicacion | Resuelto con 401 interceptor (PR #91). Banner no-blocking. |
+| restoreUser no se llamaba | UX: cada F5 forzaba round-trip a /api/me | Resuelto (PR #89). Restore instantaneo desde localStorage. |
 
 ---
 
-## Arquitectura de Deploy (actual)
+## Arquitectura de Deploy (actual, funcionando)
 
 ```
 Cloudflare (DNS + SSL + proxy)
   novaincs.com        -> A 95.216.216.149 (proxied)
   *.novaincs.com      -> A 95.216.216.149 (proxied)
   api.novaincs.com    -> A 95.216.216.149 (proxied)
-  accounts.novaincs.com -> CNAME accounts.clerk.services (pendiente Clerk migration)
 
 App Plane A (95.216.216.149)
   Traefik (reverse proxy)
-    novaincs.com           -> nova-web:3000 (Host rule)
-    *.novaincs.com         -> nova-web:3000 (HostRegexp rule)
-    api.novaincs.com       -> nova-api:3001 (Host rule)
+    novaincs.com           -> nova-web:3000
+    *.novaincs.com         -> nova-web:3000
+    api.novaincs.com       -> nova-api:3001
 
-  nova-web (Docker, puerto 3000)
-    NUXT_PUBLIC_API_BASE=https://api.novaincs.com
-    NUXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_live_...
-    NUXT_PUBLIC_TENANT_DOMAIN=novaincs.com
+  nova-web (Nuxt 4 SSR, Docker)
+  nova-api (Hono + tsup ESM, Docker)
+    -> migrate.mjs (Drizzle migraciones con sql.end())
+    -> init.sql (RLS policies)
+    -> node apps/api/dist/index.js
 
-  nova-api (Docker, puerto 3001)
-    DATABASE_URL -> 10.0.1.20:5432/nova
-    REDIS_URL -> 10.0.1.20:6379/4
-    CLERK_SECRET_KEY=sk_live_...
-    CORS_ORIGIN=https://novaincs.com
-    TENANT_DOMAIN=novaincs.com
+Data Plane (10.0.1.20)
+  PostgreSQL 16 + pgvector + pg_trgm
+  Redis 7
+```
+
+---
+
+## Estructura de archivos de la API (post-refactor)
+
+```
+apps/api/src/
+  routes/
+    reports.ts          (778 lineas - data + alerts + monta sub-routers)
+    reports-helpers.ts  (74 lineas - parsePeriodRange, periodQuery)
+    reports-pdf.ts      (243 lineas - 3 endpoints PDF export)
+    reports-xlsx.ts     (138 lineas - 4 endpoints Excel export)
+    reports-email.ts    (254 lineas - send-email endpoint)
+    sales.ts            (689 lineas - CRUD ventas + cotizaciones)
+    inventory.ts        (634 lineas - CRUD productos + batch import)
+    onboarding.ts       (328 lineas - crear negocio + owner)
+    customers.ts        (~ lineas - CRUD clientes + cuentas)
+    accounting.ts       (~ lineas - gastos + OCR)
+    catalog.ts          (129 lineas - catalogo publico)
+    auth.ts             (83 lineas - verify-owner-pin)
+    team.ts             (355 lineas - roster + empleados CRUD)
+    health.ts           (~ lineas - healthcheck)
+  services/
+    pdf-generator.ts    (471 lineas - pdfmake con createRequire)
+    excel-generator.ts  (222 lineas - xlsx ESM nativo)
+    email.ts            (96 lineas - Resend SDK)
+    ai-narrative.ts     (150 lineas - OpenRouter/Groq)
+    exchange-rate.ts    (140 lineas - tasa BCV per-tenant)
+    ocr-pipeline.ts     (~ lineas - OCR facturas)
+  middleware/
+    auth.ts             (187 lineas - Clerk JWT + X-Acting-As)
+    tenant.ts           (50 lineas - set_config RLS)
+    rate-limit.ts       (~ lineas)
+    structured-logger.ts(~ lineas)
 ```
