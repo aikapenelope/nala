@@ -8,6 +8,13 @@
       "when": 1776202204809,
       "tag": "0000_curious_ulik",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1776215893483,
+      "tag": "0001_sturdy_machine_man",
+      "breakpoints": true
     }
   ]
 }
