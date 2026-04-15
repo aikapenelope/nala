@@ -38,6 +38,7 @@ import {
   customers,
 } from "@nova/db";
 import { getCurrentRate, setCurrentRate } from "../services/exchange-rate";
+import { handleDbError } from "../utils/db-errors";
 import type { AppEnv } from "../types";
 
 const salesRoutes = new Hono<AppEnv>();
@@ -353,7 +354,9 @@ salesRoutes.post("/sales", zValidator("json", createSaleSchema), async (c) => {
   const totalBs = Math.round(totalUsd * rate.rateBcv * 100) / 100;
 
   // Atomic transaction
-  const result = await db.transaction(async (tx) => {
+  let result;
+  try {
+    result = await db.transaction(async (tx) => {
     // Insert sale record
     const [sale] = await tx
       .insert(sales)
@@ -501,7 +504,12 @@ salesRoutes.post("/sales", zValidator("json", createSaleSchema), async (c) => {
     });
 
     return sale;
-  });
+    });
+  } catch (err) {
+    const dbErr = handleDbError(err);
+    if (dbErr) return c.json({ error: dbErr.message }, dbErr.status);
+    throw err;
+  }
 
   return c.json({ sale: result }, 201);
 });
@@ -522,7 +530,9 @@ salesRoutes.post(
     const db = c.get("db");
     const businessId = c.get("businessId");
 
-    const result = await db.transaction(async (tx) => {
+    let result;
+    try {
+      result = await db.transaction(async (tx) => {
       // Get the sale
       const [sale] = await tx
         .select()
@@ -588,7 +598,12 @@ salesRoutes.post(
       });
 
       return voided;
-    });
+      });
+    } catch (err) {
+      const dbErr = handleDbError(err);
+      if (dbErr) return c.json({ error: dbErr.message }, dbErr.status);
+      throw err;
+    }
 
     if (!result) {
       return c.json({ error: "Sale not found or already voided" }, 404);
