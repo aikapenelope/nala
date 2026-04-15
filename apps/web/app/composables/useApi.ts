@@ -24,12 +24,16 @@
 
 import type { NitroFetchOptions } from "nitropack";
 
-/** Reactive flag shown by layouts/components when session expires. */
-const sessionExpired = useState<boolean>("session-expired", () => false);
-
 export function useApi() {
   const config = useRuntimeConfig();
   const apiBase = config.public.apiBase as string;
+
+  /**
+   * Reactive flag shown by layouts/components when session expires.
+   * Must be inside useApi() (not module-level) because useState requires
+   * the Nuxt instance context which is only available during setup/composables.
+   */
+  const sessionExpired = useState<boolean>("session-expired", () => false);
 
   // Capture Clerk's getToken during setup (not inside $api).
   // useAuth() uses inject() internally, which only works during setup.
