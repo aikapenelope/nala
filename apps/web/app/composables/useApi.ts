@@ -5,7 +5,7 @@
  * - Automatic base URL from runtime config (NUXT_PUBLIC_API_BASE)
  * - Clerk JWT token in Authorization header (device authentication)
  * - X-Acting-As header when an employee is identified via PIN
- * - Consistent error handling
+ * - 401 interceptor: clears stale session and redirects to re-auth
  *
  * IMPORTANT: useAuth() is called once during composable setup (not inside
  * the $api function) because Vue composables that use inject() must be
@@ -23,6 +23,9 @@
  */
 
 import type { NitroFetchOptions } from "nitropack";
+
+/** Reactive flag shown by layouts/components when session expires. */
+const sessionExpired = useState<boolean>("session-expired", () => false);
 
 export function useApi() {
   const config = useRuntimeConfig();
@@ -46,10 +49,34 @@ export function useApi() {
   }
 
   /**
+   * Handle a 401 response from the API.
+   *
+   * This means the Clerk JWT expired or was revoked. The device is no
+   * longer authenticated. Clear the stale Nova user and show a message
+   * so the owner knows they need to re-authenticate.
+   *
+   * We don't auto-redirect because the user might be mid-sale. Instead
+   * we set a reactive flag that the layout can show as a banner.
+   */
+  function handle401() {
+    if (!import.meta.client) return;
+
+    // Prevent multiple triggers
+    if (sessionExpired.value) return;
+    sessionExpired.value = true;
+
+    // Clear the stale Nova user (but keep roster for PIN re-entry)
+    const novaUser = useState<unknown>("nova-user");
+    novaUser.value = null;
+    localStorage.removeItem("nova:user");
+  }
+
+  /**
    * Make an authenticated API request.
    *
    * Always attaches the Clerk JWT (device auth).
    * If an employee is acting (PIN-identified), attaches X-Acting-As.
+   * On 401, clears session and sets sessionExpired flag.
    */
   async function $api<T = unknown>(
     path: string,
@@ -80,12 +107,24 @@ export function useApi() {
       headers["X-Acting-As"] = novaUser.value.id;
     }
 
-    return $fetch<T>(path, {
-      baseURL: apiBase,
-      ...opts,
-      headers,
-    });
+    try {
+      return await $fetch<T>(path, {
+        baseURL: apiBase,
+        ...opts,
+        headers,
+      });
+    } catch (err) {
+      // Intercept 401: Clerk JWT expired or revoked
+      const fetchError = err as { statusCode?: number; status?: number };
+      if (
+        fetchError.statusCode === 401 ||
+        fetchError.status === 401
+      ) {
+        handle401();
+      }
+      throw err;
+    }
   }
 
-  return { $api, apiBase };
+  return { $api, apiBase, sessionExpired };
 }
