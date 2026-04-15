@@ -71,13 +71,12 @@ export function useApi() {
       }
     }
 
-    // Attach X-Acting-As if an employee is identified via PIN.
-    // The nova-user state contains the currently acting user (owner or employee).
-    // If it's an employee (set via PIN screen), the backend needs to know.
+    // Attach X-Acting-As only when an employee is identified via PIN.
+    // The owner doesn't need this header -- the backend resolves them from the JWT.
     const novaUser = useState<{ id?: string; role?: string } | null>(
       "nova-user",
     );
-    if (novaUser.value?.id) {
+    if (novaUser.value?.id && novaUser.value?.role === "employee") {
       headers["X-Acting-As"] = novaUser.value.id;
     }
 
