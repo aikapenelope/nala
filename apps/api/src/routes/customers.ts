@@ -38,6 +38,7 @@ import {
   salePayments,
   activityLog,
 } from "@nova/db";
+import { handleDbError } from "../utils/db-errors";
 import type { AppEnv } from "../types";
 
 const customersRoutes = new Hono<AppEnv>();
@@ -134,19 +135,25 @@ customersRoutes.post(
     const db = c.get("db");
     const businessId = c.get("businessId");
 
-    const [customer] = await db
-      .insert(customers)
-      .values({
-        businessId,
-        name: data.name,
-        phone: data.phone,
-        email: data.email,
-        address: data.address,
-        notes: data.notes,
-      })
-      .returning();
+    try {
+      const [customer] = await db
+        .insert(customers)
+        .values({
+          businessId,
+          name: data.name,
+          phone: data.phone,
+          email: data.email,
+          address: data.address,
+          notes: data.notes,
+        })
+        .returning();
 
-    return c.json({ customer }, 201);
+      return c.json({ customer }, 201);
+    } catch (err) {
+      const dbErr = handleDbError(err);
+      if (dbErr) return c.json({ error: dbErr.message }, dbErr.status);
+      throw err;
+    }
   },
 );
 
@@ -257,7 +264,9 @@ customersRoutes.post(
     const newStatus = newBalance <= 0.01 ? "paid" : "pending";
 
     // Atomic: update receivable + customer balance + log
-    const result = await db.transaction(async (tx) => {
+    let result;
+    try {
+      result = await db.transaction(async (tx) => {
       const [updated] = await tx
         .update(accountsReceivable)
         .set({
@@ -287,7 +296,12 @@ customersRoutes.post(
       });
 
       return updated;
-    });
+      });
+    } catch (err) {
+      const dbErr = handleDbError(err);
+      if (dbErr) return c.json({ error: dbErr.message }, dbErr.status);
+      throw err;
+    }
 
     return c.json({ account: result });
   },

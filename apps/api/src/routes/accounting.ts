@@ -24,6 +24,7 @@ import {
   extractInvoiceFromImage,
   validateInvoiceMath,
 } from "../services/ocr-pipeline";
+import { handleDbError } from "../utils/db-errors";
 import type { AppEnv } from "../types";
 
 const accounting = new Hono<AppEnv>();
@@ -302,7 +303,9 @@ accounting.post(
     const db = c.get("db");
     const businessId = c.get("businessId");
 
-    const result = await db.transaction(async (tx) => {
+    let result;
+    try {
+      result = await db.transaction(async (tx) => {
       // 1. Create expense record
       const [expense] = await tx
         .insert(expenses)
@@ -411,7 +414,12 @@ accounting.post(
       }
 
       return expense;
-    });
+      });
+    } catch (err) {
+      const dbErr = handleDbError(err);
+      if (dbErr) return c.json({ error: dbErr.message }, dbErr.status);
+      throw err;
+    }
 
     return c.json({ expense: result }, 201);
   },
