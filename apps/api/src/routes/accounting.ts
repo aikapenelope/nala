@@ -120,6 +120,17 @@ accounting.post(
     const businessId = c.get("businessId");
 
     try {
+      // Check OCR availability before processing
+      if (!process.env.OPENROUTER_API_KEY) {
+        return c.json(
+          {
+            error:
+              "OCR no disponible. Configura OPENROUTER_API_KEY en las variables de entorno.",
+          },
+          503,
+        );
+      }
+
       // Load product list from DB for matching hints
       const productList = await db
         .select({ id: products.id, name: products.name, sku: products.sku })

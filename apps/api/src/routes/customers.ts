@@ -224,7 +224,7 @@ customersRoutes.post(
   zValidator("json", recordPaymentSchema),
   async (c) => {
     const id = c.req.param("id");
-    const { amountUsd } = c.req.valid("json");
+    const { amountUsd, method, reference } = c.req.valid("json");
     const db = c.get("db");
     const businessId = c.get("businessId");
     const user = c.get("user");
@@ -292,7 +292,7 @@ customersRoutes.post(
         businessId,
         userId: user.id,
         action: "payment_received",
-        detail: `Payment $${effectivePayment.toFixed(2)} on receivable ${id.slice(0, 8)}`,
+        detail: `Payment $${effectivePayment.toFixed(2)} on receivable ${id.slice(0, 8)}${method ? ` via ${method}` : ""}${reference ? ` (ref: ${reference})` : ""}`,
       });
 
       return updated;
