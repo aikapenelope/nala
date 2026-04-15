@@ -33,7 +33,7 @@ interface CachedRoster {
 }
 
 const STORAGE_KEY = "nova:team-roster";
-const REFRESH_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
+const REFRESH_INTERVAL_MS = 1 * 60 * 1000; // 1 minute
 
 export function useTeamRoster() {
   const { $api } = useApi();
