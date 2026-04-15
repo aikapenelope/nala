@@ -36,6 +36,7 @@ import {
   saleItems,
   sales,
 } from "@nova/db";
+import { handleDbError } from "../utils/db-errors";
 import type { AppEnv } from "../types";
 
 const inventory = new Hono<AppEnv>();
@@ -271,35 +272,41 @@ inventory.post(
       }
     }
 
-    const [product] = await db
-      .insert(products)
-      .values({
+    try {
+      const [product] = await db
+        .insert(products)
+        .values({
+          businessId,
+          name: data.name,
+          description: data.description,
+          categoryId: data.categoryId,
+          sku: data.sku,
+          barcode: data.barcode,
+          cost: String(data.cost),
+          price: String(data.price),
+          stock: data.stock,
+          stockMin: data.stockMin,
+          stockCritical: data.stockCritical,
+          hasVariants: data.hasVariants,
+          imageUrl: data.imageUrl,
+          expiresAt: data.expiresAt ? new Date(data.expiresAt) : undefined,
+        })
+        .returning();
+
+      // Log initial price in price history
+      await db.insert(priceHistory).values({
         businessId,
-        name: data.name,
-        description: data.description,
-        categoryId: data.categoryId,
-        sku: data.sku,
-        barcode: data.barcode,
-        cost: String(data.cost),
-        price: String(data.price),
-        stock: data.stock,
-        stockMin: data.stockMin,
-        stockCritical: data.stockCritical,
-        hasVariants: data.hasVariants,
-        imageUrl: data.imageUrl,
-        expiresAt: data.expiresAt ? new Date(data.expiresAt) : undefined,
-      })
-      .returning();
+        productId: product.id,
+        newCost: String(data.cost),
+        newPrice: String(data.price),
+      });
 
-    // Log initial price in price history
-    await db.insert(priceHistory).values({
-      businessId,
-      productId: product.id,
-      newCost: String(data.cost),
-      newPrice: String(data.price),
-    });
-
-    return c.json({ product }, 201);
+      return c.json({ product }, 201);
+    } catch (err) {
+      const dbErr = handleDbError(err);
+      if (dbErr) return c.json({ error: dbErr.message }, dbErr.status);
+      throw err;
+    }
   },
 );
 
@@ -593,36 +600,43 @@ inventory.post(
     const db = c.get("db");
     const businessId = c.get("businessId");
 
-    const result = await db.transaction(async (tx) => {
-      const created = [];
+    let result;
+    try {
+      result = await db.transaction(async (tx) => {
+        const created = [];
 
-      for (const item of items) {
-        const [product] = await tx
-          .insert(products)
-          .values({
+        for (const item of items) {
+          const [product] = await tx
+            .insert(products)
+            .values({
+              businessId,
+              name: item.name,
+              sku: item.sku,
+              barcode: item.barcode,
+              cost: String(item.cost),
+              price: String(item.price),
+              stock: item.stock,
+            })
+            .returning();
+
+          // Log initial price in price history
+          await tx.insert(priceHistory).values({
             businessId,
-            name: item.name,
-            sku: item.sku,
-            barcode: item.barcode,
-            cost: String(item.cost),
-            price: String(item.price),
-            stock: item.stock,
-          })
-          .returning();
+            productId: product.id,
+            newCost: String(item.cost),
+            newPrice: String(item.price),
+          });
 
-        // Log initial price in price history
-        await tx.insert(priceHistory).values({
-          businessId,
-          productId: product.id,
-          newCost: String(item.cost),
-          newPrice: String(item.price),
-        });
+          created.push(product);
+        }
 
-        created.push(product);
-      }
-
-      return created;
-    });
+        return created;
+      });
+    } catch (err) {
+      const dbErr = handleDbError(err);
+      if (dbErr) return c.json({ error: dbErr.message }, dbErr.status);
+      throw err;
+    }
 
     return c.json(
       { products: result, count: result.length },
