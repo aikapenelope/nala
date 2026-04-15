@@ -43,6 +43,9 @@ export const businesses = pgTable(
     /** Business WhatsApp number for "Order via WhatsApp" links on the catalog. */
     whatsappNumber: text("whatsapp_number"),
 
+    /** Accountant email for report delivery. */
+    accountantEmail: text("accountant_email"),
+
     isActive: boolean("is_active").notNull().default(true),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
