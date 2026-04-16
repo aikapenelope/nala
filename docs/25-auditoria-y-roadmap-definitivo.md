@@ -6,9 +6,9 @@
 
 ---
 
-## Completado (PRs #79-#98)
+## Completado (PRs #79-#100)
 
-### Roadmap original (doc 25, dias 1-8): TODO HECHO
+### Roadmap original (doc 25, dias 1-8): COMPLETO
 
 | Dia | Tarea | PRs |
 |-----|-------|-----|
@@ -20,18 +20,31 @@
 | 7 | Email transaccional (Resend) | #87 |
 | 8 | Import batch + ReportLayout period selector | #88 |
 
-### Mejoras post-roadmap
+### Mejoras post-roadmap: COMPLETO
 
 | Mejora | PRs |
 |--------|-----|
-| Auth: restore session on reload | #89 |
+| Auth: restore session on reload (fix critico) | #89 |
 | Auth: 401 interceptor + banner sesion expirada | #91 |
+| Auth: fix SSR crash (useState fuera de contexto) | #100 |
 | Auditoria de arquitectura (doc 26) | #90 |
-| Split reports.ts en modulos | #92 |
-| DB error handling: mensajes en espanol (sales, inventory, customers, accounting) | #94, #95 |
-| Campo accountant_email + settings API + migration | #96 |
+| Split reports.ts en modulos (778 lineas vs 1678) | #92 |
+| DB error handling: mensajes en espanol (4 archivos) | #94, #95 |
+| Campo accountant_email + settings API + migration 0001 | #96 |
 | OCR 503 fallback + payment fields en activity log | #97 |
 | Roster refresh reducido a 1 minuto | #98 |
+| Roadmap updates | #93, #99 |
+
+### Hotfixes de deploy: RESUELTOS
+
+| Problema | PRs |
+|----------|-----|
+| Docker builder sin build tools (pdfmake nativo) | #82 |
+| drizzle-kit migrate cuelga el proceso (pool abierto) | #82, #84 |
+| Migration 0000 falla en DB existente | #83 |
+| sh interpreta template literals de Node | #84 |
+| pdfmake require() falla en ESM bundle | #85 |
+| Web SSR crash: useState fuera de contexto Nuxt | #100 |
 
 ---
 
@@ -39,36 +52,34 @@
 
 ### Prioridad alta
 
-| Tarea | Complejidad | Notas |
-|-------|-------------|-------|
-| Sentry error tracking | Baja | @sentry/node + @sentry/vue. Planificar para todos los proyectos (Nova, Aurora, Propi, Whabi). |
-| Settings UI en frontend | Baja | Pagina /settings con campos accountant_email y whatsappNumber. El API ya existe (GET/PATCH /api/settings). |
+| # | Tarea | Complejidad | Notas |
+|---|-------|-------------|-------|
+| 1 | **Sentry error tracking** | Baja | @sentry/node + @sentry/vue. Planificar centralizado para Nova, Aurora, Propi, Whabi. |
+| 2 | **Settings UI en frontend** | Baja | Pagina /settings con campos accountant_email y whatsappNumber. API ya existe (GET/PATCH /api/settings, PR #96). |
 
 ### Prioridad media
 
-| Tarea | Complejidad | Notas |
-|-------|-------------|-------|
-| Segmentos de clientes | Media | Calculo automatico VIP/frecuente/en riesgo/inactivo. Tabla customer_segments existe. Funcion calculateCustomerSegments existe en shared. Falta el cron/trigger que lo ejecute. |
-| Prediccion flujo de caja | Media | Proyectar ingresos/gastos. Requiere 30+ dias de datos. |
-| Uptime monitoring | Baja | Uptime Kuma en Control Plane para api.novaincs.com/health. |
+| # | Tarea | Complejidad | Notas |
+|---|-------|-------------|-------|
+| 3 | **Segmentos de clientes** | Media | calculateCustomerSegments() existe en shared. Falta cron/trigger que lo ejecute y UI que lo muestre. |
+| 4 | **Prediccion flujo de caja** | Media | Requiere 30+ dias de datos reales. |
+| 5 | **Uptime monitoring** | Baja | Uptime Kuma en Control Plane. |
 
-### Prioridad baja (backlog)
+### Prioridad baja
 
-| Tarea | Notas |
-|-------|-------|
-| Iconos PWA (192x192, 512x512) | Placeholders actuales |
-| PgBouncer + RLS transaccional | Solo a escala |
-| Service Worker offline | PWA registrada, no verificada offline |
-| CI/CD automatico | Deploy manual via Coolify webhook |
-| E2E tests Playwright | Login, producto, venta, dashboard |
-| Catalogo: no repetir slug en URL de subdominio | Cosmetico |
+| # | Tarea | Notas |
+|---|-------|-------|
+| 6 | Iconos PWA (192x192, 512x512) | Placeholders actuales |
+| 7 | PgBouncer + RLS transaccional | Solo necesario a escala |
+| 8 | Service Worker offline verificado | PWA registrada, no verificada |
+| 9 | CI/CD automatico (push main -> deploy) | Manual via Coolify webhook |
+| 10 | E2E tests Playwright | Login, producto, venta, dashboard |
+| 11 | Catalogo: no repetir slug en URL de subdominio | Cosmetico |
 
----
-
-## Problemas conocidos (documentados, no criticos)
+### Problemas conocidos (no criticos)
 
 | Problema | Mitigacion |
 |----------|-----------|
 | set_config session-level con pool | Trafico bajo. Transacciones explicitas cuando escale. |
 | PIN hashes en localStorage | bcrypt cost 10. Aceptable para POS en tienda. |
-| Errores de DB en endpoints sin handleDbError | Solo onboarding y team no tienen el wrapper. Riesgo bajo (pocas constraint violations posibles). |
+| Coolify build queue se satura con muchos PRs seguidos | Mergear en batches de 2-3, esperar deploy. |
