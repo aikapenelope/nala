@@ -35,8 +35,9 @@ const sections: SettingsSection[] = [
   {
     icon: Store,
     label: "Negocio",
-    description: "Nombre, tipo de negocio, informacion general",
-    available: false,
+    description: "Email del contador, WhatsApp del negocio",
+    to: "/settings/business",
+    available: true,
   },
   {
     icon: CreditCard,
