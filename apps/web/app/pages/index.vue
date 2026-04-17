@@ -83,7 +83,10 @@ const syncStatus = ref<"online" | "offline" | "syncing">("online");
 const pendingSyncCount = ref(0);
 
 /** Load all dashboard data from API in parallel. */
+let loadInProgress = false;
 async function loadDashboard() {
+  if (loadInProgress) return;
+  loadInProgress = true;
   isLoading.value = true;
   loadError.value = "";
 
@@ -176,6 +179,7 @@ async function loadDashboard() {
     loadError.value = message;
   } finally {
     isLoading.value = false;
+    loadInProgress = false;
   }
 }
 
