@@ -7,11 +7,14 @@
  * 2. Fetches exchange rate from GET /api/exchange-rate
  * 3. User selects payment method
  * 4. If fiado: must select a customer
- * 5. Confirm -> POST /api/sales -> receipt option
+ * 5. Confirm:
+ *    - Online: POST /api/sales -> receipt option
+ *    - Offline: queue in IndexedDB -> sync when connectivity returns
  *
  * Connected to:
  * - GET /api/exchange-rate
  * - POST /api/sales
+ * - useOfflineQueue (IndexedDB fallback)
  */
 
 import { usdToBs } from "@nova/shared";
@@ -19,6 +22,8 @@ import type { PaymentMethod } from "@nova/shared";
 
 const router = useRouter();
 const { $api } = useApi();
+const { user } = useNovaAuth();
+const { isOnline, queueSale, init: initOfflineQueue } = useOfflineQueue();
 
 /** Exchange rate from API. */
 const exchangeRate = ref(0);
@@ -43,6 +48,9 @@ const isSubmitting = ref(false);
 const saleComplete = ref(false);
 const saleError = ref("");
 
+/** Whether the sale was queued offline (not sent to server yet). */
+const queuedOffline = ref(false);
+
 /** Total in Bs. */
 const totalBs = computed(() =>
   exchangeRate.value > 0 ? usdToBs(totalUsd.value, exchangeRate.value) : 0,
@@ -51,6 +59,9 @@ const totalBs = computed(() =>
 /** Load ticket data and exchange rate on mount. */
 onMounted(async () => {
   if (!import.meta.client) return;
+
+  // Initialize offline queue listeners
+  await initOfflineQueue();
 
   // Read ticket from sessionStorage
   const storedItems = sessionStorage.getItem("nova:checkout:items");
@@ -126,13 +137,45 @@ const canSubmit = computed(() => {
   return true;
 });
 
-/** Submit the sale to the API. */
+/** Submit the sale to the API, or queue offline if no connectivity. */
 async function confirmSale() {
   if (!canSubmit.value || !selectedMethod.value) return;
 
   isSubmitting.value = true;
   saleError.value = "";
 
+  // Offline path: queue in IndexedDB for later sync
+  if (!isOnline.value) {
+    try {
+      await queueSale({
+        items: items.value.map((item) => ({
+          productId: item.productId,
+          quantity: item.quantity,
+          price: item.unitPrice,
+          discount: item.discountPercent,
+        })),
+        total: totalUsd.value,
+        paymentMethod: selectedMethod.value,
+        customerId: selectedCustomerId.value ?? undefined,
+        userId: user.value?.id ?? "",
+        createdAt: new Date().toISOString(),
+      });
+
+      sessionStorage.removeItem("nova:checkout:items");
+      sessionStorage.removeItem("nova:checkout:total");
+
+      queuedOffline.value = true;
+      saleComplete.value = true;
+    } catch {
+      saleError.value =
+        "Error guardando la venta localmente. Intenta de nuevo.";
+    } finally {
+      isSubmitting.value = false;
+    }
+    return;
+  }
+
+  // Online path: POST to API
   try {
     await $api("/api/sales", {
       method: "POST",
@@ -188,13 +231,22 @@ function newSale() {
   <div class="mx-auto max-w-md">
     <!-- Sale complete screen -->
     <div v-if="saleComplete" class="py-12 text-center">
-      <div class="mb-4 text-5xl">✓</div>
-      <h1 class="text-2xl font-bold text-gray-900">Venta registrada</h1>
+      <div class="mb-4 text-5xl">{{ queuedOffline ? "📡" : "✓" }}</div>
+      <h1 class="text-2xl font-bold text-gray-900">
+        {{ queuedOffline ? "Venta guardada" : "Venta registrada" }}
+      </h1>
       <p class="mt-2 text-lg text-gray-500">
         ${{ totalUsd.toFixed(2) }}
         <span v-if="exchangeRate > 0" class="text-sm">
           (Bs.{{ totalBs.toFixed(2) }})
         </span>
+      </p>
+      <p
+        v-if="queuedOffline"
+        class="mt-3 rounded-lg bg-yellow-50 px-4 py-2 text-sm text-yellow-700"
+      >
+        Sin conexion. La venta se sincronizara automaticamente cuando vuelva el
+        internet.
       </p>
 
       <div class="mt-8 space-y-3">
@@ -279,6 +331,15 @@ function newSale() {
         <p class="mt-1 text-xs text-yellow-600">
           Se generara una cuenta por cobrar automaticamente
         </p>
+      </div>
+
+      <!-- Offline indicator -->
+      <div
+        v-if="!isOnline"
+        class="mb-4 flex items-center gap-2 rounded-lg bg-yellow-50 px-4 py-2 text-sm text-yellow-700"
+      >
+        <span class="h-2 w-2 rounded-full bg-yellow-500" />
+        Sin conexion. La venta se guardara localmente.
       </div>
 
       <!-- Error -->
