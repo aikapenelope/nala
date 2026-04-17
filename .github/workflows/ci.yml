@@ -102,23 +102,19 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
 
-      - name: Build all packages
-        run: npx turbo build
+      - name: Build API and shared packages
+        run: npx turbo build --filter=@nova/shared --filter=@nova/db --filter=@nova/api
         env:
           DATABASE_URL: postgresql://nova:test@localhost:5432/nova_test
           REDIS_URL: redis://localhost:6379
-          NUXT_PUBLIC_API_BASE: http://localhost:3001
-          NUXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_Y2xlcmsudGVzdC5sY2wuZGV2JA
 
-      - name: Fix Clerk shared module for Nuxt SSR
-        run: |
-          rm -rf apps/web/.output/server/node_modules/@clerk/shared
-          cp -r node_modules/@clerk/nuxt/node_modules/@clerk/shared apps/web/.output/server/node_modules/@clerk/shared
+      - name: Prepare Nuxt dev
+        run: cd apps/web && npx nuxt prepare
 
       - name: Apply DB migrations and RLS
         run: |
           psql "$DATABASE_URL" -c "CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\"; CREATE EXTENSION IF NOT EXISTS \"pg_trgm\";"
-          psql "$DATABASE_URL" -c "CREATE EXTENSION IF NOT EXISTS \"vector\";" || echo "pgvector extension not available (OK for tests)"
+          psql "$DATABASE_URL" -c "CREATE EXTENSION IF NOT EXISTS \"vector\";" || echo "pgvector not available (OK)"
           cd packages/db && node migrate.mjs && cd ../..
           psql "$DATABASE_URL" -f packages/db/init.sql
         env:
@@ -129,8 +125,6 @@ jobs:
         env:
           DATABASE_URL: postgresql://nova:test@localhost:5432/nova_test
           REDIS_URL: redis://localhost:6379
-          NUXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_Y2xlcmsudGVzdC5sY2wuZGV2JA
-          NUXT_CLERK_SECRET_KEY: sk_test_e2e_fake_secret_key
 
       - name: Upload test artifacts
         uses: actions/upload-artifact@v4

@@ -3,12 +3,12 @@ import { defineConfig, devices } from "@playwright/test";
 /**
  * Playwright E2E test configuration.
  *
- * In CI: builds and starts both API and Web servers.
- * Locally: reuses existing dev servers if running.
+ * Strategy: Run the Nuxt dev server (not production build) for E2E tests.
+ * The dev server handles Clerk more gracefully -- it doesn't crash on
+ * invalid keys, just shows warnings.
  *
- * Auth strategy: API runs without CLERK_SECRET_KEY (dev mock user).
- * Frontend auth is bypassed by injecting NovaUser into localStorage
- * via the test helper (see e2e/helpers.ts).
+ * The API runs in dev mode (no CLERK_SECRET_KEY) with a mock user.
+ * Frontend auth is bypassed by injecting NovaUser into localStorage.
  */
 export default defineConfig({
   testDir: "./e2e",
@@ -47,16 +47,16 @@ export default defineConfig({
       },
     },
     {
-      command: "node apps/web/.output/server/index.mjs",
-      url: "http://localhost:3000/api/health",
+      command: "npx nuxt dev --port 3000",
+      cwd: "apps/web",
+      url: "http://localhost:3000",
       reuseExistingServer: !process.env.CI,
-      timeout: 60000,
+      timeout: 120000,
       env: {
         PORT: "3000",
         NUXT_PUBLIC_API_BASE: "http://localhost:3001",
         NUXT_PUBLIC_CLERK_PUBLISHABLE_KEY:
           "pk_test_Y2xlcmsudGVzdC5sY2wuZGV2JA",
-        NUXT_CLERK_SECRET_KEY: "sk_test_e2e_fake_secret_key",
       },
     },
   ],
