@@ -22,6 +22,7 @@ import {
   products,
   customers,
   accountsReceivable,
+  accountsPayable,
   expenses,
   users,
 } from "@nova/db";
@@ -595,6 +596,159 @@ reports.get(
     return c.json({ data, narrative, period: query.period });
   },
 );
+
+// ============================================================
+// Cash Flow Projection
+// ============================================================
+
+/**
+ * GET /reports/cash-flow - Projected cash flow for 7 and 30 days.
+ *
+ * Calculates projections based on:
+ * - Average daily revenue from the last 30 days of completed sales
+ * - Average daily expenses from the last 30 days
+ * - Pending accounts receivable (money owed to us)
+ * - Pending accounts payable (money we owe)
+ * - Daily breakdown of last 14 days for trend visualization
+ */
+reports.get("/reports/cash-flow", async (c) => {
+  const db = c.get("db");
+  const businessId = c.get("businessId");
+
+  const now = new Date();
+  const thirtyDaysAgo = new Date(now);
+  thirtyDaysAgo.setUTCDate(thirtyDaysAgo.getUTCDate() - 30);
+
+  const fourteenDaysAgo = new Date(now);
+  fourteenDaysAgo.setUTCDate(fourteenDaysAgo.getUTCDate() - 14);
+
+  const bizCond = eq(sales.businessId, businessId);
+  const completedCond = eq(sales.status, "completed");
+
+  // Average daily revenue (last 30 days)
+  const [revResult] = await db
+    .select({
+      total: sql<number>`COALESCE(SUM(${sales.totalUsd}::numeric), 0)::float`,
+    })
+    .from(sales)
+    .where(
+      and(bizCond, completedCond, gte(sales.createdAt, thirtyDaysAgo)),
+    );
+
+  const totalRevenue30d = revResult?.total ?? 0;
+  const avgDailyRevenue = totalRevenue30d / 30;
+
+  // Average daily expenses (last 30 days)
+  const [expResult] = await db
+    .select({
+      total: sql<number>`COALESCE(SUM(${expenses.total}::numeric), 0)::float`,
+    })
+    .from(expenses)
+    .where(
+      and(
+        eq(expenses.businessId, businessId),
+        eq(expenses.status, "confirmed"),
+        gte(expenses.date, thirtyDaysAgo),
+      ),
+    );
+
+  const totalExpenses30d = expResult?.total ?? 0;
+  const avgDailyExpenses = totalExpenses30d / 30;
+
+  // Pending accounts receivable
+  const [arResult] = await db
+    .select({
+      total: sql<number>`COALESCE(SUM(${accountsReceivable.balanceUsd}::numeric), 0)::float`,
+    })
+    .from(accountsReceivable)
+    .where(
+      and(
+        eq(accountsReceivable.businessId, businessId),
+        eq(accountsReceivable.status, "pending"),
+      ),
+    );
+
+  const pendingReceivable = arResult?.total ?? 0;
+
+  // Pending accounts payable
+  const [apResult] = await db
+    .select({
+      total: sql<number>`COALESCE(SUM(${accountsPayable.balanceUsd}::numeric), 0)::float`,
+    })
+    .from(accountsPayable)
+    .where(
+      and(
+        eq(accountsPayable.businessId, businessId),
+        eq(accountsPayable.status, "pending"),
+      ),
+    );
+
+  const pendingPayable = apResult?.total ?? 0;
+
+  // Daily revenue breakdown (last 14 days for trend chart)
+  const dailyRevenue = await db
+    .select({
+      date: sql<string>`DATE(${sales.createdAt})::text`,
+      revenue: sql<number>`COALESCE(SUM(${sales.totalUsd}::numeric), 0)::float`,
+    })
+    .from(sales)
+    .where(
+      and(bizCond, completedCond, gte(sales.createdAt, fourteenDaysAgo)),
+    )
+    .groupBy(sql`DATE(${sales.createdAt})`)
+    .orderBy(sql`DATE(${sales.createdAt})`);
+
+  // Daily expenses breakdown (last 14 days)
+  const dailyExpenses = await db
+    .select({
+      date: sql<string>`DATE(${expenses.date})::text`,
+      amount: sql<number>`COALESCE(SUM(${expenses.total}::numeric), 0)::float`,
+    })
+    .from(expenses)
+    .where(
+      and(
+        eq(expenses.businessId, businessId),
+        eq(expenses.status, "confirmed"),
+        gte(expenses.date, fourteenDaysAgo),
+      ),
+    )
+    .groupBy(sql`DATE(${expenses.date})`)
+    .orderBy(sql`DATE(${expenses.date})`);
+
+  // Projections
+  const projectedRevenue7d = Math.round(avgDailyRevenue * 7 * 100) / 100;
+  const projectedExpenses7d = Math.round(avgDailyExpenses * 7 * 100) / 100;
+  const projectedNet7d = Math.round((projectedRevenue7d - projectedExpenses7d) * 100) / 100;
+
+  const projectedRevenue30d = Math.round(avgDailyRevenue * 30 * 100) / 100;
+  const projectedExpenses30d = Math.round(avgDailyExpenses * 30 * 100) / 100;
+  const projectedNet30d = Math.round((projectedRevenue30d - projectedExpenses30d) * 100) / 100;
+
+  const data = {
+    avgDailyRevenue: Math.round(avgDailyRevenue * 100) / 100,
+    avgDailyExpenses: Math.round(avgDailyExpenses * 100) / 100,
+    pendingReceivable: Math.round(pendingReceivable * 100) / 100,
+    pendingPayable: Math.round(pendingPayable * 100) / 100,
+    projection7d: {
+      revenue: projectedRevenue7d,
+      expenses: projectedExpenses7d,
+      net: projectedNet7d,
+    },
+    projection30d: {
+      revenue: projectedRevenue30d,
+      expenses: projectedExpenses30d,
+      net: projectedNet30d,
+    },
+    trend: {
+      dailyRevenue,
+      dailyExpenses,
+    },
+  };
+
+  const narrative = await generateNarrative({ type: "cash_flow_projection", data });
+
+  return c.json({ data, narrative });
+});
 
 // ============================================================
 // Smart Alerts

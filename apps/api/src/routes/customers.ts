@@ -28,9 +28,11 @@ import {
   recordPaymentSchema,
   createAccountPayableSchema,
   dayCloseSchema,
+  calculateCustomerSegments,
 } from "@nova/shared";
 import {
   customers,
+  customerSegments,
   accountsReceivable,
   accountsPayable,
   dayCloses,
@@ -87,8 +89,33 @@ customersRoutes.get(
       .from(customers)
       .where(and(...conditions));
 
+    // Fetch segments for the returned customers
+    const customerIds = rows.map((r) => r.id);
+    let segmentMap: Record<string, string[]> = {};
+
+    if (customerIds.length > 0) {
+      const segmentRows = await db
+        .select({
+          customerId: customerSegments.customerId,
+          segment: customerSegments.segment,
+        })
+        .from(customerSegments)
+        .where(sql`${customerSegments.customerId} = ANY(${customerIds})`);
+
+      segmentMap = segmentRows.reduce<Record<string, string[]>>((acc, row) => {
+        if (!acc[row.customerId]) acc[row.customerId] = [];
+        acc[row.customerId].push(row.segment);
+        return acc;
+      }, {});
+    }
+
+    const customersWithSegments = rows.map((r) => ({
+      ...r,
+      segments: segmentMap[r.id] ?? [],
+    }));
+
     return c.json({
-      customers: rows,
+      customers: customersWithSegments,
       total: countResult?.count ?? 0,
       page,
       limit,
@@ -123,7 +150,19 @@ customersRoutes.get("/customers/:id", async (c) => {
       ),
     );
 
-  return c.json({ customer, receivables });
+  // Get segments for this customer
+  const segments = await db
+    .select({ segment: customerSegments.segment })
+    .from(customerSegments)
+    .where(eq(customerSegments.customerId, id));
+
+  return c.json({
+    customer: {
+      ...customer,
+      segments: segments.map((s) => s.segment),
+    },
+    receivables,
+  });
 });
 
 /** POST /customers - Create a new customer. */
@@ -187,6 +226,91 @@ customersRoutes.patch(
     return c.json({ customer: updated });
   },
 );
+
+// ============================================================
+// Customer Segments
+// ============================================================
+
+/**
+ * POST /customers/recalculate-segments - Recalculate segments for all customers.
+ *
+ * Runs calculateCustomerSegments() from @nova/shared for every active customer
+ * in the business. Deletes old segments and inserts fresh ones in a transaction.
+ *
+ * Returns the count of customers processed and total segments assigned.
+ */
+customersRoutes.post("/customers/recalculate-segments", async (c) => {
+  const db = c.get("db");
+  const businessId = c.get("businessId");
+
+  // Fetch all active customers for this business
+  const allCustomers = await db
+    .select({
+      id: customers.id,
+      totalSpentUsd: customers.totalSpentUsd,
+      totalPurchases: customers.totalPurchases,
+      lastPurchaseAt: customers.lastPurchaseAt,
+      balanceUsd: customers.balanceUsd,
+      createdAt: customers.createdAt,
+    })
+    .from(customers)
+    .where(
+      and(eq(customers.businessId, businessId), eq(customers.isActive, true)),
+    );
+
+  if (allCustomers.length === 0) {
+    return c.json({ customersProcessed: 0, segmentsAssigned: 0 });
+  }
+
+  // Collect all spends for VIP threshold calculation
+  const allSpends = allCustomers.map((c) => Number(c.totalSpentUsd));
+
+  let totalSegments = 0;
+
+  await db.transaction(async (tx) => {
+    // Delete existing segments for this business
+    await tx
+      .delete(customerSegments)
+      .where(eq(customerSegments.businessId, businessId));
+
+    // Calculate and insert segments for each customer
+    const segmentRows: Array<{
+      customerId: string;
+      businessId: string;
+      segment: string;
+    }> = [];
+
+    for (const cust of allCustomers) {
+      const segments = calculateCustomerSegments({
+        totalSpentUsd: Number(cust.totalSpentUsd),
+        totalPurchases: cust.totalPurchases,
+        lastPurchaseAt: cust.lastPurchaseAt?.toISOString() ?? null,
+        balanceUsd: Number(cust.balanceUsd),
+        createdAt: cust.createdAt.toISOString(),
+        allCustomerSpends: allSpends,
+      });
+
+      for (const segment of segments) {
+        segmentRows.push({
+          customerId: cust.id,
+          businessId,
+          segment,
+        });
+      }
+    }
+
+    if (segmentRows.length > 0) {
+      await tx.insert(customerSegments).values(segmentRows);
+    }
+
+    totalSegments = segmentRows.length;
+  });
+
+  return c.json({
+    customersProcessed: allCustomers.length,
+    segmentsAssigned: totalSegments,
+  });
+});
 
 // ============================================================
 // Accounts Receivable

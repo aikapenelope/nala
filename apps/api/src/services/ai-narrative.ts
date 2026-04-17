@@ -19,7 +19,8 @@ export interface NarrativeInput {
     | "inventory_movement"
     | "receivable_aging"
     | "sales_by_seller"
-    | "financial_summary";
+    | "financial_summary"
+    | "cash_flow_projection";
   data: Record<string, unknown>;
   locale?: string;
 }
@@ -144,6 +145,8 @@ function buildStaticNarrative(input: NarrativeInput): string {
       return "Resumen semanal generado. Configura OPENROUTER_API_KEY para análisis con IA.";
     case "financial_summary":
       return "Resumen financiero generado. Configura OPENROUTER_API_KEY para insights con IA.";
+    case "cash_flow_projection":
+      return "Proyección de flujo de caja generada. Configura OPENROUTER_API_KEY para análisis con IA.";
     default:
       return "Reporte generado. Configura OPENROUTER_API_KEY para narrativas con IA.";
   }
