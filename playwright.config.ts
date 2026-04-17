@@ -54,7 +54,9 @@ export default defineConfig({
       env: {
         PORT: "3000",
         NUXT_PUBLIC_API_BASE: "http://localhost:3001",
-        NUXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "pk_test_placeholder",
+        NUXT_PUBLIC_CLERK_PUBLISHABLE_KEY:
+          "pk_test_Y2xlcmsudGVzdC5sY2wuZGV2JA",
+        NUXT_CLERK_SECRET_KEY: "sk_test_e2e_fake_secret_key",
       },
     },
   ],
