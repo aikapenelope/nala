@@ -111,8 +111,10 @@ jobs:
 
       - name: Apply DB migrations and RLS
         run: |
-          cd packages/db && node migrate.mjs
-          psql "$DATABASE_URL" -f init.sql
+          psql "$DATABASE_URL" -c "CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\"; CREATE EXTENSION IF NOT EXISTS \"pg_trgm\";"
+          psql "$DATABASE_URL" -c "CREATE EXTENSION IF NOT EXISTS \"vector\";" || echo "pgvector extension not available (OK for tests)"
+          cd packages/db && node migrate.mjs && cd ../..
+          psql "$DATABASE_URL" -f packages/db/init.sql
         env:
           DATABASE_URL: postgresql://nova:test@localhost:5432/nova_test
 
