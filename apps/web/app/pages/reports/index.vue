@@ -20,6 +20,12 @@ const reportsList = [
     desc: "Tendencias, mejor día, producto estrella",
   },
   {
+    to: "/reports/cash-flow",
+    icon: "💵",
+    title: "Flujo de caja",
+    desc: "Proyección 7 y 30 días, tendencia",
+  },
+  {
     to: "/reports/profitability",
     icon: "💰",
     title: "Rentabilidad",

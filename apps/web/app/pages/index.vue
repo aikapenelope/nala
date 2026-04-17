@@ -1,30 +1,39 @@
 <script setup lang="ts">
 /**
- * Dashboard with progressive disclosure (doc 17 spec).
+ * Dashboard with visual-first design for Venezuelan small business owners.
  *
- * Level 1 (visible without scroll): Answer to "How did I do today?"
- *   - Big number: today's sales (tap -> sales detail)
- *   - Trend vs same day last week
- *   - 2-3 summary cards: receivable, low stock, alerts count
- *   - BCV exchange rate in header area
+ * Design principles:
+ * - Everything important visible without scroll on a 6" phone
+ * - Big numbers, clear colors (green = good, red = attention)
+ * - Icons + text always (never icon-only)
+ * - Colloquial Spanish ("te deben", "se te acaba")
+ * - One-tap actions
  *
- * Level 2 (scroll down): Detail on demand
- *   - Actionable alerts with suggestion + action button
+ * Level 1 (no scroll): "How did I do today?"
+ *   - Greeting with business name + time of day
+ *   - Today's sales (big number) with trend
+ *   - 3 visual cards: receivable, low stock, cash flow 7d
+ *   - BCV rate
+ *   - Quick action: "Nueva venta"
+ *
+ * Level 2 (scroll): Detail on demand
+ *   - Actionable alerts (3 on mobile, 4 on desktop)
  *   - Weekly chart with AI narrative
  *   - Last sale info
  *
  * Connected to:
- *   - GET /api/reports/daily (today's summary)
- *   - GET /api/reports/weekly (weekly chart + narrative)
- *   - GET /api/reports/inventory (low stock count)
- *   - GET /api/accounts/receivable (total pending)
- *   - GET /api/reports/alerts (smart actionable alerts)
- *   - GET /api/exchange-rate (BCV rate)
- *   - GET /api/sales?limit=1 (last sale)
+ *   - GET /api/reports/daily
+ *   - GET /api/reports/weekly
+ *   - GET /api/reports/inventory
+ *   - GET /api/reports/cash-flow
+ *   - GET /api/accounts/receivable
+ *   - GET /api/reports/alerts
+ *   - GET /api/exchange-rate
+ *   - GET /api/sales?limit=1
  */
 
-const { isMobile, isDesktop } = useDevice();
-const { isAdmin } = useNovaAuth();
+const { isMobile } = useDevice();
+const { isAdmin, user } = useNovaAuth();
 const { $api } = useApi();
 
 /** Loading and error state. */
@@ -41,6 +50,9 @@ const trendPositive = ref(true);
 /** Summary cards. */
 const receivableTotal = ref(0);
 const lowStockCount = ref(0);
+
+/** Cash flow projection. */
+const cashFlow7d = ref(0);
 
 /** Exchange rate. */
 const exchangeRate = ref<number | null>(null);
@@ -82,6 +94,14 @@ const lastSale = ref<{
 const syncStatus = ref<"online" | "offline" | "syncing">("online");
 const pendingSyncCount = ref(0);
 
+/** Time-of-day greeting. */
+const greeting = computed(() => {
+  const hour = new Date().getHours();
+  if (hour < 12) return "Buenos dias";
+  if (hour < 18) return "Buenas tardes";
+  return "Buenas noches";
+});
+
 /** Load all dashboard data from API in parallel. */
 let loadInProgress = false;
 async function loadDashboard() {
@@ -99,6 +119,7 @@ async function loadDashboard() {
       alertsResult,
       rateResult,
       lastSaleResult,
+      cashFlowResult,
     ] = await Promise.allSettled([
       $api<{
         data: {
@@ -128,6 +149,10 @@ async function loadDashboard() {
       $api<{ sales: Array<{ totalUsd: string; createdAt: string }> }>(
         "/api/sales?limit=1",
       ),
+
+      $api<{
+        data: { projection7d: { net: number } };
+      }>("/api/reports/cash-flow"),
     ]);
 
     // Daily
@@ -173,6 +198,11 @@ async function loadDashboard() {
       const salesArr = lastSaleResult.value.sales;
       lastSale.value = salesArr[0] ?? null;
     }
+
+    // Cash flow
+    if (cashFlowResult.status === "fulfilled") {
+      cashFlow7d.value = cashFlowResult.value.data.projection7d.net;
+    }
   } catch (err) {
     const message =
       err instanceof Error ? err.message : "Error cargando dashboard";
@@ -201,8 +231,6 @@ onMounted(() => {
     });
   }
 
-  // Global auth middleware handles unauthenticated redirect.
-  // If we reach here, the user is authenticated.
   loadDashboard();
 });
 
@@ -276,18 +304,34 @@ function openRateEditor() {
   showRateEditor.value = true;
 }
 
-/** Alerts to show: all on desktop, max 2 on mobile. */
+/** Alerts to show: 3 on mobile, 4 on desktop. */
 const visibleAlerts = computed(() => {
-  if (isMobile.value) return alerts.value.slice(0, 1);
+  if (isMobile.value) return alerts.value.slice(0, 3);
   return alerts.value.slice(0, 4);
 });
+
+/** Alert border color by severity. */
+function alertBorder(severity: string): string {
+  if (severity === "critical") return "border-l-red-500";
+  if (severity === "warning") return "border-l-yellow-500";
+  return "border-l-blue-400";
+}
 </script>
 
 <template>
   <div>
-    <!-- Loading state -->
-    <div v-if="isLoading" class="py-12 text-center text-gray-400">
-      Cargando...
+    <!-- ============================================ -->
+    <!-- Skeleton loading                             -->
+    <!-- ============================================ -->
+    <div v-if="isLoading" class="animate-pulse space-y-4">
+      <div class="h-6 w-48 rounded bg-gray-200" />
+      <div class="h-28 rounded-xl bg-gray-200" />
+      <div class="grid grid-cols-3 gap-3">
+        <div class="h-20 rounded-xl bg-gray-200" />
+        <div class="h-20 rounded-xl bg-gray-200" />
+        <div class="h-20 rounded-xl bg-gray-200" />
+      </div>
+      <div class="h-10 rounded-xl bg-gray-200" />
     </div>
 
     <!-- Error state -->
@@ -306,79 +350,106 @@ const visibleAlerts = computed(() => {
 
     <template v-else>
       <!-- ============================================ -->
-      <!-- BCV Rate (header area, tappable by owner)    -->
+      <!-- GREETING + RATE                              -->
       <!-- ============================================ -->
-      <div
-        class="mb-3 flex items-center justify-end gap-3 text-xs text-gray-400"
-      >
-        <template v-if="exchangeRate">
-          <span>USD {{ exchangeRate.toFixed(2) }}</span>
-          <span v-if="euroRate">· EUR {{ euroRate.toFixed(2) }}</span>
-        </template>
-        <span v-else class="text-yellow-600">Tasa no configurada</span>
+      <div class="mb-4 flex items-center justify-between">
+        <div>
+          <h1 class="text-lg font-bold text-gray-900">
+            {{ greeting }}, {{ user?.businessName ?? "Nova" }}
+          </h1>
+          <p class="text-xs text-gray-400">
+            {{ user?.name ?? "" }}
+            <span v-if="isAdmin"> · Administrador</span>
+          </p>
+        </div>
+        <!-- BCV rate badge -->
         <button
           v-if="isAdmin"
-          class="rounded bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-500 hover:bg-gray-200"
+          class="rounded-lg px-3 py-1.5 text-xs font-medium"
+          :class="
+            exchangeRate
+              ? 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              : 'bg-yellow-100 text-yellow-700'
+          "
           @click="openRateEditor"
         >
-          {{ exchangeRate ? "Cambiar" : "Configurar" }}
+          <template v-if="exchangeRate">
+            Bs.{{ exchangeRate.toFixed(2) }}
+          </template>
+          <template v-else> Configurar tasa </template>
         </button>
+        <span
+          v-else-if="exchangeRate"
+          class="rounded-lg bg-gray-100 px-3 py-1.5 text-xs text-gray-500"
+        >
+          Bs.{{ exchangeRate.toFixed(2) }}
+        </span>
       </div>
 
       <!-- Rate editor modal -->
-      <div
-        v-if="showRateEditor"
-        class="mb-4 rounded-xl border border-nova-primary/20 bg-blue-50 p-4"
-      >
-        <h3 class="mb-3 text-sm font-semibold text-gray-700">
-          Tasa de cambio BCV
-        </h3>
-        <div class="flex gap-3">
-          <div class="flex-1">
-            <label class="mb-1 block text-xs text-gray-500">Dolar (USD)</label>
-            <input
-              v-model="rateInputUsd"
-              type="number"
-              step="0.01"
-              min="0"
-              placeholder="477.14"
-              class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-nova-primary focus:outline-none"
-            />
-          </div>
-          <div class="flex-1">
-            <label class="mb-1 block text-xs text-gray-500">Euro (EUR)</label>
-            <input
-              v-model="rateInputEur"
-              type="number"
-              step="0.01"
-              min="0"
-              placeholder="560.04"
-              class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-nova-primary focus:outline-none"
-            />
+      <Teleport to="body">
+        <div
+          v-if="showRateEditor"
+          class="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+          @click.self="showRateEditor = false"
+        >
+          <div class="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
+            <h3 class="mb-4 text-lg font-semibold text-gray-900">
+              Tasa de cambio BCV
+            </h3>
+            <div class="space-y-3">
+              <div>
+                <label class="mb-1 block text-sm text-gray-600"
+                  >Dolar (USD)</label
+                >
+                <input
+                  v-model="rateInputUsd"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="477.14"
+                  class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-nova-primary focus:outline-none"
+                  autofocus
+                />
+              </div>
+              <div>
+                <label class="mb-1 block text-sm text-gray-600"
+                  >Euro (EUR)</label
+                >
+                <input
+                  v-model="rateInputEur"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="560.04"
+                  class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-nova-primary focus:outline-none"
+                />
+              </div>
+            </div>
+            <p v-if="rateSaveError" class="mt-2 text-sm text-red-500">
+              {{ rateSaveError }}
+            </p>
+            <p class="mt-2 text-[10px] text-gray-400">
+              Consulta la tasa oficial en bcv.org.ve
+            </p>
+            <div class="mt-4 flex gap-3">
+              <button
+                class="flex-1 rounded-lg border border-gray-300 py-2.5 text-sm font-medium text-gray-700"
+                @click="showRateEditor = false"
+              >
+                Cancelar
+              </button>
+              <button
+                class="flex-1 rounded-lg bg-nova-primary py-2.5 text-sm font-medium text-white disabled:opacity-50"
+                :disabled="rateSaving"
+                @click="saveRate"
+              >
+                {{ rateSaving ? "Guardando..." : "Guardar" }}
+              </button>
+            </div>
           </div>
         </div>
-        <p v-if="rateSaveError" class="mt-2 text-xs text-red-500">
-          {{ rateSaveError }}
-        </p>
-        <div class="mt-3 flex gap-2">
-          <button
-            class="flex-1 rounded-lg border border-gray-300 py-2 text-xs font-medium text-gray-600"
-            @click="showRateEditor = false"
-          >
-            Cancelar
-          </button>
-          <button
-            class="flex-1 rounded-lg bg-nova-primary py-2 text-xs font-medium text-white disabled:opacity-50"
-            :disabled="rateSaving"
-            @click="saveRate"
-          >
-            {{ rateSaving ? "Guardando..." : "Guardar tasa" }}
-          </button>
-        </div>
-        <p class="mt-2 text-[10px] text-gray-400">
-          Consulta la tasa oficial en bcv.org.ve
-        </p>
-      </div>
+      </Teleport>
 
       <!-- ============================================ -->
       <!-- LEVEL 1: The answer (no scroll needed)       -->
@@ -387,112 +458,158 @@ const visibleAlerts = computed(() => {
       <!-- Main metric: today's sales -->
       <NuxtLink
         to="/sales/history"
-        class="block cursor-pointer rounded-xl bg-white p-6 text-center shadow-sm transition-colors hover:bg-gray-50"
+        class="block rounded-xl bg-white p-5 shadow-sm transition-colors hover:bg-gray-50"
       >
-        <p class="text-4xl font-bold text-gray-900">
+        <div class="flex items-center justify-between">
+          <p class="text-sm font-medium text-gray-500">Vendido hoy</p>
+          <span
+            v-if="trendPercent > 0"
+            class="rounded-full px-2 py-0.5 text-xs font-semibold"
+            :class="
+              trendPositive
+                ? 'bg-green-100 text-green-700'
+                : 'bg-red-100 text-red-700'
+            "
+          >
+            {{ trendPositive ? "+" : "-" }}{{ trendPercent }}%
+          </span>
+        </div>
+        <p class="mt-1 text-3xl font-bold text-gray-900">
           ${{ todaySales.toFixed(2) }}
         </p>
-        <p class="mt-1 text-sm text-gray-500">vendidos hoy</p>
-        <p
-          v-if="trendPercent > 0"
-          class="mt-1 text-sm font-medium"
-          :class="trendPositive ? 'text-green-600' : 'text-red-600'"
-        >
-          {{ trendPositive ? "▲" : "▼" }} {{ trendPercent }}% vs
-          {{ todayDayName }} pasado
-        </p>
-        <p v-if="isDesktop" class="mt-0.5 text-xs text-gray-400">
-          {{ todayCount }} ventas · ${{ todayAvgTicket.toFixed(2) }} ticket
-          promedio
+        <p class="mt-1 text-xs text-gray-400">
+          {{ todayCount }} venta{{ todayCount !== 1 ? "s" : "" }}
+          <template v-if="todayCount > 0">
+            · ${{ todayAvgTicket.toFixed(2) }} promedio
+          </template>
+          <template v-if="trendPercent > 0">
+            · vs {{ todayDayName }} pasado
+          </template>
         </p>
       </NuxtLink>
 
-      <!-- Summary cards -->
-      <div
-        class="mt-4 grid gap-3"
-        :class="isMobile ? 'grid-cols-2' : 'grid-cols-3'"
-      >
+      <!-- Summary cards: 3 always visible -->
+      <div class="mt-3 grid grid-cols-3 gap-3">
+        <!-- Te deben -->
         <NuxtLink
           to="/accounts"
-          class="rounded-xl bg-white p-4 shadow-sm transition-colors hover:bg-gray-50"
+          class="rounded-xl bg-white p-3 shadow-sm transition-colors hover:bg-gray-50"
         >
-          <p class="text-lg font-semibold text-gray-900">
+          <div
+            class="mb-1 flex h-8 w-8 items-center justify-center rounded-lg"
+            :class="
+              receivableTotal > 0 ? 'bg-yellow-100' : 'bg-green-100'
+            "
+          >
+            <span class="text-sm">{{
+              receivableTotal > 0 ? "💰" : "✓"
+            }}</span>
+          </div>
+          <p class="text-lg font-bold text-gray-900">
             ${{ receivableTotal.toFixed(0) }}
           </p>
-          <p class="text-xs text-gray-500">por cobrar</p>
+          <p class="text-[11px] text-gray-500">Te deben</p>
         </NuxtLink>
 
+        <!-- Stock bajo -->
         <NuxtLink
           to="/inventory?status=red"
-          class="rounded-xl bg-white p-4 shadow-sm transition-colors hover:bg-gray-50"
+          class="rounded-xl bg-white p-3 shadow-sm transition-colors hover:bg-gray-50"
         >
-          <p class="text-lg font-semibold text-gray-900">
+          <div
+            class="mb-1 flex h-8 w-8 items-center justify-center rounded-lg"
+            :class="lowStockCount > 0 ? 'bg-red-100' : 'bg-green-100'"
+          >
+            <span class="text-sm">{{
+              lowStockCount > 0 ? "📦" : "✓"
+            }}</span>
+          </div>
+          <p class="text-lg font-bold text-gray-900">
             {{ lowStockCount }}
           </p>
-          <p class="text-xs text-gray-500">stock bajo</p>
-        </NuxtLink>
-
-        <NuxtLink
-          v-if="isDesktop"
-          to="/reports"
-          class="rounded-xl bg-white p-4 shadow-sm transition-colors hover:bg-gray-50"
-        >
-          <p class="text-lg font-semibold text-gray-900">
-            {{ alerts.length }}
+          <p class="text-[11px] text-gray-500">
+            {{ lowStockCount > 0 ? "Se acaban" : "Stock OK" }}
           </p>
-          <p class="text-xs text-gray-500">alertas pendientes</p>
         </NuxtLink>
-      </div>
 
-      <!-- Sync status indicator -->
-      <div class="mt-3 flex items-center gap-2 text-xs text-gray-400">
-        <span
-          class="h-2 w-2 rounded-full"
-          :class="{
-            'bg-green-500': syncStatus === 'online',
-            'bg-gray-400': syncStatus === 'offline',
-            'bg-yellow-500 animate-pulse': syncStatus === 'syncing',
-          }"
-        />
-        <span v-if="syncStatus === 'online'">Actualizado</span>
-        <span v-else-if="syncStatus === 'syncing'">Sincronizando...</span>
-        <span v-else>
-          Sin conexion
-          <template v-if="pendingSyncCount > 0">
-            · {{ pendingSyncCount }} pendiente{{
-              pendingSyncCount > 1 ? "s" : ""
-            }}
-          </template>
-        </span>
-      </div>
-
-      <!-- Mobile: quick action -->
-      <div v-if="isMobile" class="mt-4">
+        <!-- Cash flow 7d -->
         <NuxtLink
-          to="/sales"
-          class="block w-full rounded-xl bg-nova-primary py-3 text-center font-semibold text-white"
+          to="/reports/cash-flow"
+          class="rounded-xl bg-white p-3 shadow-sm transition-colors hover:bg-gray-50"
         >
-          + Nueva venta
+          <div
+            class="mb-1 flex h-8 w-8 items-center justify-center rounded-lg"
+            :class="cashFlow7d >= 0 ? 'bg-green-100' : 'bg-red-100'"
+          >
+            <span class="text-sm">{{ cashFlow7d >= 0 ? "📈" : "📉" }}</span>
+          </div>
+          <p
+            class="text-lg font-bold"
+            :class="cashFlow7d >= 0 ? 'text-green-700' : 'text-red-600'"
+          >
+            {{ cashFlow7d >= 0 ? "+" : "" }}${{ Math.abs(cashFlow7d).toFixed(0) }}
+          </p>
+          <p class="text-[11px] text-gray-500">En 7 dias</p>
         </NuxtLink>
       </div>
+
+      <!-- Sync status + refresh -->
+      <div class="mt-3 flex items-center justify-between">
+        <div class="flex items-center gap-2 text-xs text-gray-400">
+          <span
+            class="h-2 w-2 rounded-full"
+            :class="{
+              'bg-green-500': syncStatus === 'online',
+              'bg-gray-400': syncStatus === 'offline',
+              'bg-yellow-500 animate-pulse': syncStatus === 'syncing',
+            }"
+          />
+          <span v-if="syncStatus === 'online'">Actualizado</span>
+          <span v-else-if="syncStatus === 'syncing'">Sincronizando...</span>
+          <span v-else>
+            Sin conexion
+            <template v-if="pendingSyncCount > 0">
+              · {{ pendingSyncCount }} pendiente{{
+                pendingSyncCount > 1 ? "s" : ""
+              }}
+            </template>
+          </span>
+        </div>
+        <button
+          class="rounded-lg px-2 py-1 text-xs text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+          @click="loadDashboard"
+        >
+          Actualizar
+        </button>
+      </div>
+
+      <!-- Quick action: Nueva venta -->
+      <NuxtLink
+        to="/sales"
+        class="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-nova-primary py-3.5 text-center font-semibold text-white shadow-lg shadow-nova-primary/25"
+      >
+        + Nueva venta
+      </NuxtLink>
 
       <!-- ============================================ -->
       <!-- LEVEL 2: Detail (scroll down)                -->
       <!-- ============================================ -->
 
-      <!-- Actionable alerts (doc 17: suggestion + action button) -->
+      <!-- Actionable alerts -->
       <div v-if="visibleAlerts.length > 0" class="mt-6">
         <h2 class="mb-3 text-sm font-semibold text-gray-700">
-          Alertas que necesitan tu atencion
+          Necesita tu atencion
         </h2>
         <div class="space-y-2">
-          <div
+          <NuxtLink
             v-for="alert in visibleAlerts"
             :key="alert.id"
-            class="rounded-xl bg-white p-4 shadow-sm"
+            :to="alert.actionTo"
+            class="block rounded-xl border-l-4 bg-white p-4 shadow-sm"
+            :class="alertBorder(alert.severity)"
           >
             <div class="flex items-start gap-3">
-              <span class="text-xl">{{ alert.icon }}</span>
+              <span class="text-lg">{{ alert.icon }}</span>
               <div class="flex-1">
                 <p class="text-sm font-medium text-gray-900">
                   {{ alert.title }}
@@ -501,14 +618,13 @@ const visibleAlerts = computed(() => {
                   {{ alert.suggestion }}
                 </p>
               </div>
-              <NuxtLink
-                :to="alert.actionTo"
-                class="flex-shrink-0 rounded-lg bg-nova-primary/10 px-3 py-1.5 text-xs font-medium text-nova-primary"
+              <span
+                class="flex-shrink-0 text-xs font-medium text-nova-primary"
               >
-                {{ alert.actionLabel }}
-              </NuxtLink>
+                {{ alert.actionLabel }} →
+              </span>
             </div>
-          </div>
+          </NuxtLink>
         </div>
         <NuxtLink
           v-if="alerts.length > visibleAlerts.length"
@@ -522,16 +638,16 @@ const visibleAlerts = computed(() => {
         </NuxtLink>
       </div>
 
-      <!-- Weekly chart (Level 2, admin only) -->
+      <!-- Weekly chart (admin only) -->
       <div
         v-if="isAdmin && weeklyData.length > 0"
         class="mt-6 rounded-xl bg-white p-5 shadow-sm"
       >
         <h2 class="mb-4 text-sm font-semibold text-gray-700">
-          Como te fue esta semana
+          Esta semana
         </h2>
 
-        <!-- Simple bar chart using CSS -->
+        <!-- Bar chart -->
         <div class="flex items-end gap-2" style="height: 120px">
           <div
             v-for="d in weeklyData"
@@ -561,11 +677,11 @@ const visibleAlerts = computed(() => {
           to="/reports"
           class="mt-3 inline-block text-xs font-medium text-nova-primary hover:underline"
         >
-          Ver reporte completo →
+          Ver reportes completos →
         </NuxtLink>
       </div>
 
-      <!-- Last sale (doc 17: "access to last action") -->
+      <!-- Last sale -->
       <div v-if="lastSale" class="mt-4 text-xs text-gray-400">
         Ultima venta: ${{ Number(lastSale.totalUsd).toFixed(2) }},
         {{ timeAgo(lastSale.createdAt) }}
