@@ -26,6 +26,7 @@ import {
   findUserByClerkId,
 } from "@nova/db";
 import { getDb } from "../db";
+import { handleDbError } from "../utils/db-errors";
 
 const onboarding = new Hono();
 
@@ -260,7 +261,9 @@ onboarding.post("/", zValidator("json", onboardingSchema), async (c) => {
   const pinHash = await bcrypt.hash(ownerPin, 10);
 
   // All-or-nothing: create business, owner, categories, accounts in one transaction
-  const result = await db.transaction(async (tx) => {
+  let result;
+  try {
+    result = await db.transaction(async (tx) => {
     // 1. Create business
     const [business] = await tx
       .insert(businesses)
@@ -305,7 +308,12 @@ onboarding.post("/", zValidator("json", onboardingSchema), async (c) => {
     );
 
     return { business, owner };
-  });
+    });
+  } catch (err) {
+    const dbErr = handleDbError(err);
+    if (dbErr) return c.json({ error: dbErr.message }, dbErr.status);
+    throw err;
+  }
 
   return c.json(
     {

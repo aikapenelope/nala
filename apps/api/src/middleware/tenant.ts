@@ -8,17 +8,14 @@
  * Requires: authMiddleware must run first to set `businessId` and `db`
  * on the Hono context.
  *
- * Note on set_config's third parameter (is_local):
- * - `true` means the setting only lasts for the current transaction.
- *   Since postgres.js uses a connection pool, using `true` would require
- *   wrapping every request in a transaction.
- * - `false` means the setting persists for the session (connection).
- *   With postgres.js, each query may use a different connection from the
- *   pool, so we set it before each request's queries. This is safe because
- *   the middleware runs at the start of every request.
+ * Safety model:
+ * - Sets the RLS variable at the START of every request.
+ * - Clears it at the END of every request (even on error).
+ * - This prevents a stale business_id from leaking to the next request
+ *   that reuses the same pooled connection.
  *
- * For true per-request isolation with connection pooling, each route
- * handler should wrap its queries in a transaction when RLS is critical.
+ * For critical write operations (sales, payments), route handlers should
+ * additionally wrap their queries in `db.transaction()` for atomicity.
  */
 
 import { sql } from "drizzle-orm";
@@ -26,7 +23,7 @@ import type { Context, Next } from "hono";
 import type { Database } from "@nova/db";
 
 /**
- * Tenant middleware - sets RLS context per request.
+ * Tenant middleware - sets RLS context per request and clears it after.
  *
  * Reads the `db` instance from context (set by authMiddleware)
  * and executes SET on the PostgreSQL connection.
@@ -46,5 +43,16 @@ export async function tenantMiddleware(c: Context, next: Next) {
     sql`SELECT set_config('app.current_business_id', ${businessId}, false)`,
   );
 
-  await next();
+  try {
+    await next();
+  } finally {
+    // Clear the RLS variable so the pooled connection doesn't carry
+    // a stale tenant context to the next request.
+    await db.execute(
+      sql`SELECT set_config('app.current_business_id', '', false)`,
+    ).catch(() => {
+      // Non-critical: if the connection is already broken, clearing fails
+      // harmlessly. The next request will set its own context anyway.
+    });
+  }
 }

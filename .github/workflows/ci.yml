@@ -44,7 +44,7 @@ jobs:
         run: npm ci
 
       - name: Typecheck packages
-        run: npx turbo typecheck --filter=@nova/shared --filter=@nova/db --filter=@nova/api
+        run: npx turbo typecheck
 
       - name: Lint
         run: npx turbo lint

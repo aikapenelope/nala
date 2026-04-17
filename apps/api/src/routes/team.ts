@@ -19,6 +19,7 @@ import bcrypt from "bcryptjs";
 import { eq, and } from "drizzle-orm";
 import { PIN_LENGTH } from "@nova/shared";
 import { users, businesses } from "@nova/db";
+import { handleDbError } from "../utils/db-errors";
 import type { AppEnv } from "../types";
 
 const team = new Hono<AppEnv>();
@@ -191,23 +192,29 @@ team.post("/employees", zValidator("json", createEmployeeSchema), async (c) => {
 
   const pinHash = await bcrypt.hash(pin, 10);
 
-  const [employee] = await db
-    .insert(users)
-    .values({
-      businessId: currentUser.businessId,
-      name,
-      role: "employee",
-      pinHash,
-    })
-    .returning({
-      id: users.id,
-      name: users.name,
-      role: users.role,
-      isActive: users.isActive,
-      createdAt: users.createdAt,
-    });
+  try {
+    const [employee] = await db
+      .insert(users)
+      .values({
+        businessId: currentUser.businessId,
+        name,
+        role: "employee",
+        pinHash,
+      })
+      .returning({
+        id: users.id,
+        name: users.name,
+        role: users.role,
+        isActive: users.isActive,
+        createdAt: users.createdAt,
+      });
 
-  return c.json({ employee }, 201);
+    return c.json({ employee }, 201);
+  } catch (err) {
+    const dbErr = handleDbError(err);
+    if (dbErr) return c.json({ error: dbErr.message }, dbErr.status);
+    throw err;
+  }
 });
 
 /** Schema for updating an employee. */
@@ -260,6 +267,7 @@ team.patch(
     }
 
     // Build update payload
+    try {
     const updates: Record<string, unknown> = { updatedAt: new Date() };
 
     if (data.name !== undefined) {
@@ -308,6 +316,11 @@ team.patch(
       });
 
     return c.json({ employee: updated });
+  } catch (err) {
+    const dbErr = handleDbError(err);
+    if (dbErr) return c.json({ error: dbErr.message }, dbErr.status);
+    throw err;
+  }
   },
 );
 
