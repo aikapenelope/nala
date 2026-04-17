@@ -30,3 +30,7 @@ npm-debug.log*
 
 # Docker volumes (local dev)
 .docker-data/
+
+# Playwright
+playwright-report/
+test-results/
