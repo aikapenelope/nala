@@ -380,6 +380,7 @@ accounting.post(
 
         await tx.insert(expenseItems).values({
           expenseId: expense.id,
+          businessId,
           description: item.description,
           quantity: item.quantity,
           unitPrice: String(item.unitPrice),

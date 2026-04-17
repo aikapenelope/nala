@@ -377,6 +377,7 @@ salesRoutes.post("/sales", zValidator("json", createSaleSchema), async (c) => {
     await tx.insert(saleItems).values(
       itemsWithTotals.map((item) => ({
         saleId: sale.id,
+        businessId,
         productId: item.productId,
         variantId: item.variantId,
         quantity: item.quantity,
@@ -390,6 +391,7 @@ salesRoutes.post("/sales", zValidator("json", createSaleSchema), async (c) => {
     await tx.insert(salePayments).values(
       data.payments.map((payment) => ({
         saleId: sale.id,
+        businessId,
         method: payment.method,
         amountUsd: String(payment.amountUsd),
         amountBs: payment.amountBs ? String(payment.amountBs) : null,
