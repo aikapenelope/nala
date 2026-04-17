@@ -15,6 +15,13 @@
       "when": 1776215893483,
       "tag": "0001_sturdy_machine_man",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1776302400000,
+      "tag": "0002_rls_child_tables",
+      "breakpoints": true
     }
   ]
 }

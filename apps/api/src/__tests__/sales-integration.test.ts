@@ -87,6 +87,7 @@ describe.skipIf(!hasDb)("Sales integration", () => {
 
       await tx.insert(saleItems).values({
         saleId: sale.id,
+        businessId: bizId,
         productId: productA.id,
         quantity: 3,
         unitPrice: "2.50",
@@ -95,6 +96,7 @@ describe.skipIf(!hasDb)("Sales integration", () => {
 
       await tx.insert(salePayments).values({
         saleId: sale.id,
+        businessId: bizId,
         method: "efectivo",
         amountUsd: String(totalUsd),
         exchangeRate: "36.5",
@@ -141,6 +143,7 @@ describe.skipIf(!hasDb)("Sales integration", () => {
 
       await tx.insert(saleItems).values({
         saleId: sale.id,
+        businessId: bizId,
         productId: productB.id,
         quantity: 2,
         unitPrice: "4.00",
@@ -149,6 +152,7 @@ describe.skipIf(!hasDb)("Sales integration", () => {
 
       await tx.insert(salePayments).values({
         saleId: sale.id,
+        businessId: bizId,
         method: "fiado",
         amountUsd: String(fiadoAmount),
         exchangeRate: "36.5",
@@ -230,6 +234,7 @@ describe.skipIf(!hasDb)("Sales integration", () => {
 
     await db.insert(saleItems).values({
       saleId: sale.id,
+      businessId: bizId,
       productId: productA.id,
       quantity: 2,
       unitPrice: "2.50",
@@ -238,6 +243,7 @@ describe.skipIf(!hasDb)("Sales integration", () => {
 
     await db.insert(salePayments).values({
       saleId: sale.id,
+      businessId: bizId,
       method: "efectivo",
       amountUsd: "5.00",
     });

@@ -410,6 +410,9 @@ export const saleItems = pgTable("sale_items", {
   saleId: uuid("sale_id")
     .notNull()
     .references(() => sales.id, { onDelete: "cascade" }),
+  businessId: uuid("business_id")
+    .notNull()
+    .references(() => businesses.id),
   productId: uuid("product_id")
     .notNull()
     .references(() => products.id),
@@ -439,6 +442,9 @@ export const salePayments = pgTable("sale_payments", {
   saleId: uuid("sale_id")
     .notNull()
     .references(() => sales.id, { onDelete: "cascade" }),
+  businessId: uuid("business_id")
+    .notNull()
+    .references(() => businesses.id),
 
   /** Payment method used. */
   method: text("method").notNull(),
@@ -720,6 +726,9 @@ export const expenseItems = pgTable("expense_items", {
   expenseId: uuid("expense_id")
     .notNull()
     .references(() => expenses.id, { onDelete: "cascade" }),
+  businessId: uuid("business_id")
+    .notNull()
+    .references(() => businesses.id),
   description: text("description").notNull(),
   quantity: integer("quantity").notNull(),
   unitPrice: numeric("unit_price", { precision: 12, scale: 2 }).notNull(),

@@ -83,6 +83,18 @@ DROP POLICY IF EXISTS sales_tenant_isolation ON sales;
 CREATE POLICY sales_tenant_isolation ON sales
   USING (business_id = current_business_id());
 
+-- Sale items
+ALTER TABLE sale_items ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS sale_items_tenant_isolation ON sale_items;
+CREATE POLICY sale_items_tenant_isolation ON sale_items
+  USING (business_id = current_business_id());
+
+-- Sale payments
+ALTER TABLE sale_payments ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS sale_payments_tenant_isolation ON sale_payments;
+CREATE POLICY sale_payments_tenant_isolation ON sale_payments
+  USING (business_id = current_business_id());
+
 -- Quotations
 ALTER TABLE quotations ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS quotations_tenant_isolation ON quotations;
@@ -135,6 +147,12 @@ CREATE POLICY accounting_entries_tenant_isolation ON accounting_entries
 ALTER TABLE expenses ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS expenses_tenant_isolation ON expenses;
 CREATE POLICY expenses_tenant_isolation ON expenses
+  USING (business_id = current_business_id());
+
+-- Expense items
+ALTER TABLE expense_items ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS expense_items_tenant_isolation ON expense_items;
+CREATE POLICY expense_items_tenant_isolation ON expense_items
   USING (business_id = current_business_id());
 
 -- Product aliases
