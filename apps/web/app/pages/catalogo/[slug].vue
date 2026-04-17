@@ -97,6 +97,13 @@ onMounted(() => {
 });
 
 /** SEO: set page title and meta tags after data loads. */
+const catalogUrl = computed(() => {
+  const domain = config.public.tenantDomain as string;
+  return business.value
+    ? `https://${business.value.slug}.${domain}`
+    : `https://${domain}/catalogo/${slug}`;
+});
+
 useHead(
   computed(() => ({
     title: business.value
@@ -106,7 +113,7 @@ useHead(
       {
         name: "description",
         content: business.value
-          ? `Productos de ${business.value.name}. Precios actualizados.`
+          ? `Productos de ${business.value.name}. Precios actualizados. Pide por WhatsApp.`
           : "Catalogo de productos",
       },
       {
@@ -118,10 +125,29 @@ useHead(
       {
         property: "og:description",
         content: business.value
-          ? `Ve los productos y precios de ${business.value.name}`
+          ? `Ve los productos y precios de ${business.value.name}. Pide directo por WhatsApp.`
           : "Catalogo de productos",
       },
       { property: "og:type", content: "website" },
+      { property: "og:url", content: catalogUrl.value },
+      {
+        property: "og:image",
+        content: "https://novaincs.com/og-catalog.png",
+      },
+      { property: "og:locale", content: "es_VE" },
+      { name: "twitter:card", content: "summary_large_image" },
+      {
+        name: "twitter:title",
+        content: business.value
+          ? `${business.value.name} - Catalogo`
+          : "Catalogo",
+      },
+      {
+        name: "twitter:description",
+        content: business.value
+          ? `Productos de ${business.value.name}. Pide por WhatsApp.`
+          : "Catalogo de productos",
+      },
     ],
   })),
 );
