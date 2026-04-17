@@ -108,6 +108,7 @@ jobs:
           DATABASE_URL: postgresql://nova:test@localhost:5432/nova_test
           REDIS_URL: redis://localhost:6379
           NUXT_PUBLIC_API_BASE: http://localhost:3001
+          NUXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_placeholder
 
       - name: Fix Clerk shared module for Nuxt SSR
         run: |

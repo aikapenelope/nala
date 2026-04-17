@@ -35,11 +35,10 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command:
-        "cd apps/api && NODE_ENV=development node dist/index.js",
+      command: "node apps/api/dist/index.js",
       url: "http://localhost:3001/health",
       reuseExistingServer: !process.env.CI,
-      timeout: 30000,
+      timeout: 60000,
       env: {
         NODE_ENV: "development",
         PORT: "3001",
@@ -48,13 +47,14 @@ export default defineConfig({
       },
     },
     {
-      command: "cd apps/web && node .output/server/index.mjs",
-      url: "http://localhost:3000",
+      command: "node apps/web/.output/server/index.mjs",
+      url: "http://localhost:3000/api/health",
       reuseExistingServer: !process.env.CI,
-      timeout: 30000,
+      timeout: 60000,
       env: {
         PORT: "3000",
         NUXT_PUBLIC_API_BASE: "http://localhost:3001",
+        NUXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "pk_test_placeholder",
       },
     },
   ],
