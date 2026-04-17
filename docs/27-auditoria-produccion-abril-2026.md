@@ -59,16 +59,22 @@ Nota: error tracking (Sentry u otra herramienta) diferido hasta decidir solucion
 
 ---
 
-## Sprint 5: E2E Testing y CI -- COMPLETADO (PR #108)
+## Sprint 5: E2E Testing -- PARCIAL (PR #108)
 
 | # | Tarea | Estado |
 |---|-------|--------|
-| 16 | Playwright instalado y configurado (dual webServer: API + Web) | HECHO |
-| 17 | Auth bypass: mock user en localStorage, API en dev mode | HECHO |
-| 18 | Tests publicos: landing (branding, CTAs, pricing), catalogo (error state) | HECHO |
-| 19 | Tests autenticados: dashboard, POS, inventario, settings, reportes, navegacion | HECHO |
-| 20 | CI: job e2e separado con PostgreSQL + Redis + Chromium + artifact upload | HECHO |
-| 21 | Backups DB: cubierto por Hetzner Cloud backup diario de VPS | OK |
+| 16 | Playwright instalado y configurado | HECHO |
+| 17 | Auth bypass: mock user en localStorage | HECHO |
+| 18 | Tests publicos: landing, catalogo | HECHO (local only) |
+| 19 | Tests autenticados: dashboard, POS, inventario, settings, reportes | HECHO (local only) |
+| 20 | CI: E2E job en GitHub Actions | BLOQUEADO |
+| 21 | Backups DB: cubierto por Hetzner Cloud backup diario | OK |
+
+Nota: `@clerk/nuxt` fuerza HTTPS en SSR produccion y valida el formato del publishable key
+en cada request del server middleware. No es posible correr E2E en CI sin credenciales reales
+de Clerk. Los tests existen y funcionan localmente con `npm run e2e` cuando los servers estan
+corriendo. Para habilitar E2E en CI se necesita: un Clerk test instance con keys reales como
+secrets de GitHub Actions, o migrar a un auth provider que soporte modo test sin red.
 
 ---
 
@@ -88,13 +94,14 @@ Nota: error tracking (Sentry u otra herramienta) diferido hasta decidir solucion
 | # | Tarea | Notas |
 |---|-------|-------|
 | 1 | Error tracking (Sentry/Highlight/otra) | Decidir herramienta para todos los proyectos |
-| 2 | PWA icons (192x192, 512x512) | Subir logo de Nova |
-| 3 | og:image real para catalogo | Subir /og-catalog.png (1200x630) |
-| 4 | Rate limit en PIN attempts client-side | Mitigado por bcrypt lento |
-| 5 | robots.txt con reglas utiles | Actual esta vacio |
-| 6 | sitemap.xml para catalogo | SEO |
-| 7 | PgBouncer + RLS transaccional | Solo a escala |
-| 8 | Service Worker offline verificado | PWA registrada, no verificada |
+| 2 | E2E tests en CI | Requiere Clerk test keys como GitHub secrets |
+| 3 | PWA icons (192x192, 512x512) | Subir logo de Nova |
+| 4 | og:image real para catalogo | Subir /og-catalog.png (1200x630) |
+| 5 | Rate limit en PIN attempts client-side | Mitigado por bcrypt lento |
+| 6 | robots.txt con reglas utiles | Actual esta vacio |
+| 7 | sitemap.xml para catalogo | SEO |
+| 8 | PgBouncer + RLS transaccional | Solo a escala |
+| 9 | Service Worker offline verificado | PWA registrada, no verificada |
 
 ---
 
@@ -137,3 +144,4 @@ Nota: error tracking (Sentry u otra herramienta) diferido hasta decidir solucion
 - $fetch<T> de Nuxt con baseURL externo requiere cast explicito `as T` (Nitro type mismatch).
 - E2E auth bypass: inyectar NovaUser en localStorage via addInitScript, API en dev mode sin CLERK_SECRET_KEY.
 - Playwright en CI: instalar solo Chromium (--with-deps), correr con --project=chromium para velocidad.
+- @clerk/nuxt en SSR: fuerza HTTPS y valida publishable key en cada request del server middleware. Imposible correr E2E en CI sin keys reales. Tests E2E quedan como local-only hasta tener Clerk test instance.
