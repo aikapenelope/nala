@@ -109,6 +109,11 @@ jobs:
           REDIS_URL: redis://localhost:6379
           NUXT_PUBLIC_API_BASE: http://localhost:3001
 
+      - name: Fix Clerk shared module for Nuxt SSR
+        run: |
+          rm -rf apps/web/.output/server/node_modules/@clerk/shared
+          cp -r node_modules/@clerk/nuxt/node_modules/@clerk/shared apps/web/.output/server/node_modules/@clerk/shared
+
       - name: Apply DB migrations and RLS
         run: |
           psql "$DATABASE_URL" -c "CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\"; CREATE EXTENSION IF NOT EXISTS \"pg_trgm\";"
