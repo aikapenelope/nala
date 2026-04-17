@@ -112,11 +112,11 @@ export function useApi() {
     }
 
     try {
-      return await $fetch<T>(path, {
+      return (await $fetch(path, {
         baseURL: apiBase,
         ...opts,
         headers,
-      });
+      })) as T;
     } catch (err) {
       // Intercept 401: Clerk JWT expired or revoked
       const fetchError = err as { statusCode?: number; status?: number };
