@@ -164,6 +164,7 @@ Los E2E tests corren contra la API directamente via `app.request()` (Hono). No r
 | Documento | Contenido |
 |---|---|
 | [29 - Features actuales](docs/29-nova-features-actuales.md) | Catalogo completo de features, endpoints, tablas, paginas |
+| [30 - Auditoria y roadmap produccion](docs/30-auditoria-roadmap-produccion.md) | Bugs criticos, seguridad, calidad, roadmap de UI |
 | [27 - Auditoria produccion](docs/27-auditoria-produccion-abril-2026.md) | Roadmap de sprints, estado de cada feature |
 | [26 - Auditoria arquitectura](docs/26-auditoria-arquitectura-abril-2026.md) | Auth flow, multi-tenancy, Drizzle, riesgos |
 | [25 - Auditoria y roadmap](docs/25-auditoria-y-roadmap-definitivo.md) | Auditoria de codigo, plan dia por dia |
