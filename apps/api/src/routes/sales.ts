@@ -364,22 +364,8 @@ salesRoutes.post("/sales", zValidator("json", createSaleSchema), async (c) => {
       );
     }
 
-    // Check stock (aggregate quantity per product across all items).
-    // Services don't track stock, so skip the check for them.
-    if (!product.isService) {
-      const totalQtyForProduct = data.items
-        .filter((i) => i.productId === item.productId)
-        .reduce((sum, i) => sum + i.quantity, 0);
-
-      if (product.stock < totalQtyForProduct) {
-        return c.json(
-          {
-            error: `Insufficient stock for "${product.name}": available ${product.stock}, requested ${totalQtyForProduct}`,
-          },
-          400,
-        );
-      }
-    }
+    // Stock is validated atomically inside the transaction (WHERE stock >= qty)
+    // to prevent race conditions between concurrent sales.
   }
 
   // 5. Validate variant stock if applicable
@@ -401,14 +387,7 @@ salesRoutes.post("/sales", zValidator("json", createSaleSchema), async (c) => {
       if (!variant || !variant.isActive) {
         return c.json({ error: `Variant ${item.variantId} not found` }, 400);
       }
-      if (variant.stock < item.quantity) {
-        return c.json(
-          {
-            error: `Insufficient stock for variant ${item.variantId}: available ${variant.stock}, requested ${item.quantity}`,
-          },
-          400,
-        );
-      }
+      // Variant stock is validated atomically inside the transaction.
     }
   }
 
@@ -453,164 +432,192 @@ salesRoutes.post("/sales", zValidator("json", createSaleSchema), async (c) => {
   let result;
   try {
     result = await db.transaction(async (tx) => {
-    // Insert sale record
-    const [sale] = await tx
-      .insert(sales)
-      .values({
-        businessId,
-        userId: user.id,
-        customerId: data.customerId,
-        totalUsd: String(totalUsd),
-        totalBs: String(totalBs),
-        exchangeRate: String(rate.rateBcv),
-        discountPercent: String(data.discountPercent),
-        discountAmount: String(data.discountAmount),
-        totalCostUsd: String(Math.round(totalCostUsd * 100) / 100),
-        channel: data.channel,
-        surcharges: data.surcharges,
-        notes: data.notes,
-        status: "completed",
-      })
-      .returning();
+      // Insert sale record
+      const [sale] = await tx
+        .insert(sales)
+        .values({
+          businessId,
+          userId: user.id,
+          customerId: data.customerId,
+          totalUsd: String(totalUsd),
+          totalBs: String(totalBs),
+          exchangeRate: String(rate.rateBcv),
+          discountPercent: String(data.discountPercent),
+          discountAmount: String(data.discountAmount),
+          totalCostUsd: String(Math.round(totalCostUsd * 100) / 100),
+          channel: data.channel,
+          surcharges: data.surcharges,
+          notes: data.notes,
+          status: "completed",
+        })
+        .returning();
 
-    // Insert sale items
-    await tx.insert(saleItems).values(
-      itemsWithTotals.map((item) => ({
-        saleId: sale.id,
-        businessId,
-        productId: item.productId,
-        variantId: item.variantId,
-        quantity: item.quantity,
-        unitPrice: String(item.unitPrice),
-        discountPercent: String(item.discountPercent),
-        lineTotal: String(item.lineTotal),
-      })),
-    );
+      // Insert sale items
+      await tx.insert(saleItems).values(
+        itemsWithTotals.map((item) => ({
+          saleId: sale.id,
+          businessId,
+          productId: item.productId,
+          variantId: item.variantId,
+          quantity: item.quantity,
+          unitPrice: String(item.unitPrice),
+          discountPercent: String(item.discountPercent),
+          lineTotal: String(item.lineTotal),
+        })),
+      );
 
-    // Insert sale payments
-    await tx.insert(salePayments).values(
-      data.payments.map((payment) => ({
-        saleId: sale.id,
-        businessId,
-        method: payment.method,
-        amountUsd: String(payment.amountUsd),
-        amountBs: payment.amountBs ? String(payment.amountBs) : null,
-        exchangeRate: payment.exchangeRate
-          ? String(payment.exchangeRate)
-          : String(rate.rateBcv),
-        reference: payment.reference,
-      })),
-    );
+      // Insert sale payments
+      await tx.insert(salePayments).values(
+        data.payments.map((payment) => ({
+          saleId: sale.id,
+          businessId,
+          method: payment.method,
+          amountUsd: String(payment.amountUsd),
+          amountBs: payment.amountBs ? String(payment.amountBs) : null,
+          exchangeRate: payment.exchangeRate
+            ? String(payment.exchangeRate)
+            : String(rate.rateBcv),
+          reference: payment.reference,
+        })),
+      );
 
-    // Decrement product stock for each item (skip services)
-    for (const item of data.items) {
-      const product = productMap.get(item.productId);
-      if (product?.isService) continue;
+      // Decrement product stock atomically with WHERE stock >= qty guard.
+      // This prevents overselling under concurrent requests (race condition fix).
+      for (const item of data.items) {
+        const product = productMap.get(item.productId);
+        if (product?.isService) continue;
 
-      if (item.variantId) {
-        await tx
-          .update(productVariants)
+        if (item.variantId) {
+          const variantResult = await tx
+            .update(productVariants)
+            .set({
+              stock: sql`${productVariants.stock} - ${item.quantity}`,
+              updatedAt: new Date(),
+            })
+            .where(
+              and(
+                eq(productVariants.id, item.variantId),
+                sql`${productVariants.stock} >= ${item.quantity}`,
+              ),
+            )
+            .returning({ id: productVariants.id });
+
+          if (variantResult.length === 0) {
+            throw new Error(`Insufficient stock for variant ${item.variantId}`);
+          }
+        }
+
+        const productResult = await tx
+          .update(products)
           .set({
-            stock: sql`${productVariants.stock} - ${item.quantity}`,
+            stock: sql`${products.stock} - ${item.quantity}`,
+            lastSoldAt: new Date(),
             updatedAt: new Date(),
           })
-          .where(eq(productVariants.id, item.variantId));
+          .where(
+            and(
+              eq(products.id, item.productId),
+              sql`${products.stock} >= ${item.quantity}`,
+            ),
+          )
+          .returning({ id: products.id });
+
+        if (productResult.length === 0) {
+          throw new Error(
+            `Insufficient stock for "${product?.name ?? item.productId}"`,
+          );
+        }
       }
 
-      await tx
-        .update(products)
-        .set({
-          stock: sql`${products.stock} - ${item.quantity}`,
-          lastSoldAt: new Date(),
-          updatedAt: new Date(),
-        })
-        .where(eq(products.id, item.productId));
-    }
+      // If fiado payment, create accounts_receivable and update customer balance
+      const fiadoPayment = data.payments.find((p) => p.method === "fiado");
+      if (fiadoPayment && data.customerId) {
+        await tx.insert(accountsReceivable).values({
+          businessId,
+          customerId: data.customerId,
+          saleId: sale.id,
+          amountUsd: String(fiadoPayment.amountUsd),
+          balanceUsd: String(fiadoPayment.amountUsd),
+        });
 
-    // If fiado payment, create accounts_receivable and update customer balance
-    const fiadoPayment = data.payments.find((p) => p.method === "fiado");
-    if (fiadoPayment && data.customerId) {
-      await tx.insert(accountsReceivable).values({
+        // Update customer balance
+        await tx
+          .update(customers)
+          .set({
+            balanceUsd: sql`${customers.balanceUsd}::numeric + ${fiadoPayment.amountUsd}`,
+            totalPurchases: sql`${customers.totalPurchases} + 1`,
+            totalSpentUsd: sql`${customers.totalSpentUsd}::numeric + ${totalUsd}`,
+            averageTicketUsd: sql`(${customers.totalSpentUsd}::numeric + ${totalUsd}) / (${customers.totalPurchases} + 1)`,
+            lastPurchaseAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .where(eq(customers.id, data.customerId));
+      } else if (data.customerId) {
+        // Non-fiado sale with customer: update purchase stats only
+        await tx
+          .update(customers)
+          .set({
+            totalPurchases: sql`${customers.totalPurchases} + 1`,
+            totalSpentUsd: sql`${customers.totalSpentUsd}::numeric + ${totalUsd}`,
+            averageTicketUsd: sql`(${customers.totalSpentUsd}::numeric + ${totalUsd}) / (${customers.totalPurchases} + 1)`,
+            lastPurchaseAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .where(eq(customers.id, data.customerId));
+      }
+
+      // Generate accounting entries (revenue)
+      const revenueAccounts = await tx
+        .select()
+        .from(accountingAccounts)
+        .where(
+          and(
+            eq(accountingAccounts.businessId, businessId),
+            eq(accountingAccounts.code, "4101"),
+          ),
+        )
+        .limit(1);
+
+      const cashAccounts = await tx
+        .select()
+        .from(accountingAccounts)
+        .where(
+          and(
+            eq(accountingAccounts.businessId, businessId),
+            eq(accountingAccounts.code, "1101"),
+          ),
+        )
+        .limit(1);
+
+      if (revenueAccounts[0] && cashAccounts[0]) {
+        await tx.insert(accountingEntries).values({
+          businessId,
+          date: new Date(),
+          debitAccountId: cashAccounts[0].id,
+          creditAccountId: revenueAccounts[0].id,
+          amount: String(totalUsd),
+          description: `Venta #${sale.id.slice(0, 8)}`,
+          referenceType: "sale",
+          referenceId: sale.id,
+        });
+      }
+
+      // Log activity
+      await tx.insert(activityLog).values({
         businessId,
-        customerId: data.customerId,
-        saleId: sale.id,
-        amountUsd: String(fiadoPayment.amountUsd),
-        balanceUsd: String(fiadoPayment.amountUsd),
+        userId: user.id,
+        action: "sale_created",
+        detail: `Sale $${totalUsd} (${data.items.length} items)`,
       });
 
-      // Update customer balance
-      await tx
-        .update(customers)
-        .set({
-          balanceUsd: sql`${customers.balanceUsd}::numeric + ${fiadoPayment.amountUsd}`,
-          totalPurchases: sql`${customers.totalPurchases} + 1`,
-          totalSpentUsd: sql`${customers.totalSpentUsd}::numeric + ${totalUsd}`,
-          averageTicketUsd: sql`(${customers.totalSpentUsd}::numeric + ${totalUsd}) / (${customers.totalPurchases} + 1)`,
-          lastPurchaseAt: new Date(),
-          updatedAt: new Date(),
-        })
-        .where(eq(customers.id, data.customerId));
-    } else if (data.customerId) {
-      // Non-fiado sale with customer: update purchase stats only
-      await tx
-        .update(customers)
-        .set({
-          totalPurchases: sql`${customers.totalPurchases} + 1`,
-          totalSpentUsd: sql`${customers.totalSpentUsd}::numeric + ${totalUsd}`,
-          averageTicketUsd: sql`(${customers.totalSpentUsd}::numeric + ${totalUsd}) / (${customers.totalPurchases} + 1)`,
-          lastPurchaseAt: new Date(),
-          updatedAt: new Date(),
-        })
-        .where(eq(customers.id, data.customerId));
-    }
-
-    // Generate accounting entries (revenue)
-    const revenueAccounts = await tx
-      .select()
-      .from(accountingAccounts)
-      .where(
-        and(
-          eq(accountingAccounts.businessId, businessId),
-          eq(accountingAccounts.code, "4101"),
-        ),
-      )
-      .limit(1);
-
-    const cashAccounts = await tx
-      .select()
-      .from(accountingAccounts)
-      .where(
-        and(
-          eq(accountingAccounts.businessId, businessId),
-          eq(accountingAccounts.code, "1101"),
-        ),
-      )
-      .limit(1);
-
-    if (revenueAccounts[0] && cashAccounts[0]) {
-      await tx.insert(accountingEntries).values({
-        businessId,
-        date: new Date(),
-        debitAccountId: cashAccounts[0].id,
-        creditAccountId: revenueAccounts[0].id,
-        amount: String(totalUsd),
-        description: `Venta #${sale.id.slice(0, 8)}`,
-        referenceType: "sale",
-        referenceId: sale.id,
-      });
-    }
-
-    // Log activity
-    await tx.insert(activityLog).values({
-      businessId,
-      userId: user.id,
-      action: "sale_created",
-      detail: `Sale $${totalUsd} (${data.items.length} items)`,
-    });
-
-    return sale;
+      return sale;
     });
   } catch (err) {
+    // Stock guard throws a plain Error with "Insufficient stock" message.
+    // Return 409 Conflict so the client can retry or show a stock error.
+    if (err instanceof Error && err.message.startsWith("Insufficient stock")) {
+      return c.json({ error: err.message }, 409);
+    }
     const dbErr = handleDbError(err);
     if (dbErr) return c.json({ error: dbErr.message }, dbErr.status);
     throw err;
@@ -643,7 +650,8 @@ salesRoutes.post("/sales", zValidator("json", createSaleSchema), async (c) => {
  * POST /sales/:id/void - Void a sale.
  *
  * Requires owner PIN verification (handled by frontend modal).
- * Restores inventory and marks sale as voided.
+ * Restores inventory, reverses fiado (customer balance + accounts_receivable),
+ * reverses customer purchase stats, and marks sale as voided.
  */
 salesRoutes.post(
   "/sales/:id/void",
@@ -658,71 +666,128 @@ salesRoutes.post(
     let result;
     try {
       result = await db.transaction(async (tx) => {
-      // Get the sale
-      const [sale] = await tx
-        .select()
-        .from(sales)
-        .where(
-          and(
-            eq(sales.id, saleId),
-            eq(sales.businessId, businessId),
-            eq(sales.status, "completed"),
-          ),
-        )
-        .limit(1);
+        // Get the sale
+        const [sale] = await tx
+          .select()
+          .from(sales)
+          .where(
+            and(
+              eq(sales.id, saleId),
+              eq(sales.businessId, businessId),
+              eq(sales.status, "completed"),
+            ),
+          )
+          .limit(1);
 
-      if (!sale) {
-        return null;
-      }
-
-      // Get sale items to restore stock
-      const items = await tx
-        .select()
-        .from(saleItems)
-        .where(eq(saleItems.saleId, saleId));
-
-      // Restore stock for each item
-      for (const item of items) {
-        if (item.variantId) {
-          await tx
-            .update(productVariants)
-            .set({
-              stock: sql`${productVariants.stock} + ${item.quantity}`,
-              updatedAt: new Date(),
-            })
-            .where(eq(productVariants.id, item.variantId));
+        if (!sale) {
+          return null;
         }
 
-        await tx
-          .update(products)
+        // Get sale items to restore stock
+        const items = await tx
+          .select()
+          .from(saleItems)
+          .where(eq(saleItems.saleId, saleId));
+
+        // Restore stock for each item
+        for (const item of items) {
+          if (item.variantId) {
+            await tx
+              .update(productVariants)
+              .set({
+                stock: sql`${productVariants.stock} + ${item.quantity}`,
+                updatedAt: new Date(),
+              })
+              .where(eq(productVariants.id, item.variantId));
+          }
+
+          await tx
+            .update(products)
+            .set({
+              stock: sql`${products.stock} + ${item.quantity}`,
+              updatedAt: new Date(),
+            })
+            .where(eq(products.id, item.productId));
+        }
+
+        // Reverse fiado: restore customer balance and cancel accounts_receivable
+        if (sale.customerId) {
+          const fiadoPayments = await tx
+            .select()
+            .from(salePayments)
+            .where(
+              and(
+                eq(salePayments.saleId, saleId),
+                eq(salePayments.method, "fiado"),
+              ),
+            );
+
+          const fiadoTotal = fiadoPayments.reduce(
+            (sum, p) => sum + Number(p.amountUsd),
+            0,
+          );
+
+          if (fiadoTotal > 0) {
+            // Subtract fiado amount from customer balance
+            await tx
+              .update(customers)
+              .set({
+                balanceUsd: sql`GREATEST(${customers.balanceUsd}::numeric - ${fiadoTotal}, 0)`,
+                updatedAt: new Date(),
+              })
+              .where(eq(customers.id, sale.customerId));
+
+            // Cancel the accounts_receivable record for this sale
+            await tx
+              .update(accountsReceivable)
+              .set({
+                status: "cancelled",
+                updatedAt: new Date(),
+              })
+              .where(
+                and(
+                  eq(accountsReceivable.saleId, saleId),
+                  eq(accountsReceivable.businessId, businessId),
+                ),
+              );
+          }
+
+          // Reverse customer purchase stats
+          const saleTotal = Number(sale.totalUsd);
+          await tx
+            .update(customers)
+            .set({
+              totalPurchases: sql`GREATEST(${customers.totalPurchases} - 1, 0)`,
+              totalSpentUsd: sql`GREATEST(${customers.totalSpentUsd}::numeric - ${saleTotal}, 0)`,
+              averageTicketUsd: sql`CASE WHEN ${customers.totalPurchases} > 1
+              THEN (${customers.totalSpentUsd}::numeric - ${saleTotal}) / (${customers.totalPurchases} - 1)
+              ELSE 0 END`,
+              updatedAt: new Date(),
+            })
+            .where(eq(customers.id, sale.customerId));
+        }
+
+        // Mark sale as voided
+        const [voided] = await tx
+          .update(sales)
           .set({
-            stock: sql`${products.stock} + ${item.quantity}`,
+            status: "voided",
+            voidReason: reason,
+            voidedBy: user.id,
             updatedAt: new Date(),
           })
-          .where(eq(products.id, item.productId));
-      }
+          .where(eq(sales.id, saleId))
+          .returning();
 
-      // Mark sale as voided
-      const [voided] = await tx
-        .update(sales)
-        .set({
-          status: "voided",
-          voidReason: reason,
-          voidedBy: user.id,
-          updatedAt: new Date(),
-        })
-        .where(eq(sales.id, saleId))
-        .returning();
+        // Log activity
+        await tx.insert(activityLog).values({
+          businessId,
+          userId: user.id,
+          action: "sale_voided",
+          detail: `Sale ${saleId.slice(0, 8)} voided: ${reason}`,
+        });
 
-      // Log activity
-      await tx.insert(activityLog).values({
-        businessId,
-        userId: user.id,
-        action: "sale_voided",
-        detail: `Sale ${saleId.slice(0, 8)} voided: ${reason}`,
-      });
-
-      return voided;
+        return voided;
       });
     } catch (err) {
       const dbErr = handleDbError(err);
