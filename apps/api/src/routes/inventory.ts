@@ -290,6 +290,11 @@ inventory.post(
           stockMin: data.stockMin,
           stockCritical: data.stockCritical,
           hasVariants: data.hasVariants,
+          isService: data.isService,
+          wholesalePrice: data.wholesalePrice !== undefined ? String(data.wholesalePrice) : undefined,
+          wholesaleMinQty: data.wholesaleMinQty,
+          brand: data.brand,
+          location: data.location,
           imageUrl: data.imageUrl,
           expiresAt: data.expiresAt ? new Date(data.expiresAt) : undefined,
         })
@@ -370,6 +375,14 @@ inventory.patch(
       updateValues.stockCritical = data.stockCritical;
     if (data.hasVariants !== undefined)
       updateValues.hasVariants = data.hasVariants;
+    if (data.isService !== undefined)
+      updateValues.isService = data.isService;
+    if (data.wholesalePrice !== undefined)
+      updateValues.wholesalePrice = data.wholesalePrice !== undefined ? String(data.wholesalePrice) : null;
+    if (data.wholesaleMinQty !== undefined)
+      updateValues.wholesaleMinQty = data.wholesaleMinQty;
+    if (data.brand !== undefined) updateValues.brand = data.brand;
+    if (data.location !== undefined) updateValues.location = data.location;
     if (data.imageUrl !== undefined) updateValues.imageUrl = data.imageUrl;
     if (data.expiresAt !== undefined)
       updateValues.expiresAt = data.expiresAt ? new Date(data.expiresAt) : null;

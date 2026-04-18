@@ -178,3 +178,21 @@ ALTER TABLE cash_openings ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS cash_openings_tenant_isolation ON cash_openings;
 CREATE POLICY cash_openings_tenant_isolation ON cash_openings
   USING (business_id = current_business_id());
+
+-- Surcharge types
+ALTER TABLE surcharge_types ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS surcharge_types_tenant_isolation ON surcharge_types;
+CREATE POLICY surcharge_types_tenant_isolation ON surcharge_types
+  USING (business_id = current_business_id());
+
+-- Bank accounts
+ALTER TABLE bank_accounts ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS bank_accounts_tenant_isolation ON bank_accounts;
+CREATE POLICY bank_accounts_tenant_isolation ON bank_accounts
+  USING (business_id = current_business_id());
+
+-- Notification preferences
+ALTER TABLE notification_preferences ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS notification_preferences_tenant_isolation ON notification_preferences;
+CREATE POLICY notification_preferences_tenant_isolation ON notification_preferences
+  USING (business_id = current_business_id());

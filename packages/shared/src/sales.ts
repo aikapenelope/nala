@@ -6,6 +6,15 @@
 import { z } from "zod";
 import { paymentMethodSchema } from "./schemas";
 
+/** Valid sale channels. */
+export const SALE_CHANNELS = [
+  "pos",
+  "whatsapp",
+  "delivery",
+  "online",
+] as const;
+export type SaleChannel = (typeof SALE_CHANNELS)[number];
+
 /** Schema for a sale item (line in the ticket). */
 export const saleItemSchema = z.object({
   productId: z.string().uuid(),
@@ -24,6 +33,12 @@ export const salePaymentSchema = z.object({
   reference: z.string().max(100).optional(),
 });
 
+/** Schema for a surcharge applied to a sale. */
+export const saleSurchargeSchema = z.object({
+  name: z.string().min(1).max(100),
+  amount: z.number().min(0),
+});
+
 /** Schema for creating a new sale. */
 export const createSaleSchema = z.object({
   customerId: z.string().uuid().optional(),
@@ -32,6 +47,10 @@ export const createSaleSchema = z.object({
   discountPercent: z.number().min(0).max(100).default(0),
   /** Fixed discount amount in USD (applied after percentage discount). */
   discountAmount: z.number().min(0).default(0),
+  /** Extra charges: delivery, tips, packaging, etc. */
+  surcharges: z.array(saleSurchargeSchema).default([]),
+  /** Sale channel. */
+  channel: z.enum(SALE_CHANNELS).default("pos"),
   notes: z.string().max(500).optional(),
 });
 
@@ -61,13 +80,14 @@ export function calculateLineTotal(
 }
 
 /**
- * Calculate sale total after discounts.
+ * Calculate sale total after discounts and surcharges.
  *
  * Flow:
  * 1. Sum line totals (after per-item discounts)
  * 2. Apply sale-level percentage discount
  * 3. Apply sale-level fixed amount discount
- * 4. Return the final total as a number
+ * 4. Add surcharges
+ * 5. Return the final total as a number
  */
 export function calculateSaleTotal(
   items: Array<{
@@ -77,6 +97,7 @@ export function calculateSaleTotal(
   }>,
   saleDiscountPercent: number = 0,
   saleDiscountAmount: number = 0,
+  surcharges: Array<{ amount: number }> = [],
 ): number {
   // 1. Sum line totals
   const subtotal = items.reduce(
@@ -88,9 +109,15 @@ export function calculateSaleTotal(
 
   // 2-3. Apply sale-level discounts
   const afterPercentDiscount = subtotal * (1 - saleDiscountPercent / 100);
-  const total = Math.max(0, afterPercentDiscount - saleDiscountAmount);
+  const afterAllDiscounts = Math.max(
+    0,
+    afterPercentDiscount - saleDiscountAmount,
+  );
 
-  return Math.round(total * 100) / 100;
+  // 4. Add surcharges
+  const surchargeTotal = surcharges.reduce((sum, s) => sum + s.amount, 0);
+
+  return Math.round((afterAllDiscounts + surchargeTotal) * 100) / 100;
 }
 
 /**
@@ -98,4 +125,20 @@ export function calculateSaleTotal(
  */
 export function usdToBs(amountUsd: number, rate: number): number {
   return Math.round(amountUsd * rate * 100) / 100;
+}
+
+/**
+ * Resolve the effective unit price considering wholesale pricing.
+ * Returns wholesalePrice if qty >= wholesaleMinQty, otherwise regular price.
+ */
+export function resolveUnitPrice(
+  quantity: number,
+  price: number,
+  wholesalePrice: number | null,
+  wholesaleMinQty: number,
+): number {
+  if (wholesalePrice !== null && quantity >= wholesaleMinQty) {
+    return wholesalePrice;
+  }
+  return price;
 }

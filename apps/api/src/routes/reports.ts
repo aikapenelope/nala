@@ -553,10 +553,11 @@ reports.get(
         ),
       );
 
-    // Expenses: sum of confirmed expenses in the period
-    const [expResult] = await db
+    // Expenses: sum of confirmed expenses in the period, broken down by category
+    const expensesByCategory = await db
       .select({
-        expenses: sql<number>`COALESCE(SUM(${expenses.total}::numeric), 0)::float`,
+        category: expenses.category,
+        total: sql<number>`COALESCE(SUM(${expenses.total}::numeric), 0)::float`,
       })
       .from(expenses)
       .where(
@@ -566,11 +567,16 @@ reports.get(
           gte(expenses.date, start),
           lte(expenses.date, end),
         ),
-      );
+      )
+      .groupBy(expenses.category);
+
+    const fixedExpenses = expensesByCategory.find((e) => e.category === "fixed")?.total ?? 0;
+    const variableExpenses = expensesByCategory.find((e) => e.category === "variable")?.total ?? 0;
+    const cogsExpenses = expensesByCategory.find((e) => e.category === "cogs")?.total ?? 0;
+    const totalExpenses = fixedExpenses + variableExpenses + cogsExpenses;
 
     const revenue = revResult?.revenue ?? 0;
     const costOfGoods = cogsResult?.cogs ?? 0;
-    const totalExpenses = expResult?.expenses ?? 0;
     const grossProfit = revenue - costOfGoods;
     const netProfit = grossProfit - totalExpenses;
     const grossMargin =
@@ -583,6 +589,9 @@ reports.get(
       costOfGoods: Math.round(costOfGoods * 100) / 100,
       grossProfit: Math.round(grossProfit * 100) / 100,
       expenses: Math.round(totalExpenses * 100) / 100,
+      fixedExpenses: Math.round(fixedExpenses * 100) / 100,
+      variableExpenses: Math.round(variableExpenses * 100) / 100,
+      cogsExpenses: Math.round(cogsExpenses * 100) / 100,
       netProfit: Math.round(netProfit * 100) / 100,
       grossMargin,
       netMargin,
@@ -957,6 +966,174 @@ reports.get("/reports/alerts", async (c) => {
   alerts.sort((a, b) => severityOrder[a.severity] - severityOrder[b.severity]);
 
   return c.json({ alerts });
+});
+
+// ============================================================
+// Monthly Trend
+// ============================================================
+
+/**
+ * GET /reports/monthly-trend - Revenue by month for the last 12 months.
+ *
+ * Returns an array of { month: "2026-04", revenue, expenses, net } objects
+ * for charting long-term business evolution.
+ */
+reports.get("/reports/monthly-trend", async (c) => {
+  const db = c.get("db");
+  const businessId = c.get("businessId");
+
+  const bizCond = eq(sales.businessId, businessId);
+  const completedCond = eq(sales.status, "completed");
+
+  // Revenue by month (last 12 months)
+  const revenueByMonth = await db
+    .select({
+      month: sql<string>`TO_CHAR(${sales.createdAt}, 'YYYY-MM')`,
+      revenue: sql<number>`COALESCE(SUM(${sales.totalUsd}::numeric), 0)::float`,
+    })
+    .from(sales)
+    .where(
+      and(
+        bizCond,
+        completedCond,
+        sql`${sales.createdAt} >= NOW() - INTERVAL '12 months'`,
+      ),
+    )
+    .groupBy(sql`TO_CHAR(${sales.createdAt}, 'YYYY-MM')`)
+    .orderBy(sql`TO_CHAR(${sales.createdAt}, 'YYYY-MM')`);
+
+  // Expenses by month (last 12 months)
+  const expensesByMonth = await db
+    .select({
+      month: sql<string>`TO_CHAR(${expenses.date}, 'YYYY-MM')`,
+      total: sql<number>`COALESCE(SUM(${expenses.total}::numeric), 0)::float`,
+    })
+    .from(expenses)
+    .where(
+      and(
+        eq(expenses.businessId, businessId),
+        eq(expenses.status, "confirmed"),
+        sql`${expenses.date} >= NOW() - INTERVAL '12 months'`,
+      ),
+    )
+    .groupBy(sql`TO_CHAR(${expenses.date}, 'YYYY-MM')`)
+    .orderBy(sql`TO_CHAR(${expenses.date}, 'YYYY-MM')`);
+
+  const expenseMap = new Map(expensesByMonth.map((e) => [e.month, e.total]));
+
+  const trend = revenueByMonth.map((r) => {
+    const exp = expenseMap.get(r.month) ?? 0;
+    return {
+      month: r.month,
+      revenue: Math.round(r.revenue * 100) / 100,
+      expenses: Math.round(exp * 100) / 100,
+      net: Math.round((r.revenue - exp) * 100) / 100,
+    };
+  });
+
+  return c.json({ trend });
+});
+
+// ============================================================
+// Client Stats
+// ============================================================
+
+/**
+ * GET /reports/customer-stats/:id - Detailed stats for a single customer.
+ *
+ * Returns purchase history, top products bought, visit frequency,
+ * and spending trend.
+ */
+reports.get("/reports/customer-stats/:id", async (c) => {
+  const customerId = c.req.param("id");
+  const db = c.get("db");
+  const businessId = c.get("businessId");
+
+  // Verify customer exists
+  const [customer] = await db
+    .select()
+    .from(customers)
+    .where(
+      and(eq(customers.id, customerId), eq(customers.businessId, businessId)),
+    )
+    .limit(1);
+
+  if (!customer) {
+    return c.json({ error: "Customer not found" }, 404);
+  }
+
+  // Recent sales for this customer (last 20)
+  const recentSales = await db
+    .select({
+      id: sales.id,
+      totalUsd: sales.totalUsd,
+      createdAt: sales.createdAt,
+      status: sales.status,
+    })
+    .from(sales)
+    .where(
+      and(
+        eq(sales.businessId, businessId),
+        eq(sales.customerId, customerId),
+      ),
+    )
+    .orderBy(desc(sales.createdAt))
+    .limit(20);
+
+  // Top products bought by this customer
+  const topProducts = await db
+    .select({
+      name: products.name,
+      totalQty: sql<number>`SUM(${saleItems.quantity})::int`,
+      totalSpent: sql<number>`SUM(${saleItems.lineTotal}::numeric)::float`,
+    })
+    .from(saleItems)
+    .innerJoin(sales, eq(saleItems.saleId, sales.id))
+    .innerJoin(products, eq(saleItems.productId, products.id))
+    .where(
+      and(
+        eq(sales.businessId, businessId),
+        eq(sales.customerId, customerId),
+        eq(sales.status, "completed"),
+      ),
+    )
+    .groupBy(products.id, products.name)
+    .orderBy(desc(sql`SUM(${saleItems.lineTotal}::numeric)`))
+    .limit(10);
+
+  // Monthly spending trend (last 6 months)
+  const spendingTrend = await db
+    .select({
+      month: sql<string>`TO_CHAR(${sales.createdAt}, 'YYYY-MM')`,
+      total: sql<number>`COALESCE(SUM(${sales.totalUsd}::numeric), 0)::float`,
+      count: sql<number>`count(*)::int`,
+    })
+    .from(sales)
+    .where(
+      and(
+        eq(sales.businessId, businessId),
+        eq(sales.customerId, customerId),
+        eq(sales.status, "completed"),
+        sql`${sales.createdAt} >= NOW() - INTERVAL '6 months'`,
+      ),
+    )
+    .groupBy(sql`TO_CHAR(${sales.createdAt}, 'YYYY-MM')`)
+    .orderBy(sql`TO_CHAR(${sales.createdAt}, 'YYYY-MM')`);
+
+  return c.json({
+    customer: {
+      id: customer.id,
+      name: customer.name,
+      totalPurchases: customer.totalPurchases,
+      totalSpentUsd: Number(customer.totalSpentUsd),
+      averageTicketUsd: Number(customer.averageTicketUsd),
+      balanceUsd: Number(customer.balanceUsd),
+      lastPurchaseAt: customer.lastPurchaseAt,
+    },
+    recentSales,
+    topProducts,
+    spendingTrend,
+  });
 });
 
 // ============================================================

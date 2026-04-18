@@ -7,6 +7,7 @@ import {
   calculateLineTotal,
   calculateSaleTotal,
   usdToBs,
+  resolveUnitPrice,
 } from "../sales";
 import {
   calculateStockSemaphore,
@@ -56,6 +57,12 @@ describe("calculateSaleTotal", () => {
     // 10% off = 90, then -5 = 85
     expect(calculateSaleTotal(items, 10, 5)).toBe(85);
   });
+
+  it("adds surcharges to total", () => {
+    const items = [{ quantity: 1, unitPrice: 100, discountPercent: 0 }];
+    const surcharges = [{ amount: 5 }, { amount: 3 }];
+    expect(calculateSaleTotal(items, 0, 0, surcharges)).toBe(108);
+  });
 });
 
 describe("usdToBs", () => {
@@ -80,6 +87,24 @@ describe("calculateStockSemaphore", () => {
   it("returns gray for dead stock", () => {
     const oldDate = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
     expect(calculateStockSemaphore(50, 10, 3, oldDate)).toBe("gray");
+  });
+
+  it("returns green for service products regardless of stock", () => {
+    expect(calculateStockSemaphore(0, 10, 3, null, true)).toBe("green");
+  });
+});
+
+describe("resolveUnitPrice", () => {
+  it("returns regular price below wholesale qty", () => {
+    expect(resolveUnitPrice(5, 10, 8, 12)).toBe(10);
+  });
+
+  it("returns wholesale price at or above min qty", () => {
+    expect(resolveUnitPrice(12, 10, 8, 12)).toBe(8);
+  });
+
+  it("returns regular price when no wholesale price set", () => {
+    expect(resolveUnitPrice(100, 10, null, 1)).toBe(10);
   });
 });
 

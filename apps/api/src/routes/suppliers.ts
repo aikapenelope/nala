@@ -4,13 +4,14 @@
  * GET    /suppliers          - List suppliers
  * POST   /suppliers          - Create supplier
  * PATCH  /suppliers/:id      - Update supplier
+ * GET    /suppliers/:id/account - Supplier account summary
  */
 
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import { eq, and, desc, ilike } from "drizzle-orm";
-import { suppliers } from "@nova/db";
+import { eq, and, desc, ilike, sql } from "drizzle-orm";
+import { suppliers, expenses, accountsPayable } from "@nova/db";
 import { handleDbError } from "../utils/db-errors";
 import type { AppEnv } from "../types";
 
@@ -117,5 +118,87 @@ suppliersRoutes.patch(
     return c.json({ supplier: updated });
   },
 );
+
+/**
+ * GET /suppliers/:id/account - Supplier account summary.
+ *
+ * Returns total purchases, pending payables, and recent expenses
+ * for a specific supplier.
+ */
+suppliersRoutes.get("/suppliers/:id/account", async (c) => {
+  const id = c.req.param("id");
+  const db = c.get("db");
+  const businessId = c.get("businessId");
+
+  // Verify supplier exists
+  const [supplier] = await db
+    .select()
+    .from(suppliers)
+    .where(and(eq(suppliers.id, id), eq(suppliers.businessId, businessId)))
+    .limit(1);
+
+  if (!supplier) {
+    return c.json({ error: "Proveedor no encontrado" }, 404);
+  }
+
+  // Total purchases from this supplier
+  const [purchaseStats] = await db
+    .select({
+      totalPurchases: sql<number>`COALESCE(SUM(${expenses.total}::numeric), 0)::float`,
+      purchaseCount: sql<number>`count(*)::int`,
+    })
+    .from(expenses)
+    .where(
+      and(
+        eq(expenses.businessId, businessId),
+        eq(expenses.supplierId, id),
+        eq(expenses.status, "confirmed"),
+      ),
+    );
+
+  // Pending payables for this supplier
+  const [payableStats] = await db
+    .select({
+      totalPending: sql<number>`COALESCE(SUM(${accountsPayable.balanceUsd}::numeric), 0)::float`,
+      pendingCount: sql<number>`count(*)::int`,
+    })
+    .from(accountsPayable)
+    .where(
+      and(
+        eq(accountsPayable.businessId, businessId),
+        eq(accountsPayable.supplierName, supplier.name),
+        eq(accountsPayable.status, "pending"),
+      ),
+    );
+
+  // Recent expenses (last 10)
+  const recentExpenses = await db
+    .select({
+      id: expenses.id,
+      date: expenses.date,
+      total: expenses.total,
+      invoiceNumber: expenses.invoiceNumber,
+    })
+    .from(expenses)
+    .where(
+      and(
+        eq(expenses.businessId, businessId),
+        eq(expenses.supplierId, id),
+      ),
+    )
+    .orderBy(desc(expenses.date))
+    .limit(10);
+
+  return c.json({
+    supplier,
+    account: {
+      totalPurchases: Math.round((purchaseStats?.totalPurchases ?? 0) * 100) / 100,
+      purchaseCount: purchaseStats?.purchaseCount ?? 0,
+      totalPending: Math.round((payableStats?.totalPending ?? 0) * 100) / 100,
+      pendingCount: payableStats?.pendingCount ?? 0,
+    },
+    recentExpenses,
+  });
+});
 
 export { suppliersRoutes };
