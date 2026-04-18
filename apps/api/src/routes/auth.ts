@@ -17,12 +17,22 @@ import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { eq, and } from "drizzle-orm";
 import { PIN_LENGTH } from "@nova/shared";
-import { users } from "@nova/db";
+import {
+  users,
+  incrementPinFailedAttempts,
+  resetPinFailedAttempts,
+} from "@nova/db";
 import type { AppEnv } from "../types";
 
 // ============================================================
 // Protected owner PIN verification (mounted under /api in app.ts)
 // ============================================================
+
+/** Maximum failed PIN attempts before lockout. */
+const MAX_PIN_ATTEMPTS = 5;
+
+/** Lockout duration in minutes after exceeding max attempts. */
+const LOCKOUT_MINUTES = 15;
 
 /** Schema for owner PIN verification (restricted actions). */
 const ownerPinSchema = z.object({
@@ -44,8 +54,8 @@ export const ownerPinRoute = new Hono<AppEnv>();
  * Used when an employee needs owner approval (void sale, large discount).
  * The businessId is taken from the authenticated session context.
  *
- * This is the server-side double-check. The frontend does a local bcrypt
- * check first for instant feedback, then calls this endpoint to confirm.
+ * Implements PIN lockout: after 5 failed attempts, the owner account is
+ * locked for 15 minutes. Successful verification resets the counter.
  */
 ownerPinRoute.post(
   "/verify-owner-pin",
@@ -71,11 +81,51 @@ ownerPinRoute.post(
       return c.json({ error: "No owner found for this business" }, 404);
     }
 
+    // Check if any owner is currently locked out
+    const now = new Date();
+    const allLocked = owners.every(
+      (o) => o.pinLockedUntil && o.pinLockedUntil > now,
+    );
+    if (allLocked) {
+      const earliest = owners.reduce((min, o) => {
+        const lockEnd = o.pinLockedUntil?.getTime() ?? 0;
+        return lockEnd < min ? lockEnd : min;
+      }, Infinity);
+      const minutesLeft = Math.ceil((earliest - now.getTime()) / 60_000);
+      return c.json(
+        {
+          error: `PIN bloqueado por ${minutesLeft} minuto(s). Intenta mas tarde.`,
+          verified: false,
+          locked: true,
+        },
+        429,
+      );
+    }
+
+    // Try to match PIN against non-locked owners
     for (const owner of owners) {
+      // Skip locked owners
+      if (owner.pinLockedUntil && owner.pinLockedUntil > now) continue;
+
       const match = await bcrypt.compare(pin, owner.pinHash);
       if (match) {
+        // Reset failed attempts on success
+        await resetPinFailedAttempts(db, owner.id);
         return c.json({ verified: true, ownerId: owner.id });
       }
+    }
+
+    // PIN didn't match any owner -- increment failed attempts for all non-locked owners
+    for (const owner of owners) {
+      if (owner.pinLockedUntil && owner.pinLockedUntil > now) continue;
+
+      const newAttempts = owner.pinFailedAttempts + 1;
+      const lockUntil =
+        newAttempts >= MAX_PIN_ATTEMPTS
+          ? new Date(now.getTime() + LOCKOUT_MINUTES * 60_000)
+          : undefined;
+
+      await incrementPinFailedAttempts(db, owner.id, lockUntil);
     }
 
     return c.json({ error: "PIN de dueño incorrecto", verified: false }, 401);

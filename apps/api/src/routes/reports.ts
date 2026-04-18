@@ -35,6 +35,7 @@ import { periodQuery, parsePeriodRange } from "./reports-helpers";
 import { reportsPdf } from "./reports-pdf";
 import { reportsXlsx } from "./reports-xlsx";
 import { reportsEmail } from "./reports-email";
+import { validateUuidParam } from "../middleware/validate-uuid";
 import type { AppEnv } from "../types";
 
 const reports = new Hono<AppEnv>();
@@ -1044,7 +1045,7 @@ reports.get("/reports/monthly-trend", async (c) => {
  * Returns purchase history, top products bought, visit frequency,
  * and spending trend.
  */
-reports.get("/reports/customer-stats/:id", async (c) => {
+reports.get("/reports/customer-stats/:id", validateUuidParam, async (c) => {
   const customerId = c.req.param("id");
   const db = c.get("db");
   const businessId = c.get("businessId");

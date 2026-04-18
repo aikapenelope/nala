@@ -43,6 +43,7 @@ import {
 import { getCurrentRate, setCurrentRate } from "../services/exchange-rate";
 import { fetchBcvRates } from "../services/bcv-rates";
 import { handleDbError } from "../utils/db-errors";
+import { validateUuidParam } from "../middleware/validate-uuid";
 import type { AppEnv } from "../types";
 
 const salesRoutes = new Hono<AppEnv>();
@@ -225,7 +226,7 @@ salesRoutes.get("/sales", zValidator("query", listSalesQuery), async (c) => {
 });
 
 /** GET /sales/:id - Get sale detail. */
-salesRoutes.get("/sales/:id", async (c) => {
+salesRoutes.get("/sales/:id", validateUuidParam, async (c) => {
   const id = c.req.param("id");
   const db = c.get("db");
   const businessId = c.get("businessId");
@@ -610,6 +611,24 @@ salesRoutes.post("/sales", zValidator("json", createSaleSchema), async (c) => {
         detail: `Sale $${totalUsd} (${data.items.length} items)`,
       });
 
+      // Log stock movements inside the transaction for consistency.
+      for (const item of data.items) {
+        const product = productMap.get(item.productId);
+        if (product?.isService) continue;
+
+        await tx.insert(stockMovements).values({
+          businessId,
+          productId: item.productId,
+          variantId: item.variantId,
+          type: "sale",
+          quantity: -item.quantity,
+          costUnit: String(product?.cost ?? 0),
+          referenceType: "sale",
+          referenceId: sale.id,
+          userId: user.id,
+        });
+      }
+
       return sale;
     });
   } catch (err) {
@@ -621,26 +640,6 @@ salesRoutes.post("/sales", zValidator("json", createSaleSchema), async (c) => {
     const dbErr = handleDbError(err);
     if (dbErr) return c.json({ error: dbErr.message }, dbErr.status);
     throw err;
-  }
-
-  // Log stock movements AFTER the sale transaction succeeds.
-  // This is outside the TX: if it fails, the sale is already recorded.
-  try {
-    for (const item of data.items) {
-      await db.insert(stockMovements).values({
-        businessId,
-        productId: item.productId,
-        variantId: item.variantId,
-        type: "sale",
-        quantity: -item.quantity,
-        costUnit: String(productMap.get(item.productId)?.cost ?? 0),
-        referenceType: "sale",
-        referenceId: result.id,
-        userId: user.id,
-      });
-    }
-  } catch {
-    // Non-critical: stock movement logging failed but sale is safe
   }
 
   return c.json({ sale: result }, 201);
@@ -655,6 +654,7 @@ salesRoutes.post("/sales", zValidator("json", createSaleSchema), async (c) => {
  */
 salesRoutes.post(
   "/sales/:id/void",
+  validateUuidParam,
   zValidator("json", voidSaleSchema),
   async (c) => {
     const saleId = c.req.param("id");
@@ -857,7 +857,7 @@ salesRoutes.post(
 );
 
 /** POST /quotations/:id/convert - Convert quotation to sale. */
-salesRoutes.post("/quotations/:id/convert", async (c) => {
+salesRoutes.post("/quotations/:id/convert", validateUuidParam, async (c) => {
   const id = c.req.param("id");
   const db = c.get("db");
   const businessId = c.get("businessId");

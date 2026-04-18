@@ -39,6 +39,7 @@ import {
   activityLog,
 } from "@nova/db";
 import { handleDbError } from "../utils/db-errors";
+import { validateUuidParam } from "../middleware/validate-uuid";
 import type { AppEnv } from "../types";
 
 const inventory = new Hono<AppEnv>();
@@ -201,7 +202,7 @@ inventory.get(
 );
 
 /** GET /products/:id - Get single product with its variants. */
-inventory.get("/products/:id", async (c) => {
+inventory.get("/products/:id", validateUuidParam, async (c) => {
   const id = c.req.param("id");
   const db = c.get("db");
   const businessId = c.get("businessId");
@@ -320,6 +321,7 @@ inventory.post(
 /** PATCH /products/:id - Update an existing product. */
 inventory.patch(
   "/products/:id",
+  validateUuidParam,
   zValidator("json", updateProductSchema),
   async (c) => {
     const id = c.req.param("id");
@@ -416,7 +418,7 @@ inventory.patch(
 );
 
 /** DELETE /products/:id - Soft-delete a product (set isActive = false). */
-inventory.delete("/products/:id", async (c) => {
+inventory.delete("/products/:id", validateUuidParam, async (c) => {
   const id = c.req.param("id");
   const db = c.get("db");
   const businessId = c.get("businessId");
@@ -448,6 +450,7 @@ inventory.delete("/products/:id", async (c) => {
 /** POST /products/:id/variants - Add a variant to a product. */
 inventory.post(
   "/products/:id/variants",
+  validateUuidParam,
   zValidator("json", createVariantSchema.omit({ productId: true })),
   async (c) => {
     const productId = c.req.param("id");
@@ -499,6 +502,7 @@ inventory.post(
 /** PATCH /products/variants/:id - Update a variant. */
 inventory.patch(
   "/products/variants/:id",
+  validateUuidParam,
   zValidator("json", createVariantSchema.omit({ productId: true }).partial()),
   async (c) => {
     const id = c.req.param("id");
@@ -535,7 +539,7 @@ inventory.patch(
 );
 
 /** DELETE /products/variants/:id - Soft-delete a variant. */
-inventory.delete("/products/variants/:id", async (c) => {
+inventory.delete("/products/variants/:id", validateUuidParam, async (c) => {
   const id = c.req.param("id");
   const db = c.get("db");
   const businessId = c.get("businessId");
@@ -678,6 +682,7 @@ const adjustStockSchema = z.object({
  */
 inventory.post(
   "/products/:id/adjust-stock",
+  validateUuidParam,
   zValidator("json", adjustStockSchema),
   async (c) => {
     const id = c.req.param("id");

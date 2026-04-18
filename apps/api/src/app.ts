@@ -150,6 +150,7 @@ app.route("/health", health);
 app.use("/catalog/*", publicRateLimit);
 app.route("/catalog", catalog);
 app.use("/onboarding/check-slug/*", publicRateLimit);
+app.use("/onboarding", publicRateLimit);
 app.route("/onboarding", onboarding);
 
 // ---------------------------------------------------------------------------
