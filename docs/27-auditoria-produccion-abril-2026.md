@@ -3,15 +3,16 @@
 > Codebase: ~21,400 lineas | 26 tablas (26 RLS policies) | 67 endpoints | 32 paginas | 49 tests
 > Stack: Nuxt 4.4 + Hono + PostgreSQL 16 + Redis 7 + Clerk + Drizzle ORM
 > Produccion: novaincs.com, api.novaincs.com, *.novaincs.com
-> Migraciones: 6 (0000-0005)
+> Migraciones: 7 (0000-0006)
 
 ---
 
 ## Estado actual: Production-ready
 
-Todos los sprints completados. IVA, IGTF, proveedores, notas de credito, cupos de credito,
-numeros de control, movimientos de inventario, apertura de caja, ajuste manual, tasa BCV
+Todos los sprints completados. Proveedores, cupos de credito,
+movimientos de inventario, apertura de caja, ajuste manual, tasa BCV
 automatica, alertas de vencimiento. Dashboard rediseñado. 49 tests en CI.
+Campos fiscales SENIAT eliminados en migracion 0006 (Nova es para comercio informal).
 
 ---
 
@@ -40,6 +41,12 @@ split de reports, settings API, OCR fallback.
 | #115 | Gap analysis SENIAT (doc 28) |
 | #116 | RIF, apertura de caja, ajuste manual inventario (migracion 0005) |
 
+### Sesion 3 (PR #119)
+
+| PR | Contenido |
+|----|-----------|
+| #119 | Eliminar campos SENIAT/fiscal, simplificar flujo de ventas (migracion 0006) |
+
 PR #108 (Playwright E2E) cerrado sin merge -- reemplazado por #109.
 
 ---
@@ -48,12 +55,7 @@ PR #108 (Playwright E2E) cerrado sin merge -- reemplazado por #109.
 
 ### POS y ventas
 - Venta en 3-4 toques, 7 metodos de pago venezolanos
-- IVA (0%, 8%, 16%) con calculo automatico
-- IGTF 3% en pagos en divisas (Binance, Zinli, Zelle)
 - Descuento por porcentaje y monto fijo
-- Numeros de control secuenciales por negocio
-- Campo de control fiscal para imprenta digital (SENIAT-ready)
-- Notas de credito con devolucion parcial y restauracion de stock
 - Cotizaciones convertibles a venta
 - Split payment (multiples metodos)
 - Offline queue (IndexedDB + sync FIFO)
@@ -70,27 +72,25 @@ PR #108 (Playwright E2E) cerrado sin merge -- reemplazado por #109.
 
 ### Clientes y CRM
 - Perfil automatico con segmentos (VIP, en riesgo, inactivo)
-- RIF del cliente para facturacion formal
 - Cuentas por cobrar con pagos parciales y aging
 - Cupo de credito por cliente (validado en checkout)
 - Cobro por WhatsApp
 
 ### Proveedores
-- Directorio con RIF, telefono, email, direccion
+- Directorio con telefono, email, direccion
 - CRUD completo (GET/POST/PATCH /suppliers)
 - Vinculado a gastos y facturas de compra
 
-### Reportes (10)
+### Reportes (9)
 - Diario, semanal, rentabilidad, inventario, cuentas por cobrar
 - Vendedores, financiero (P&L), flujo de caja (7d/30d)
-- Alertas inteligentes, libro de compras
+- Alertas inteligentes
 - Narrativa AI (OpenRouter/Groq)
 - Export PDF, Excel, email
 
 ### Contabilidad
 - Plan de cuentas pre-configurado por tipo de negocio
 - Asientos automaticos desde ventas y gastos
-- RIF del negocio
 
 ### Dashboard
 - Saludo con nombre del negocio + hora del dia
@@ -127,16 +127,13 @@ PR #108 (Playwright E2E) cerrado sin merge -- reemplazado por #109.
 - Cobro por WhatsApp
 - Catalogo publico por subdominio
 - Multi-tenant SaaS con RLS
-- IGTF automatico
 - Tasa BCV por scraping
 - Alertas de vencimiento
 
 ### Nova equivalente a FoxPro
 - Inventario con variantes, barcode, semaforo, unidades
-- IVA (0%, 8%, 16%)
 - Cuentas por cobrar/pagar con pagos parciales
-- Proveedores con RIF
-- Notas de credito
+- Proveedores
 - Cupos de credito
 - Descuentos por % y monto fijo
 - Plan de cuentas con asientos automaticos
@@ -144,10 +141,9 @@ PR #108 (Playwright E2E) cerrado sin merge -- reemplazado por #109.
 - Cotizaciones
 - Historial de precios
 - Movimientos de inventario
-- Libro de compras
 
 ### Excede el scope
-- Facturacion electronica SENIAT (ver doc 28)
+- Facturacion electronica SENIAT (eliminado en PR #119 -- Nova es para comercio informal)
 - Nomina/RRHH
 - Costos FIFO/promedio ponderado
 - Multi-almacen
@@ -164,8 +160,7 @@ PR #108 (Playwright E2E) cerrado sin merge -- reemplazado por #109.
 | 3 | og:image catalogo | Subir /og-catalog.png (1200x630) |
 | 4 | Recibo/factura PDF individual | Para enviar al cliente o imprimir |
 | 5 | Pagina de movimientos de inventario | La tabla existe, falta UI |
-| 6 | Resumen de IGTF por periodo | Para declaracion |
-| 7 | Devolucion rapida desde historial | Boton "Devolver" en detalle de venta |
+| 6 | Devolucion rapida desde historial | Boton "Devolver" en detalle de venta |
 | 8 | Busqueda global | Productos + clientes + ventas |
 | 9 | E2E browser tests en CI | Requiere Clerk test keys |
 | 10 | robots.txt / sitemap.xml | SEO |
@@ -175,12 +170,11 @@ PR #108 (Playwright E2E) cerrado sin merge -- reemplazado por #109.
 
 ---
 
-## SENIAT (doc 28)
+## SENIAT (eliminado)
 
-Nova cubre ~70% de los requisitos tecnicos. Ver `docs/28-seniat-gap-analysis.md` para el analisis completo. Gaps principales:
-- Nivel 1 (implementado): RIF, numeros de control, IVA, IGTF, NC
-- Nivel 2 (depende de terceros): integracion con imprenta digital, transmision al SENIAT
-- Nivel 3 (administrativo): entidad legal en Venezuela, solicitud formal
+Los campos fiscales SENIAT (IVA, IGTF, RIF, numeros de control, notas de credito, libro de compras/ventas)
+fueron eliminados en PR #119 (migracion 0006). Nova es para comercio informal en Venezuela y no necesita
+cumplimiento SENIAT. Esto simplifica el flujo critico de ventas sin afectar al usuario target.
 
 ---
 
@@ -220,7 +214,6 @@ Nova cubre ~70% de los requisitos tecnicos. Ver `docs/28-seniat-gap-analysis.md`
 - Migraciones con backfill: nullable -> UPDATE -> SET NOT NULL.
 - $fetch<T> de Nuxt con baseURL externo requiere cast `as T`.
 - @clerk/nuxt en SSR: fuerza HTTPS, imposible E2E browser sin keys reales.
-- calculateSaleTotal cambio de number a {subtotal, discountTotal, taxTotal, total}.
+- calculateSaleTotal revertido de {subtotal, discountTotal, taxTotal, total} a number (PR #119).
 - supplier_id text -> uuid: RENAME old -> ADD new -> DROP old.
 - BCV rate scraping: API publica en bcv-exchange-rates.vercel.app, timeout 10s.
-- IGTF: solo aplica a binance, zinli, zelle (divisas). Efectivo y pago movil son VES.

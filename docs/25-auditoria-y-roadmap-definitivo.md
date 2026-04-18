@@ -16,7 +16,7 @@
 | 2 | Migraciones Drizzle versionadas + seed fix | #79, #82-85 |
 | 3-4 | Tests integracion (sales, fiado, void, RLS) | #80 |
 | 5 | Export PDF (daily, weekly, financial) | #81, #85 |
-| 6 | Export Excel (daily, weekly, sellers, libro SENIAT) | #86 |
+| 6 | Export Excel (daily, weekly, sellers) | #86 |
 | 7 | Email transaccional (Resend) | #87 |
 | 8 | Import batch + ReportLayout period selector | #88 |
 

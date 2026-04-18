@@ -314,12 +314,12 @@ Exportar                         → Seleccionar periodo
                                  → Preview del paquete
                                  → Descargar (PDF, Excel)
                                  → "Enviar al contador por WhatsApp"
-Libro de ventas SENIAT           → Generado automáticamente
+Libro de ventas SENIAT           → Eliminado (Nova es para comercio informal)
 ```
 
 **Configuración:**
 ```
-Negocio                          → Nombre, RIF, dirección, logo, tipo de negocio
+Negocio                          → Nombre, dirección, logo, tipo de negocio
 Usuarios                         → Lista de empleados con PIN, rol (Dueño/Empleado)
                                  → Agregar/desactivar usuarios
 Métodos de pago                  → Habilitar/deshabilitar (efectivo, Pago Móvil, etc.)

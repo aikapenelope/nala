@@ -121,7 +121,7 @@
 | H1 | Exportación contable estructurada (CSV/Excel) | [NUEVO] | Columnas estándar: fecha, descripción, cuenta contable, debe, haber, referencia. Excel con formato de libro diario/mayor/auxiliares |
 | H2 | Catálogo de cuentas configurable | [NUEVO] | El contador asigna cuentas contables a cada tipo de transacción (ventas efectivo → 4101, costo mercancía → 5101, etc.). Una vez configurado, cada exportación sale con asientos armados |
 | H3 | Plantillas para sistemas contables venezolanos | [NUEVO] | Formatos específicos para: Galac (TXT), Profit Plus (CSV/TXT), Saint (propietario), Valery (Excel), A2 Softway (TXT/CSV), Excel del contador (plantilla personalizable) |
-| H4 | Libros de compras/ventas para SENIAT | [NUEVO] | Generación automática de libros fiscales en PDF, listos para declaraciones de IVA/ISLR |
+| H4 | ~~Libros de compras/ventas para SENIAT~~ | [ELIMINADO] | ~~Generación automática de libros fiscales~~ — eliminado, Nova es para comercio informal |
 | H5 | Portal del contador | [NUEVO] | URL dedicada donde el contador descarga reportes directamente sin que el dueño tenga que enviar nada. Acceso con rol de solo lectura |
 
 ---
@@ -320,7 +320,7 @@
 | H1 | Exportación contable CSV/Excel | NUEVO | Alta | ___ |
 | H2 | Catálogo de cuentas configurable | NUEVO | Alta | ___ |
 | H3 | Plantillas sistemas contables VE | NUEVO | Alta | ___ |
-| H4 | Libros compras/ventas SENIAT | NUEVO | Alta | ___ |
+| H4 | ~~Libros compras/ventas SENIAT~~ | ELIMINADO | - | ___ |
 | H5 | Portal del contador | NUEVO | Media | ___ |
 | I1 | Seguridad básica login/password | ACTUAL | - | SI |
 | I2 | Datos seguros al cancelar | ACTUAL | - | SI |

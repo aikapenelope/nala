@@ -112,7 +112,7 @@ El código. Pero no se pre-elabora en documentos -- se descubre codeando. Lo ún
 - Asientos automáticos desde ventas, gastos, pagos (invisible para el usuario)
 - Exportación contable: Excel con formato libro diario (fecha, cuenta, debe, haber)
 - Botón "Enviar al contador" (genera paquete + abre WhatsApp)
-- Libros de compras/ventas formato SENIAT
+- Libros de compras/ventas formato SENIAT _(eliminado: Nova es para comercio informal)_
 - OCR de facturas: cámara PWA → GPT-4o-mini vision (vía OpenRouter) → matching con inventario → confirmación → registro
 - Matching: alias exacto → SKU exacto → fuzzy (pg_trgm) → producto nuevo
 - Tabla de aliases por proveedor (aprendizaje automático)

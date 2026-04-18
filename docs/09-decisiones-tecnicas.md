@@ -76,7 +76,6 @@ Nova → Genera Excel con formato contable (ya tiene cuentas asignadas) → Bot�
    - Resumen de ventas por método de pago
    - Resumen de gastos por categoría
    - P&L simplificado (ingresos - costos - gastos = ganancia)
-   - Libro de ventas en formato SENIAT (si aplica)
 
 4. **Envío:** Se abre WhatsApp con el archivo adjunto y un mensaje prellenado: "Hola [nombre contador], aquí está el reporte contable de [mes] de [nombre negocio]."
 
@@ -85,7 +84,6 @@ Nova → Genera Excel con formato contable (ya tiene cuentas asignadas) → Bot�
 **Lo que NO hacemos:**
 - No hacemos contabilidad completa (balance general, estados financieros auditables)
 - No hacemos declaraciones de impuestos
-- No hacemos retenciones de IVA/ISLR
 - No hacemos portal del contador en v1 (es más simple enviar por WhatsApp)
 - No competimos con Alegra ni con Galac. Somos el puente entre el negocio y el contador
 
