@@ -25,6 +25,7 @@ import {
   calculateSaleTotal,
   calculateLineTotal,
   calculateLineTax,
+  calculateIgtf,
 } from "@nova/shared";
 import {
   sales,
@@ -38,8 +39,10 @@ import {
   accountingEntries,
   accountingAccounts,
   customers,
+  stockMovements,
 } from "@nova/db";
 import { getCurrentRate, setCurrentRate } from "../services/exchange-rate";
+import { fetchBcvRates } from "../services/bcv-rates";
 import { handleDbError } from "../utils/db-errors";
 import type { AppEnv } from "../types";
 
@@ -99,6 +102,29 @@ salesRoutes.post(
     }
   },
 );
+
+/**
+ * GET /exchange-rate/bcv - Fetch current BCV official rate.
+ *
+ * Returns the official BCV rate scraped from bcv.org.ve.
+ * This is informational -- the business's actual rate is set manually.
+ * Returns 503 if the BCV API is unreachable.
+ */
+salesRoutes.get("/exchange-rate/bcv", async (c) => {
+  const rates = await fetchBcvRates();
+  if (!rates) {
+    return c.json(
+      { error: "No se pudo obtener la tasa BCV. Intenta mas tarde." },
+      503,
+    );
+  }
+  return c.json({
+    rateBcv: rates.usd,
+    rateEur: rates.eur,
+    date: rates.date,
+    source: "bcv",
+  });
+});
 
 // ============================================================
 // Sales
@@ -387,10 +413,22 @@ salesRoutes.post("/sales", zValidator("json", createSaleSchema), async (c) => {
 
   const totalBs = Math.round(totalUsd * rate.rateBcv * 100) / 100;
 
+  // Calculate IGTF on foreign currency payments
+  const igtfAmount = calculateIgtf(data.payments);
+
   // Atomic transaction
   let result;
   try {
     result = await db.transaction(async (tx) => {
+    // Get next control number for this business
+    const [maxControl] = await tx
+      .select({
+        max: sql<number>`COALESCE(MAX(${sales.controlNumber}), 0)`,
+      })
+      .from(sales)
+      .where(eq(sales.businessId, businessId));
+    const controlNumber = (maxControl?.max ?? 0) + 1;
+
     // Insert sale record
     const [sale] = await tx
       .insert(sales)
@@ -405,6 +443,8 @@ salesRoutes.post("/sales", zValidator("json", createSaleSchema), async (c) => {
         discountPercent: String(data.discountPercent),
         discountAmount: String(data.discountAmount),
         taxAmount: String(saleTotals.taxTotal),
+        igtfAmount: String(igtfAmount),
+        controlNumber,
         notes: data.notes,
         status: "completed",
         documentType: "invoice",
@@ -462,6 +502,19 @@ salesRoutes.post("/sales", zValidator("json", createSaleSchema), async (c) => {
           updatedAt: new Date(),
         })
         .where(eq(products.id, item.productId));
+
+      // Log stock movement
+      await tx.insert(stockMovements).values({
+        businessId,
+        productId: item.productId,
+        variantId: item.variantId,
+        type: "sale",
+        quantity: -item.quantity,
+        costUnit: String(productMap.get(item.productId)?.cost ?? 0),
+        referenceType: "sale",
+        referenceId: sale.id,
+        userId: user.id,
+      });
     }
 
     // If fiado payment, create accounts_receivable and update customer balance

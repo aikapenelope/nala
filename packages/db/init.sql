@@ -166,3 +166,9 @@ ALTER TABLE product_aliases ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS product_aliases_tenant_isolation ON product_aliases;
 CREATE POLICY product_aliases_tenant_isolation ON product_aliases
   USING (business_id = current_business_id());
+
+-- Stock movements
+ALTER TABLE stock_movements ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS stock_movements_tenant_isolation ON stock_movements;
+CREATE POLICY stock_movements_tenant_isolation ON stock_movements
+  USING (business_id = current_business_id());

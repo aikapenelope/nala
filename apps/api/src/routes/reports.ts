@@ -35,6 +35,7 @@ import { periodQuery, parsePeriodRange } from "./reports-helpers";
 import { reportsPdf } from "./reports-pdf";
 import { reportsXlsx } from "./reports-xlsx";
 import { reportsEmail } from "./reports-email";
+import { purchaseBook } from "./reports-purchase-book";
 import type { AppEnv } from "../types";
 
 const reports = new Hono<AppEnv>();
@@ -910,6 +911,44 @@ reports.get("/reports/alerts", async (c) => {
     });
   }
 
+  // 5. Products expiring soon (within 30 days)
+  const expiringProducts = await db
+    .select({
+      id: products.id,
+      name: products.name,
+      expiresAt: products.expiresAt,
+    })
+    .from(products)
+    .where(
+      and(
+        eq(products.businessId, businessId),
+        eq(products.isActive, true),
+        sql`${products.stock} > 0`,
+        sql`${products.expiresAt} IS NOT NULL`,
+        sql`${products.expiresAt} > NOW()`,
+        sql`${products.expiresAt} < NOW() + INTERVAL '30 days'`,
+      ),
+    )
+    .limit(5);
+
+  for (const p of expiringProducts) {
+    const daysLeft = Math.ceil(
+      (p.expiresAt!.getTime() - Date.now()) / (1000 * 60 * 60 * 24),
+    );
+    alerts.push({
+      id: `expiring-${p.id}`,
+      icon: "⏰",
+      title: `${p.name}: vence en ${daysLeft} dia${daysLeft > 1 ? "s" : ""}`,
+      suggestion:
+        daysLeft <= 7
+          ? "Vence esta semana. Considerar descuento urgente."
+          : "Vence pronto. Planificar venta o descuento.",
+      actionLabel: "Ver producto",
+      actionTo: `/inventory/${p.id}`,
+      severity: daysLeft <= 7 ? "critical" : "warning",
+    });
+  }
+
   // Sort: critical first, then warning, then info
   const severityOrder: Record<AlertSeverity, number> = {
     critical: 0,
@@ -928,5 +967,6 @@ reports.get("/reports/alerts", async (c) => {
 reports.route("/", reportsPdf);
 reports.route("/", reportsXlsx);
 reports.route("/", reportsEmail);
+reports.route("/", purchaseBook);
 
 export { reports };
