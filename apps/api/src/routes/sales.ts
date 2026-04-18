@@ -342,18 +342,21 @@ salesRoutes.post("/sales", zValidator("json", createSaleSchema), async (c) => {
       );
     }
 
-    // Check stock (aggregate quantity per product across all items)
-    const totalQtyForProduct = data.items
-      .filter((i) => i.productId === item.productId)
-      .reduce((sum, i) => sum + i.quantity, 0);
+    // Check stock (aggregate quantity per product across all items).
+    // Services don't track stock, so skip the check for them.
+    if (!product.isService) {
+      const totalQtyForProduct = data.items
+        .filter((i) => i.productId === item.productId)
+        .reduce((sum, i) => sum + i.quantity, 0);
 
-    if (product.stock < totalQtyForProduct) {
-      return c.json(
-        {
-          error: `Insufficient stock for "${product.name}": available ${product.stock}, requested ${totalQtyForProduct}`,
-        },
-        400,
-      );
+      if (product.stock < totalQtyForProduct) {
+        return c.json(
+          {
+            error: `Insufficient stock for "${product.name}": available ${product.stock}, requested ${totalQtyForProduct}`,
+          },
+          400,
+        );
+      }
     }
   }
 
@@ -387,7 +390,7 @@ salesRoutes.post("/sales", zValidator("json", createSaleSchema), async (c) => {
     }
   }
 
-  // 6. Calculate totals
+  // 6. Calculate totals (including surcharges)
   const itemsWithTotals = data.items.map((item) => {
     const lineTotal = calculateLineTotal(
       item.quantity,
@@ -401,7 +404,15 @@ salesRoutes.post("/sales", zValidator("json", createSaleSchema), async (c) => {
     data.items,
     data.discountPercent,
     data.discountAmount,
+    data.surcharges,
   );
+
+  // Calculate total cost for profit tracking
+  const totalCostUsd = data.items.reduce((sum, item) => {
+    const product = productMap.get(item.productId);
+    return sum + item.quantity * Number(product?.cost ?? 0);
+  }, 0);
+
   const totalPayments = data.payments.reduce((sum, p) => sum + p.amountUsd, 0);
 
   // Allow a small tolerance for floating point rounding (1 cent)
@@ -432,6 +443,9 @@ salesRoutes.post("/sales", zValidator("json", createSaleSchema), async (c) => {
         exchangeRate: String(rate.rateBcv),
         discountPercent: String(data.discountPercent),
         discountAmount: String(data.discountAmount),
+        totalCostUsd: String(Math.round(totalCostUsd * 100) / 100),
+        channel: data.channel,
+        surcharges: data.surcharges,
         notes: data.notes,
         status: "completed",
       })
@@ -466,8 +480,11 @@ salesRoutes.post("/sales", zValidator("json", createSaleSchema), async (c) => {
       })),
     );
 
-    // Decrement product stock for each item
+    // Decrement product stock for each item (skip services)
     for (const item of data.items) {
+      const product = productMap.get(item.productId);
+      if (product?.isService) continue;
+
       if (item.variantId) {
         await tx
           .update(productVariants)
