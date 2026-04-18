@@ -22,6 +22,7 @@ import {
   Settings,
   ArrowRightLeft,
   LogOut,
+  Truck,
 } from "lucide-vue-next";
 import type { Component } from "vue";
 
@@ -69,6 +70,13 @@ const menuItems: MenuItem[] = [
     icon: FileText,
     label: "Contabilidad",
     description: "Asientos y exportacion contable",
+    adminOnly: true,
+  },
+  {
+    to: "/suppliers",
+    icon: Truck,
+    label: "Proveedores",
+    description: "Directorio y estado de cuenta",
     adminOnly: true,
   },
   {
