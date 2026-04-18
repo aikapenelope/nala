@@ -14,6 +14,8 @@ export const createCustomerSchema = z.object({
   email: z.string().email().optional(),
   address: z.string().max(500).optional(),
   notes: z.string().max(1000).optional(),
+  /** Maximum fiado allowed (0 = no limit). */
+  creditLimitUsd: z.number().min(0).optional(),
 });
 
 export const updateCustomerSchema = createCustomerSchema.partial();

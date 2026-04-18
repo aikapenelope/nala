@@ -21,8 +21,10 @@ import {
   createSaleSchema,
   voidSaleSchema,
   createQuotationSchema,
+  createCreditNoteSchema,
   calculateSaleTotal,
   calculateLineTotal,
+  calculateLineTax,
 } from "@nova/shared";
 import {
   sales,
@@ -238,10 +240,14 @@ salesRoutes.post("/sales", zValidator("json", createSaleSchema), async (c) => {
     );
   }
 
-  // 3. Validate customer exists if provided
+  // 3. Validate customer exists if provided + credit limit for fiado
   if (data.customerId) {
     const [customer] = await db
-      .select({ id: customers.id })
+      .select({
+        id: customers.id,
+        balanceUsd: customers.balanceUsd,
+        creditLimitUsd: customers.creditLimitUsd,
+      })
       .from(customers)
       .where(
         and(
@@ -254,6 +260,26 @@ salesRoutes.post("/sales", zValidator("json", createSaleSchema), async (c) => {
 
     if (!customer) {
       return c.json({ error: "Customer not found" }, 400);
+    }
+
+    // Check credit limit for fiado payments
+    if (hasFiado) {
+      const creditLimit = Number(customer.creditLimitUsd);
+      if (creditLimit > 0) {
+        const currentBalance = Number(customer.balanceUsd);
+        const fiadoAmount = data.payments
+          .filter((p) => p.method === "fiado")
+          .reduce((sum, p) => sum + p.amountUsd, 0);
+
+        if (currentBalance + fiadoAmount > creditLimit) {
+          return c.json(
+            {
+              error: `El cliente excede su cupo de credito. Limite: $${creditLimit.toFixed(2)}, saldo actual: $${currentBalance.toFixed(2)}, fiado solicitado: $${fiadoAmount.toFixed(2)}`,
+            },
+            400,
+          );
+        }
+      }
     }
   }
 
@@ -328,17 +354,25 @@ salesRoutes.post("/sales", zValidator("json", createSaleSchema), async (c) => {
     }
   }
 
-  // 6. Validate payments cover the total
-  const itemsWithTotals = data.items.map((item) => ({
-    ...item,
-    lineTotal: calculateLineTotal(
+  // 6. Calculate totals with IVA
+  const itemsWithTotals = data.items.map((item) => {
+    const product = productMap.get(item.productId);
+    const taxRate = item.taxRate ?? Number(product?.taxRate ?? 0);
+    const lineTotal = calculateLineTotal(
       item.quantity,
       item.unitPrice,
       item.discountPercent,
-    ),
-  }));
+    );
+    const taxAmount = calculateLineTax(lineTotal, taxRate);
+    return { ...item, lineTotal, taxRate, taxAmount };
+  });
 
-  const totalUsd = calculateSaleTotal(data.items, data.discountPercent);
+  const saleTotals = calculateSaleTotal(
+    itemsWithTotals,
+    data.discountPercent,
+    data.discountAmount,
+  );
+  const totalUsd = saleTotals.total;
   const totalPayments = data.payments.reduce((sum, p) => sum + p.amountUsd, 0);
 
   // Allow a small tolerance for floating point rounding (1 cent)
@@ -364,12 +398,16 @@ salesRoutes.post("/sales", zValidator("json", createSaleSchema), async (c) => {
         businessId,
         userId: user.id,
         customerId: data.customerId,
+        subtotalUsd: String(saleTotals.subtotal),
         totalUsd: String(totalUsd),
         totalBs: String(totalBs),
         exchangeRate: String(rate.rateBcv),
         discountPercent: String(data.discountPercent),
+        discountAmount: String(data.discountAmount),
+        taxAmount: String(saleTotals.taxTotal),
         notes: data.notes,
         status: "completed",
+        documentType: "invoice",
       })
       .returning();
 
@@ -384,6 +422,8 @@ salesRoutes.post("/sales", zValidator("json", createSaleSchema), async (c) => {
         unitPrice: String(item.unitPrice),
         discountPercent: String(item.discountPercent),
         lineTotal: String(item.lineTotal),
+        taxRate: String(item.taxRate),
+        taxAmount: String(item.taxAmount),
       })),
     );
 
@@ -612,6 +652,156 @@ salesRoutes.post(
     }
 
     return c.json({ sale: result });
+  },
+);
+
+// ============================================================
+// Credit Notes
+// ============================================================
+
+/**
+ * POST /sales/credit-note - Create a credit note (partial refund).
+ *
+ * Creates a negative sale document linked to the original sale.
+ * Restores stock for returned items. Adjusts customer balance if applicable.
+ */
+salesRoutes.post(
+  "/sales/credit-note",
+  zValidator("json", createCreditNoteSchema),
+  async (c) => {
+    const data = c.req.valid("json");
+    const user = c.get("user");
+    const db = c.get("db");
+    const businessId = c.get("businessId");
+
+    // Only owners can create credit notes
+    if (user.role !== "owner") {
+      return c.json(
+        { error: "Solo el dueno puede crear notas de credito" },
+        403,
+      );
+    }
+
+    // Verify original sale exists and is completed
+    const [originalSale] = await db
+      .select()
+      .from(sales)
+      .where(
+        and(
+          eq(sales.id, data.originalSaleId),
+          eq(sales.businessId, businessId),
+          eq(sales.status, "completed"),
+          eq(sales.documentType, "invoice"),
+        ),
+      )
+      .limit(1);
+
+    if (!originalSale) {
+      return c.json(
+        { error: "Venta original no encontrada o no es una factura completada" },
+        404,
+      );
+    }
+
+    // Calculate credit note totals
+    const creditItems = data.items.map((item) => {
+      const lineTotal = calculateLineTotal(item.quantity, item.unitPrice, 0);
+      const taxAmount = calculateLineTax(lineTotal, item.taxRate);
+      return { ...item, lineTotal, taxAmount, discountPercent: 0 };
+    });
+
+    const creditSubtotal = creditItems.reduce((sum, i) => sum + i.lineTotal, 0);
+    const creditTax = creditItems.reduce((sum, i) => sum + i.taxAmount, 0);
+    const creditTotal = Math.round((creditSubtotal + creditTax) * 100) / 100;
+
+    let result;
+    try {
+      result = await db.transaction(async (tx) => {
+        // Create credit note (negative sale)
+        const [creditNote] = await tx
+          .insert(sales)
+          .values({
+            businessId,
+            userId: user.id,
+            customerId: originalSale.customerId,
+            subtotalUsd: String(-creditSubtotal),
+            totalUsd: String(-creditTotal),
+            totalBs: originalSale.exchangeRate
+              ? String(-creditTotal * Number(originalSale.exchangeRate))
+              : null,
+            exchangeRate: originalSale.exchangeRate,
+            taxAmount: String(-creditTax),
+            notes: data.reason,
+            status: "completed",
+            documentType: "credit_note",
+            originalSaleId: data.originalSaleId,
+          })
+          .returning();
+
+        // Insert credit note items
+        await tx.insert(saleItems).values(
+          creditItems.map((item) => ({
+            saleId: creditNote.id,
+            businessId,
+            productId: item.productId,
+            variantId: item.variantId,
+            quantity: -item.quantity,
+            unitPrice: String(item.unitPrice),
+            lineTotal: String(-item.lineTotal),
+            taxRate: String(item.taxRate),
+            taxAmount: String(-item.taxAmount),
+          })),
+        );
+
+        // Restore stock for returned items
+        for (const item of data.items) {
+          if (item.variantId) {
+            await tx
+              .update(productVariants)
+              .set({
+                stock: sql`${productVariants.stock} + ${item.quantity}`,
+                updatedAt: new Date(),
+              })
+              .where(eq(productVariants.id, item.variantId));
+          }
+
+          await tx
+            .update(products)
+            .set({
+              stock: sql`${products.stock} + ${item.quantity}`,
+              updatedAt: new Date(),
+            })
+            .where(eq(products.id, item.productId));
+        }
+
+        // Adjust customer balance if applicable
+        if (originalSale.customerId) {
+          await tx
+            .update(customers)
+            .set({
+              balanceUsd: sql`GREATEST(0, ${customers.balanceUsd}::numeric - ${creditTotal})`,
+              updatedAt: new Date(),
+            })
+            .where(eq(customers.id, originalSale.customerId));
+        }
+
+        // Log activity
+        await tx.insert(activityLog).values({
+          businessId,
+          userId: user.id,
+          action: "credit_note_created",
+          detail: `Credit note $${creditTotal.toFixed(2)} for sale ${data.originalSaleId.slice(0, 8)}: ${data.reason}`,
+        });
+
+        return creditNote;
+      });
+    } catch (err) {
+      const dbErr = handleDbError(err);
+      if (dbErr) return c.json({ error: dbErr.message }, dbErr.status);
+      throw err;
+    }
+
+    return c.json({ creditNote: result }, 201);
   },
 );
 
