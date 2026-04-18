@@ -34,8 +34,6 @@ export const businesses = pgTable(
       .primaryKey(),
     name: text("name").notNull(),
     type: text("type").notNull().default("otro"),
-    /** RIF (Registro de Informacion Fiscal). E.g. J-12345678-9. */
-    rif: text("rif"),
     phone: text("phone"),
     address: text("address"),
 
@@ -184,9 +182,6 @@ export const products = pgTable(
 
     /** Sale price in USD. For products with variants, this is the default. */
     price: numeric("price", { precision: 12, scale: 2 }).notNull().default("0"),
-
-    /** Tax rate for this product (0, 8, 16). 0 = exento. */
-    taxRate: numeric("tax_rate", { precision: 5, scale: 2 }).notNull().default("0"),
 
     /** Current stock. For products with variants, this is the sum of variant stocks. */
     stock: integer("stock").notNull().default(0),
@@ -387,20 +382,8 @@ export const sales = pgTable(
       scale: 2,
     }).default("0"),
 
-    /** Subtotal before tax (USD). */
-    subtotalUsd: numeric("subtotal_usd", { precision: 12, scale: 2 }),
-
-    /** Total tax amount (USD). */
-    taxAmount: numeric("tax_amount", { precision: 12, scale: 2 }).default("0"),
-
     /** Sale status. */
     status: text("status").notNull().default("completed"),
-
-    /** Document type: invoice (default), credit_note, debit_note. */
-    documentType: text("document_type").notNull().default("invoice"),
-
-    /** Reference to original sale (for credit/debit notes). */
-    originalSaleId: uuid("original_sale_id"),
 
     /** Void reason (required when status = 'voided'). */
     voidReason: text("void_reason"),
@@ -409,15 +392,6 @@ export const sales = pgTable(
 
     /** Notes visible on the receipt. */
     notes: text("notes"),
-
-    /** Sequential control number per business (SENIAT-ready). */
-    controlNumber: integer("control_number"),
-
-    /** IGTF amount (3% on foreign currency payments). */
-    igtfAmount: numeric("igtf_amount", { precision: 12, scale: 2 }).default("0"),
-
-    /** Fiscal control number assigned by authorized digital printer. */
-    fiscalControlNumber: text("fiscal_control_number"),
 
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
@@ -463,12 +437,6 @@ export const saleItems = pgTable("sale_items", {
   }).default("0"),
   /** Line total after discount (USD). */
   lineTotal: numeric("line_total", { precision: 12, scale: 2 }).notNull(),
-
-  /** Tax rate applied to this item (copied from product at time of sale). */
-  taxRate: numeric("tax_rate", { precision: 5, scale: 2 }).default("0"),
-
-  /** Tax amount for this line (USD). */
-  taxAmount: numeric("tax_amount", { precision: 12, scale: 2 }).default("0"),
 });
 
 /**
@@ -596,8 +564,6 @@ export const customers = pgTable(
       .notNull()
       .references(() => businesses.id),
     name: text("name").notNull(),
-    /** RIF (Registro de Informacion Fiscal) del cliente. */
-    rif: text("rif"),
     phone: text("phone"),
     email: text("email"),
     address: text("address"),

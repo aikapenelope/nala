@@ -181,7 +181,6 @@ customersRoutes.post(
         .values({
           businessId,
           name: data.name,
-          rif: data.rif,
           phone: data.phone,
           email: data.email,
           address: data.address,
@@ -213,7 +212,6 @@ customersRoutes.patch(
 
     const updateValues: Record<string, unknown> = { updatedAt: new Date() };
     if (data.name !== undefined) updateValues.name = data.name;
-    if (data.rif !== undefined) updateValues.rif = data.rif;
     if (data.phone !== undefined) updateValues.phone = data.phone;
     if (data.email !== undefined) updateValues.email = data.email;
     if (data.address !== undefined) updateValues.address = data.address;

@@ -4,7 +4,6 @@
  * GET /reports/daily/export-xlsx     - Daily summary XLSX
  * GET /reports/weekly/export-xlsx    - Weekly summary XLSX
  * GET /reports/sellers/export-xlsx   - Sellers ranking XLSX
- * GET /reports/libro-ventas/export-xlsx - Libro de ventas SENIAT
  */
 
 import { Hono } from "hono";
@@ -15,14 +14,12 @@ import {
   saleItems,
   salePayments,
   products,
-  customers,
   users,
 } from "@nova/db";
 import {
   generateDailyExcel,
   generateWeeklyExcel,
   generateSellersExcel,
-  generateLibroVentas,
 } from "../services/excel-generator";
 import { periodQuery, parsePeriodRange } from "./reports-helpers";
 import type { AppEnv } from "../types";
@@ -104,35 +101,4 @@ reportsXlsx.get("/reports/sellers/export-xlsx", zValidator("query", periodQuery)
   return c.body(buffer);
 });
 
-/** GET /reports/libro-ventas/export-xlsx */
-reportsXlsx.get("/reports/libro-ventas/export-xlsx", zValidator("query", periodQuery), async (c) => {
-  const query = c.req.valid("query");
-  const db = c.get("db");
-  const businessId = c.get("businessId");
-  const { start, end } = parsePeriodRange(query.period, query.from, query.to);
 
-  const saleRows = await db.select({ id: sales.id, createdAt: sales.createdAt, totalUsd: sales.totalUsd, totalBs: sales.totalBs, exchangeRate: sales.exchangeRate, customerId: sales.customerId }).from(sales).where(and(eq(sales.businessId, businessId), eq(sales.status, "completed"), gte(sales.createdAt, start), lte(sales.createdAt, end))).orderBy(sales.createdAt);
-
-  const customerIds = saleRows.map((s) => s.customerId).filter((id): id is string => id !== null);
-  const customerMap = new Map<string, string>();
-  if (customerIds.length > 0) {
-    const customerRows = await db.select({ id: customers.id, name: customers.name }).from(customers).where(sql`${customers.id} IN (${sql.join(customerIds.map((id) => sql`${id}`), sql`, `)})`);
-    for (const cr of customerRows) customerMap.set(cr.id, cr.name);
-  }
-
-  const saleIds = saleRows.map((s) => s.id);
-  const paymentMap = new Map<string, string>();
-  if (saleIds.length > 0) {
-    const paymentRows = await db.select({ saleId: salePayments.saleId, method: salePayments.method, amount: sql<number>`${salePayments.amountUsd}::float` }).from(salePayments).where(sql`${salePayments.saleId} IN (${sql.join(saleIds.map((id) => sql`${id}`), sql`, `)})`);
-    const bySale = new Map<string, { method: string; amount: number }>();
-    for (const p of paymentRows) { const current = bySale.get(p.saleId); if (!current || p.amount > current.amount) bySale.set(p.saleId, { method: p.method, amount: p.amount }); }
-    for (const [saleId, { method }] of bySale) paymentMap.set(saleId, method);
-  }
-
-  const periodLabel = query.period === "month" ? "Este mes" : query.period === "last_month" ? "Mes anterior" : query.period;
-  const dateStr = new Date().toISOString().split("T")[0];
-  const buffer = generateLibroVentas(saleRows.map((s, idx) => ({ date: s.createdAt.toISOString().split("T")[0], invoiceNumber: String(idx + 1).padStart(6, "0"), customerName: s.customerId ? (customerMap.get(s.customerId) ?? "Cliente") : "Venta directa", totalUsd: Number(s.totalUsd), totalBs: Number(s.totalBs ?? 0), exchangeRate: Number(s.exchangeRate ?? 0), paymentMethod: paymentMap.get(s.id) ?? "efectivo" })), periodLabel);
-  c.header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-  c.header("Content-Disposition", `attachment; filename="libro-ventas-${dateStr}.xlsx"`);
-  return c.body(buffer);
-});

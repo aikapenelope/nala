@@ -5,7 +5,6 @@
  * - Daily summary
  * - Weekly summary
  * - Sellers ranking
- * - Libro de ventas (SENIAT format)
  *
  * xlsx has native ESM support — no createRequire workaround needed.
  */
@@ -164,59 +163,4 @@ export function generateSellersExcel(data: SellersExcelData): ArrayBuffer {
   return workbookToBuffer(wb);
 }
 
-// ============================================================
-// Libro de Ventas SENIAT (Venezuelan tax format)
-// ============================================================
 
-export interface SaleRecord {
-  date: string;
-  invoiceNumber: string;
-  customerName: string;
-  totalUsd: number;
-  totalBs: number;
-  exchangeRate: number;
-  paymentMethod: string;
-}
-
-export function generateLibroVentas(
-  sales: SaleRecord[],
-  period: string,
-): ArrayBuffer {
-  const wb = XLSX.utils.book_new();
-
-  const headers = [
-    "Fecha",
-    "N° Factura",
-    "Cliente",
-    "Total USD",
-    "Tasa BCV",
-    "Total Bs.",
-    "Metodo de Pago",
-  ];
-
-  const rows = sales.map((s) => [
-    s.date,
-    s.invoiceNumber,
-    s.customerName,
-    s.totalUsd,
-    s.exchangeRate,
-    s.totalBs,
-    s.paymentMethod,
-  ]);
-
-  // Totals row
-  const totalUsd = sales.reduce((sum, s) => sum + s.totalUsd, 0);
-  const totalBs = sales.reduce((sum, s) => sum + s.totalBs, 0);
-  rows.push(["", "", "TOTAL", totalUsd, "", totalBs, ""]);
-
-  const ws = XLSX.utils.aoa_to_sheet([
-    [`Libro de Ventas - ${period}`],
-    [],
-    headers,
-    ...rows,
-  ]);
-  autoWidth(ws, headers);
-  XLSX.utils.book_append_sheet(wb, ws, "Libro de Ventas");
-
-  return workbookToBuffer(wb);
-}
