@@ -36,6 +36,13 @@
       "when": 1776475200000,
       "tag": "0004_control_igtf_movements",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1776561600000,
+      "tag": "0005_rif_openings",
+      "breakpoints": true
     }
   ]
 }

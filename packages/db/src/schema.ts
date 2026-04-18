@@ -34,6 +34,8 @@ export const businesses = pgTable(
       .primaryKey(),
     name: text("name").notNull(),
     type: text("type").notNull().default("otro"),
+    /** RIF (Registro de Informacion Fiscal). E.g. J-12345678-9. */
+    rif: text("rif"),
     phone: text("phone"),
     address: text("address"),
 
@@ -414,6 +416,9 @@ export const sales = pgTable(
     /** IGTF amount (3% on foreign currency payments). */
     igtfAmount: numeric("igtf_amount", { precision: 12, scale: 2 }).default("0"),
 
+    /** Fiscal control number assigned by authorized digital printer. */
+    fiscalControlNumber: text("fiscal_control_number"),
+
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -591,6 +596,8 @@ export const customers = pgTable(
       .notNull()
       .references(() => businesses.id),
     name: text("name").notNull(),
+    /** RIF (Registro de Informacion Fiscal) del cliente. */
+    rif: text("rif"),
     phone: text("phone"),
     email: text("email"),
     address: text("address"),
@@ -715,6 +722,8 @@ export const dayCloses = pgTable("day_closes", {
   closedBy: uuid("closed_by")
     .notNull()
     .references(() => users.id),
+  /** Opening ID this close corresponds to (null for legacy closes). */
+  openingId: uuid("opening_id"),
   date: timestamp("date", { withTimezone: true }).notNull(),
   cashCounted: numeric("cash_counted", { precision: 12, scale: 2 }).notNull(),
   cashExpected: numeric("cash_expected", { precision: 12, scale: 2 }).notNull(),
@@ -728,6 +737,26 @@ export const dayCloses = pgTable("day_closes", {
   }).notNull(),
   totalSalesCount: integer("total_sales_count").notNull(),
   totalVoidsCount: integer("total_voids_count").notNull().default(0),
+  notes: text("notes"),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+/** Cash register openings - start-of-day cash declaration. */
+export const cashOpenings = pgTable("cash_openings", {
+  id: uuid("id")
+    .default(sql`gen_random_uuid()`)
+    .primaryKey(),
+  businessId: uuid("business_id")
+    .notNull()
+    .references(() => businesses.id),
+  openedBy: uuid("opened_by")
+    .notNull()
+    .references(() => users.id),
+  date: timestamp("date", { withTimezone: true }).notNull(),
+  /** Cash amount counted at opening. */
+  cashAmount: numeric("cash_amount", { precision: 12, scale: 2 }).notNull(),
   notes: text("notes"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()

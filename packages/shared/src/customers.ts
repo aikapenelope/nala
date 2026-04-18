@@ -10,6 +10,8 @@ export type AgingColor = "green" | "yellow" | "red";
 
 export const createCustomerSchema = z.object({
   name: z.string().min(1).max(200),
+  /** RIF (Registro de Informacion Fiscal). */
+  rif: z.string().max(20).optional(),
   phone: z.string().max(20).optional(),
   email: z.string().email().optional(),
   address: z.string().max(500).optional(),
