@@ -19,7 +19,7 @@ CI:   GitHub Actions (typecheck + lint + 49 tests + build)
 | Lineas de codigo | ~22,000 |
 | Tablas PostgreSQL | 29 (todas con RLS) |
 | RLS policies | 29 |
-| Endpoints API | 80+ |
+| Endpoints API | 87 |
 | Paginas frontend | 32 |
 | Tests automatizados | 49 (unit + E2E API) |
 | Migraciones Drizzle | 8 |
@@ -44,7 +44,7 @@ CI:   GitHub Actions (typecheck + lint + 49 tests + build)
 
 ```
 apps/
-  api/     Hono REST API (80+ endpoints, structured JSON logging, rate limiting)
+  api/     Hono REST API (87 endpoints, structured JSON logging, rate limiting)
   web/     Nuxt 4.4 SSR + PWA (32 paginas, subdomain-per-tenant)
 packages/
   db/      Drizzle ORM schema (29 tablas, 29 RLS policies, 8 migraciones)

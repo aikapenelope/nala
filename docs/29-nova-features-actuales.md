@@ -1,7 +1,7 @@
 # Nova: Features Actuales
 
 > Ultima actualizacion: Abril 2026
-> Codebase: ~22,000 lineas | 29 tablas (29 RLS policies) | 80+ endpoints | 32 paginas | 49 tests
+> Codebase: ~22,000 lineas | 29 tablas (29 RLS policies) | 87 endpoints | 32 paginas | 49 tests
 > Stack: Nuxt 4.4 + Hono + PostgreSQL 16 + Redis 7 + Clerk + Drizzle ORM
 > Produccion: novaincs.com | api.novaincs.com | *.novaincs.com (subdominios por tenant)
 > Migraciones: 8 (0000-0007)
