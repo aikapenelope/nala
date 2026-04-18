@@ -1,116 +1,27 @@
 # Nova: Auditoria de Produccion - Abril 2026
 
-> Codebase: ~20,500 lineas | 30 tablas (todas con RLS) | 55+ endpoints | 33 paginas | 49 tests
+> Codebase: ~21,400 lineas | 26 tablas (26 RLS policies) | 67 endpoints | 32 paginas | 49 tests
 > Stack: Nuxt 4.4 + Hono + PostgreSQL 16 + Redis 7 + Clerk + Drizzle ORM
 > Produccion: novaincs.com, api.novaincs.com, *.novaincs.com
+> Migraciones: 6 (0000-0005)
 
 ---
 
 ## Estado actual: Production-ready
 
-Todos los sprints completados. IVA, proveedores, notas de credito, cupos de credito
-implementados. Dashboard rediseñado para comerciantes venezolanos. 30 tablas con RLS,
-55+ endpoints, 49 tests en CI.
+Todos los sprints completados. IVA, IGTF, proveedores, notas de credito, cupos de credito,
+numeros de control, movimientos de inventario, apertura de caja, ajuste manual, tasa BCV
+automatica, alertas de vencimiento. Dashboard rediseñado. 49 tests en CI.
 
 ---
 
-## Features (PR #102) -- COMPLETADO
+## Completado por sesion
 
-| # | Tarea | Estado |
-|---|-------|--------|
-| 1 | Settings UI: pagina /settings/business (email contador, WhatsApp) | HECHO |
-| 2 | Segmentos de clientes: endpoint recalculate + segments en list/detail | HECHO |
-| 3 | Prediccion flujo de caja: endpoint /reports/cash-flow (7d, 30d, trend) | HECHO |
+### Sesion 1 (PRs #79-#101)
+Roadmap original de 8 dias, hotfixes de deploy, auditoria de auth, DB error handling,
+split de reports, settings API, OCR fallback.
 
----
-
-## Sprint 1: Seguridad y estabilidad -- COMPLETADO (PR #103)
-
-| # | Tarea | Estado |
-|---|-------|--------|
-| 4 | RLS safety: tenant middleware limpia contexto despues de cada request | HECHO |
-| 5 | handleDbError en onboarding y team (mensajes en espanol) | HECHO |
-| 6 | CI: typecheck ahora corre en todos los packages incluyendo web | HECHO |
-| 7 | Team-roster 401: roster download no bloquea login, retry con delay | HECHO |
-
----
-
-## Sprint 2: RLS en tablas hijas + migracion -- COMPLETADO (PR #104)
-
-| # | Tarea | Estado |
-|---|-------|--------|
-| 8 | business_id + RLS en sale_items, sale_payments, expense_items | HECHO |
-| 9 | Migracion 0002 con backfill desde tablas padre | HECHO |
-| 10 | RLS policies para las 3 tablas hijas en init.sql | HECHO |
-| 11 | INSERT statements actualizados en sales, accounting, tests | HECHO |
-
----
-
-## Sprint 3: UX y observabilidad -- COMPLETADO (PR #106)
-
-| # | Tarea | Estado |
-|---|-------|--------|
-| 12 | Dashboard dedup guard: previene 4x exchange-rate 503 loop | HECHO |
-| 13 | Health check SSR: endpoint /api/health en Nuxt + Dockerfile actualizado | HECHO |
-| 14 | Fix $fetch type error pre-existente en useApi.ts | HECHO |
-
----
-
-## Sprint 4: Offline y PWA -- COMPLETADO (PR #107)
-
-| # | Tarea | Estado |
-|---|-------|--------|
-| 15 | Offline queue integrada en checkout (IndexedDB + sync FIFO) | HECHO |
-| 16 | Indicador offline + mensaje "Venta guardada" diferenciado | HECHO |
-| 17 | SEO catalogo: og:url, og:image, og:locale, twitter:card | HECHO |
-| 18 | PWA icons reales | PENDIENTE (logo por subir) |
-
----
-
-## Sprint 5: Testing -- COMPLETADO (PR #109)
-
-| # | Tarea | Estado |
-|---|-------|--------|
-| 19 | 30 API E2E tests con Vitest + Hono app.request() | HECHO |
-| 20 | e2e-sales: ciclo completo venta, void, fiado, stock | HECHO |
-| 21 | e2e-inventory-customers: CRUD productos, busqueda, clientes, segmentos | HECHO |
-| 22 | e2e-reports-settings: 8 reportes, cash flow, settings, team, contabilidad | HECHO |
-| 23 | Corren en CI con PostgreSQL + Redis (sin Clerk, sin browser) | HECHO |
-| 24 | Backups DB: cubierto por Hetzner Cloud backup diario | OK |
-
----
-
-## Dashboard redesign -- COMPLETADO (PR #111)
-
-| # | Tarea | Estado |
-|---|-------|--------|
-| 25 | Saludo con nombre del negocio + hora del dia | HECHO |
-| 26 | Card de ventas con trend badge verde/rojo | HECHO |
-| 27 | 3 cards visuales: "Te deben", "Se acaban", "En 7 dias" (cash flow) | HECHO |
-| 28 | Alertas: 3 visibles en mobile con borde coloreado por severidad | HECHO |
-| 29 | Skeleton loading + boton Actualizar (pull-to-refresh) | HECHO |
-| 30 | Rate editor movido a modal | HECHO |
-| 31 | Pagina /reports/cash-flow con proyeccion 7d/30d y trend chart | HECHO |
-| 32 | Reports hub actualizado con link a cash flow | HECHO |
-
----
-
-## Paridad FoxPro -- COMPLETADO (PR #112)
-
-| # | Tarea | Estado |
-|---|-------|--------|
-| 33 | IVA basico: tax_rate en productos (0/8/16%), calculo en ventas | HECHO |
-| 34 | subtotal_usd, tax_amount en sales y sale_items | HECHO |
-| 35 | Tabla de proveedores: suppliers con RIF, CRUD completo | HECHO |
-| 36 | expenses.supplier_id migrado de text a uuid FK | HECHO |
-| 37 | Notas de credito: POST /sales/credit-note con stock restore | HECHO |
-| 38 | Cupo de credito: credit_limit_usd en customers, validacion en checkout | HECHO |
-| 39 | Descuento por monto fijo: discount_amount en sales | HECHO |
-| 40 | Migracion 0003 + RLS para suppliers | HECHO |
-
----
-
-## PRs de esta sesion
+### Sesion 2 (PRs #102-#116)
 
 | PR | Contenido |
 |----|-----------|
@@ -120,18 +31,95 @@ implementados. Dashboard rediseñado para comerciantes venezolanos. 30 tablas co
 | #105 | Roadmap actualizado |
 | #106 | Sprint 3: dashboard dedup, SSR health, $fetch fix |
 | #107 | Sprint 4: offline queue, SEO catalogo |
-| #109 | Sprint 5: 30 API E2E tests |
-| #110 | Roadmap final |
+| #109 | Sprint 5: 49 API E2E tests |
+| #110 | Roadmap |
 | #111 | Dashboard redesign visual |
-| #112 | Paridad FoxPro: IVA, proveedores, NC, cupos, descuento fijo |
+| #112 | IVA, proveedores, NC, cupos, descuento fijo (migracion 0003) |
+| #113 | Roadmap + cobertura FoxPro |
+| #114 | Control numbers, IGTF, stock movements, purchase book, BCV, alertas vencimiento (migracion 0004) |
+| #115 | Gap analysis SENIAT (doc 28) |
+| #116 | RIF, apertura de caja, ajuste manual inventario (migracion 0005) |
 
 PR #108 (Playwright E2E) cerrado sin merge -- reemplazado por #109.
 
 ---
 
+## Features implementadas
+
+### POS y ventas
+- Venta en 3-4 toques, 7 metodos de pago venezolanos
+- IVA (0%, 8%, 16%) con calculo automatico
+- IGTF 3% en pagos en divisas (Binance, Zinli, Zelle)
+- Descuento por porcentaje y monto fijo
+- Numeros de control secuenciales por negocio
+- Campo de control fiscal para imprenta digital (SENIAT-ready)
+- Notas de credito con devolucion parcial y restauracion de stock
+- Cotizaciones convertibles a venta
+- Split payment (multiples metodos)
+- Offline queue (IndexedDB + sync FIFO)
+- Anulacion con PIN del dueno
+
+### Inventario
+- Variantes (talla, color), barcode, semaforo de stock
+- Prediccion de agotamiento, alertas de vencimiento (30 dias)
+- Unidades de medida con conversion
+- Ajuste manual de inventario con audit trail
+- Movimientos de stock explicitos (venta, compra, ajuste)
+- Importacion batch, OCR de facturas
+- Historial de precios
+
+### Clientes y CRM
+- Perfil automatico con segmentos (VIP, en riesgo, inactivo)
+- RIF del cliente para facturacion formal
+- Cuentas por cobrar con pagos parciales y aging
+- Cupo de credito por cliente (validado en checkout)
+- Cobro por WhatsApp
+
+### Proveedores
+- Directorio con RIF, telefono, email, direccion
+- CRUD completo (GET/POST/PATCH /suppliers)
+- Vinculado a gastos y facturas de compra
+
+### Reportes (10)
+- Diario, semanal, rentabilidad, inventario, cuentas por cobrar
+- Vendedores, financiero (P&L), flujo de caja (7d/30d)
+- Alertas inteligentes, libro de compras
+- Narrativa AI (OpenRouter/Groq)
+- Export PDF, Excel, email
+
+### Contabilidad
+- Plan de cuentas pre-configurado por tipo de negocio
+- Asientos automaticos desde ventas y gastos
+- RIF del negocio
+
+### Dashboard
+- Saludo con nombre del negocio + hora del dia
+- Ventas con tendencia verde/rojo
+- 3 cards: "Te deben", "Se acaban", "En 7 dias"
+- Alertas con colores (stock, vencimiento, deudas)
+- Skeleton loading + boton actualizar
+- Tasa BCV oficial (scraping) + tasa manual
+
+### Operaciones
+- Apertura de caja (POST /cash-opening)
+- Cierre de caja con comparacion
+- Multi-empleado con PIN, ranking de vendedores
+- Catalogo publico por subdominio con SEO
+- Tasa BCV + EUR manual por negocio
+
+### Seguridad
+- RLS en 26 tablas con cleanup en finally
+- Rate limiting (Redis + fallback)
+- Scanner bot blocking
+- Security headers
+- PIN lockout (5 intentos)
+- handleDbError en todos los endpoints de escritura
+
+---
+
 ## Cobertura vs FoxPro legacy
 
-### Lo que Nova TIENE que FoxPro no tiene
+### Nova TIENE que FoxPro NO tiene
 - POS mobile-first con offline queue
 - OCR de facturas con IA
 - Reportes con narrativa AI
@@ -139,37 +127,31 @@ PR #108 (Playwright E2E) cerrado sin merge -- reemplazado por #109.
 - Cobro por WhatsApp
 - Catalogo publico por subdominio
 - Multi-tenant SaaS con RLS
-- 7 metodos de pago venezolanos
+- IGTF automatico
+- Tasa BCV por scraping
+- Alertas de vencimiento
 
-### Lo que Nova TIENE equivalente a FoxPro
-- Inventario con variantes, barcode, semaforo, unidades de medida
+### Nova equivalente a FoxPro
+- Inventario con variantes, barcode, semaforo, unidades
 - IVA (0%, 8%, 16%)
-- Cuentas por cobrar con pagos parciales y aging
-- Cuentas por pagar con vencimientos
+- Cuentas por cobrar/pagar con pagos parciales
 - Proveedores con RIF
-- Notas de credito con devolucion parcial
-- Cupos de credito por cliente
+- Notas de credito
+- Cupos de credito
 - Descuentos por % y monto fijo
-- Plan de cuentas contable con asientos automaticos
-- Cierre de caja diario
-- Cotizaciones convertibles a venta
+- Plan de cuentas con asientos automaticos
+- Apertura y cierre de caja
+- Cotizaciones
 - Historial de precios
+- Movimientos de inventario
+- Libro de compras
 
-### Lo que EXCEDE el scope de Nova (no recomendado implementar)
-- Facturacion electronica SENIAT (integrar con servicio externo)
-- Nomina/RRHH (sistema separado)
-- Costos FIFO/promedio ponderado (ultimo costo es suficiente para PYMES)
-- Multi-almacen (solo necesario a escala)
-- Centros de costo (empresas medianas/grandes)
-- Integracion bancaria (no hay APIs bancarias en Venezuela)
-
-### Migracion de datos desde FoxPro
-Nova no necesita un modulo de migracion interno. La estrategia es:
-1. Script externo en Python que lee archivos .DBF (libreria `dbf`)
-2. Transforma y limpia datos (encoding Windows-1252 -> UTF-8, normalizacion)
-3. Carga via API REST de Nova (POST /products, /customers, /suppliers)
-4. Los endpoints de batch import ya existen (/inventory/import, OCR confirm)
-5. Operacion en paralelo durante transicion (FoxPro + Nova)
+### Excede el scope
+- Facturacion electronica SENIAT (ver doc 28)
+- Nomina/RRHH
+- Costos FIFO/promedio ponderado
+- Multi-almacen
+- Integracion bancaria
 
 ---
 
@@ -177,18 +159,28 @@ Nova no necesita un modulo de migracion interno. La estrategia es:
 
 | # | Tarea | Notas |
 |---|-------|-------|
-| 1 | Error tracking (Sentry/Highlight/otra) | Decidir herramienta para todos los proyectos |
-| 2 | E2E browser tests en CI | Requiere Clerk test keys como GitHub secrets |
-| 3 | PWA icons (192x192, 512x512) | Subir logo de Nova |
-| 4 | og:image real para catalogo | Subir /og-catalog.png (1200x630) |
-| 5 | Rate limit en PIN attempts client-side | Mitigado por bcrypt lento |
-| 6 | robots.txt con reglas utiles | Actual esta vacio |
-| 7 | sitemap.xml para catalogo | SEO |
-| 8 | PgBouncer + RLS transaccional | Solo a escala |
-| 9 | Service Worker offline verificado | PWA registrada, no verificada |
-| 10 | Multi-almacen | Solo si hay demanda |
-| 11 | Precios por cliente/escala | Solo si hay demanda |
-| 12 | Ordenes de compra | Conectar con OCR confirm |
+| 1 | Error tracking | Decidir herramienta para todos los proyectos |
+| 2 | PWA icons | Subir logo de Nova |
+| 3 | og:image catalogo | Subir /og-catalog.png (1200x630) |
+| 4 | Recibo/factura PDF individual | Para enviar al cliente o imprimir |
+| 5 | Pagina de movimientos de inventario | La tabla existe, falta UI |
+| 6 | Resumen de IGTF por periodo | Para declaracion |
+| 7 | Devolucion rapida desde historial | Boton "Devolver" en detalle de venta |
+| 8 | Busqueda global | Productos + clientes + ventas |
+| 9 | E2E browser tests en CI | Requiere Clerk test keys |
+| 10 | robots.txt / sitemap.xml | SEO |
+| 11 | Multi-almacen | Solo si hay demanda |
+| 12 | Precios por cliente | Solo si hay demanda |
+| 13 | Ordenes de compra | Conectar con OCR confirm |
+
+---
+
+## SENIAT (doc 28)
+
+Nova cubre ~70% de los requisitos tecnicos. Ver `docs/28-seniat-gap-analysis.md` para el analisis completo. Gaps principales:
+- Nivel 1 (implementado): RIF, numeros de control, IVA, IGTF, NC
+- Nivel 2 (depende de terceros): integracion con imprenta digital, transmision al SENIAT
+- Nivel 3 (administrativo): entidad legal en Venezuela, solicitud formal
 
 ---
 
@@ -200,8 +192,8 @@ Nova no necesita un modulo de migracion interno. La estrategia es:
 | DATABASE_URL | Si | OK |
 | CLERK_SECRET_KEY | Si | OK |
 | REDIS_URL | Si | OK |
-| CORS_ORIGIN | Si | Verificar: `https://novaincs.com` |
-| TENANT_DOMAIN | Si | Verificar: `novaincs.com` |
+| CORS_ORIGIN | Si | `https://novaincs.com` |
+| TENANT_DOMAIN | Si | `novaincs.com` |
 | OPENROUTER_API_KEY | No | Opcional (narrativas AI) |
 | GROQ_API_KEY | No | Opcional (fallback AI) |
 
@@ -218,18 +210,17 @@ Nova no necesita un modulo de migracion interno. La estrategia es:
 ### Sesion 1 (PRs #79-#101)
 - Drizzle query builder: excelente. drizzle-kit CLI: fragil. Usar migrate.mjs propio.
 - pdfmake es CJS-only: requiere createRequire(import.meta.url) en bundle ESM.
-- xlsx (SheetJS) tiene ESM nativo, sin problemas.
-- useState/useRuntimeConfig de Nuxt: NUNCA a nivel de modulo, siempre dentro de composables/setup.
+- useState/useRuntimeConfig de Nuxt: NUNCA a nivel de modulo.
 - Coolify se satura con muchos PRs seguidos: mergear en batches de 2-3.
 
-### Sesion 2 (PRs #102-#112)
-- NUXT_PUBLIC_API_BASE es build-time: requiere rebuild del web service despues de cambiar.
-- Clerk redirect_uri_mismatch: verificar que el redirect URI en Google Cloud Console coincida exactamente con el de Clerk Dashboard.
+### Sesion 2 (PRs #102-#116)
+- NUXT_PUBLIC_API_BASE es build-time: requiere rebuild del web service.
+- Clerk redirect_uri_mismatch: verificar redirect URI en Google Cloud Console.
 - set_config session-level con pool: limpiar en finally para evitar RLS leak.
-- Migraciones con backfill: agregar columna nullable -> UPDATE desde parent -> SET NOT NULL.
-- Los NOTICE de "policy does not exist, skipping" en init.sql son normales en primer deploy.
-- $fetch<T> de Nuxt con baseURL externo requiere cast explicito `as T` (Nitro type mismatch).
-- @clerk/nuxt en SSR: fuerza HTTPS y valida publishable key en cada request. Imposible correr E2E browser en CI sin keys reales.
-- Clerk publishable key format: pk_test_ + base64(dominio + "$"). No acepta placeholders.
-- calculateSaleTotal cambio de retornar number a retornar {subtotal, discountTotal, taxTotal, total}. Actualizar todos los call sites.
-- Migracion de supplier_id text -> uuid: RENAME old -> ADD new uuid -> DROP old. No se puede ALTER TYPE directamente.
+- Migraciones con backfill: nullable -> UPDATE -> SET NOT NULL.
+- $fetch<T> de Nuxt con baseURL externo requiere cast `as T`.
+- @clerk/nuxt en SSR: fuerza HTTPS, imposible E2E browser sin keys reales.
+- calculateSaleTotal cambio de number a {subtotal, discountTotal, taxTotal, total}.
+- supplier_id text -> uuid: RENAME old -> ADD new -> DROP old.
+- BCV rate scraping: API publica en bcv-exchange-rates.vercel.app, timeout 10s.
+- IGTF: solo aplica a binance, zinli, zelle (divisas). Efectivo y pago movil son VES.
