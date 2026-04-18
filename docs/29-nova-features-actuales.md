@@ -1,10 +1,10 @@
 # Nova: Features Actuales
 
-> Ultima actualizacion: Abril 2026
-> Codebase: ~22,000 lineas | 29 tablas (29 RLS policies) | 80+ endpoints | 32 paginas | 49 tests
+> Ultima actualizacion: Abril 2026 (post-auditoria, sesion 5)
+> Codebase: ~23,500 lineas | 29 tablas (29 RLS policies) | 87 endpoints | 39 paginas | 47 tests
 > Stack: Nuxt 4.4 + Hono + PostgreSQL 16 + Redis 7 + Clerk + Drizzle ORM
 > Produccion: novaincs.com | api.novaincs.com | *.novaincs.com (subdominios por tenant)
-> Migraciones: 8 (0000-0007)
+> Migraciones: 9 (0000-0008)
 
 ---
 
@@ -191,11 +191,15 @@ Todos los reportes incluyen narrativa generada por IA (OpenRouter GPT-4o-mini, f
 | 5. Acciones restringidas | Anular venta, ajustar stock, crear empleado: requieren PIN del dueno (verificacion local + server-side) |
 
 ### Seguridad
-- PIN lockout: 5 intentos fallidos -> bloqueo 5 minutos
-- Rate limiting: 60 req/min publico, 120 req/min autenticado, 30 req/min escritura
+- PIN lockout: 5 intentos fallidos -> bloqueo 15 minutos
+- Rate limiting: 60 req/min publico, 120 req/min autenticado, 30 req/min escritura, onboarding protegido
+- UUID validation: middleware en 22 endpoints con path params, retorna 400 para IDs malformados
 - Scanner bot blocking: paths conocidos (.env, .git, wp-admin, etc.) retornan 404 silencioso
 - Security headers (Hono secure-headers)
-- RLS en 26 tablas con cleanup en finally (previene leak entre tenants)
+- RLS en 29 tablas con cleanup en finally (previene leak entre tenants)
+- Stock guard atomico: WHERE stock >= qty en UPDATE dentro de TX (previene overselling)
+- Stock movements dentro de la transaccion de venta (atomicidad garantizada)
+- Void sale restaura saldo fiado del cliente y cancela accounts_receivable
 
 ---
 
@@ -249,7 +253,7 @@ Crea en una transaccion atomica:
 | Storage | MinIO (S3-compatible, para imagenes de productos y facturas OCR) |
 | CI/CD | GitHub Actions: typecheck + lint + 49 tests + build en cada push/PR |
 | Docker | Multi-stage Dockerfile: deps -> builder -> api (port 3001) -> web (port 3000) |
-| Migraciones | Drizzle versionadas (8 migraciones) + init.sql para RLS policies |
+| Migraciones | Drizzle versionadas (9 migraciones) + init.sql para RLS policies |
 
 ---
 
@@ -335,7 +339,7 @@ Crea en una transaccion atomica:
 
 ---
 
-## 17. Paginas frontend (32)
+## 17. Paginas frontend (39)
 
 ### Publicas
 | Ruta | Proposito |
@@ -359,6 +363,7 @@ Crea en una transaccion atomica:
 | /inventory/[id] | Owner | Crear/editar producto |
 | /inventory/import | Owner | Importar desde Excel |
 | /clients | Todos | Lista de clientes |
+| /clients/[id] | Owner | Estadisticas detalladas del cliente |
 | /clients/new | Owner | Crear cliente |
 | /accounts | Owner | Cuentas por cobrar/pagar |
 | /accounts/day-close | Owner | Cierre de caja |
@@ -371,10 +376,16 @@ Crea en una transaccion atomica:
 | /reports/sellers | Owner | Ventas por vendedor |
 | /reports/financial | Owner | P&L simplificado |
 | /reports/cash-flow | Owner | Proyeccion de flujo de caja |
-| /accounting | Owner | Plan de cuentas + asientos |
+| /reports/monthly-trend | Owner | Tendencia mensual (12 meses) |
+| /accounting | Owner | Plan de cuentas + asientos + gastos |
+| /suppliers | Owner | Lista de proveedores |
+| /suppliers/[id] | Owner | Estado de cuenta del proveedor |
 | /settings | Owner | Hub de configuracion |
 | /settings/business | Owner | Datos del negocio |
 | /settings/team | Owner | Gestion de empleados |
+| /settings/surcharges | Owner | CRUD cargos adicionales |
+| /settings/bank-accounts | Owner | CRUD cuentas bancarias |
+| /settings/notifications | Owner | Preferencias de notificaciones |
 | /more | Todos | Menu adicional (mobile) |
 
 ---

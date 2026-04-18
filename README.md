@@ -16,13 +16,13 @@ CI:   GitHub Actions (typecheck + lint + 49 tests + build)
 
 | Metrica | Valor |
 |---------|-------|
-| Lineas de codigo | ~22,000 |
+| Lineas de codigo | ~23,500 |
 | Tablas PostgreSQL | 29 (todas con RLS) |
 | RLS policies | 29 |
-| Endpoints API | 80+ |
-| Paginas frontend | 32 |
-| Tests automatizados | 49 (unit + E2E API) |
-| Migraciones Drizzle | 8 |
+| Endpoints API | 87 |
+| Paginas frontend | 39 |
+| Tests automatizados | 47 (17 unit + 30 E2E API) |
+| Migraciones Drizzle | 9 (0000-0008) |
 
 ## Stack tecnico
 
@@ -44,10 +44,10 @@ CI:   GitHub Actions (typecheck + lint + 49 tests + build)
 
 ```
 apps/
-  api/     Hono REST API (80+ endpoints, structured JSON logging, rate limiting)
-  web/     Nuxt 4.4 SSR + PWA (32 paginas, subdomain-per-tenant)
+  api/     Hono REST API (87 endpoints, structured JSON logging, rate limiting)
+  web/     Nuxt 4.4 SSR + PWA (39 paginas, subdomain-per-tenant)
 packages/
-  db/      Drizzle ORM schema (29 tablas, 29 RLS policies, 8 migraciones)
+  db/      Drizzle ORM schema (29 tablas, 29 RLS policies, 9 migraciones)
   shared/  Zod schemas, constantes, utilidades (moneda dual VES/USD)
 ```
 
@@ -164,9 +164,9 @@ Los E2E tests corren contra la API directamente via `app.request()` (Hono). No r
 | Documento | Contenido |
 |---|---|
 | [29 - Features actuales](docs/29-nova-features-actuales.md) | Catalogo completo de features, endpoints, tablas, paginas |
-| [30 - Auditoria y roadmap produccion](docs/30-auditoria-roadmap-produccion.md) | Bugs criticos, seguridad, calidad, roadmap de UI |
-| [27 - Auditoria produccion](docs/27-auditoria-produccion-abril-2026.md) | Roadmap de sprints, estado de cada feature |
-| [26 - Auditoria arquitectura](docs/26-auditoria-arquitectura-abril-2026.md) | Auth flow, multi-tenancy, Drizzle, riesgos |
+| [30 - Auditoria y roadmap](docs/30-auditoria-roadmap-produccion.md) | 15 hallazgos en 4 sprints: criticos, seguridad, calidad, frontend. **Completado** |
+| [27 - Auditoria produccion](docs/27-auditoria-produccion-abril-2026.md) | Historial de sesiones, features por PR, backlog |
+| [26 - Auditoria arquitectura](docs/26-auditoria-arquitectura-abril-2026.md) | Auth flow, multi-tenancy, Drizzle, riesgos, RLS session-level |
 | [25 - Auditoria y roadmap](docs/25-auditoria-y-roadmap-definitivo.md) | Auditoria de codigo, plan dia por dia |
 
 ## Licencia

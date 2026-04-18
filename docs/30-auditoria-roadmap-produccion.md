@@ -2,10 +2,11 @@
 
 > Resultado de auditoria exhaustiva del codebase. 15 hallazgos clasificados por severidad.
 > Organizados en 4 sprints por prioridad.
+> **Estado: COMPLETADO** (sesion 5, PRs #125, #129, #130, #131, #132)
 
 ---
 
-## Sprint 1: Criticos (datos y dinero)
+## Sprint 1: Criticos (datos y dinero) -- COMPLETADO (PR #125)
 
 Estos bugs pueden causar perdida de datos o saldos incorrectos en produccion.
 
@@ -23,7 +24,7 @@ Estos bugs pueden causar perdida de datos o saldos incorrectos en produccion.
 
 ---
 
-## Sprint 2: Seguridad
+## Sprint 2: Seguridad -- COMPLETADO (PR #129)
 
 Vulnerabilidades que un atacante podria explotar.
 
@@ -55,7 +56,7 @@ Vulnerabilidades que un atacante podria explotar.
 
 ---
 
-## Sprint 3: Calidad de datos
+## Sprint 3: Calidad de datos -- COMPLETADO (PR #130)
 
 Mejoras que previenen degradacion de performance y datos inconsistentes.
 
@@ -82,7 +83,7 @@ Mejoras que previenen degradacion de performance y datos inconsistentes.
 
 ---
 
-## Sprint 4: Frontend de features nuevas
+## Sprint 4: Frontend de features nuevas -- COMPLETADO (PRs #131, #132)
 
 Los 14 features del PR #122 solo existen como endpoints API. Necesitan UI.
 
@@ -109,12 +110,14 @@ Los 14 features del PR #122 solo existen como endpoints API. Necesitan UI.
 
 ## Resumen
 
-| Sprint | Items | Esfuerzo estimado | Prioridad |
-|--------|-------|-------------------|-----------|
-| 1. Criticos | 2 bugs (stock race, void fiado) | 2-3 horas | Hacer antes de mas usuarios |
-| 2. Seguridad | 5 items (rate limit, UUID, PIN lockout, stock movements, deps) | 3-4 horas | Hacer antes de marketing |
-| 3. Calidad | 4 items (paginacion, indices, health, docs) | 2 horas | Hacer cuando convenga |
-| 4. Frontend | 13 UIs nuevas | 2-3 dias | Hacer por prioridad |
+| Sprint | Items | PR | Estado |
+|--------|-------|-----|--------|
+| 1. Criticos | 2 bugs (stock race, void fiado) | #125 | Completado |
+| 2. Seguridad | 5 items (rate limit, UUID, PIN lockout, stock movements, deps) | #129 | Completado |
+| 3. Calidad | 4 items (paginacion, indices, health, docs) | #130 | Completado |
+| 4. Frontend | 14 UIs nuevas | #131, #132 | Completado |
+
+**Nota:** drizzle-orm upgrade a >=0.45.2 (SQL injection via identificadores) se dejo pendiente intencionalmente. Es breaking change y el riesgo es bajo porque Nova usa el query builder de Drizzle, no SQL raw con identificadores dinamicos.
 
 ---
 
