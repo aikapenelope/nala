@@ -553,10 +553,11 @@ reports.get(
         ),
       );
 
-    // Expenses: sum of confirmed expenses in the period
-    const [expResult] = await db
+    // Expenses: sum of confirmed expenses in the period, broken down by category
+    const expensesByCategory = await db
       .select({
-        expenses: sql<number>`COALESCE(SUM(${expenses.total}::numeric), 0)::float`,
+        category: expenses.category,
+        total: sql<number>`COALESCE(SUM(${expenses.total}::numeric), 0)::float`,
       })
       .from(expenses)
       .where(
@@ -566,11 +567,16 @@ reports.get(
           gte(expenses.date, start),
           lte(expenses.date, end),
         ),
-      );
+      )
+      .groupBy(expenses.category);
+
+    const fixedExpenses = expensesByCategory.find((e) => e.category === "fixed")?.total ?? 0;
+    const variableExpenses = expensesByCategory.find((e) => e.category === "variable")?.total ?? 0;
+    const cogsExpenses = expensesByCategory.find((e) => e.category === "cogs")?.total ?? 0;
+    const totalExpenses = fixedExpenses + variableExpenses + cogsExpenses;
 
     const revenue = revResult?.revenue ?? 0;
     const costOfGoods = cogsResult?.cogs ?? 0;
-    const totalExpenses = expResult?.expenses ?? 0;
     const grossProfit = revenue - costOfGoods;
     const netProfit = grossProfit - totalExpenses;
     const grossMargin =
@@ -583,6 +589,9 @@ reports.get(
       costOfGoods: Math.round(costOfGoods * 100) / 100,
       grossProfit: Math.round(grossProfit * 100) / 100,
       expenses: Math.round(totalExpenses * 100) / 100,
+      fixedExpenses: Math.round(fixedExpenses * 100) / 100,
+      variableExpenses: Math.round(variableExpenses * 100) / 100,
+      cogsExpenses: Math.round(cogsExpenses * 100) / 100,
       netProfit: Math.round(netProfit * 100) / 100,
       grossMargin,
       netMargin,

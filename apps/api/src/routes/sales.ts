@@ -141,14 +141,18 @@ salesRoutes.get("/exchange-rate/bcv", async (c) => {
 const listSalesQuery = z.object({
   date: z.string().optional(),
   userId: z.string().uuid().optional(),
+  customerId: z.string().uuid().optional(),
+  productId: z.string().uuid().optional(),
   method: z.string().optional(),
+  channel: z.string().optional(),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(50),
 });
 
 /** GET /sales - List sales with filters. */
 salesRoutes.get("/sales", zValidator("query", listSalesQuery), async (c) => {
-  const { date, userId, method, page, limit } = c.req.valid("query");
+  const { date, userId, customerId, productId, method, channel, page, limit } =
+    c.req.valid("query");
   const db = c.get("db");
   const businessId = c.get("businessId");
   const offset = (page - 1) * limit;
@@ -157,6 +161,14 @@ salesRoutes.get("/sales", zValidator("query", listSalesQuery), async (c) => {
 
   if (userId) {
     conditions.push(eq(sales.userId, userId));
+  }
+
+  if (customerId) {
+    conditions.push(eq(sales.customerId, customerId));
+  }
+
+  if (channel) {
+    conditions.push(eq(sales.channel, channel));
   }
 
   if (date) {
@@ -177,6 +189,16 @@ salesRoutes.get("/sales", zValidator("query", listSalesQuery), async (c) => {
       sql`${sales.id} IN (
         SELECT ${salePayments.saleId} FROM ${salePayments}
         WHERE ${salePayments.method} = ${method}
+      )`,
+    );
+  }
+
+  // Filter by product requires a subquery on sale_items
+  if (productId) {
+    conditions.push(
+      sql`${sales.id} IN (
+        SELECT ${saleItems.saleId} FROM ${saleItems}
+        WHERE ${saleItems.productId} = ${productId}
       )`,
     );
   }
