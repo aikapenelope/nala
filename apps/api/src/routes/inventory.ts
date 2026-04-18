@@ -291,7 +291,10 @@ inventory.post(
           stockCritical: data.stockCritical,
           hasVariants: data.hasVariants,
           isService: data.isService,
-          wholesalePrice: data.wholesalePrice !== undefined ? String(data.wholesalePrice) : undefined,
+          wholesalePrice:
+            data.wholesalePrice !== undefined
+              ? String(data.wholesalePrice)
+              : undefined,
           wholesaleMinQty: data.wholesaleMinQty,
           brand: data.brand,
           location: data.location,
@@ -375,10 +378,10 @@ inventory.patch(
       updateValues.stockCritical = data.stockCritical;
     if (data.hasVariants !== undefined)
       updateValues.hasVariants = data.hasVariants;
-    if (data.isService !== undefined)
-      updateValues.isService = data.isService;
+    if (data.isService !== undefined) updateValues.isService = data.isService;
     if (data.wholesalePrice !== undefined)
-      updateValues.wholesalePrice = data.wholesalePrice !== undefined ? String(data.wholesalePrice) : null;
+      updateValues.wholesalePrice =
+        data.wholesalePrice !== undefined ? String(data.wholesalePrice) : null;
     if (data.wholesaleMinQty !== undefined)
       updateValues.wholesaleMinQty = data.wholesaleMinQty;
     if (data.brand !== undefined) updateValues.brand = data.brand;
@@ -573,7 +576,8 @@ inventory.get("/categories", async (c) => {
     .where(
       and(eq(categories.businessId, businessId), eq(categories.isActive, true)),
     )
-    .orderBy(categories.sortOrder);
+    .orderBy(categories.sortOrder)
+    .limit(500);
 
   return c.json({ categories: rows });
 });
@@ -653,10 +657,7 @@ inventory.post(
       throw err;
     }
 
-    return c.json(
-      { products: result, count: result.length },
-      201,
-    );
+    return c.json({ products: result, count: result.length }, 201);
   },
 );
 
@@ -688,18 +689,13 @@ inventory.post(
 
     // Only owners can adjust stock
     if (user.role !== "owner") {
-      return c.json(
-        { error: "Solo el dueno puede ajustar inventario" },
-        403,
-      );
+      return c.json({ error: "Solo el dueno puede ajustar inventario" }, 403);
     }
 
     const [product] = await db
       .select({ id: products.id, stock: products.stock, cost: products.cost })
       .from(products)
-      .where(
-        and(eq(products.id, id), eq(products.businessId, businessId)),
-      )
+      .where(and(eq(products.id, id), eq(products.businessId, businessId)))
       .limit(1);
 
     if (!product) {

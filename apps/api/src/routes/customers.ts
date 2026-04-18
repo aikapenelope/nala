@@ -336,7 +336,8 @@ customersRoutes.get("/accounts/receivable", async (c) => {
         eq(accountsReceivable.status, "pending"),
       ),
     )
-    .orderBy(desc(accountsReceivable.createdAt));
+    .orderBy(desc(accountsReceivable.createdAt))
+    .limit(500);
 
   const totalPending = rows.reduce((sum, r) => sum + Number(r.balanceUsd), 0);
 
@@ -397,35 +398,35 @@ customersRoutes.post(
     let result;
     try {
       result = await db.transaction(async (tx) => {
-      const [updated] = await tx
-        .update(accountsReceivable)
-        .set({
-          paidUsd: String(newPaid),
-          balanceUsd: String(newBalance),
-          status: newStatus,
-          updatedAt: new Date(),
-        })
-        .where(eq(accountsReceivable.id, id))
-        .returning();
+        const [updated] = await tx
+          .update(accountsReceivable)
+          .set({
+            paidUsd: String(newPaid),
+            balanceUsd: String(newBalance),
+            status: newStatus,
+            updatedAt: new Date(),
+          })
+          .where(eq(accountsReceivable.id, id))
+          .returning();
 
-      // Update customer balance
-      await tx
-        .update(customers)
-        .set({
-          balanceUsd: sql`GREATEST(0, ${customers.balanceUsd}::numeric - ${effectivePayment})`,
-          updatedAt: new Date(),
-        })
-        .where(eq(customers.id, account.customerId));
+        // Update customer balance
+        await tx
+          .update(customers)
+          .set({
+            balanceUsd: sql`GREATEST(0, ${customers.balanceUsd}::numeric - ${effectivePayment})`,
+            updatedAt: new Date(),
+          })
+          .where(eq(customers.id, account.customerId));
 
-      // Log activity
-      await tx.insert(activityLog).values({
-        businessId,
-        userId: user.id,
-        action: "payment_received",
-        detail: `Payment $${effectivePayment.toFixed(2)} on receivable ${id.slice(0, 8)}${method ? ` via ${method}` : ""}${reference ? ` (ref: ${reference})` : ""}`,
-      });
+        // Log activity
+        await tx.insert(activityLog).values({
+          businessId,
+          userId: user.id,
+          action: "payment_received",
+          detail: `Payment $${effectivePayment.toFixed(2)} on receivable ${id.slice(0, 8)}${method ? ` via ${method}` : ""}${reference ? ` (ref: ${reference})` : ""}`,
+        });
 
-      return updated;
+        return updated;
       });
     } catch (err) {
       const dbErr = handleDbError(err);
@@ -490,7 +491,8 @@ customersRoutes.get("/accounts/payable", async (c) => {
         eq(accountsPayable.status, "pending"),
       ),
     )
-    .orderBy(desc(accountsPayable.createdAt));
+    .orderBy(desc(accountsPayable.createdAt))
+    .limit(500);
 
   const totalPending = rows.reduce((sum, r) => sum + Number(r.balanceUsd), 0);
 

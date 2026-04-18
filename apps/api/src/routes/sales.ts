@@ -816,7 +816,8 @@ salesRoutes.get("/quotations", async (c) => {
     .select()
     .from(quotations)
     .where(eq(quotations.businessId, businessId))
-    .orderBy(desc(quotations.createdAt));
+    .orderBy(desc(quotations.createdAt))
+    .limit(500);
 
   return c.json({ quotations: rows });
 });

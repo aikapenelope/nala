@@ -53,7 +53,8 @@ configRoutes.get("/surcharge-types", async (c) => {
         eq(surchargeTypes.businessId, businessId),
         eq(surchargeTypes.isActive, true),
       ),
-    );
+    )
+    .limit(500);
 
   return c.json({ surchargeTypes: rows });
 });
@@ -133,10 +134,7 @@ configRoutes.delete("/surcharge-types/:id", async (c) => {
     .update(surchargeTypes)
     .set({ isActive: false })
     .where(
-      and(
-        eq(surchargeTypes.id, id),
-        eq(surchargeTypes.businessId, businessId),
-      ),
+      and(eq(surchargeTypes.id, id), eq(surchargeTypes.businessId, businessId)),
     )
     .returning();
 
@@ -154,7 +152,9 @@ configRoutes.delete("/surcharge-types/:id", async (c) => {
 const createBankAccountSchema = z.object({
   name: z.string().min(1).max(100),
   bankName: z.string().max(100).optional(),
-  accountType: z.enum(["checking", "savings", "cash", "digital"]).default("checking"),
+  accountType: z
+    .enum(["checking", "savings", "cash", "digital"])
+    .default("checking"),
   initialBalance: z.number().min(0).default(0),
 });
 
@@ -227,10 +227,7 @@ configRoutes.patch(
       .update(bankAccounts)
       .set(updates)
       .where(
-        and(
-          eq(bankAccounts.id, id),
-          eq(bankAccounts.businessId, businessId),
-        ),
+        and(eq(bankAccounts.id, id), eq(bankAccounts.businessId, businessId)),
       )
       .returning();
 

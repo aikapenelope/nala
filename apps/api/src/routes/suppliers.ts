@@ -57,7 +57,8 @@ suppliersRoutes.get(
       .select()
       .from(suppliers)
       .where(and(...conditions))
-      .orderBy(desc(suppliers.updatedAt));
+      .orderBy(desc(suppliers.updatedAt))
+      .limit(500);
 
     return c.json({ suppliers: rows });
   },
@@ -181,10 +182,7 @@ suppliersRoutes.get("/suppliers/:id/account", async (c) => {
     })
     .from(expenses)
     .where(
-      and(
-        eq(expenses.businessId, businessId),
-        eq(expenses.supplierId, id),
-      ),
+      and(eq(expenses.businessId, businessId), eq(expenses.supplierId, id)),
     )
     .orderBy(desc(expenses.date))
     .limit(10);
@@ -192,7 +190,8 @@ suppliersRoutes.get("/suppliers/:id/account", async (c) => {
   return c.json({
     supplier,
     account: {
-      totalPurchases: Math.round((purchaseStats?.totalPurchases ?? 0) * 100) / 100,
+      totalPurchases:
+        Math.round((purchaseStats?.totalPurchases ?? 0) * 100) / 100,
       purchaseCount: purchaseStats?.purchaseCount ?? 0,
       totalPending: Math.round((payableStats?.totalPending ?? 0) * 100) / 100,
       pendingCount: payableStats?.pendingCount ?? 0,
