@@ -10,6 +10,16 @@ import { paymentMethodSchema } from "./schemas";
 export const VALID_TAX_RATES = [0, 8, 16] as const;
 export type TaxRate = (typeof VALID_TAX_RATES)[number];
 
+/** IGTF rate for foreign currency payments (3%). */
+export const IGTF_RATE = 3;
+
+/** Payment methods that are in foreign currency (trigger IGTF). */
+export const FOREIGN_CURRENCY_METHODS = [
+  "binance",
+  "zinli",
+  "zelle",
+] as const;
+
 /** Schema for a sale item (line in the ticket). */
 export const saleItemSchema = z.object({
   productId: z.string().uuid(),
@@ -164,4 +174,19 @@ export function calculateSaleTotal(
  */
 export function usdToBs(amountUsd: number, rate: number): number {
   return Math.round(amountUsd * rate * 100) / 100;
+}
+
+/**
+ * Calculate IGTF (3%) on foreign currency payments.
+ * Only applies to payments in divisas (binance, zinli, zelle).
+ */
+export function calculateIgtf(
+  payments: Array<{ method: string; amountUsd: number }>,
+): number {
+  const foreignTotal = payments
+    .filter((p) =>
+      (FOREIGN_CURRENCY_METHODS as readonly string[]).includes(p.method),
+    )
+    .reduce((sum, p) => sum + p.amountUsd, 0);
+  return Math.round(foreignTotal * (IGTF_RATE / 100) * 100) / 100;
 }

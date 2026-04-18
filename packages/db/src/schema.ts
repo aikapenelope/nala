@@ -332,6 +332,8 @@ export const exchangeRates = pgTable(
     rateBcv: numeric("rate_bcv", { precision: 12, scale: 4 }).notNull(),
     /** EUR rate (optional, manually set by owner). */
     rateParallel: numeric("rate_parallel", { precision: 12, scale: 4 }),
+    /** Source of the rate: 'manual' or 'bcv'. */
+    source: text("source").notNull().default("manual"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -405,6 +407,12 @@ export const sales = pgTable(
 
     /** Notes visible on the receipt. */
     notes: text("notes"),
+
+    /** Sequential control number per business (SENIAT-ready). */
+    controlNumber: integer("control_number"),
+
+    /** IGTF amount (3% on foreign currency payments). */
+    igtfAmount: numeric("igtf_amount", { precision: 12, scale: 2 }).default("0"),
 
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
@@ -487,6 +495,53 @@ export const salePayments = pgTable("sale_payments", {
     .notNull()
     .defaultNow(),
 });
+
+/**
+ * Stock movements - explicit log of every inventory change.
+ * Types: sale, purchase, adjustment, void, credit_note.
+ * Provides audit trail for stock changes.
+ */
+export const stockMovements = pgTable(
+  "stock_movements",
+  {
+    id: uuid("id")
+      .default(sql`gen_random_uuid()`)
+      .primaryKey(),
+    businessId: uuid("business_id")
+      .notNull()
+      .references(() => businesses.id),
+    productId: uuid("product_id")
+      .notNull()
+      .references(() => products.id),
+    variantId: uuid("variant_id").references(() => productVariants.id),
+
+    /** Movement type. */
+    type: text("type").notNull(),
+
+    /** Positive = stock in, negative = stock out. */
+    quantity: integer("quantity").notNull(),
+
+    /** Unit cost at time of movement (for COGS tracking). */
+    costUnit: numeric("cost_unit", { precision: 12, scale: 2 }),
+
+    /** Reference to the source document (sale ID, expense ID, etc.). */
+    referenceType: text("reference_type"),
+    referenceId: uuid("reference_id"),
+
+    /** Optional note (e.g., "Ajuste por conteo fisico"). */
+    notes: text("notes"),
+
+    userId: uuid("user_id").references(() => users.id),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("idx_stock_movements_business").on(table.businessId),
+    index("idx_stock_movements_product").on(table.productId),
+    index("idx_stock_movements_created").on(table.createdAt),
+  ],
+);
 
 /**
  * Quotations - pre-sales that can be converted to sales.
