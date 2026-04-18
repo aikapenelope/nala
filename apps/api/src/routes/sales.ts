@@ -118,11 +118,19 @@ salesRoutes.get("/exchange-rate/bcv", async (c) => {
       503,
     );
   }
+
+  const promedio =
+    rates.usd > 0 && rates.usdParalelo > 0
+      ? Math.round(((rates.usd + rates.usdParalelo) / 2) * 100) / 100
+      : rates.usd;
+
   return c.json({
     rateBcv: rates.usd,
     rateEur: rates.eur,
+    rateParalelo: rates.usdParalelo,
+    ratePromedio: promedio,
     date: rates.date,
-    source: "bcv",
+    source: "api",
   });
 });
 
@@ -502,19 +510,6 @@ salesRoutes.post("/sales", zValidator("json", createSaleSchema), async (c) => {
           updatedAt: new Date(),
         })
         .where(eq(products.id, item.productId));
-
-      // Log stock movement
-      await tx.insert(stockMovements).values({
-        businessId,
-        productId: item.productId,
-        variantId: item.variantId,
-        type: "sale",
-        quantity: -item.quantity,
-        costUnit: String(productMap.get(item.productId)?.cost ?? 0),
-        referenceType: "sale",
-        referenceId: sale.id,
-        userId: user.id,
-      });
     }
 
     // If fiado payment, create accounts_receivable and update customer balance
@@ -604,6 +599,26 @@ salesRoutes.post("/sales", zValidator("json", createSaleSchema), async (c) => {
     const dbErr = handleDbError(err);
     if (dbErr) return c.json({ error: dbErr.message }, dbErr.status);
     throw err;
+  }
+
+  // Log stock movements AFTER the sale transaction succeeds.
+  // This is outside the TX: if it fails, the sale is already recorded.
+  try {
+    for (const item of data.items) {
+      await db.insert(stockMovements).values({
+        businessId,
+        productId: item.productId,
+        variantId: item.variantId,
+        type: "sale",
+        quantity: -item.quantity,
+        costUnit: String(productMap.get(item.productId)?.cost ?? 0),
+        referenceType: "sale",
+        referenceId: result.id,
+        userId: user.id,
+      });
+    }
+  } catch {
+    // Non-critical: stock movement logging failed but sale is safe
   }
 
   return c.json({ sale: result }, 201);
