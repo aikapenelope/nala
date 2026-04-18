@@ -35,6 +35,8 @@ import {
   priceHistory,
   saleItems,
   sales,
+  stockMovements,
+  activityLog,
 } from "@nova/db";
 import { handleDbError } from "../utils/db-errors";
 import type { AppEnv } from "../types";
@@ -642,6 +644,96 @@ inventory.post(
       { products: result, count: result.length },
       201,
     );
+  },
+);
+
+// ============================================================
+// Inventory Adjustment
+// ============================================================
+
+const adjustStockSchema = z.object({
+  /** New stock count (absolute, not delta). */
+  newStock: z.number().int().min(0),
+  reason: z.string().min(1).max(500),
+});
+
+/**
+ * POST /products/:id/adjust-stock - Manual inventory adjustment.
+ *
+ * Sets the stock to a new value and logs the difference as a
+ * stock movement of type "adjustment". Used for physical counts.
+ */
+inventory.post(
+  "/products/:id/adjust-stock",
+  zValidator("json", adjustStockSchema),
+  async (c) => {
+    const id = c.req.param("id");
+    const { newStock, reason } = c.req.valid("json");
+    const user = c.get("user");
+    const db = c.get("db");
+    const businessId = c.get("businessId");
+
+    // Only owners can adjust stock
+    if (user.role !== "owner") {
+      return c.json(
+        { error: "Solo el dueno puede ajustar inventario" },
+        403,
+      );
+    }
+
+    const [product] = await db
+      .select({ id: products.id, stock: products.stock, cost: products.cost })
+      .from(products)
+      .where(
+        and(eq(products.id, id), eq(products.businessId, businessId)),
+      )
+      .limit(1);
+
+    if (!product) {
+      return c.json({ error: "Producto no encontrado" }, 404);
+    }
+
+    const oldStock = product.stock;
+    const difference = newStock - oldStock;
+
+    if (difference === 0) {
+      return c.json({ message: "Stock sin cambios", stock: oldStock });
+    }
+
+    await db.transaction(async (tx) => {
+      // Update stock
+      await tx
+        .update(products)
+        .set({ stock: newStock, updatedAt: new Date() })
+        .where(eq(products.id, id));
+
+      // Log stock movement
+      await tx.insert(stockMovements).values({
+        businessId,
+        productId: id,
+        type: "adjustment",
+        quantity: difference,
+        costUnit: product.cost,
+        notes: reason,
+        userId: user.id,
+      });
+
+      // Log activity
+      await tx.insert(activityLog).values({
+        businessId,
+        userId: user.id,
+        action: "stock_adjusted",
+        detail: `${product.id}: ${oldStock} -> ${newStock} (${difference > 0 ? "+" : ""}${difference}). ${reason}`,
+      });
+    });
+
+    return c.json({
+      productId: id,
+      previousStock: oldStock,
+      newStock,
+      difference,
+      reason,
+    });
   },
 );
 

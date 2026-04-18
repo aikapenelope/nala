@@ -36,6 +36,7 @@ import {
   accountsReceivable,
   accountsPayable,
   dayCloses,
+  cashOpenings,
   sales,
   salePayments,
   activityLog,
@@ -180,6 +181,7 @@ customersRoutes.post(
         .values({
           businessId,
           name: data.name,
+          rif: data.rif,
           phone: data.phone,
           email: data.email,
           address: data.address,
@@ -211,6 +213,7 @@ customersRoutes.patch(
 
     const updateValues: Record<string, unknown> = { updatedAt: new Date() };
     if (data.name !== undefined) updateValues.name = data.name;
+    if (data.rif !== undefined) updateValues.rif = data.rif;
     if (data.phone !== undefined) updateValues.phone = data.phone;
     if (data.email !== undefined) updateValues.email = data.email;
     if (data.address !== undefined) updateValues.address = data.address;
@@ -702,6 +705,76 @@ customersRoutes.get("/day-close/history", async (c) => {
     .limit(30);
 
   return c.json({ closes: rows });
+});
+
+// ============================================================
+// Cash Register Opening
+// ============================================================
+
+const cashOpeningSchema = z.object({
+  cashAmount: z.number().min(0),
+  notes: z.string().max(500).optional(),
+});
+
+/**
+ * POST /cash-opening - Record start-of-day cash amount.
+ *
+ * The owner declares how much cash is in the register at the start
+ * of the day. This is compared with the day-close count later.
+ */
+customersRoutes.post(
+  "/cash-opening",
+  zValidator("json", cashOpeningSchema),
+  async (c) => {
+    const { cashAmount, notes } = c.req.valid("json");
+    const user = c.get("user");
+    const db = c.get("db");
+    const businessId = c.get("businessId");
+
+    const [opening] = await db
+      .insert(cashOpenings)
+      .values({
+        businessId,
+        openedBy: user.id,
+        date: new Date(),
+        cashAmount: String(cashAmount),
+        notes,
+      })
+      .returning();
+
+    // Log activity
+    await db.insert(activityLog).values({
+      businessId,
+      userId: user.id,
+      action: "cash_opened",
+      detail: `Cash opening: $${cashAmount.toFixed(2)}${notes ? ` - ${notes}` : ""}`,
+    });
+
+    return c.json({ opening }, 201);
+  },
+);
+
+/** GET /cash-opening/latest - Get the latest cash opening for today. */
+customersRoutes.get("/cash-opening/latest", async (c) => {
+  const db = c.get("db");
+  const businessId = c.get("businessId");
+
+  const todayStr = new Date().toISOString().split("T")[0];
+  const todayStart = new Date(`${todayStr}T00:00:00.000Z`);
+
+  const [latest] = await db
+    .select()
+    .from(cashOpenings)
+    .where(
+      and(
+        eq(cashOpenings.businessId, businessId),
+        gte(cashOpenings.date, todayStart),
+      ),
+    )
+    .orderBy(desc(cashOpenings.date))
+    .limit(1);
+
+  return c.json({ opening: latest ?? null });
 });
 
 export { customersRoutes };
