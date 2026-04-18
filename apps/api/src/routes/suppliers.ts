@@ -58,7 +58,8 @@ suppliersRoutes.get(
       .select()
       .from(suppliers)
       .where(and(...conditions))
-      .orderBy(desc(suppliers.updatedAt));
+      .orderBy(desc(suppliers.updatedAt))
+      .limit(500);
 
     return c.json({ suppliers: rows });
   },
