@@ -43,6 +43,7 @@ import {
 import { getCurrentRate, setCurrentRate } from "../services/exchange-rate";
 import { fetchBcvRates } from "../services/bcv-rates";
 import { handleDbError } from "../utils/db-errors";
+import { validateUuidParam } from "../middleware/validate-uuid";
 import type { AppEnv } from "../types";
 
 const salesRoutes = new Hono<AppEnv>();
@@ -225,7 +226,7 @@ salesRoutes.get("/sales", zValidator("query", listSalesQuery), async (c) => {
 });
 
 /** GET /sales/:id - Get sale detail. */
-salesRoutes.get("/sales/:id", async (c) => {
+salesRoutes.get("/sales/:id", validateUuidParam, async (c) => {
   const id = c.req.param("id");
   const db = c.get("db");
   const businessId = c.get("businessId");
@@ -453,187 +454,185 @@ salesRoutes.post("/sales", zValidator("json", createSaleSchema), async (c) => {
   let result;
   try {
     result = await db.transaction(async (tx) => {
-    // Insert sale record
-    const [sale] = await tx
-      .insert(sales)
-      .values({
-        businessId,
-        userId: user.id,
-        customerId: data.customerId,
-        totalUsd: String(totalUsd),
-        totalBs: String(totalBs),
-        exchangeRate: String(rate.rateBcv),
-        discountPercent: String(data.discountPercent),
-        discountAmount: String(data.discountAmount),
-        totalCostUsd: String(Math.round(totalCostUsd * 100) / 100),
-        channel: data.channel,
-        surcharges: data.surcharges,
-        notes: data.notes,
-        status: "completed",
-      })
-      .returning();
+      // Insert sale record
+      const [sale] = await tx
+        .insert(sales)
+        .values({
+          businessId,
+          userId: user.id,
+          customerId: data.customerId,
+          totalUsd: String(totalUsd),
+          totalBs: String(totalBs),
+          exchangeRate: String(rate.rateBcv),
+          discountPercent: String(data.discountPercent),
+          discountAmount: String(data.discountAmount),
+          totalCostUsd: String(Math.round(totalCostUsd * 100) / 100),
+          channel: data.channel,
+          surcharges: data.surcharges,
+          notes: data.notes,
+          status: "completed",
+        })
+        .returning();
 
-    // Insert sale items
-    await tx.insert(saleItems).values(
-      itemsWithTotals.map((item) => ({
-        saleId: sale.id,
-        businessId,
-        productId: item.productId,
-        variantId: item.variantId,
-        quantity: item.quantity,
-        unitPrice: String(item.unitPrice),
-        discountPercent: String(item.discountPercent),
-        lineTotal: String(item.lineTotal),
-      })),
-    );
+      // Insert sale items
+      await tx.insert(saleItems).values(
+        itemsWithTotals.map((item) => ({
+          saleId: sale.id,
+          businessId,
+          productId: item.productId,
+          variantId: item.variantId,
+          quantity: item.quantity,
+          unitPrice: String(item.unitPrice),
+          discountPercent: String(item.discountPercent),
+          lineTotal: String(item.lineTotal),
+        })),
+      );
 
-    // Insert sale payments
-    await tx.insert(salePayments).values(
-      data.payments.map((payment) => ({
-        saleId: sale.id,
-        businessId,
-        method: payment.method,
-        amountUsd: String(payment.amountUsd),
-        amountBs: payment.amountBs ? String(payment.amountBs) : null,
-        exchangeRate: payment.exchangeRate
-          ? String(payment.exchangeRate)
-          : String(rate.rateBcv),
-        reference: payment.reference,
-      })),
-    );
+      // Insert sale payments
+      await tx.insert(salePayments).values(
+        data.payments.map((payment) => ({
+          saleId: sale.id,
+          businessId,
+          method: payment.method,
+          amountUsd: String(payment.amountUsd),
+          amountBs: payment.amountBs ? String(payment.amountBs) : null,
+          exchangeRate: payment.exchangeRate
+            ? String(payment.exchangeRate)
+            : String(rate.rateBcv),
+          reference: payment.reference,
+        })),
+      );
 
-    // Decrement product stock for each item (skip services)
-    for (const item of data.items) {
-      const product = productMap.get(item.productId);
-      if (product?.isService) continue;
+      // Decrement product stock for each item (skip services)
+      for (const item of data.items) {
+        const product = productMap.get(item.productId);
+        if (product?.isService) continue;
 
-      if (item.variantId) {
+        if (item.variantId) {
+          await tx
+            .update(productVariants)
+            .set({
+              stock: sql`${productVariants.stock} - ${item.quantity}`,
+              updatedAt: new Date(),
+            })
+            .where(eq(productVariants.id, item.variantId));
+        }
+
         await tx
-          .update(productVariants)
+          .update(products)
           .set({
-            stock: sql`${productVariants.stock} - ${item.quantity}`,
+            stock: sql`${products.stock} - ${item.quantity}`,
+            lastSoldAt: new Date(),
             updatedAt: new Date(),
           })
-          .where(eq(productVariants.id, item.variantId));
+          .where(eq(products.id, item.productId));
       }
 
-      await tx
-        .update(products)
-        .set({
-          stock: sql`${products.stock} - ${item.quantity}`,
-          lastSoldAt: new Date(),
-          updatedAt: new Date(),
-        })
-        .where(eq(products.id, item.productId));
-    }
+      // If fiado payment, create accounts_receivable and update customer balance
+      const fiadoPayment = data.payments.find((p) => p.method === "fiado");
+      if (fiadoPayment && data.customerId) {
+        await tx.insert(accountsReceivable).values({
+          businessId,
+          customerId: data.customerId,
+          saleId: sale.id,
+          amountUsd: String(fiadoPayment.amountUsd),
+          balanceUsd: String(fiadoPayment.amountUsd),
+        });
 
-    // If fiado payment, create accounts_receivable and update customer balance
-    const fiadoPayment = data.payments.find((p) => p.method === "fiado");
-    if (fiadoPayment && data.customerId) {
-      await tx.insert(accountsReceivable).values({
+        // Update customer balance
+        await tx
+          .update(customers)
+          .set({
+            balanceUsd: sql`${customers.balanceUsd}::numeric + ${fiadoPayment.amountUsd}`,
+            totalPurchases: sql`${customers.totalPurchases} + 1`,
+            totalSpentUsd: sql`${customers.totalSpentUsd}::numeric + ${totalUsd}`,
+            averageTicketUsd: sql`(${customers.totalSpentUsd}::numeric + ${totalUsd}) / (${customers.totalPurchases} + 1)`,
+            lastPurchaseAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .where(eq(customers.id, data.customerId));
+      } else if (data.customerId) {
+        // Non-fiado sale with customer: update purchase stats only
+        await tx
+          .update(customers)
+          .set({
+            totalPurchases: sql`${customers.totalPurchases} + 1`,
+            totalSpentUsd: sql`${customers.totalSpentUsd}::numeric + ${totalUsd}`,
+            averageTicketUsd: sql`(${customers.totalSpentUsd}::numeric + ${totalUsd}) / (${customers.totalPurchases} + 1)`,
+            lastPurchaseAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .where(eq(customers.id, data.customerId));
+      }
+
+      // Generate accounting entries (revenue)
+      const revenueAccounts = await tx
+        .select()
+        .from(accountingAccounts)
+        .where(
+          and(
+            eq(accountingAccounts.businessId, businessId),
+            eq(accountingAccounts.code, "4101"),
+          ),
+        )
+        .limit(1);
+
+      const cashAccounts = await tx
+        .select()
+        .from(accountingAccounts)
+        .where(
+          and(
+            eq(accountingAccounts.businessId, businessId),
+            eq(accountingAccounts.code, "1101"),
+          ),
+        )
+        .limit(1);
+
+      if (revenueAccounts[0] && cashAccounts[0]) {
+        await tx.insert(accountingEntries).values({
+          businessId,
+          date: new Date(),
+          debitAccountId: cashAccounts[0].id,
+          creditAccountId: revenueAccounts[0].id,
+          amount: String(totalUsd),
+          description: `Venta #${sale.id.slice(0, 8)}`,
+          referenceType: "sale",
+          referenceId: sale.id,
+        });
+      }
+
+      // Log activity
+      await tx.insert(activityLog).values({
         businessId,
-        customerId: data.customerId,
-        saleId: sale.id,
-        amountUsd: String(fiadoPayment.amountUsd),
-        balanceUsd: String(fiadoPayment.amountUsd),
+        userId: user.id,
+        action: "sale_created",
+        detail: `Sale $${totalUsd} (${data.items.length} items)`,
       });
 
-      // Update customer balance
-      await tx
-        .update(customers)
-        .set({
-          balanceUsd: sql`${customers.balanceUsd}::numeric + ${fiadoPayment.amountUsd}`,
-          totalPurchases: sql`${customers.totalPurchases} + 1`,
-          totalSpentUsd: sql`${customers.totalSpentUsd}::numeric + ${totalUsd}`,
-          averageTicketUsd: sql`(${customers.totalSpentUsd}::numeric + ${totalUsd}) / (${customers.totalPurchases} + 1)`,
-          lastPurchaseAt: new Date(),
-          updatedAt: new Date(),
-        })
-        .where(eq(customers.id, data.customerId));
-    } else if (data.customerId) {
-      // Non-fiado sale with customer: update purchase stats only
-      await tx
-        .update(customers)
-        .set({
-          totalPurchases: sql`${customers.totalPurchases} + 1`,
-          totalSpentUsd: sql`${customers.totalSpentUsd}::numeric + ${totalUsd}`,
-          averageTicketUsd: sql`(${customers.totalSpentUsd}::numeric + ${totalUsd}) / (${customers.totalPurchases} + 1)`,
-          lastPurchaseAt: new Date(),
-          updatedAt: new Date(),
-        })
-        .where(eq(customers.id, data.customerId));
-    }
+      // Log stock movements inside the transaction for consistency.
+      for (const item of data.items) {
+        const product = productMap.get(item.productId);
+        if (product?.isService) continue;
 
-    // Generate accounting entries (revenue)
-    const revenueAccounts = await tx
-      .select()
-      .from(accountingAccounts)
-      .where(
-        and(
-          eq(accountingAccounts.businessId, businessId),
-          eq(accountingAccounts.code, "4101"),
-        ),
-      )
-      .limit(1);
+        await tx.insert(stockMovements).values({
+          businessId,
+          productId: item.productId,
+          variantId: item.variantId,
+          type: "sale",
+          quantity: -item.quantity,
+          costUnit: String(product?.cost ?? 0),
+          referenceType: "sale",
+          referenceId: sale.id,
+          userId: user.id,
+        });
+      }
 
-    const cashAccounts = await tx
-      .select()
-      .from(accountingAccounts)
-      .where(
-        and(
-          eq(accountingAccounts.businessId, businessId),
-          eq(accountingAccounts.code, "1101"),
-        ),
-      )
-      .limit(1);
-
-    if (revenueAccounts[0] && cashAccounts[0]) {
-      await tx.insert(accountingEntries).values({
-        businessId,
-        date: new Date(),
-        debitAccountId: cashAccounts[0].id,
-        creditAccountId: revenueAccounts[0].id,
-        amount: String(totalUsd),
-        description: `Venta #${sale.id.slice(0, 8)}`,
-        referenceType: "sale",
-        referenceId: sale.id,
-      });
-    }
-
-    // Log activity
-    await tx.insert(activityLog).values({
-      businessId,
-      userId: user.id,
-      action: "sale_created",
-      detail: `Sale $${totalUsd} (${data.items.length} items)`,
-    });
-
-    return sale;
+      return sale;
     });
   } catch (err) {
     const dbErr = handleDbError(err);
     if (dbErr) return c.json({ error: dbErr.message }, dbErr.status);
     throw err;
-  }
-
-  // Log stock movements AFTER the sale transaction succeeds.
-  // This is outside the TX: if it fails, the sale is already recorded.
-  try {
-    for (const item of data.items) {
-      await db.insert(stockMovements).values({
-        businessId,
-        productId: item.productId,
-        variantId: item.variantId,
-        type: "sale",
-        quantity: -item.quantity,
-        costUnit: String(productMap.get(item.productId)?.cost ?? 0),
-        referenceType: "sale",
-        referenceId: result.id,
-        userId: user.id,
-      });
-    }
-  } catch {
-    // Non-critical: stock movement logging failed but sale is safe
   }
 
   return c.json({ sale: result }, 201);
@@ -647,6 +646,7 @@ salesRoutes.post("/sales", zValidator("json", createSaleSchema), async (c) => {
  */
 salesRoutes.post(
   "/sales/:id/void",
+  validateUuidParam,
   zValidator("json", voidSaleSchema),
   async (c) => {
     const saleId = c.req.param("id");
@@ -658,71 +658,71 @@ salesRoutes.post(
     let result;
     try {
       result = await db.transaction(async (tx) => {
-      // Get the sale
-      const [sale] = await tx
-        .select()
-        .from(sales)
-        .where(
-          and(
-            eq(sales.id, saleId),
-            eq(sales.businessId, businessId),
-            eq(sales.status, "completed"),
-          ),
-        )
-        .limit(1);
+        // Get the sale
+        const [sale] = await tx
+          .select()
+          .from(sales)
+          .where(
+            and(
+              eq(sales.id, saleId),
+              eq(sales.businessId, businessId),
+              eq(sales.status, "completed"),
+            ),
+          )
+          .limit(1);
 
-      if (!sale) {
-        return null;
-      }
-
-      // Get sale items to restore stock
-      const items = await tx
-        .select()
-        .from(saleItems)
-        .where(eq(saleItems.saleId, saleId));
-
-      // Restore stock for each item
-      for (const item of items) {
-        if (item.variantId) {
-          await tx
-            .update(productVariants)
-            .set({
-              stock: sql`${productVariants.stock} + ${item.quantity}`,
-              updatedAt: new Date(),
-            })
-            .where(eq(productVariants.id, item.variantId));
+        if (!sale) {
+          return null;
         }
 
-        await tx
-          .update(products)
+        // Get sale items to restore stock
+        const items = await tx
+          .select()
+          .from(saleItems)
+          .where(eq(saleItems.saleId, saleId));
+
+        // Restore stock for each item
+        for (const item of items) {
+          if (item.variantId) {
+            await tx
+              .update(productVariants)
+              .set({
+                stock: sql`${productVariants.stock} + ${item.quantity}`,
+                updatedAt: new Date(),
+              })
+              .where(eq(productVariants.id, item.variantId));
+          }
+
+          await tx
+            .update(products)
+            .set({
+              stock: sql`${products.stock} + ${item.quantity}`,
+              updatedAt: new Date(),
+            })
+            .where(eq(products.id, item.productId));
+        }
+
+        // Mark sale as voided
+        const [voided] = await tx
+          .update(sales)
           .set({
-            stock: sql`${products.stock} + ${item.quantity}`,
+            status: "voided",
+            voidReason: reason,
+            voidedBy: user.id,
             updatedAt: new Date(),
           })
-          .where(eq(products.id, item.productId));
-      }
+          .where(eq(sales.id, saleId))
+          .returning();
 
-      // Mark sale as voided
-      const [voided] = await tx
-        .update(sales)
-        .set({
-          status: "voided",
-          voidReason: reason,
-          voidedBy: user.id,
-          updatedAt: new Date(),
-        })
-        .where(eq(sales.id, saleId))
-        .returning();
+        // Log activity
+        await tx.insert(activityLog).values({
+          businessId,
+          userId: user.id,
+          action: "sale_voided",
+          detail: `Sale ${saleId.slice(0, 8)} voided: ${reason}`,
+        });
 
-      // Log activity
-      await tx.insert(activityLog).values({
-        businessId,
-        userId: user.id,
-        action: "sale_voided",
-        detail: `Sale ${saleId.slice(0, 8)} voided: ${reason}`,
-      });
-
-      return voided;
+        return voided;
       });
     } catch (err) {
       const dbErr = handleDbError(err);
@@ -792,7 +792,7 @@ salesRoutes.post(
 );
 
 /** POST /quotations/:id/convert - Convert quotation to sale. */
-salesRoutes.post("/quotations/:id/convert", async (c) => {
+salesRoutes.post("/quotations/:id/convert", validateUuidParam, async (c) => {
   const id = c.req.param("id");
   const db = c.get("db");
   const businessId = c.get("businessId");

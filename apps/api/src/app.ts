@@ -114,8 +114,9 @@ app.use(
   "*",
   cors({
     origin: (origin) => {
-      const allowed =
-        process.env.CORS_ORIGIN?.split(",") ?? ["http://localhost:3000"];
+      const allowed = process.env.CORS_ORIGIN?.split(",") ?? [
+        "http://localhost:3000",
+      ];
 
       // Exact match (e.g., https://novaincs.com)
       if (allowed.includes(origin)) return origin;
@@ -150,6 +151,7 @@ app.route("/health", health);
 app.use("/catalog/*", publicRateLimit);
 app.route("/catalog", catalog);
 app.use("/onboarding/check-slug/*", publicRateLimit);
+app.use("/onboarding", publicRateLimit);
 app.route("/onboarding", onboarding);
 
 // ---------------------------------------------------------------------------

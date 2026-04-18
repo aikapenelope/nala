@@ -13,6 +13,7 @@ import { z } from "zod";
 import { eq, and, desc, ilike, sql } from "drizzle-orm";
 import { suppliers, expenses, accountsPayable } from "@nova/db";
 import { handleDbError } from "../utils/db-errors";
+import { validateUuidParam } from "../middleware/validate-uuid";
 import type { AppEnv } from "../types";
 
 const suppliersRoutes = new Hono<AppEnv>();
@@ -90,6 +91,7 @@ suppliersRoutes.post(
 /** PATCH /suppliers/:id - Update supplier. */
 suppliersRoutes.patch(
   "/suppliers/:id",
+  validateUuidParam,
   zValidator("json", createSupplierSchema.partial()),
   async (c) => {
     const id = c.req.param("id");
@@ -125,7 +127,7 @@ suppliersRoutes.patch(
  * Returns total purchases, pending payables, and recent expenses
  * for a specific supplier.
  */
-suppliersRoutes.get("/suppliers/:id/account", async (c) => {
+suppliersRoutes.get("/suppliers/:id/account", validateUuidParam, async (c) => {
   const id = c.req.param("id");
   const db = c.get("db");
   const businessId = c.get("businessId");
@@ -181,10 +183,7 @@ suppliersRoutes.get("/suppliers/:id/account", async (c) => {
     })
     .from(expenses)
     .where(
-      and(
-        eq(expenses.businessId, businessId),
-        eq(expenses.supplierId, id),
-      ),
+      and(eq(expenses.businessId, businessId), eq(expenses.supplierId, id)),
     )
     .orderBy(desc(expenses.date))
     .limit(10);
@@ -192,7 +191,8 @@ suppliersRoutes.get("/suppliers/:id/account", async (c) => {
   return c.json({
     supplier,
     account: {
-      totalPurchases: Math.round((purchaseStats?.totalPurchases ?? 0) * 100) / 100,
+      totalPurchases:
+        Math.round((purchaseStats?.totalPurchases ?? 0) * 100) / 100,
       purchaseCount: purchaseStats?.purchaseCount ?? 0,
       totalPending: Math.round((payableStats?.totalPending ?? 0) * 100) / 100,
       pendingCount: payableStats?.pendingCount ?? 0,

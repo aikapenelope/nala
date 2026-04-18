@@ -20,6 +20,7 @@ import { eq, and } from "drizzle-orm";
 import { PIN_LENGTH } from "@nova/shared";
 import { users, businesses } from "@nova/db";
 import { handleDbError } from "../utils/db-errors";
+import { validateUuidParam } from "../middleware/validate-uuid";
 import type { AppEnv } from "../types";
 
 const team = new Hono<AppEnv>();
@@ -232,6 +233,7 @@ const updateEmployeeSchema = z.object({
  */
 team.patch(
   "/employees/:id",
+  validateUuidParam,
   zValidator("json", updateEmployeeSchema),
   async (c) => {
     const ownerCheck = requireOwner(c);
@@ -268,59 +270,59 @@ team.patch(
 
     // Build update payload
     try {
-    const updates: Record<string, unknown> = { updatedAt: new Date() };
+      const updates: Record<string, unknown> = { updatedAt: new Date() };
 
-    if (data.name !== undefined) {
-      updates.name = data.name;
-    }
-
-    if (data.isActive !== undefined) {
-      updates.isActive = data.isActive;
-    }
-
-    if (data.pin !== undefined) {
-      // Check for duplicate PIN
-      const otherUsers = await db
-        .select({ id: users.id, pinHash: users.pinHash })
-        .from(users)
-        .where(
-          and(
-            eq(users.businessId, currentUser.businessId),
-            eq(users.isActive, true),
-          ),
-        );
-
-      for (const other of otherUsers) {
-        if (other.id === employeeId) continue;
-        const isDuplicate = await bcrypt.compare(data.pin, other.pinHash);
-        if (isDuplicate) {
-          return c.json(
-            { error: "Este PIN ya esta en uso por otro miembro del equipo" },
-            409,
-          );
-        }
+      if (data.name !== undefined) {
+        updates.name = data.name;
       }
 
-      updates.pinHash = await bcrypt.hash(data.pin, 10);
+      if (data.isActive !== undefined) {
+        updates.isActive = data.isActive;
+      }
+
+      if (data.pin !== undefined) {
+        // Check for duplicate PIN
+        const otherUsers = await db
+          .select({ id: users.id, pinHash: users.pinHash })
+          .from(users)
+          .where(
+            and(
+              eq(users.businessId, currentUser.businessId),
+              eq(users.isActive, true),
+            ),
+          );
+
+        for (const other of otherUsers) {
+          if (other.id === employeeId) continue;
+          const isDuplicate = await bcrypt.compare(data.pin, other.pinHash);
+          if (isDuplicate) {
+            return c.json(
+              { error: "Este PIN ya esta en uso por otro miembro del equipo" },
+              409,
+            );
+          }
+        }
+
+        updates.pinHash = await bcrypt.hash(data.pin, 10);
+      }
+
+      const [updated] = await db
+        .update(users)
+        .set(updates)
+        .where(eq(users.id, employeeId))
+        .returning({
+          id: users.id,
+          name: users.name,
+          role: users.role,
+          isActive: users.isActive,
+        });
+
+      return c.json({ employee: updated });
+    } catch (err) {
+      const dbErr = handleDbError(err);
+      if (dbErr) return c.json({ error: dbErr.message }, dbErr.status);
+      throw err;
     }
-
-    const [updated] = await db
-      .update(users)
-      .set(updates)
-      .where(eq(users.id, employeeId))
-      .returning({
-        id: users.id,
-        name: users.name,
-        role: users.role,
-        isActive: users.isActive,
-      });
-
-    return c.json({ employee: updated });
-  } catch (err) {
-    const dbErr = handleDbError(err);
-    if (dbErr) return c.json({ error: dbErr.message }, dbErr.status);
-    throw err;
-  }
   },
 );
 
@@ -330,7 +332,7 @@ team.patch(
  * Sets isActive = false. The employee can no longer use PIN to identify.
  * Their sales history is preserved.
  */
-team.delete("/employees/:id", async (c) => {
+team.delete("/employees/:id", validateUuidParam, async (c) => {
   const ownerCheck = requireOwner(c);
   if (ownerCheck) return c.json(ownerCheck, 403);
 
@@ -395,34 +397,30 @@ team.get("/settings", async (c) => {
 });
 
 /** PATCH /settings - Update business settings. */
-team.patch(
-  "/settings",
-  zValidator("json", updateSettingsSchema),
-  async (c) => {
-    const ownerCheck = requireOwner(c);
-    if (ownerCheck) return c.json(ownerCheck, 403);
+team.patch("/settings", zValidator("json", updateSettingsSchema), async (c) => {
+  const ownerCheck = requireOwner(c);
+  if (ownerCheck) return c.json(ownerCheck, 403);
 
-    const data = c.req.valid("json");
-    const currentUser = c.get("user");
-    const db = c.get("db");
+  const data = c.req.valid("json");
+  const currentUser = c.get("user");
+  const db = c.get("db");
 
-    const updates: Record<string, unknown> = { updatedAt: new Date() };
-    if (data.accountantEmail !== undefined)
-      updates.accountantEmail = data.accountantEmail;
-    if (data.whatsappNumber !== undefined)
-      updates.whatsappNumber = data.whatsappNumber;
+  const updates: Record<string, unknown> = { updatedAt: new Date() };
+  if (data.accountantEmail !== undefined)
+    updates.accountantEmail = data.accountantEmail;
+  if (data.whatsappNumber !== undefined)
+    updates.whatsappNumber = data.whatsappNumber;
 
-    const [updated] = await db
-      .update(businesses)
-      .set(updates)
-      .where(eq(businesses.id, currentUser.businessId))
-      .returning({
-        accountantEmail: businesses.accountantEmail,
-        whatsappNumber: businesses.whatsappNumber,
-      });
+  const [updated] = await db
+    .update(businesses)
+    .set(updates)
+    .where(eq(businesses.id, currentUser.businessId))
+    .returning({
+      accountantEmail: businesses.accountantEmail,
+      whatsappNumber: businesses.whatsappNumber,
+    });
 
-    return c.json({ settings: updated });
-  },
-);
+  return c.json({ settings: updated });
+});
 
 export { team };

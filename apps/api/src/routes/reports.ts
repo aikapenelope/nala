@@ -26,15 +26,13 @@ import {
   expenses,
   users,
 } from "@nova/db";
-import {
-  DEAD_STOCK_DAYS,
-  AGING_THRESHOLDS,
-} from "@nova/shared";
+import { DEAD_STOCK_DAYS, AGING_THRESHOLDS } from "@nova/shared";
 import { generateNarrative } from "../services/ai-narrative";
 import { periodQuery, parsePeriodRange } from "./reports-helpers";
 import { reportsPdf } from "./reports-pdf";
 import { reportsXlsx } from "./reports-xlsx";
 import { reportsEmail } from "./reports-email";
+import { validateUuidParam } from "../middleware/validate-uuid";
 import type { AppEnv } from "../types";
 
 const reports = new Hono<AppEnv>();
@@ -570,9 +568,12 @@ reports.get(
       )
       .groupBy(expenses.category);
 
-    const fixedExpenses = expensesByCategory.find((e) => e.category === "fixed")?.total ?? 0;
-    const variableExpenses = expensesByCategory.find((e) => e.category === "variable")?.total ?? 0;
-    const cogsExpenses = expensesByCategory.find((e) => e.category === "cogs")?.total ?? 0;
+    const fixedExpenses =
+      expensesByCategory.find((e) => e.category === "fixed")?.total ?? 0;
+    const variableExpenses =
+      expensesByCategory.find((e) => e.category === "variable")?.total ?? 0;
+    const cogsExpenses =
+      expensesByCategory.find((e) => e.category === "cogs")?.total ?? 0;
     const totalExpenses = fixedExpenses + variableExpenses + cogsExpenses;
 
     const revenue = revResult?.revenue ?? 0;
@@ -640,9 +641,7 @@ reports.get("/reports/cash-flow", async (c) => {
       total: sql<number>`COALESCE(SUM(${sales.totalUsd}::numeric), 0)::float`,
     })
     .from(sales)
-    .where(
-      and(bizCond, completedCond, gte(sales.createdAt, thirtyDaysAgo)),
-    );
+    .where(and(bizCond, completedCond, gte(sales.createdAt, thirtyDaysAgo)));
 
   const totalRevenue30d = revResult?.total ?? 0;
   const avgDailyRevenue = totalRevenue30d / 30;
@@ -701,9 +700,7 @@ reports.get("/reports/cash-flow", async (c) => {
       revenue: sql<number>`COALESCE(SUM(${sales.totalUsd}::numeric), 0)::float`,
     })
     .from(sales)
-    .where(
-      and(bizCond, completedCond, gte(sales.createdAt, fourteenDaysAgo)),
-    )
+    .where(and(bizCond, completedCond, gte(sales.createdAt, fourteenDaysAgo)))
     .groupBy(sql`DATE(${sales.createdAt})`)
     .orderBy(sql`DATE(${sales.createdAt})`);
 
@@ -727,11 +724,13 @@ reports.get("/reports/cash-flow", async (c) => {
   // Projections
   const projectedRevenue7d = Math.round(avgDailyRevenue * 7 * 100) / 100;
   const projectedExpenses7d = Math.round(avgDailyExpenses * 7 * 100) / 100;
-  const projectedNet7d = Math.round((projectedRevenue7d - projectedExpenses7d) * 100) / 100;
+  const projectedNet7d =
+    Math.round((projectedRevenue7d - projectedExpenses7d) * 100) / 100;
 
   const projectedRevenue30d = Math.round(avgDailyRevenue * 30 * 100) / 100;
   const projectedExpenses30d = Math.round(avgDailyExpenses * 30 * 100) / 100;
-  const projectedNet30d = Math.round((projectedRevenue30d - projectedExpenses30d) * 100) / 100;
+  const projectedNet30d =
+    Math.round((projectedRevenue30d - projectedExpenses30d) * 100) / 100;
 
   const data = {
     avgDailyRevenue: Math.round(avgDailyRevenue * 100) / 100,
@@ -754,7 +753,10 @@ reports.get("/reports/cash-flow", async (c) => {
     },
   };
 
-  const narrative = await generateNarrative({ type: "cash_flow_projection", data });
+  const narrative = await generateNarrative({
+    type: "cash_flow_projection",
+    data,
+  });
 
   return c.json({ data, narrative });
 });
@@ -1044,7 +1046,7 @@ reports.get("/reports/monthly-trend", async (c) => {
  * Returns purchase history, top products bought, visit frequency,
  * and spending trend.
  */
-reports.get("/reports/customer-stats/:id", async (c) => {
+reports.get("/reports/customer-stats/:id", validateUuidParam, async (c) => {
   const customerId = c.req.param("id");
   const db = c.get("db");
   const businessId = c.get("businessId");
@@ -1072,10 +1074,7 @@ reports.get("/reports/customer-stats/:id", async (c) => {
     })
     .from(sales)
     .where(
-      and(
-        eq(sales.businessId, businessId),
-        eq(sales.customerId, customerId),
-      ),
+      and(eq(sales.businessId, businessId), eq(sales.customerId, customerId)),
     )
     .orderBy(desc(sales.createdAt))
     .limit(20);

@@ -39,6 +39,7 @@ import {
   activityLog,
 } from "@nova/db";
 import { handleDbError } from "../utils/db-errors";
+import { validateUuidParam } from "../middleware/validate-uuid";
 import type { AppEnv } from "../types";
 
 const inventory = new Hono<AppEnv>();
@@ -201,7 +202,7 @@ inventory.get(
 );
 
 /** GET /products/:id - Get single product with its variants. */
-inventory.get("/products/:id", async (c) => {
+inventory.get("/products/:id", validateUuidParam, async (c) => {
   const id = c.req.param("id");
   const db = c.get("db");
   const businessId = c.get("businessId");
@@ -291,7 +292,10 @@ inventory.post(
           stockCritical: data.stockCritical,
           hasVariants: data.hasVariants,
           isService: data.isService,
-          wholesalePrice: data.wholesalePrice !== undefined ? String(data.wholesalePrice) : undefined,
+          wholesalePrice:
+            data.wholesalePrice !== undefined
+              ? String(data.wholesalePrice)
+              : undefined,
           wholesaleMinQty: data.wholesaleMinQty,
           brand: data.brand,
           location: data.location,
@@ -320,6 +324,7 @@ inventory.post(
 /** PATCH /products/:id - Update an existing product. */
 inventory.patch(
   "/products/:id",
+  validateUuidParam,
   zValidator("json", updateProductSchema),
   async (c) => {
     const id = c.req.param("id");
@@ -375,10 +380,10 @@ inventory.patch(
       updateValues.stockCritical = data.stockCritical;
     if (data.hasVariants !== undefined)
       updateValues.hasVariants = data.hasVariants;
-    if (data.isService !== undefined)
-      updateValues.isService = data.isService;
+    if (data.isService !== undefined) updateValues.isService = data.isService;
     if (data.wholesalePrice !== undefined)
-      updateValues.wholesalePrice = data.wholesalePrice !== undefined ? String(data.wholesalePrice) : null;
+      updateValues.wholesalePrice =
+        data.wholesalePrice !== undefined ? String(data.wholesalePrice) : null;
     if (data.wholesaleMinQty !== undefined)
       updateValues.wholesaleMinQty = data.wholesaleMinQty;
     if (data.brand !== undefined) updateValues.brand = data.brand;
@@ -416,7 +421,7 @@ inventory.patch(
 );
 
 /** DELETE /products/:id - Soft-delete a product (set isActive = false). */
-inventory.delete("/products/:id", async (c) => {
+inventory.delete("/products/:id", validateUuidParam, async (c) => {
   const id = c.req.param("id");
   const db = c.get("db");
   const businessId = c.get("businessId");
@@ -448,6 +453,7 @@ inventory.delete("/products/:id", async (c) => {
 /** POST /products/:id/variants - Add a variant to a product. */
 inventory.post(
   "/products/:id/variants",
+  validateUuidParam,
   zValidator("json", createVariantSchema.omit({ productId: true })),
   async (c) => {
     const productId = c.req.param("id");
@@ -499,6 +505,7 @@ inventory.post(
 /** PATCH /products/variants/:id - Update a variant. */
 inventory.patch(
   "/products/variants/:id",
+  validateUuidParam,
   zValidator("json", createVariantSchema.omit({ productId: true }).partial()),
   async (c) => {
     const id = c.req.param("id");
@@ -535,7 +542,7 @@ inventory.patch(
 );
 
 /** DELETE /products/variants/:id - Soft-delete a variant. */
-inventory.delete("/products/variants/:id", async (c) => {
+inventory.delete("/products/variants/:id", validateUuidParam, async (c) => {
   const id = c.req.param("id");
   const db = c.get("db");
   const businessId = c.get("businessId");
@@ -653,10 +660,7 @@ inventory.post(
       throw err;
     }
 
-    return c.json(
-      { products: result, count: result.length },
-      201,
-    );
+    return c.json({ products: result, count: result.length }, 201);
   },
 );
 
@@ -678,6 +682,7 @@ const adjustStockSchema = z.object({
  */
 inventory.post(
   "/products/:id/adjust-stock",
+  validateUuidParam,
   zValidator("json", adjustStockSchema),
   async (c) => {
     const id = c.req.param("id");
@@ -688,18 +693,13 @@ inventory.post(
 
     // Only owners can adjust stock
     if (user.role !== "owner") {
-      return c.json(
-        { error: "Solo el dueno puede ajustar inventario" },
-        403,
-      );
+      return c.json({ error: "Solo el dueno puede ajustar inventario" }, 403);
     }
 
     const [product] = await db
       .select({ id: products.id, stock: products.stock, cost: products.cost })
       .from(products)
-      .where(
-        and(eq(products.id, id), eq(products.businessId, businessId)),
-      )
+      .where(and(eq(products.id, id), eq(products.businessId, businessId)))
       .limit(1);
 
     if (!product) {
