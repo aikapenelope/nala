@@ -9,7 +9,15 @@
  * - Exchange rate -- coming soon
  */
 
-import { Store, Users, CreditCard, ArrowLeftRight } from "lucide-vue-next";
+import {
+  Store,
+  Users,
+  CreditCard,
+  ArrowLeftRight,
+  Tag,
+  Landmark,
+  Bell,
+} from "lucide-vue-next";
 import type { Component } from "vue";
 
 definePageMeta({ middleware: ["admin-only"] });
@@ -37,6 +45,27 @@ const sections: SettingsSection[] = [
     label: "Negocio",
     description: "Email del contador, WhatsApp del negocio",
     to: "/settings/business",
+    available: true,
+  },
+  {
+    icon: Tag,
+    label: "Cargos adicionales",
+    description: "Delivery, propinas, empaques",
+    to: "/settings/surcharges",
+    available: true,
+  },
+  {
+    icon: Landmark,
+    label: "Cuentas bancarias",
+    description: "Bancos para referencia de pagos",
+    to: "/settings/bank-accounts",
+    available: true,
+  },
+  {
+    icon: Bell,
+    label: "Notificaciones",
+    description: "Alertas diarias por email",
+    to: "/settings/notifications",
     available: true,
   },
   {

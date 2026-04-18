@@ -100,7 +100,7 @@ function getSegments(c: Customer): CustomerSegment[] {
         placeholder="Buscar cliente..."
         class="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-nova-primary focus:outline-none"
         @input="onSearchInput"
-      />
+      >
     </div>
 
     <!-- Loading -->
@@ -151,6 +151,7 @@ function getSegments(c: Customer): CustomerSegment[] {
                 Saldo
               </th>
               <th class="px-4 py-3 font-medium text-gray-500">Segmentos</th>
+              <th class="px-4 py-3" />
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-100">
@@ -190,6 +191,14 @@ function getSegments(c: Customer): CustomerSegment[] {
                     {{ segmentConfig[seg].label }}
                   </span>
                 </div>
+              </td>
+              <td class="px-4 py-3">
+                <NuxtLink
+                  :to="`/clients/${c.id}`"
+                  class="text-xs text-nova-primary hover:underline"
+                >
+                  Stats
+                </NuxtLink>
               </td>
             </tr>
           </tbody>

@@ -5,20 +5,22 @@
  * Flow:
  * 1. Reads ticket items from sessionStorage (set by POS screen)
  * 2. Fetches exchange rate from GET /api/exchange-rate
- * 3. User selects payment method
- * 4. If fiado: must select a customer
- * 5. Confirm:
+ * 3. Fetches available surcharge types from GET /api/surcharge-types
+ * 4. User selects payment method, channel, and optional surcharges
+ * 5. If fiado: must select a customer
+ * 6. Confirm:
  *    - Online: POST /api/sales -> receipt option
  *    - Offline: queue in IndexedDB -> sync when connectivity returns
  *
  * Connected to:
  * - GET /api/exchange-rate
+ * - GET /api/surcharge-types
  * - POST /api/sales
  * - useOfflineQueue (IndexedDB fallback)
  */
 
 import { usdToBs } from "@nova/shared";
-import type { PaymentMethod } from "@nova/shared";
+import type { PaymentMethod, SaleChannel } from "@nova/shared";
 
 const router = useRouter();
 const { $api } = useApi();
@@ -39,7 +41,7 @@ interface CheckoutItem {
 }
 
 const items = ref<CheckoutItem[]>([]);
-const totalUsd = ref(0);
+const subtotalUsd = ref(0);
 
 const selectedMethod = ref<PaymentMethod | null>(null);
 const reference = ref("");
@@ -51,12 +53,63 @@ const saleError = ref("");
 /** Whether the sale was queued offline (not sent to server yet). */
 const queuedOffline = ref(false);
 
+/** Sale channel (defaults to POS). */
+const selectedChannel = ref<SaleChannel>("pos");
+
+/** Channel display info. */
+const channelOptions: Array<{ value: SaleChannel; label: string }> = [
+  { value: "pos", label: "POS" },
+  { value: "whatsapp", label: "WhatsApp" },
+  { value: "delivery", label: "Delivery" },
+  { value: "online", label: "Online" },
+];
+
+/** Available surcharge types from API. */
+interface SurchargeType {
+  id: string;
+  name: string;
+  defaultAmount: string | null;
+}
+const surchargeTypes = ref<SurchargeType[]>([]);
+
+/** Surcharges applied to this sale. */
+interface AppliedSurcharge {
+  name: string;
+  amount: number;
+}
+const appliedSurcharges = ref<AppliedSurcharge[]>([]);
+
+/** Total surcharges amount. */
+const surchargesTotal = computed(() =>
+  appliedSurcharges.value.reduce((sum, s) => sum + s.amount, 0),
+);
+
+/** Grand total including surcharges. */
+const totalUsd = computed(() =>
+  Math.round((subtotalUsd.value + surchargesTotal.value) * 100) / 100,
+);
+
 /** Total in Bs. */
 const totalBs = computed(() =>
   exchangeRate.value > 0 ? usdToBs(totalUsd.value, exchangeRate.value) : 0,
 );
 
-/** Load ticket data and exchange rate on mount. */
+/** Add a surcharge from the available types. */
+function addSurcharge(st: SurchargeType) {
+  // Don't add duplicates
+  if (appliedSurcharges.value.some((s) => s.name === st.name)) return;
+  appliedSurcharges.value.push({
+    name: st.name,
+    amount: Number(st.defaultAmount ?? 0),
+  });
+}
+
+/** Remove a surcharge by index. */
+function removeSurcharge(index: number) {
+  appliedSurcharges.value.splice(index, 1);
+}
+
+/** Load ticket data, exchange rate, and surcharge types on mount. */
 onMounted(async () => {
   if (!import.meta.client) return;
 
@@ -75,7 +128,7 @@ onMounted(async () => {
 
   try {
     items.value = JSON.parse(storedItems);
-    totalUsd.value = Number(storedTotal);
+    subtotalUsd.value = Number(storedTotal);
   } catch {
     router.push("/sales");
     return;
@@ -88,6 +141,16 @@ onMounted(async () => {
   } catch {
     rateError.value =
       "Tasa de cambio no disponible. Las ventas se registran solo en USD.";
+  }
+
+  // Fetch available surcharge types
+  try {
+    const result = await $api<{
+      surchargeTypes: SurchargeType[];
+    }>("/api/surcharge-types");
+    surchargeTypes.value = result.surchargeTypes;
+  } catch {
+    // Non-critical: surcharge section won't show
   }
 });
 
@@ -195,6 +258,12 @@ async function confirmSale() {
         ],
         customerId: selectedCustomerId.value || undefined,
         discountPercent: 0,
+        discountAmount: 0,
+        surcharges: appliedSurcharges.value.map((s) => ({
+          name: s.name,
+          amount: s.amount,
+        })),
+        channel: selectedChannel.value,
       },
     });
 
@@ -273,12 +342,89 @@ function newSale() {
         <p class="text-4xl font-bold text-gray-900">
           ${{ totalUsd.toFixed(2) }}
         </p>
+        <p
+          v-if="surchargesTotal > 0"
+          class="mt-1 text-xs text-gray-400"
+        >
+          Subtotal ${{ subtotalUsd.toFixed(2) }} + cargos
+          ${{ surchargesTotal.toFixed(2) }}
+        </p>
         <p v-if="exchangeRate > 0" class="mt-1 text-sm text-gray-400">
           Bs.{{ totalBs.toFixed(2) }} · Tasa {{ exchangeRate.toFixed(2) }}
         </p>
         <p v-if="rateError" class="mt-1 text-xs text-yellow-600">
           {{ rateError }}
         </p>
+      </div>
+
+      <!-- Sale channel selector -->
+      <div class="mb-4">
+        <p class="mb-2 text-sm font-semibold text-gray-700">Canal de venta</p>
+        <div class="flex gap-2">
+          <button
+            v-for="ch in channelOptions"
+            :key="ch.value"
+            class="rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors"
+            :class="
+              selectedChannel === ch.value
+                ? 'border-nova-primary bg-blue-50 text-nova-primary'
+                : 'border-gray-200 text-gray-600 hover:border-gray-300'
+            "
+            @click="selectedChannel = ch.value"
+          >
+            {{ ch.label }}
+          </button>
+        </div>
+      </div>
+
+      <!-- Surcharges -->
+      <div v-if="surchargeTypes.length > 0" class="mb-4">
+        <p class="mb-2 text-sm font-semibold text-gray-700">
+          Cargos adicionales
+        </p>
+
+        <!-- Available surcharge types -->
+        <div class="mb-2 flex flex-wrap gap-2">
+          <button
+            v-for="st in surchargeTypes"
+            :key="st.id"
+            class="rounded-full border border-dashed border-gray-300 px-3 py-1 text-xs text-gray-600 transition-colors hover:border-nova-primary hover:text-nova-primary"
+            :class="{
+              'opacity-40': appliedSurcharges.some((s) => s.name === st.name),
+            }"
+            :disabled="appliedSurcharges.some((s) => s.name === st.name)"
+            @click="addSurcharge(st)"
+          >
+            + {{ st.name }}
+          </button>
+        </div>
+
+        <!-- Applied surcharges with editable amounts -->
+        <div v-if="appliedSurcharges.length > 0" class="space-y-2">
+          <div
+            v-for="(surcharge, idx) in appliedSurcharges"
+            :key="idx"
+            class="flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2"
+          >
+            <span class="flex-1 text-sm text-gray-700">
+              {{ surcharge.name }}
+            </span>
+            <span class="text-xs text-gray-400">$</span>
+            <input
+              v-model.number="surcharge.amount"
+              type="number"
+              step="0.01"
+              min="0"
+              class="w-20 rounded border border-gray-200 px-2 py-1 text-right text-sm focus:border-nova-primary focus:outline-none"
+            >
+            <button
+              class="text-xs text-red-400 hover:text-red-600"
+              @click="removeSurcharge(idx)"
+            >
+              x
+            </button>
+          </div>
+        </div>
       </div>
 
       <!-- Payment method selector -->
@@ -314,7 +460,7 @@ function newSale() {
           type="text"
           placeholder="Numero de referencia"
           class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-nova-primary focus:outline-none"
-        />
+        >
       </div>
 
       <!-- Customer selector (for fiado) -->
@@ -327,7 +473,7 @@ function newSale() {
           type="text"
           placeholder="ID del cliente..."
           class="w-full rounded-lg border border-yellow-300 px-3 py-2 text-sm focus:border-yellow-500 focus:outline-none"
-        />
+        >
         <p class="mt-1 text-xs text-yellow-600">
           Se generara una cuenta por cobrar automaticamente
         </p>
