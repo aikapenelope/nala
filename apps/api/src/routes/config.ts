@@ -24,6 +24,7 @@ import {
   notificationPreferences,
 } from "@nova/db";
 import { handleDbError } from "../utils/db-errors";
+import { validateUuidParam } from "../middleware/validate-uuid";
 import type { AppEnv } from "../types";
 
 const configRoutes = new Hono<AppEnv>();
@@ -91,6 +92,7 @@ configRoutes.post(
 /** PATCH /surcharge-types/:id - Update a surcharge type. */
 configRoutes.patch(
   "/surcharge-types/:id",
+  validateUuidParam,
   zValidator("json", createSurchargeTypeSchema.partial()),
   async (c) => {
     const id = c.req.param("id");
@@ -124,7 +126,7 @@ configRoutes.patch(
 );
 
 /** DELETE /surcharge-types/:id - Deactivate a surcharge type. */
-configRoutes.delete("/surcharge-types/:id", async (c) => {
+configRoutes.delete("/surcharge-types/:id", validateUuidParam, async (c) => {
   const id = c.req.param("id");
   const db = c.get("db");
   const businessId = c.get("businessId");
@@ -209,6 +211,7 @@ configRoutes.post(
 /** PATCH /bank-accounts/:id - Update a bank account. */
 configRoutes.patch(
   "/bank-accounts/:id",
+  validateUuidParam,
   zValidator("json", createBankAccountSchema.partial()),
   async (c) => {
     const id = c.req.param("id");

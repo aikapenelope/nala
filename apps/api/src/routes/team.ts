@@ -20,6 +20,7 @@ import { eq, and } from "drizzle-orm";
 import { PIN_LENGTH } from "@nova/shared";
 import { users, businesses } from "@nova/db";
 import { handleDbError } from "../utils/db-errors";
+import { validateUuidParam } from "../middleware/validate-uuid";
 import type { AppEnv } from "../types";
 
 const team = new Hono<AppEnv>();
@@ -232,6 +233,7 @@ const updateEmployeeSchema = z.object({
  */
 team.patch(
   "/employees/:id",
+  validateUuidParam,
   zValidator("json", updateEmployeeSchema),
   async (c) => {
     const ownerCheck = requireOwner(c);
@@ -330,7 +332,7 @@ team.patch(
  * Sets isActive = false. The employee can no longer use PIN to identify.
  * Their sales history is preserved.
  */
-team.delete("/employees/:id", async (c) => {
+team.delete("/employees/:id", validateUuidParam, async (c) => {
   const ownerCheck = requireOwner(c);
   if (ownerCheck) return c.json(ownerCheck, 403);
 

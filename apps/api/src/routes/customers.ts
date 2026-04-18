@@ -42,6 +42,7 @@ import {
   activityLog,
 } from "@nova/db";
 import { handleDbError } from "../utils/db-errors";
+import { validateUuidParam } from "../middleware/validate-uuid";
 import type { AppEnv } from "../types";
 
 const customersRoutes = new Hono<AppEnv>();
@@ -125,7 +126,7 @@ customersRoutes.get(
 );
 
 /** GET /customers/:id - Get customer detail. */
-customersRoutes.get("/customers/:id", async (c) => {
+customersRoutes.get("/customers/:id", validateUuidParam, async (c) => {
   const id = c.req.param("id");
   const db = c.get("db");
   const businessId = c.get("businessId");
@@ -203,6 +204,7 @@ customersRoutes.post(
 /** PATCH /customers/:id - Update a customer. */
 customersRoutes.patch(
   "/customers/:id",
+  validateUuidParam,
   zValidator("json", updateCustomerSchema),
   async (c) => {
     const id = c.req.param("id");
@@ -351,6 +353,7 @@ customersRoutes.get("/accounts/receivable", async (c) => {
  */
 customersRoutes.post(
   "/accounts/receivable/:id/payment",
+  validateUuidParam,
   zValidator("json", recordPaymentSchema),
   async (c) => {
     const id = c.req.param("id");
@@ -529,6 +532,7 @@ customersRoutes.post(
  */
 customersRoutes.patch(
   "/accounts/payable/:id/pay",
+  validateUuidParam,
   zValidator("json", recordPaymentSchema),
   async (c) => {
     const id = c.req.param("id");
