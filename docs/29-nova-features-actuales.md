@@ -1,10 +1,10 @@
 # Nova: Features Actuales
 
 > Ultima actualizacion: Abril 2026
-> Codebase: ~20,900 lineas | 26 tablas (26 RLS policies) | 64 endpoints | 32 paginas | 49 tests
+> Codebase: ~22,000 lineas | 29 tablas (29 RLS policies) | 80+ endpoints | 32 paginas | 49 tests
 > Stack: Nuxt 4.4 + Hono + PostgreSQL 16 + Redis 7 + Clerk + Drizzle ORM
 > Produccion: novaincs.com | api.novaincs.com | *.novaincs.com (subdominios por tenant)
-> Migraciones: 7 (0000-0006)
+> Migraciones: 8 (0000-0007)
 
 ---
 
@@ -26,6 +26,11 @@ Nova es un backoffice operativo para comerciantes informales y PyMEs en Venezuel
 | 7 metodos de pago | Efectivo, Pago Movil, Binance, Zinli, Transferencia, Zelle, Fiado |
 | Split payment | Multiples metodos de pago en una sola venta |
 | Descuentos | Por porcentaje (%) y monto fijo (USD), a nivel de item y de venta |
+| Cargos adicionales | Delivery, propinas, empaques, comisiones. Configurables por negocio (surcharge_types) |
+| Canales de venta | POS, WhatsApp, delivery, online. Cada venta registra su canal |
+| Precio al mayor | Precio diferenciado por cantidad (wholesalePrice + wholesaleMinQty) |
+| Utilidad por venta | Costo total calculado automaticamente (totalCostUsd). Margen visible |
+| Productos tipo servicio | Productos sin stock (peluqueria, talleres). No decrementan inventario |
 | Offline | IndexedDB (Dexie.js) + cola FIFO, sincroniza al volver internet |
 | Cotizaciones | Crear cotizacion, convertir a venta con un toque |
 | Anulacion | Requiere PIN del dueno + motivo obligatorio. Restaura stock automaticamente |
@@ -46,7 +51,10 @@ Nova es un backoffice operativo para comerciantes informales y PyMEs en Venezuel
 |---------|---------|
 | Productos | CRUD completo con nombre, descripcion, SKU, barcode, costo, precio, stock |
 | Variantes | Talla, color, etc. Cada variante tiene su propio SKU, stock, costo y precio |
+| Servicios | Productos tipo servicio (sin stock). Para peluquerias, talleres, etc. |
 | Categorias | Pre-configuradas por tipo de negocio en onboarding. CRUD para agregar mas |
+| Marca y ubicacion | Campos opcionales para filtrar por marca y ubicacion fisica en tienda |
+| Precio al mayor | wholesalePrice + wholesaleMinQty por producto. Se aplica automaticamente |
 | Semaforo de stock | Verde (OK), amarillo (bajo), rojo (critico), gris (sin movimiento 60+ dias) |
 | Prediccion de agotamiento | "Se acaba en ~X dias" basado en velocidad de venta de los ultimos 30 dias |
 | Alertas de vencimiento | Productos que vencen en los proximos 30 dias |
@@ -92,12 +100,13 @@ Nova es un backoffice operativo para comerciantes informales y PyMEs en Venezuel
 |---------|---------|
 | Directorio | Nombre, telefono, email, direccion, notas |
 | CRUD | Crear, listar, editar (GET/POST/PATCH /suppliers) |
+| Estado de cuenta | GET /suppliers/:id/account: total compras, deudas pendientes, historial |
 | Vinculado a gastos | Las facturas de compra (OCR) se asocian al proveedor |
 | Aliases | El sistema aprende como cada proveedor nombra los productos |
 
 ---
 
-## 5. Reportes (9 tipos)
+## 5. Reportes (11 tipos)
 
 Todos los reportes incluyen narrativa generada por IA (OpenRouter GPT-4o-mini, fallback Groq).
 
@@ -109,9 +118,11 @@ Todos los reportes incluyen narrativa generada por IA (OpenRouter GPT-4o-mini, f
 | Inventario | GET /reports/inventory | Total productos, valor del inventario, stock bajo, stock critico, stock muerto |
 | Cuentas por cobrar | GET /reports/receivable | Total pendiente, aging (verde/amarillo/rojo), top 10 deudores |
 | Vendedores | GET /reports/sellers | Ranking por total vendido, cantidad de ventas, ticket promedio |
-| Financiero | GET /reports/financial | P&L simplificado: revenue, costo de ventas, gastos, ganancia bruta/neta, margenes |
+| Financiero | GET /reports/financial | P&L con desglose: revenue, COGS, gastos fijos/variables, ganancia bruta/neta, margenes |
 | Flujo de caja | GET /reports/cash-flow | Proyeccion a 7 y 30 dias, promedio diario revenue/gastos, pendientes por cobrar/pagar, tendencia 14 dias |
 | Alertas | GET /reports/alerts | Stock critico, stock bajo, deudas vencidas (30+ dias), stock muerto (60+ dias), productos por vencer |
+| Tendencia mensual | GET /reports/monthly-trend | Revenue, gastos y neto por mes (ultimos 12 meses) |
+| Stats por cliente | GET /reports/customer-stats/:id | Historial de compras, top productos, tendencia de gasto (6 meses) |
 
 ### Exportacion
 - **PDF**: Diario, semanal, financiero
@@ -143,7 +154,19 @@ Todos los reportes incluyen narrativa generada por IA (OpenRouter GPT-4o-mini, f
 
 ---
 
-## 8. Dashboard
+## 8. Configuracion del negocio
+
+| Feature | Detalle |
+|---------|---------|
+| Cargos adicionales | CRUD de surcharge_types: delivery, propinas, empaques. Monto fijo o porcentaje |
+| Cuentas bancarias | CRUD de bank_accounts: nombre, banco, tipo (corriente/ahorro/caja/digital), saldo inicial |
+| Notificaciones | Preferencias de alertas diarias por email (notification_preferences) |
+| Datos del negocio | Nombre, telefono, direccion, WhatsApp, email del contador |
+| Equipo | CRUD de empleados con PIN, activar/desactivar |
+
+---
+
+## 9. Dashboard
 
 | Elemento | Detalle |
 |----------|---------|
@@ -157,7 +180,7 @@ Todos los reportes incluyen narrativa generada por IA (OpenRouter GPT-4o-mini, f
 
 ---
 
-## 9. Autenticacion (patron Square POS)
+## 10. Autenticacion (patron Square POS)
 
 | Paso | Detalle |
 |------|---------|
@@ -176,7 +199,7 @@ Todos los reportes incluyen narrativa generada por IA (OpenRouter GPT-4o-mini, f
 
 ---
 
-## 10. Multi-tenancy
+## 11. Multi-tenancy
 
 | Capa | Implementacion |
 |------|---------------|
@@ -189,7 +212,7 @@ Todos los reportes incluyen narrativa generada por IA (OpenRouter GPT-4o-mini, f
 
 ---
 
-## 11. Onboarding
+## 12. Onboarding
 
 Flujo en 3 pasos despues de Clerk sign-up:
 
@@ -205,7 +228,7 @@ Crea en una transaccion atomica:
 
 ---
 
-## 12. PWA y Offline
+## 13. PWA y Offline
 
 | Feature | Detalle |
 |---------|---------|
@@ -216,7 +239,7 @@ Crea en una transaccion atomica:
 
 ---
 
-## 13. Infraestructura
+## 14. Infraestructura
 
 | Componente | Detalle |
 |------------|---------|
@@ -226,11 +249,11 @@ Crea en una transaccion atomica:
 | Storage | MinIO (S3-compatible, para imagenes de productos y facturas OCR) |
 | CI/CD | GitHub Actions: typecheck + lint + 49 tests + build en cada push/PR |
 | Docker | Multi-stage Dockerfile: deps -> builder -> api (port 3001) -> web (port 3000) |
-| Migraciones | Drizzle versionadas (7 migraciones) + init.sql para RLS policies |
+| Migraciones | Drizzle versionadas (8 migraciones) + init.sql para RLS policies |
 
 ---
 
-## 14. Stack tecnico
+## 15. Stack tecnico
 
 | Capa | Tecnologia | Version |
 |------|-----------|---------|
@@ -255,7 +278,7 @@ Crea en una transaccion atomica:
 
 ---
 
-## 15. Base de datos (26 tablas)
+## 16. Base de datos (29 tablas)
 
 ### Core
 | Tabla | Proposito |
@@ -269,7 +292,7 @@ Crea en una transaccion atomica:
 |-------|-----------|
 | categories | Categorias de productos por negocio |
 | units_of_measure | Unidades con abreviatura (unidad, caja, kg, litro) |
-| products | Productos con costo, precio, stock, semaforo, vencimiento |
+| products | Productos con costo, precio, stock, semaforo, vencimiento, marca, ubicacion, wholesale, servicio |
 | product_variants | Variantes (talla, color) con su propio stock/precio |
 | price_history | Log de cada cambio de costo/precio |
 | stock_movements | Log de cada cambio de stock (venta, compra, ajuste) |
@@ -278,7 +301,7 @@ Crea en una transaccion atomica:
 | Tabla | Proposito |
 |-------|-----------|
 | exchange_rates | Tasa BCV/EUR por dia por negocio |
-| sales | Ventas completadas/anuladas. Total USD/Bs, tasa, descuentos |
+| sales | Ventas: total USD/Bs, tasa, descuentos, costo, canal, cargos adicionales |
 | sale_items | Items de cada venta con cantidad, precio, descuento |
 | sale_payments | Pagos de cada venta (split payment) |
 | quotations | Cotizaciones (draft -> converted) |
@@ -303,9 +326,16 @@ Crea en una transaccion atomica:
 | expense_items | Items de cada gasto |
 | product_aliases | Aliases OCR aprendidos por proveedor |
 
+### Configuracion
+| Tabla | Proposito |
+|-------|-----------|
+| surcharge_types | Cargos adicionales configurables (delivery, propinas, empaques) |
+| bank_accounts | Cuentas bancarias y caja para tracking de saldos |
+| notification_preferences | Preferencias de alertas por email por negocio |
+
 ---
 
-## 16. Paginas frontend (32)
+## 17. Paginas frontend (32)
 
 ### Publicas
 | Ruta | Proposito |
@@ -349,12 +379,20 @@ Crea en una transaccion atomica:
 
 ---
 
-## 17. Lo que Nova NO hace (fuera de scope)
+## 18. Lo que Nova NO hace (fuera de scope)
 
 - Facturacion electronica / cumplimiento SENIAT (eliminado en PR #119 -- Nova es para comercio informal)
 - Nomina / RRHH
 - Costos FIFO / promedio ponderado
-- Multi-almacen
 - Integracion bancaria directa
 - Contabilidad completa (balance general, estados financieros auditables)
 - Declaraciones de impuestos
+
+---
+
+## 19. Roadmap (futuro)
+
+| Feature | Complejidad | Notas |
+|---------|-------------|-------|
+| Multi-almacen | Alta | Requiere reestructurar modelo de stock. Solo si hay demanda |
+| Mensajeria masiva WhatsApp | Alta | Requiere WhatsApp Business API + aprobacion de templates por Meta |
