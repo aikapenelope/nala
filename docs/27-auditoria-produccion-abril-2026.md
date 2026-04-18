@@ -1,9 +1,9 @@
 # Nova: Auditoria de Produccion - Abril 2026
 
-> Codebase: ~22,000 lineas | 29 tablas (29 RLS policies) | 80+ endpoints | 32 paginas | 49 tests
+> Codebase: ~23,500 lineas | 29 tablas (29 RLS policies) | 87 endpoints | 39 paginas | 47 tests
 > Stack: Nuxt 4.4 + Hono + PostgreSQL 16 + Redis 7 + Clerk + Drizzle ORM
 > Produccion: novaincs.com, api.novaincs.com, *.novaincs.com
-> Migraciones: 8 (0000-0007)
+> Migraciones: 9 (0000-0008)
 
 ---
 
@@ -54,6 +54,23 @@ split de reports, settings API, OCR fallback.
 | #122 | Feature parity: 14 features en 5 sprints (migracion 0007). Utilidad por venta, servicios, cargos adicionales, precio al mayor, canales de venta, gastos fijos/variables, estado de cuenta proveedor, tendencia mensual, stats por cliente, cuentas bancarias, surcharge types, notificaciones |
 
 PR #108 (Playwright E2E) cerrado sin merge -- reemplazado por #109.
+
+### Sesion 5 (PRs #125, #129, #130, #131, #132)
+
+Ejecucion completa del roadmap de auditoria (doc 30). 4 sprints, 15 hallazgos resueltos.
+
+| PR | Contenido |
+|----|-----------|
+| #125 | Sprint 1 (critico): fix race condition en stock (WHERE stock >= qty atomico), fix void sale fiado (restaurar balanceUsd + cancelar accounts_receivable + revertir stats) |
+| #129 | Sprint 2 (seguridad): publicRateLimit en POST /onboarding, validateUuidParam en 22 endpoints, PIN lockout (5 intentos/15 min), stockMovements dentro de TX, npm audit fix (Clerk CVE) |
+| #130 | Sprint 3 (calidad): .limit(500) en 6 endpoints sin paginacion, migracion 0008 (idx_sales_customer, idx_sales_channel), health check con write test, documentacion RLS session-level en doc 26 |
+| #131 | Sprint 4 (frontend): UI para surcharges y canales en checkout, isService/wholesale/brand/location en producto, utilidad en historial, gastos fijos/variables, tendencia mensual, stats por cliente, CRUD surcharges/bank accounts/notifications en settings |
+| #132 | Sprint 4 (complemento): UI estado de cuenta proveedor (/suppliers list + /suppliers/:id detail) |
+
+PRs cerrados sin merge (reemplazados por rebases):
+- #126 -> reemplazado por #129 (conflictos con Sprint 1)
+- #127 -> reemplazado por #130 (conflictos con Sprint 2)
+- #128 -> reemplazado por #131 (conflictos con Sprint 2)
 
 ---
 
@@ -129,11 +146,14 @@ PR #108 (Playwright E2E) cerrado sin merge -- reemplazado por #109.
 
 ### Seguridad
 - RLS en 29 tablas con cleanup en finally
-- Rate limiting (Redis + fallback)
+- Rate limiting (Redis + fallback): publico 60/min, autenticado 120/min, escritura 30/min, onboarding 60/min
+- UUID validation middleware en 22 endpoints con path params (:id)
 - Scanner bot blocking
 - Security headers
-- PIN lockout (5 intentos)
+- PIN lockout (5 intentos, bloqueo 15 minutos)
 - handleDbError en todos los endpoints de escritura
+- Stock movements atomicos dentro de la transaccion de venta
+- npm audit: Clerk CVE parcheado, dependencias seguras actualizadas
 
 ---
 
