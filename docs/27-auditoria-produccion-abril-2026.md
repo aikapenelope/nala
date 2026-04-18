@@ -1,16 +1,16 @@
 # Nova: Auditoria de Produccion - Abril 2026
 
-> Codebase: ~19,500 lineas | 26 tablas (todas con RLS) | 51 endpoints | 32 paginas | 47 tests
+> Codebase: ~20,500 lineas | 30 tablas (todas con RLS) | 55+ endpoints | 33 paginas | 49 tests
 > Stack: Nuxt 4.4 + Hono + PostgreSQL 16 + Redis 7 + Clerk + Drizzle ORM
 > Produccion: novaincs.com, api.novaincs.com, *.novaincs.com
 
 ---
 
-## Estado actual: 95% production-ready
+## Estado actual: Production-ready
 
-Todos los sprints completados. Seguridad RLS completa en 29 tablas, offline queue
-integrada, 47 tests en CI, SEO para catalogo. Pendiente: error tracking (herramienta
-por decidir) y PWA icons (logo por subir).
+Todos los sprints completados. IVA, proveedores, notas de credito, cupos de credito
+implementados. Dashboard rediseñado para comerciantes venezolanos. 30 tablas con RLS,
+55+ endpoints, 49 tests en CI.
 
 ---
 
@@ -54,8 +54,6 @@ por decidir) y PWA icons (logo por subir).
 | 13 | Health check SSR: endpoint /api/health en Nuxt + Dockerfile actualizado | HECHO |
 | 14 | Fix $fetch type error pre-existente en useApi.ts | HECHO |
 
-Nota: error tracking (Sentry u otra herramienta) diferido hasta decidir solucion para todos los proyectos.
-
 ---
 
 ## Sprint 4: Offline y PWA -- COMPLETADO (PR #107)
@@ -80,12 +78,39 @@ Nota: error tracking (Sentry u otra herramienta) diferido hasta decidir solucion
 | 23 | Corren en CI con PostgreSQL + Redis (sin Clerk, sin browser) | HECHO |
 | 24 | Backups DB: cubierto por Hetzner Cloud backup diario | OK |
 
-Nota: E2E browser tests (Playwright) bloqueados por @clerk/nuxt forzando HTTPS en SSR.
-Para habilitarlos se necesita Clerk test instance con keys reales como GitHub secrets.
+---
+
+## Dashboard redesign -- COMPLETADO (PR #111)
+
+| # | Tarea | Estado |
+|---|-------|--------|
+| 25 | Saludo con nombre del negocio + hora del dia | HECHO |
+| 26 | Card de ventas con trend badge verde/rojo | HECHO |
+| 27 | 3 cards visuales: "Te deben", "Se acaban", "En 7 dias" (cash flow) | HECHO |
+| 28 | Alertas: 3 visibles en mobile con borde coloreado por severidad | HECHO |
+| 29 | Skeleton loading + boton Actualizar (pull-to-refresh) | HECHO |
+| 30 | Rate editor movido a modal | HECHO |
+| 31 | Pagina /reports/cash-flow con proyeccion 7d/30d y trend chart | HECHO |
+| 32 | Reports hub actualizado con link a cash flow | HECHO |
 
 ---
 
-## PRs mergeados en esta sesion
+## Paridad FoxPro -- COMPLETADO (PR #112)
+
+| # | Tarea | Estado |
+|---|-------|--------|
+| 33 | IVA basico: tax_rate en productos (0/8/16%), calculo en ventas | HECHO |
+| 34 | subtotal_usd, tax_amount en sales y sale_items | HECHO |
+| 35 | Tabla de proveedores: suppliers con RIF, CRUD completo | HECHO |
+| 36 | expenses.supplier_id migrado de text a uuid FK | HECHO |
+| 37 | Notas de credito: POST /sales/credit-note con stock restore | HECHO |
+| 38 | Cupo de credito: credit_limit_usd en customers, validacion en checkout | HECHO |
+| 39 | Descuento por monto fijo: discount_amount en sales | HECHO |
+| 40 | Migracion 0003 + RLS para suppliers | HECHO |
+
+---
+
+## PRs de esta sesion
 
 | PR | Contenido |
 |----|-----------|
@@ -96,8 +121,55 @@ Para habilitarlos se necesita Clerk test instance con keys reales como GitHub se
 | #106 | Sprint 3: dashboard dedup, SSR health, $fetch fix |
 | #107 | Sprint 4: offline queue, SEO catalogo |
 | #109 | Sprint 5: 30 API E2E tests |
+| #110 | Roadmap final |
+| #111 | Dashboard redesign visual |
+| #112 | Paridad FoxPro: IVA, proveedores, NC, cupos, descuento fijo |
 
 PR #108 (Playwright E2E) cerrado sin merge -- reemplazado por #109.
+
+---
+
+## Cobertura vs FoxPro legacy
+
+### Lo que Nova TIENE que FoxPro no tiene
+- POS mobile-first con offline queue
+- OCR de facturas con IA
+- Reportes con narrativa AI
+- CRM automatico con segmentos
+- Cobro por WhatsApp
+- Catalogo publico por subdominio
+- Multi-tenant SaaS con RLS
+- 7 metodos de pago venezolanos
+
+### Lo que Nova TIENE equivalente a FoxPro
+- Inventario con variantes, barcode, semaforo, unidades de medida
+- IVA (0%, 8%, 16%)
+- Cuentas por cobrar con pagos parciales y aging
+- Cuentas por pagar con vencimientos
+- Proveedores con RIF
+- Notas de credito con devolucion parcial
+- Cupos de credito por cliente
+- Descuentos por % y monto fijo
+- Plan de cuentas contable con asientos automaticos
+- Cierre de caja diario
+- Cotizaciones convertibles a venta
+- Historial de precios
+
+### Lo que EXCEDE el scope de Nova (no recomendado implementar)
+- Facturacion electronica SENIAT (integrar con servicio externo)
+- Nomina/RRHH (sistema separado)
+- Costos FIFO/promedio ponderado (ultimo costo es suficiente para PYMES)
+- Multi-almacen (solo necesario a escala)
+- Centros de costo (empresas medianas/grandes)
+- Integracion bancaria (no hay APIs bancarias en Venezuela)
+
+### Migracion de datos desde FoxPro
+Nova no necesita un modulo de migracion interno. La estrategia es:
+1. Script externo en Python que lee archivos .DBF (libreria `dbf`)
+2. Transforma y limpia datos (encoding Windows-1252 -> UTF-8, normalizacion)
+3. Carga via API REST de Nova (POST /products, /customers, /suppliers)
+4. Los endpoints de batch import ya existen (/inventory/import, OCR confirm)
+5. Operacion en paralelo durante transicion (FoxPro + Nova)
 
 ---
 
@@ -114,6 +186,9 @@ PR #108 (Playwright E2E) cerrado sin merge -- reemplazado por #109.
 | 7 | sitemap.xml para catalogo | SEO |
 | 8 | PgBouncer + RLS transaccional | Solo a escala |
 | 9 | Service Worker offline verificado | PWA registrada, no verificada |
+| 10 | Multi-almacen | Solo si hay demanda |
+| 11 | Precios por cliente/escala | Solo si hay demanda |
+| 12 | Ordenes de compra | Conectar con OCR confirm |
 
 ---
 
@@ -147,12 +222,14 @@ PR #108 (Playwright E2E) cerrado sin merge -- reemplazado por #109.
 - useState/useRuntimeConfig de Nuxt: NUNCA a nivel de modulo, siempre dentro de composables/setup.
 - Coolify se satura con muchos PRs seguidos: mergear en batches de 2-3.
 
-### Sesion 2 (PRs #102-#109)
+### Sesion 2 (PRs #102-#112)
 - NUXT_PUBLIC_API_BASE es build-time: requiere rebuild del web service despues de cambiar.
 - Clerk redirect_uri_mismatch: verificar que el redirect URI en Google Cloud Console coincida exactamente con el de Clerk Dashboard.
 - set_config session-level con pool: limpiar en finally para evitar RLS leak.
-- Migraciones con backfill: agregar columna nullable -> UPDATE desde parent -> SET NOT NULL. Seguro en produccion.
-- Los NOTICE de "policy does not exist, skipping" en init.sql son normales en primer deploy de nuevas policies.
+- Migraciones con backfill: agregar columna nullable -> UPDATE desde parent -> SET NOT NULL.
+- Los NOTICE de "policy does not exist, skipping" en init.sql son normales en primer deploy.
 - $fetch<T> de Nuxt con baseURL externo requiere cast explicito `as T` (Nitro type mismatch).
-- @clerk/nuxt en SSR: fuerza HTTPS y valida publishable key en cada request del server middleware. Imposible correr E2E browser en CI sin keys reales. Solucion: API E2E tests con Vitest + app.request() (sin HTTP, sin Clerk).
-- Clerk publishable key format: pk_test_ + base64(dominio + "$"). No acepta placeholders arbitrarios.
+- @clerk/nuxt en SSR: fuerza HTTPS y valida publishable key en cada request. Imposible correr E2E browser en CI sin keys reales.
+- Clerk publishable key format: pk_test_ + base64(dominio + "$"). No acepta placeholders.
+- calculateSaleTotal cambio de retornar number a retornar {subtotal, discountTotal, taxTotal, total}. Actualizar todos los call sites.
+- Migracion de supplier_id text -> uuid: RENAME old -> ADD new uuid -> DROP old. No se puede ALTER TYPE directamente.
