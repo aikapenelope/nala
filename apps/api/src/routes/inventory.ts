@@ -577,7 +577,8 @@ inventory.get("/categories", async (c) => {
     .where(
       and(eq(categories.businessId, businessId), eq(categories.isActive, true)),
     )
-    .orderBy(categories.sortOrder);
+    .orderBy(categories.sortOrder)
+    .limit(500);
 
   return c.json({ categories: rows });
 });

@@ -57,6 +57,13 @@
       "when": 1776734400000,
       "tag": "0007_feature_parity",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1776820800000,
+      "tag": "0008_sales_indexes",
+      "breakpoints": true
     }
   ]
 }

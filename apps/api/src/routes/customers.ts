@@ -338,7 +338,8 @@ customersRoutes.get("/accounts/receivable", async (c) => {
         eq(accountsReceivable.status, "pending"),
       ),
     )
-    .orderBy(desc(accountsReceivable.createdAt));
+    .orderBy(desc(accountsReceivable.createdAt))
+    .limit(500);
 
   const totalPending = rows.reduce((sum, r) => sum + Number(r.balanceUsd), 0);
 
@@ -493,7 +494,8 @@ customersRoutes.get("/accounts/payable", async (c) => {
         eq(accountsPayable.status, "pending"),
       ),
     )
-    .orderBy(desc(accountsPayable.createdAt));
+    .orderBy(desc(accountsPayable.createdAt))
+    .limit(500);
 
   const totalPending = rows.reduce((sum, r) => sum + Number(r.balanceUsd), 0);
 

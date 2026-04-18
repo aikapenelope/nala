@@ -428,6 +428,8 @@ export const sales = pgTable(
     index("idx_sales_business").on(table.businessId),
     index("idx_sales_user").on(table.userId),
     index("idx_sales_created").on(table.createdAt),
+    index("idx_sales_customer").on(table.customerId),
+    index("idx_sales_channel").on(table.channel),
   ],
 );
 

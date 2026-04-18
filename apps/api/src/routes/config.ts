@@ -54,7 +54,8 @@ configRoutes.get("/surcharge-types", async (c) => {
         eq(surchargeTypes.businessId, businessId),
         eq(surchargeTypes.isActive, true),
       ),
-    );
+    )
+    .limit(500);
 
   return c.json({ surchargeTypes: rows });
 });

@@ -185,7 +185,7 @@ Lo que si hicimos fue **dejar de usar el CLI de drizzle-kit en runtime** y reemp
 | 2 | JWT expira + roster cacheado = 401 silencioso | Empleado ve errores sin explicacion | Interceptor en useApi que detecta 401 y muestra "Sesion expirada, el dueno debe re-autenticar" |
 | 3 | Ventana de 5 min con PIN viejo tras cambio | Empleado despedido puede operar 5 min | Reducir refresh a 1 min, o forzar refresh al cambiar PIN |
 | 4 | reports.ts tiene 1500+ lineas | Dificil de mantener | Dividir en reports-data.ts, reports-pdf.ts, reports-xlsx.ts, reports-email.ts |
-| 5 | `set_config` session-level con pool | Riesgo teorico de RLS leak bajo carga | Documentado. Migrar a transacciones explicitas cuando el trafico lo justifique |
+| 5 | `set_config` session-level con pool | Riesgo teorico de RLS leak bajo carga | Documentado (ver seccion 7). Migrar a transacciones explicitas cuando el trafico lo justifique |
 
 ### Bajos (backlog)
 
@@ -238,3 +238,49 @@ El riesgo principal no es tecnico sino operacional: mantener 26 tablas con RLS, 
 3. **Dividir reports.ts** - mantenibilidad
 4. **Reducir roster refresh a 1 min** - seguridad
 5. **Sentry error tracking** - visibilidad de errores en produccion
+
+---
+
+## 7. RLS Session-Level: Requisito de Connection Pooling
+
+### Como funciona actualmente
+
+Nova usa `set_config('app.current_business_id', businessId, false)` en el tenant
+middleware para establecer el contexto RLS. El tercer parametro `false` significa
+**session-level** (persiste durante toda la conexion, no solo la transaccion actual).
+
+El driver `postgres.js` crea una conexion nueva por cada query por defecto, lo que
+hace que el session-level sea seguro: cada request obtiene su propia conexion, se
+configura el business_id, se ejecutan las queries, y la conexion se devuelve al pool.
+El `finally` block en el tenant middleware limpia el config al terminar.
+
+### Riesgo con PgBouncer
+
+Si en el futuro se agrega PgBouncer como connection pooler:
+
+- **Session mode:** Seguro. Cada sesion del cliente mantiene su propia conexion
+  al backend de PostgreSQL. `set_config` session-level funciona correctamente.
+
+- **Transaction mode:** **PELIGROSO.** PgBouncer reutiliza conexiones entre
+  transacciones. Si el `finally` block no limpia el config (por error o timeout),
+  la siguiente request podria heredar el `business_id` de otro tenant, causando
+  un **leak de datos entre tenants**.
+
+### Reglas
+
+1. **No usar PgBouncer en transaction mode** con la implementacion actual de RLS.
+   Solo session mode es seguro.
+
+2. Si se necesita transaction mode (para escalar a muchos tenants), migrar a
+   `set_config('app.current_business_id', businessId, true)` (transaction-level)
+   y envolver cada request en una transaccion explicita.
+
+3. El `finally` block en `apps/api/src/middleware/tenant.ts` que ejecuta
+   `set_config('app.current_business_id', '', false)` es **critico**. Nunca
+   eliminarlo sin migrar a transaction-level primero.
+
+### Estado actual
+
+Con `postgres.js` directo (sin PgBouncer), el riesgo es teorico. El trafico
+actual de Nova no justifica agregar PgBouncer. Cuando el trafico lo requiera,
+migrar a transaction-level `set_config` antes de agregar cualquier pooler externo.
