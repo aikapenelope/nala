@@ -35,7 +35,6 @@ import { periodQuery, parsePeriodRange } from "./reports-helpers";
 import { reportsPdf } from "./reports-pdf";
 import { reportsXlsx } from "./reports-xlsx";
 import { reportsEmail } from "./reports-email";
-import { purchaseBook } from "./reports-purchase-book";
 import type { AppEnv } from "../types";
 
 const reports = new Hono<AppEnv>();
@@ -967,6 +966,5 @@ reports.get("/reports/alerts", async (c) => {
 reports.route("/", reportsPdf);
 reports.route("/", reportsXlsx);
 reports.route("/", reportsEmail);
-reports.route("/", purchaseBook);
 
 export { reports };

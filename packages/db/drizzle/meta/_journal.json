@@ -43,6 +43,13 @@
       "when": 1776561600000,
       "tag": "0005_rif_openings",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1776648000000,
+      "tag": "0006_remove_seniat_fields",
+      "breakpoints": true
     }
   ]
 }

@@ -110,7 +110,7 @@ const ticketTotal = computed(() => {
       unitPrice: item.unitPrice,
       discountPercent: item.discountPercent,
     })),
-  ).total;
+  );
 });
 
 /** Filtered products based on search. */

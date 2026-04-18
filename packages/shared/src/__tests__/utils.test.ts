@@ -38,25 +38,23 @@ describe("calculateSaleTotal", () => {
       { quantity: 2, unitPrice: 5, discountPercent: 0 },
       { quantity: 1, unitPrice: 3, discountPercent: 0 },
     ];
-    expect(calculateSaleTotal(items).total).toBe(13);
+    expect(calculateSaleTotal(items)).toBe(13);
   });
 
   it("applies sale-level discount", () => {
     const items = [{ quantity: 1, unitPrice: 100, discountPercent: 0 }];
-    expect(calculateSaleTotal(items, 10).total).toBe(90);
-  });
-
-  it("calculates IVA correctly", () => {
-    const items = [{ quantity: 1, unitPrice: 100, discountPercent: 0, taxRate: 16 }];
-    const result = calculateSaleTotal(items);
-    expect(result.subtotal).toBe(100);
-    expect(result.taxTotal).toBe(16);
-    expect(result.total).toBe(116);
+    expect(calculateSaleTotal(items, 10)).toBe(90);
   });
 
   it("applies fixed discount amount", () => {
     const items = [{ quantity: 1, unitPrice: 100, discountPercent: 0 }];
-    expect(calculateSaleTotal(items, 0, 10).total).toBe(90);
+    expect(calculateSaleTotal(items, 0, 10)).toBe(90);
+  });
+
+  it("applies both percentage and fixed discount", () => {
+    const items = [{ quantity: 1, unitPrice: 100, discountPercent: 0 }];
+    // 10% off = 90, then -5 = 85
+    expect(calculateSaleTotal(items, 10, 5)).toBe(85);
   });
 });
 
