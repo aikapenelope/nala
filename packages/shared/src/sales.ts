@@ -6,6 +6,10 @@
 import { z } from "zod";
 import { paymentMethodSchema } from "./schemas";
 
+/** Valid IVA rates in Venezuela. */
+export const VALID_TAX_RATES = [0, 8, 16] as const;
+export type TaxRate = (typeof VALID_TAX_RATES)[number];
+
 /** Schema for a sale item (line in the ticket). */
 export const saleItemSchema = z.object({
   productId: z.string().uuid(),
@@ -13,6 +17,8 @@ export const saleItemSchema = z.object({
   quantity: z.number().int().min(1),
   unitPrice: z.number().min(0),
   discountPercent: z.number().min(0).max(100).default(0),
+  /** Tax rate for this item (copied from product). */
+  taxRate: z.number().min(0).max(100).default(0),
 });
 
 /** Schema for a sale payment. */
@@ -30,11 +36,32 @@ export const createSaleSchema = z.object({
   items: z.array(saleItemSchema).min(1),
   payments: z.array(salePaymentSchema).min(1),
   discountPercent: z.number().min(0).max(100).default(0),
+  /** Fixed discount amount in USD (applied after percentage discount). */
+  discountAmount: z.number().min(0).default(0),
   notes: z.string().max(500).optional(),
 });
 
 /** Schema for voiding a sale (requires owner PIN). */
 export const voidSaleSchema = z.object({
+  reason: z.string().min(1).max(500),
+});
+
+/** Schema for creating a credit note (partial refund). */
+export const createCreditNoteSchema = z.object({
+  /** Original sale to credit against. */
+  originalSaleId: z.string().uuid(),
+  /** Items to return (subset of original sale items). */
+  items: z
+    .array(
+      z.object({
+        productId: z.string().uuid(),
+        variantId: z.string().uuid().optional(),
+        quantity: z.number().int().min(1),
+        unitPrice: z.number().min(0),
+        taxRate: z.number().min(0).max(100).default(0),
+      }),
+    )
+    .min(1),
   reason: z.string().min(1).max(500),
 });
 
@@ -45,7 +72,7 @@ export const createQuotationSchema = z.object({
 });
 
 /**
- * Calculate line total after discount.
+ * Calculate line total after discount (before tax).
  * lineTotal = quantity * unitPrice * (1 - discountPercent / 100)
  */
 export function calculateLineTotal(
@@ -53,23 +80,83 @@ export function calculateLineTotal(
   unitPrice: number,
   discountPercent: number,
 ): number {
-  return Math.round(quantity * unitPrice * (1 - discountPercent / 100) * 100) / 100;
+  return (
+    Math.round(quantity * unitPrice * (1 - discountPercent / 100) * 100) / 100
+  );
 }
 
 /**
- * Calculate sale total from items with optional sale-level discount.
+ * Calculate tax amount for a line item.
+ * taxAmount = lineTotal * (taxRate / 100)
+ */
+export function calculateLineTax(
+  lineTotal: number,
+  taxRate: number,
+): number {
+  return Math.round(lineTotal * (taxRate / 100) * 100) / 100;
+}
+
+/**
+ * Calculate sale totals with IVA and discounts.
+ *
+ * Flow:
+ * 1. Sum line totals (after per-item discounts) = subtotal
+ * 2. Apply sale-level % discount
+ * 3. Apply sale-level fixed amount discount
+ * 4. Calculate tax on each item's line total
+ * 5. Total = discounted subtotal + total tax
  */
 export function calculateSaleTotal(
-  items: Array<{ quantity: number; unitPrice: number; discountPercent: number }>,
+  items: Array<{
+    quantity: number;
+    unitPrice: number;
+    discountPercent: number;
+    taxRate?: number;
+  }>,
   saleDiscountPercent: number = 0,
-): number {
+  saleDiscountAmount: number = 0,
+): {
+  subtotal: number;
+  discountTotal: number;
+  taxTotal: number;
+  total: number;
+} {
+  // 1. Sum line totals
   const subtotal = items.reduce(
     (sum, item) =>
-      sum + calculateLineTotal(item.quantity, item.unitPrice, item.discountPercent),
+      sum +
+      calculateLineTotal(item.quantity, item.unitPrice, item.discountPercent),
     0,
   );
-  const total = subtotal * (1 - saleDiscountPercent / 100);
-  return Math.round(total * 100) / 100;
+
+  // 2-3. Apply sale-level discounts
+  const afterPercentDiscount = subtotal * (1 - saleDiscountPercent / 100);
+  const afterAllDiscounts = Math.max(0, afterPercentDiscount - saleDiscountAmount);
+  const discountTotal =
+    Math.round((subtotal - afterAllDiscounts) * 100) / 100;
+
+  // 4. Calculate tax per item (on line totals, proportionally discounted)
+  const discountRatio = subtotal > 0 ? afterAllDiscounts / subtotal : 0;
+  const taxTotal = items.reduce((sum, item) => {
+    const lineTotal = calculateLineTotal(
+      item.quantity,
+      item.unitPrice,
+      item.discountPercent,
+    );
+    const discountedLine = lineTotal * discountRatio;
+    return sum + calculateLineTax(discountedLine, item.taxRate ?? 0);
+  }, 0);
+
+  // 5. Total
+  const total =
+    Math.round((afterAllDiscounts + taxTotal) * 100) / 100;
+
+  return {
+    subtotal: Math.round(subtotal * 100) / 100,
+    discountTotal,
+    taxTotal: Math.round(taxTotal * 100) / 100,
+    total,
+  };
 }
 
 /**

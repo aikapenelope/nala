@@ -149,6 +149,12 @@ DROP POLICY IF EXISTS expenses_tenant_isolation ON expenses;
 CREATE POLICY expenses_tenant_isolation ON expenses
   USING (business_id = current_business_id());
 
+-- Suppliers
+ALTER TABLE suppliers ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS suppliers_tenant_isolation ON suppliers;
+CREATE POLICY suppliers_tenant_isolation ON suppliers
+  USING (business_id = current_business_id());
+
 -- Expense items
 ALTER TABLE expense_items ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS expense_items_tenant_isolation ON expense_items;

@@ -184,6 +184,9 @@ customersRoutes.post(
           email: data.email,
           address: data.address,
           notes: data.notes,
+          creditLimitUsd: data.creditLimitUsd
+            ? String(data.creditLimitUsd)
+            : undefined,
         })
         .returning();
 
@@ -212,6 +215,8 @@ customersRoutes.patch(
     if (data.email !== undefined) updateValues.email = data.email;
     if (data.address !== undefined) updateValues.address = data.address;
     if (data.notes !== undefined) updateValues.notes = data.notes;
+    if (data.creditLimitUsd !== undefined)
+      updateValues.creditLimitUsd = String(data.creditLimitUsd);
 
     const [updated] = await db
       .update(customers)

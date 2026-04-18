@@ -183,6 +183,9 @@ export const products = pgTable(
     /** Sale price in USD. For products with variants, this is the default. */
     price: numeric("price", { precision: 12, scale: 2 }).notNull().default("0"),
 
+    /** Tax rate for this product (0, 8, 16). 0 = exento. */
+    taxRate: numeric("tax_rate", { precision: 5, scale: 2 }).notNull().default("0"),
+
     /** Current stock. For products with variants, this is the sum of variant stocks. */
     stock: integer("stock").notNull().default(0),
 
@@ -374,8 +377,26 @@ export const sales = pgTable(
       scale: 2,
     }).default("0"),
 
+    /** Discount on the entire sale (fixed amount in USD). */
+    discountAmount: numeric("discount_amount", {
+      precision: 12,
+      scale: 2,
+    }).default("0"),
+
+    /** Subtotal before tax (USD). */
+    subtotalUsd: numeric("subtotal_usd", { precision: 12, scale: 2 }),
+
+    /** Total tax amount (USD). */
+    taxAmount: numeric("tax_amount", { precision: 12, scale: 2 }).default("0"),
+
     /** Sale status. */
     status: text("status").notNull().default("completed"),
+
+    /** Document type: invoice (default), credit_note, debit_note. */
+    documentType: text("document_type").notNull().default("invoice"),
+
+    /** Reference to original sale (for credit/debit notes). */
+    originalSaleId: uuid("original_sale_id"),
 
     /** Void reason (required when status = 'voided'). */
     voidReason: text("void_reason"),
@@ -429,6 +450,12 @@ export const saleItems = pgTable("sale_items", {
   }).default("0"),
   /** Line total after discount (USD). */
   lineTotal: numeric("line_total", { precision: 12, scale: 2 }).notNull(),
+
+  /** Tax rate applied to this item (copied from product at time of sale). */
+  taxRate: numeric("tax_rate", { precision: 5, scale: 2 }).default("0"),
+
+  /** Tax amount for this line (USD). */
+  taxAmount: numeric("tax_amount", { precision: 12, scale: 2 }).default("0"),
 });
 
 /**
@@ -522,6 +549,11 @@ export const customers = pgTable(
       .default("0"),
     lastPurchaseAt: timestamp("last_purchase_at", { withTimezone: true }),
     balanceUsd: numeric("balance_usd", { precision: 12, scale: 2 })
+      .notNull()
+      .default("0"),
+
+    /** Maximum fiado allowed for this customer (0 = no limit). */
+    creditLimitUsd: numeric("credit_limit_usd", { precision: 12, scale: 2 })
       .notNull()
       .default("0"),
     isActive: boolean("is_active").notNull().default(true),
@@ -651,6 +683,34 @@ export const dayCloses = pgTable("day_closes", {
 // Phase 6 tables: Accounting + OCR
 // ============================================================
 
+/** Suppliers - vendor/provider directory. */
+export const suppliers = pgTable(
+  "suppliers",
+  {
+    id: uuid("id")
+      .default(sql`gen_random_uuid()`)
+      .primaryKey(),
+    businessId: uuid("business_id")
+      .notNull()
+      .references(() => businesses.id),
+    name: text("name").notNull(),
+    /** RIF or tax ID (e.g. J-12345678-9). */
+    rif: text("rif"),
+    phone: text("phone"),
+    email: text("email"),
+    address: text("address"),
+    notes: text("notes"),
+    isActive: boolean("is_active").notNull().default(true),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [index("idx_suppliers_business").on(table.businessId)],
+);
+
 /** Chart of accounts - pre-configured per business type. */
 export const accountingAccounts = pgTable("accounting_accounts", {
   id: uuid("id")
@@ -705,7 +765,9 @@ export const expenses = pgTable("expenses", {
   businessId: uuid("business_id")
     .notNull()
     .references(() => businesses.id),
-  supplierId: text("supplier_id"),
+  /** Link to supplier directory (optional, for new supplier workflow). */
+  supplierId: uuid("supplier_id").references(() => suppliers.id),
+  /** Supplier name (denormalized for display, or free text if no supplier record). */
   supplierName: text("supplier_name"),
   invoiceNumber: text("invoice_number"),
   date: timestamp("date", { withTimezone: true }).notNull(),
