@@ -16,13 +16,13 @@ CI:   GitHub Actions (typecheck + lint + 49 tests + build)
 
 | Metrica | Valor |
 |---------|-------|
-| Lineas de codigo | ~21,400 |
-| Tablas PostgreSQL | 26 (todas con RLS) |
-| RLS policies | 26 |
-| Endpoints API | 67 |
+| Lineas de codigo | ~22,000 |
+| Tablas PostgreSQL | 29 (todas con RLS) |
+| RLS policies | 29 |
+| Endpoints API | 80+ |
 | Paginas frontend | 32 |
 | Tests automatizados | 49 (unit + E2E API) |
-| Migraciones Drizzle | 7 |
+| Migraciones Drizzle | 8 |
 
 ## Stack tecnico
 
@@ -44,10 +44,10 @@ CI:   GitHub Actions (typecheck + lint + 49 tests + build)
 
 ```
 apps/
-  api/     Hono REST API (67 endpoints, structured JSON logging, rate limiting)
+  api/     Hono REST API (80+ endpoints, structured JSON logging, rate limiting)
   web/     Nuxt 4.4 SSR + PWA (32 paginas, subdomain-per-tenant)
 packages/
-  db/      Drizzle ORM schema (26 tablas, 26 RLS policies, 7 migraciones)
+  db/      Drizzle ORM schema (29 tablas, 29 RLS policies, 8 migraciones)
   shared/  Zod schemas, constantes, utilidades (moneda dual VES/USD)
 ```
 
@@ -75,12 +75,18 @@ Ferreterias, bodegas, tiendas de ropa, autopartes, peluquerias, farmacias, tiend
 - Registro en 3-4 toques, 7 metodos de pago venezolanos
 - Funciona offline (IndexedDB + sync FIFO cuando vuelve internet)
 - Descuento por porcentaje y monto fijo
+- Cargos adicionales configurables (delivery, propinas, empaques)
+- Canales de venta (POS, WhatsApp, delivery, online)
+- Utilidad por venta en tiempo real (costo vs precio)
 - Cotizaciones convertibles a venta
 - Split payment (multiples metodos en una venta)
 - Anulacion de ventas con PIN del dueno
 
 ### Inventario
 - Variantes (talla, color), barcode, semaforo de stock
+- Productos tipo servicio (sin stock, para peluquerias/talleres)
+- Precio al mayor (wholesalePrice + cantidad minima)
+- Marca y ubicacion fisica del producto
 - Prediccion de agotamiento, alertas de vencimiento
 - Unidades de medida con conversion (caja -> unidad)
 - Ajuste manual de inventario con audit trail
@@ -89,16 +95,18 @@ Ferreterias, bodegas, tiendas de ropa, autopartes, peluquerias, farmacias, tiend
 
 ### Clientes y CRM
 - Perfil automatico con segmentos (VIP, en riesgo, inactivo)
+- Estadisticas detalladas por cliente (historial, top productos, tendencia)
 - Cuentas por cobrar con pagos parciales y aging
 - Cupo de credito por cliente (validado en checkout)
 - Cobro por WhatsApp en un toque
 
 ### Proveedores
 - Directorio con telefono, email, direccion
+- Estado de cuenta por proveedor (compras, deudas, historial)
 - Vinculado a gastos y facturas de compra
 
 ### Reportes con IA
-- 9 reportes: diario, semanal, rentabilidad, inventario, cuentas por cobrar, vendedores, financiero, flujo de caja, alertas
+- 11 reportes: diario, semanal, rentabilidad, inventario, cuentas por cobrar, vendedores, financiero (P&L con gastos fijos/variables), flujo de caja, alertas, tendencia mensual (12 meses), stats por cliente
 - Narrativa generada por IA (OpenRouter/Groq)
 - Export PDF, Excel, email via Resend
 - Proyeccion de flujo de caja a 7 y 30 dias
@@ -106,6 +114,7 @@ Ferreterias, bodegas, tiendas de ropa, autopartes, peluquerias, farmacias, tiend
 ### Contabilidad
 - Plan de cuentas pre-configurado por tipo de negocio
 - Asientos automaticos desde ventas y gastos
+- Gastos clasificados: fijos, variables, costo de venta
 
 ### Dashboard visual
 - Saludo con nombre del negocio + hora del dia
@@ -120,6 +129,11 @@ Ferreterias, bodegas, tiendas de ropa, autopartes, peluquerias, farmacias, tiend
 - Multi-empleado con PIN, ranking de vendedores
 - Catalogo publico por subdominio con SEO para WhatsApp
 - Tasa de cambio BCV + EUR manual por negocio
+
+### Configuracion del negocio
+- Cargos adicionales (surcharge types): delivery, propinas, empaques
+- Cuentas bancarias: registro de cuentas para referencia
+- Notificaciones: preferencias de alertas diarias por email
 
 ## Moneda dual VES/USD
 

@@ -1,9 +1,9 @@
 # Nova: Auditoria de Produccion - Abril 2026
 
-> Codebase: ~21,400 lineas | 26 tablas (26 RLS policies) | 67 endpoints | 32 paginas | 49 tests
+> Codebase: ~22,000 lineas | 29 tablas (29 RLS policies) | 80+ endpoints | 32 paginas | 49 tests
 > Stack: Nuxt 4.4 + Hono + PostgreSQL 16 + Redis 7 + Clerk + Drizzle ORM
 > Produccion: novaincs.com, api.novaincs.com, *.novaincs.com
-> Migraciones: 7 (0000-0006)
+> Migraciones: 8 (0000-0007)
 
 ---
 
@@ -47,6 +47,12 @@ split de reports, settings API, OCR fallback.
 |----|-----------|
 | #119 | Eliminar campos SENIAT/fiscal, simplificar flujo de ventas (migracion 0006) |
 
+### Sesion 4 (PR #122)
+
+| PR | Contenido |
+|----|-----------|
+| #122 | Feature parity: 14 features en 5 sprints (migracion 0007). Utilidad por venta, servicios, cargos adicionales, precio al mayor, canales de venta, gastos fijos/variables, estado de cuenta proveedor, tendencia mensual, stats por cliente, cuentas bancarias, surcharge types, notificaciones |
+
 PR #108 (Playwright E2E) cerrado sin merge -- reemplazado por #109.
 
 ---
@@ -56,6 +62,10 @@ PR #108 (Playwright E2E) cerrado sin merge -- reemplazado por #109.
 ### POS y ventas
 - Venta en 3-4 toques, 7 metodos de pago venezolanos
 - Descuento por porcentaje y monto fijo
+- Cargos adicionales configurables (delivery, propinas, empaques)
+- Canales de venta (POS, WhatsApp, delivery, online)
+- Utilidad por venta (totalCostUsd calculado automaticamente)
+- Precio al mayor (wholesalePrice + wholesaleMinQty)
 - Cotizaciones convertibles a venta
 - Split payment (multiples metodos)
 - Offline queue (IndexedDB + sync FIFO)
@@ -63,6 +73,8 @@ PR #108 (Playwright E2E) cerrado sin merge -- reemplazado por #109.
 
 ### Inventario
 - Variantes (talla, color), barcode, semaforo de stock
+- Productos tipo servicio (sin stock, para peluquerias/talleres)
+- Marca y ubicacion fisica del producto
 - Prediccion de agotamiento, alertas de vencimiento (30 dias)
 - Unidades de medida con conversion
 - Ajuste manual de inventario con audit trail
@@ -72,6 +84,7 @@ PR #108 (Playwright E2E) cerrado sin merge -- reemplazado por #109.
 
 ### Clientes y CRM
 - Perfil automatico con segmentos (VIP, en riesgo, inactivo)
+- Estadisticas detalladas por cliente (historial, top productos, tendencia 6 meses)
 - Cuentas por cobrar con pagos parciales y aging
 - Cupo de credito por cliente (validado en checkout)
 - Cobro por WhatsApp
@@ -79,18 +92,20 @@ PR #108 (Playwright E2E) cerrado sin merge -- reemplazado por #109.
 ### Proveedores
 - Directorio con telefono, email, direccion
 - CRUD completo (GET/POST/PATCH /suppliers)
+- Estado de cuenta por proveedor (compras, deudas, historial)
 - Vinculado a gastos y facturas de compra
 
-### Reportes (9)
+### Reportes (11)
 - Diario, semanal, rentabilidad, inventario, cuentas por cobrar
-- Vendedores, financiero (P&L), flujo de caja (7d/30d)
-- Alertas inteligentes
+- Vendedores, financiero (P&L con gastos fijos/variables), flujo de caja (7d/30d)
+- Alertas inteligentes, tendencia mensual (12 meses), stats por cliente
 - Narrativa AI (OpenRouter/Groq)
 - Export PDF, Excel, email
 
 ### Contabilidad
 - Plan de cuentas pre-configurado por tipo de negocio
 - Asientos automaticos desde ventas y gastos
+- Gastos clasificados: fijos, variables, costo de venta
 
 ### Dashboard
 - Saludo con nombre del negocio + hora del dia
@@ -107,8 +122,13 @@ PR #108 (Playwright E2E) cerrado sin merge -- reemplazado por #109.
 - Catalogo publico por subdominio con SEO
 - Tasa BCV + EUR manual por negocio
 
+### Configuracion del negocio
+- Cargos adicionales (surcharge_types): delivery, propinas, empaques
+- Cuentas bancarias (bank_accounts): registro para referencia
+- Notificaciones (notification_preferences): alertas diarias por email
+
 ### Seguridad
-- RLS en 26 tablas con cleanup en finally
+- RLS en 29 tablas con cleanup en finally
 - Rate limiting (Redis + fallback)
 - Scanner bot blocking
 - Security headers
@@ -123,20 +143,26 @@ PR #108 (Playwright E2E) cerrado sin merge -- reemplazado por #109.
 - POS mobile-first con offline queue
 - OCR de facturas con IA
 - Reportes con narrativa AI
-- CRM automatico con segmentos
+- CRM automatico con segmentos + stats por cliente
 - Cobro por WhatsApp
 - Catalogo publico por subdominio
 - Multi-tenant SaaS con RLS
 - Tasa BCV por scraping
 - Alertas de vencimiento
+- Utilidad por venta en tiempo real
+- Cargos adicionales configurables
+- Canales de venta (POS, WhatsApp, delivery, online)
+- Tendencia mensual (12 meses)
 
 ### Nova equivalente a FoxPro
 - Inventario con variantes, barcode, semaforo, unidades
 - Cuentas por cobrar/pagar con pagos parciales
-- Proveedores
+- Proveedores con estado de cuenta
 - Cupos de credito
 - Descuentos por % y monto fijo
+- Precio al mayor
 - Plan de cuentas con asientos automaticos
+- Gastos fijos/variables/costo de venta
 - Apertura y cierre de caja
 - Cotizaciones
 - Historial de precios
@@ -161,12 +187,20 @@ PR #108 (Playwright E2E) cerrado sin merge -- reemplazado por #109.
 | 4 | Recibo/factura PDF individual | Para enviar al cliente o imprimir |
 | 5 | Pagina de movimientos de inventario | La tabla existe, falta UI |
 | 6 | Devolucion rapida desde historial | Boton "Devolver" en detalle de venta |
-| 8 | Busqueda global | Productos + clientes + ventas |
-| 9 | E2E browser tests en CI | Requiere Clerk test keys |
-| 10 | robots.txt / sitemap.xml | SEO |
-| 11 | Multi-almacen | Solo si hay demanda |
-| 12 | Precios por cliente | Solo si hay demanda |
-| 13 | Ordenes de compra | Conectar con OCR confirm |
+| 7 | Busqueda global | Productos + clientes + ventas |
+| 8 | E2E browser tests en CI | Requiere Clerk test keys |
+| 9 | robots.txt / sitemap.xml | SEO |
+| 10 | Precios por cliente | Solo si hay demanda |
+| 11 | Ordenes de compra | Conectar con OCR confirm |
+
+---
+
+## Roadmap (futuro)
+
+| Feature | Complejidad | Notas |
+|---------|-------------|-------|
+| Multi-almacen | Alta | Requiere reestructurar modelo de stock (warehouse_stock). Solo si hay demanda |
+| Mensajeria masiva WhatsApp | Alta | Requiere WhatsApp Business API + aprobacion de templates por Meta. Segmentacion ya existe |
 
 ---
 
