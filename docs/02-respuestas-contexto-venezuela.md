@@ -141,7 +141,7 @@ Fina genera archivos listos para importar:
 |---|---|---|
 | **CSV estructurado** | Universal | Columnas estandarizadas: fecha, descripción, cuenta contable, debe, haber, referencia. Cualquier sistema lo importa. |
 | **Excel con formato contable** | Contadores tradicionales | Plantilla con formato de libro diario, libro mayor, auxiliares. El contador abre y ya tiene todo organizado. |
-| **PDF de reportes fiscales** | Declaraciones | Libro de compras, libro de ventas, retenciones, en formato listo para SENIAT. |
+| **PDF de reportes fiscales** | Declaraciones | Resumen de ventas, gastos, P&L. _(Libros SENIAT eliminados: Nova es para comercio informal)_ |
 
 **Mapeo de cuentas contables:**
 
@@ -193,7 +193,7 @@ No es un respaldo. Es un **puente** entre la operación del negocio y la contabi
 
 1. **Fase 1:** Exportación en CSV/Excel con formato contable estándar + mapeo de cuentas configurable
 2. **Fase 2:** Plantillas específicas para Galac, Profit Plus y los sistemas más usados en Venezuela
-3. **Fase 3:** Generación automática de libros de compras/ventas para SENIAT
+3. ~~**Fase 3:** Generación automática de libros de compras/ventas para SENIAT~~ _(eliminado: Nova es para comercio informal)_
 4. **Fase 4:** Portal del contador donde puede descargar directamente sin que el dueño tenga que enviar nada
 
 ---

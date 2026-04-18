@@ -22,7 +22,7 @@ CI:   GitHub Actions (typecheck + lint + 49 tests + build)
 | Endpoints API | 67 |
 | Paginas frontend | 32 |
 | Tests automatizados | 49 (unit + E2E API) |
-| Migraciones Drizzle | 6 |
+| Migraciones Drizzle | 7 |
 
 ## Stack tecnico
 
@@ -47,8 +47,8 @@ apps/
   api/     Hono REST API (67 endpoints, structured JSON logging, rate limiting)
   web/     Nuxt 4.4 SSR + PWA (32 paginas, subdomain-per-tenant)
 packages/
-  db/      Drizzle ORM schema (26 tablas, 26 RLS policies, 6 migraciones)
-  shared/  Zod schemas, constantes, utilidades (IVA, IGTF, moneda dual)
+  db/      Drizzle ORM schema (26 tablas, 26 RLS policies, 7 migraciones)
+  shared/  Zod schemas, constantes, utilidades (moneda dual VES/USD)
 ```
 
 ### Multi-tenancy
@@ -74,12 +74,10 @@ Ferreterias, bodegas, tiendas de ropa, autopartes, peluquerias, farmacias, tiend
 ### Punto de venta
 - Registro en 3-4 toques, 7 metodos de pago venezolanos
 - Funciona offline (IndexedDB + sync FIFO cuando vuelve internet)
-- IVA (0%, 8%, 16%) + IGTF 3% en pagos en divisas
 - Descuento por porcentaje y monto fijo
-- Numeros de control secuenciales (SENIAT-ready)
-- Notas de credito con devolucion parcial y restauracion de stock
 - Cotizaciones convertibles a venta
 - Split payment (multiples metodos en una venta)
+- Anulacion de ventas con PIN del dueno
 
 ### Inventario
 - Variantes (talla, color), barcode, semaforo de stock
@@ -94,15 +92,13 @@ Ferreterias, bodegas, tiendas de ropa, autopartes, peluquerias, farmacias, tiend
 - Cuentas por cobrar con pagos parciales y aging
 - Cupo de credito por cliente (validado en checkout)
 - Cobro por WhatsApp en un toque
-- RIF del cliente para facturacion formal
 
 ### Proveedores
-- Directorio con RIF, telefono, email, direccion
+- Directorio con telefono, email, direccion
 - Vinculado a gastos y facturas de compra
-- Libro de compras con totales por periodo
 
 ### Reportes con IA
-- 10 reportes: diario, semanal, rentabilidad, inventario, cuentas por cobrar, vendedores, financiero, flujo de caja, alertas, libro de compras
+- 9 reportes: diario, semanal, rentabilidad, inventario, cuentas por cobrar, vendedores, financiero, flujo de caja, alertas
 - Narrativa generada por IA (OpenRouter/Groq)
 - Export PDF, Excel, email via Resend
 - Proyeccion de flujo de caja a 7 y 30 dias
@@ -110,8 +106,6 @@ Ferreterias, bodegas, tiendas de ropa, autopartes, peluquerias, farmacias, tiend
 ### Contabilidad
 - Plan de cuentas pre-configurado por tipo de negocio
 - Asientos automaticos desde ventas y gastos
-- RIF del negocio para documentos fiscales
-- Campo de control fiscal para integracion con imprenta digital
 
 ### Dashboard visual
 - Saludo con nombre del negocio + hora del dia
@@ -129,7 +123,7 @@ Ferreterias, bodegas, tiendas de ropa, autopartes, peluquerias, farmacias, tiend
 
 ## Moneda dual VES/USD
 
-Nova opera en dolares (USD) como moneda base con conversion automatica a bolivares (VES) usando la tasa BCV del dia. Cada negocio configura su propia tasa. El IGTF (3%) se calcula automaticamente en pagos en divisas (Binance, Zinli, Zelle).
+Nova opera en dolares (USD) como moneda base con conversion automatica a bolivares (VES) usando la tasa BCV del dia. Cada negocio configura su propia tasa.
 
 ## Desarrollo local
 
@@ -158,7 +152,6 @@ Los E2E tests corren contra la API directamente via `app.request()` (Hono). No r
 | [25 - Auditoria y roadmap](docs/25-auditoria-y-roadmap-definitivo.md) | Auditoria de codigo, plan dia por dia |
 | [26 - Auditoria arquitectura](docs/26-auditoria-arquitectura-abril-2026.md) | Auth flow, multi-tenancy, Drizzle, riesgos |
 | [27 - Auditoria produccion](docs/27-auditoria-produccion-abril-2026.md) | Roadmap de sprints, estado de cada feature |
-| [28 - Gap analysis SENIAT](docs/28-seniat-gap-analysis.md) | Requisitos PA 000102/000121, gaps, ruta a homologacion |
 
 ## Licencia
 

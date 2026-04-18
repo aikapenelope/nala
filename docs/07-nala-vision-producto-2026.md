@@ -171,13 +171,13 @@ El dueño o gerente que trabaja desde una PC o laptop tiene acceso a la experien
   - PDF con formato de libro diario
   - Excel con columnas contables estándar (fecha, cuenta, debe, haber, descripción)
   - Formato específico para Galac, Profit Plus, Saint (seleccionable)
-- Libro de ventas y libro de compras en formato SENIAT
+- Libro de ventas y libro de compras en formato SENIAT _(eliminado: Nova es para comercio informal)_
 - Botón "Enviar al contador": genera el paquete completo y abre WhatsApp con el archivo adjunto
 - Portal del contador (URL dedicada, solo lectura): el contador entra con su propio login y descarga lo que necesita
 
 #### Configuración
 
-- Datos del negocio (nombre, RIF, dirección, logo)
+- Datos del negocio (nombre, dirección, logo)
 - Usuarios y roles:
   - **Dueño/Admin:** acceso total
   - **Gerente:** ve reportes, gestiona inventario, no configura usuarios
@@ -341,7 +341,7 @@ La IA no es un módulo. Es una capa que enriquece cada pantalla del producto.
 - Catálogo de cuentas pre-configurado (editable)
 - Asientos automáticos desde ventas/compras/gastos
 - Exportación: PDF libro diario, Excel contable, formatos Galac/Profit Plus/Saint
-- Libros de compras/ventas formato SENIAT
+- Libros de compras/ventas formato SENIAT _(eliminado: Nova es para comercio informal)_
 - Portal del contador (URL dedicada, solo lectura)
 
 ### Seguridad

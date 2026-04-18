@@ -66,7 +66,6 @@ Al final del mes, el dueño toca "Enviar al contador". Nova genera:
 - Resumen de ventas por método de pago
 - Resumen de gastos por categoría
 - P&L simplificado
-- Libro de ventas formato SENIAT
 
 El contador recibe un paquete completo. Las diferencias de caja están documentadas. El contador decide cómo tratarlas contablemente.
 

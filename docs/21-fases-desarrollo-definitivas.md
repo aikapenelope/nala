@@ -441,7 +441,7 @@ Esto corre en cada push. Si algo falla, GitHub muestra X roja en el PR. No neces
    - Asientos automáticos desde ventas, gastos, pagos (invisible para el usuario)
    - Exportación: Excel con formato libro diario (fecha, cuenta, debe, haber)
    - Botón "Enviar al contador" (genera paquete + abre WhatsApp)
-   - Libros de compras/ventas formato SENIAT
+   - Libros de compras/ventas formato SENIAT _(eliminado: Nova es para comercio informal)_
 
 2. OCR de facturas
    - Botón "Escanear factura" → cámara PWA (resolución completa)

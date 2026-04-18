@@ -101,7 +101,6 @@ Nova no es un sistema contable. Es un puente entre las operaciones del negocio y
 - Catálogo de cuentas pre-configurado por tipo de negocio. El contador lo ajusta una vez
 - Cada venta, gasto y pago genera asientos contables automáticamente (invisible para el usuario)
 - Botón "Enviar al contador": genera paquete completo (Excel libro diario + resumen ventas/gastos + P&L) y abre WhatsApp con archivo adjunto
-- Libros de compras y ventas en formato SENIAT
 - Formatos específicos para Galac y Profit Plus en v2
 - El usuario nunca ve "debe", "haber", ni "asiento contable". Solo ve "Enviar al contador"
 

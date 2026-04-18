@@ -115,7 +115,7 @@ Tenancy:  Subdomain-per-tenant listo en codigo. Pendiente: dominio dedicado + DN
 |---|---|---|
 | 1 | Web Push notifications | Alertas de stock critico via @vite-pwa/nuxt |
 | 2 | Email transaccional | Resend: boton "Enviar resumen" y "Enviar al contador" en PWA |
-| 3 | Exportacion PDF | Reportes, libro de ventas SENIAT, P&L |
+| 3 | Exportacion PDF | Reportes, P&L |
 | 4 | Exportacion Excel | Endpoint /reports/{type}/export?format=xlsx |
 | 5 | Import Excel (conectar) | inventory/import.vue -> POST /api/products batch |
 | 6 | Segmentos de clientes | Calculo automatico: VIP, frecuente, en riesgo, inactivo |

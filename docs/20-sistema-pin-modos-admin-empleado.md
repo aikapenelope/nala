@@ -98,7 +98,7 @@ No hay logout/login. No hay carga de página. Es un cambio de contexto dentro de
 | Clientes | Completo: perfiles, segmentos, campañas, cobros |
 | Cuentas | Completo: por cobrar, por pagar, cuadre de caja, cierre de día |
 | Reportes | Completo: los 7 reportes, exportación, envío al contador |
-| Contabilidad | Completo: catálogo de cuentas, exportación, SENIAT |
+| Contabilidad | Completo: catálogo de cuentas, exportación |
 | Configuración | Completo: negocio, usuarios, métodos de pago, categorías, tasa BCV, 2FA, log |
 | OCR | Completo: escanear facturas, confirmar, registrar |
 | WhatsApp | Completo: consultas + acciones con confirmación |
