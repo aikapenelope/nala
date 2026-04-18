@@ -17,13 +17,11 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import {
   surchargeTypes,
   bankAccounts,
   notificationPreferences,
-  salePayments,
-  sales,
 } from "@nova/db";
 import { handleDbError } from "../utils/db-errors";
 import type { AppEnv } from "../types";
