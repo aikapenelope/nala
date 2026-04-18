@@ -55,6 +55,12 @@ const reportsList = [
     title: "Resumen financiero",
     desc: "Ingresos, costos, ganancia (P&L)",
   },
+  {
+    to: "/reports/monthly-trend",
+    icon: "📅",
+    title: "Tendencia mensual",
+    desc: "Ingresos por mes, ultimos 12 meses",
+  },
 ];
 </script>
 

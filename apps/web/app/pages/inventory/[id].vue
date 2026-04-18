@@ -34,6 +34,11 @@ const form = reactive({
   stockMin: 5,
   stockCritical: 2,
   hasVariants: false,
+  isService: false,
+  wholesalePrice: 0,
+  wholesaleMinQty: 1,
+  brand: "",
+  location: "",
   expiresAt: "",
 });
 
@@ -134,6 +139,11 @@ onMounted(async () => {
           stockMin: number;
           stockCritical: number;
           hasVariants: boolean;
+          isService: boolean;
+          wholesalePrice: string | null;
+          wholesaleMinQty: number;
+          brand: string | null;
+          location: string | null;
           expiresAt: string | null;
         };
         variants: Array<{
@@ -158,6 +168,11 @@ onMounted(async () => {
       form.stockMin = p.stockMin;
       form.stockCritical = p.stockCritical;
       form.hasVariants = p.hasVariants;
+      form.isService = p.isService;
+      form.wholesalePrice = Number(p.wholesalePrice ?? 0);
+      form.wholesaleMinQty = p.wholesaleMinQty;
+      form.brand = p.brand ?? "";
+      form.location = p.location ?? "";
       form.expiresAt = p.expiresAt ? (p.expiresAt.split("T")[0] ?? "") : "";
 
       if (result.variants.length > 0) {
@@ -208,6 +223,11 @@ async function submitForm() {
       stockMin: form.stockMin,
       stockCritical: form.stockCritical,
       hasVariants: form.hasVariants,
+      isService: form.isService,
+      wholesalePrice: form.wholesalePrice > 0 ? form.wholesalePrice : undefined,
+      wholesaleMinQty: form.wholesaleMinQty,
+      brand: form.brand || undefined,
+      location: form.location || undefined,
       expiresAt: form.expiresAt
         ? new Date(form.expiresAt).toISOString()
         : undefined,
@@ -287,7 +307,7 @@ async function submitForm() {
               placeholder="Ej: Harina PAN 1kg"
               class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-nova-primary focus:outline-none"
               required
-            />
+            >
           </div>
 
           <div>
@@ -321,7 +341,7 @@ async function submitForm() {
                 type="text"
                 placeholder="HP-001"
                 class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-nova-primary focus:outline-none"
-              />
+              >
             </div>
             <div>
               <label class="mb-1 block text-sm text-gray-600">
@@ -332,7 +352,62 @@ async function submitForm() {
                 type="text"
                 placeholder="7591234567890"
                 class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-nova-primary focus:outline-none"
+              >
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Product type and details -->
+      <div class="rounded-xl bg-white p-5 shadow-sm">
+        <h2 class="mb-4 text-sm font-semibold text-gray-700">
+          Tipo y detalles
+        </h2>
+
+        <div class="space-y-4">
+          <!-- Service toggle -->
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-sm font-medium text-gray-700">
+                Producto tipo servicio
+              </p>
+              <p class="text-xs text-gray-500">
+                No maneja inventario (peluqueria, taller, etc.)
+              </p>
+            </div>
+            <label class="relative inline-flex cursor-pointer items-center">
+              <input
+                v-model="form.isService"
+                type="checkbox"
+                class="peer sr-only"
+              >
+              <div
+                class="h-6 w-11 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:bg-white after:transition-all peer-checked:bg-nova-primary peer-checked:after:translate-x-full"
               />
+            </label>
+          </div>
+
+          <!-- Brand and location -->
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="mb-1 block text-sm text-gray-600">Marca</label>
+              <input
+                v-model="form.brand"
+                type="text"
+                placeholder="Ej: Samsung"
+                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-nova-primary focus:outline-none"
+              >
+            </div>
+            <div>
+              <label class="mb-1 block text-sm text-gray-600">
+                Ubicacion fisica
+              </label>
+              <input
+                v-model="form.location"
+                type="text"
+                placeholder="Ej: Estante A3"
+                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-nova-primary focus:outline-none"
+              >
             </div>
           </div>
         </div>
@@ -351,7 +426,7 @@ async function submitForm() {
               step="0.01"
               min="0"
               class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-nova-primary focus:outline-none"
-            />
+            >
           </div>
           <div>
             <label class="mb-1 block text-sm text-gray-600">
@@ -364,7 +439,7 @@ async function submitForm() {
               min="0"
               class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-nova-primary focus:outline-none"
               required
-            />
+            >
           </div>
           <div>
             <label class="mb-1 block text-sm text-gray-600">Margen</label>
@@ -375,10 +450,43 @@ async function submitForm() {
             </div>
           </div>
         </div>
+
+        <!-- Wholesale pricing -->
+        <div class="mt-4 border-t border-gray-100 pt-4">
+          <p class="mb-3 text-xs font-medium text-gray-500">
+            Precio al mayor (opcional)
+          </p>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="mb-1 block text-sm text-gray-600">
+                Precio al mayor
+              </label>
+              <input
+                v-model.number="form.wholesalePrice"
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder="0.00"
+                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-nova-primary focus:outline-none"
+              >
+            </div>
+            <div>
+              <label class="mb-1 block text-sm text-gray-600">
+                Cantidad minima
+              </label>
+              <input
+                v-model.number="form.wholesaleMinQty"
+                type="number"
+                min="1"
+                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-nova-primary focus:outline-none"
+              >
+            </div>
+          </div>
+        </div>
       </div>
 
-      <!-- Stock -->
-      <div class="rounded-xl bg-white p-5 shadow-sm">
+      <!-- Stock (hidden for services) -->
+      <div v-if="!form.isService" class="rounded-xl bg-white p-5 shadow-sm">
         <h2 class="mb-4 text-sm font-semibold text-gray-700">Inventario</h2>
 
         <div class="grid grid-cols-3 gap-4">
@@ -389,7 +497,7 @@ async function submitForm() {
               type="number"
               min="0"
               class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-nova-primary focus:outline-none"
-            />
+            >
           </div>
           <div>
             <label class="mb-1 block text-sm text-gray-600">
@@ -400,7 +508,7 @@ async function submitForm() {
               type="number"
               min="0"
               class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-nova-primary focus:outline-none"
-            />
+            >
           </div>
           <div>
             <label class="mb-1 block text-sm text-gray-600">
@@ -411,7 +519,7 @@ async function submitForm() {
               type="number"
               min="0"
               class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-nova-primary focus:outline-none"
-            />
+            >
           </div>
         </div>
       </div>
@@ -430,7 +538,7 @@ async function submitForm() {
               v-model="form.hasVariants"
               type="checkbox"
               class="peer sr-only"
-            />
+            >
             <div
               class="h-6 w-11 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:bg-white after:transition-all peer-checked:bg-nova-primary peer-checked:after:translate-x-full"
             />
@@ -465,7 +573,7 @@ async function submitForm() {
                   placeholder="Ej: Talla"
                   class="w-24 rounded-lg border border-gray-300 px-2 py-1 text-xs"
                   @keyup.enter="addAttributeKey"
-                />
+                >
                 <button
                   type="button"
                   class="rounded-lg bg-gray-100 px-2 py-1 text-xs"
@@ -493,7 +601,7 @@ async function submitForm() {
                   type="text"
                   :placeholder="key"
                   class="w-full rounded border border-gray-200 px-2 py-1 text-xs"
-                />
+                >
               </div>
               <input
                 v-model.number="variant.stock"
@@ -501,7 +609,7 @@ async function submitForm() {
                 min="0"
                 placeholder="Stock"
                 class="w-16 rounded border border-gray-200 px-2 py-1 text-xs"
-              />
+              >
               <input
                 v-model.number="variant.price"
                 type="number"
@@ -509,7 +617,7 @@ async function submitForm() {
                 min="0"
                 placeholder="Precio"
                 class="w-20 rounded border border-gray-200 px-2 py-1 text-xs"
-              />
+              >
               <button
                 type="button"
                 class="text-xs text-red-400 hover:text-red-600"
