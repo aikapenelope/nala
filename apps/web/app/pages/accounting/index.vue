@@ -35,6 +35,28 @@ interface Entry {
 const accounts = ref<Account[]>([]);
 const entries = ref<Entry[]>([]);
 
+/** Expenses with category classification. */
+interface Expense {
+  id: string;
+  supplierName: string | null;
+  date: string;
+  total: string;
+  category: string;
+  status: string;
+}
+const recentExpenses = ref<Expense[]>([]);
+
+/** Manual expense form. */
+const showExpenseForm = ref(false);
+const expenseForm = reactive({
+  supplierName: "",
+  total: 0,
+  category: "variable" as "variable" | "fixed" | "cogs",
+  description: "",
+});
+const expenseSubmitting = ref(false);
+const expenseError = ref("");
+
 onMounted(async () => {
   try {
     const [accResult, entResult] = await Promise.all([
@@ -44,6 +66,16 @@ onMounted(async () => {
 
     accounts.value = accResult.accounts;
     entries.value = entResult.entries;
+
+    // Fetch recent expenses
+    try {
+      const expResult = await $api<{ expenses: Expense[] }>(
+        "/api/accounting/expenses",
+      );
+      recentExpenses.value = expResult.expenses;
+    } catch {
+      // Non-critical: expenses section won't show
+    }
   } catch (err) {
     const message =
       err instanceof Error ? err.message : "Error cargando contabilidad";
@@ -151,6 +183,132 @@ function exportAndSend() {
             </div>
           </div>
         </div>
+      </div>
+
+      <!-- Expenses by category -->
+      <div class="mb-6 rounded-xl bg-white p-6 shadow-sm">
+        <div class="mb-4 flex items-center justify-between">
+          <h2 class="text-sm font-semibold text-gray-700">Gastos recientes</h2>
+          <button
+            class="rounded-lg bg-nova-primary px-3 py-1.5 text-xs font-medium text-white"
+            @click="showExpenseForm = !showExpenseForm"
+          >
+            {{ showExpenseForm ? "Cancelar" : "+ Registrar gasto" }}
+          </button>
+        </div>
+
+        <!-- Manual expense form -->
+        <div
+          v-if="showExpenseForm"
+          class="mb-4 space-y-3 rounded-lg border border-gray-200 p-4"
+        >
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="mb-1 block text-xs text-gray-500">Proveedor</label>
+              <input
+                v-model="expenseForm.supplierName"
+                type="text"
+                placeholder="Nombre del proveedor"
+                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-nova-primary focus:outline-none"
+              >
+            </div>
+            <div>
+              <label class="mb-1 block text-xs text-gray-500">Monto ($)</label>
+              <input
+                v-model.number="expenseForm.total"
+                type="number"
+                step="0.01"
+                min="0"
+                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-nova-primary focus:outline-none"
+              >
+            </div>
+          </div>
+          <div>
+            <label class="mb-1 block text-xs text-gray-500">Clasificacion</label>
+            <div class="flex gap-2">
+              <button
+                v-for="cat in [
+                  { value: 'variable', label: 'Variable' },
+                  { value: 'fixed', label: 'Fijo' },
+                  { value: 'cogs', label: 'Costo de venta' },
+                ] as const"
+                :key="cat.value"
+                class="rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors"
+                :class="
+                  expenseForm.category === cat.value
+                    ? 'border-nova-primary bg-blue-50 text-nova-primary'
+                    : 'border-gray-200 text-gray-600'
+                "
+                @click="expenseForm.category = cat.value"
+              >
+                {{ cat.label }}
+              </button>
+            </div>
+          </div>
+          <div>
+            <label class="mb-1 block text-xs text-gray-500">Descripcion</label>
+            <input
+              v-model="expenseForm.description"
+              type="text"
+              placeholder="Opcional"
+              class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-nova-primary focus:outline-none"
+            >
+          </div>
+          <p v-if="expenseError" class="text-xs text-red-500">
+            {{ expenseError }}
+          </p>
+          <button
+            class="w-full rounded-lg bg-nova-primary py-2 text-sm font-medium text-white disabled:opacity-50"
+            :disabled="expenseSubmitting || expenseForm.total <= 0"
+          >
+            {{ expenseSubmitting ? "Guardando..." : "Registrar gasto" }}
+          </button>
+        </div>
+
+        <!-- Expense list -->
+        <div v-if="recentExpenses.length > 0" class="space-y-2">
+          <div
+            v-for="exp in recentExpenses.slice(0, 15)"
+            :key="exp.id"
+            class="flex items-center justify-between rounded-lg bg-gray-50 px-4 py-2 text-sm"
+          >
+            <div>
+              <p class="text-gray-900">
+                {{ exp.supplierName ?? "Sin proveedor" }}
+              </p>
+              <p class="text-xs text-gray-400">
+                {{ formatDate(exp.date) }}
+              </p>
+            </div>
+            <div class="text-right">
+              <p class="font-medium text-gray-900">
+                ${{ Number(exp.total).toFixed(2) }}
+              </p>
+              <span
+                class="rounded-full px-2 py-0.5 text-[10px] font-medium"
+                :class="{
+                  'bg-blue-50 text-blue-700': exp.category === 'fixed',
+                  'bg-orange-50 text-orange-700': exp.category === 'variable',
+                  'bg-purple-50 text-purple-700': exp.category === 'cogs',
+                }"
+              >
+                {{
+                  exp.category === "fixed"
+                    ? "Fijo"
+                    : exp.category === "cogs"
+                      ? "Costo"
+                      : "Variable"
+                }}
+              </span>
+            </div>
+          </div>
+        </div>
+        <p
+          v-else-if="!showExpenseForm"
+          class="text-center text-sm text-gray-400"
+        >
+          No hay gastos registrados
+        </p>
       </div>
 
       <!-- Export package -->

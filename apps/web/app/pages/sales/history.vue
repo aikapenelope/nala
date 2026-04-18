@@ -23,6 +23,8 @@ interface Sale {
   userId: string;
   totalUsd: string;
   totalBs: string | null;
+  totalCostUsd: string | null;
+  channel: string | null;
   status: "completed" | "voided";
 }
 
@@ -76,6 +78,12 @@ function formatDate(iso: string): string {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+/** Calculate profit for a sale. Returns null if cost data is unavailable. */
+function saleProfit(sale: Sale): number | null {
+  if (!sale.totalCostUsd) return null;
+  return Number(sale.totalUsd) - Number(sale.totalCostUsd);
 }
 
 /** Void sale flow: reason input -> PIN verification -> API call. */
@@ -151,7 +159,7 @@ async function handleVoidConfirmed() {
         v-model="dateFilter"
         type="date"
         class="rounded-lg border border-gray-300 px-3 py-2 text-sm"
-      />
+      >
       <select
         v-model="methodFilter"
         class="rounded-lg border border-gray-300 px-3 py-2 text-sm"
@@ -210,6 +218,10 @@ async function handleVoidConfirmed() {
               <th class="px-4 py-3 text-right font-medium text-gray-500">
                 Total
               </th>
+              <th class="px-4 py-3 text-right font-medium text-gray-500">
+                Utilidad
+              </th>
+              <th class="px-4 py-3 font-medium text-gray-500">Canal</th>
               <th class="px-4 py-3 font-medium text-gray-500">Estado</th>
               <th v-if="isAdmin" class="px-4 py-3" />
             </tr>
@@ -229,6 +241,23 @@ async function handleVoidConfirmed() {
                 <span v-if="sale.totalBs" class="text-xs text-gray-400">
                   Bs.{{ Number(sale.totalBs).toFixed(2) }}
                 </span>
+              </td>
+              <td class="px-4 py-3 text-right text-sm">
+                <template v-if="saleProfit(sale) !== null">
+                  <span
+                    :class="
+                      saleProfit(sale)! >= 0
+                        ? 'text-green-600'
+                        : 'text-red-600'
+                    "
+                  >
+                    ${{ saleProfit(sale)!.toFixed(2) }}
+                  </span>
+                </template>
+                <span v-else class="text-gray-300">--</span>
+              </td>
+              <td class="px-4 py-3 text-xs text-gray-500">
+                {{ sale.channel ?? "pos" }}
               </td>
               <td class="px-4 py-3">
                 <span
@@ -268,9 +297,24 @@ async function handleVoidConfirmed() {
             <div>
               <p class="font-medium text-gray-900">
                 ${{ Number(sale.totalUsd).toFixed(2) }}
+                <span
+                  v-if="saleProfit(sale) !== null"
+                  class="ml-1 text-xs"
+                  :class="
+                    saleProfit(sale)! >= 0
+                      ? 'text-green-600'
+                      : 'text-red-600'
+                  "
+                >
+                  ({{ saleProfit(sale)! >= 0 ? "+" : ""
+                  }}${{ saleProfit(sale)!.toFixed(2) }})
+                </span>
               </p>
               <p class="text-xs text-gray-500">
                 {{ formatDate(sale.createdAt) }}
+                <span v-if="sale.channel" class="ml-1 text-gray-400">
+                  · {{ sale.channel }}
+                </span>
               </p>
             </div>
             <div class="flex items-center gap-2">
