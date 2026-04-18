@@ -195,6 +195,21 @@ export const products = pgTable(
     /** Whether this product has variants (talla, color, etc.). */
     hasVariants: boolean("has_variants").notNull().default(false),
 
+    /** Whether this is a service (no stock tracking). */
+    isService: boolean("is_service").notNull().default(false),
+
+    /** Wholesale price (USD). Applied when qty >= wholesaleMinQty. */
+    wholesalePrice: numeric("wholesale_price", { precision: 12, scale: 2 }),
+
+    /** Minimum quantity to trigger wholesale price. */
+    wholesaleMinQty: integer("wholesale_min_qty").notNull().default(1),
+
+    /** Brand name (free text, for filtering). */
+    brand: text("brand"),
+
+    /** Physical location within the store (e.g. "Pasillo 3", "Vitrina A"). */
+    location: text("location"),
+
     /** Sale unit of measure (what the customer buys). */
     saleUnitId: uuid("sale_unit_id").references(() => unitsOfMeasure.id),
 
@@ -392,6 +407,15 @@ export const sales = pgTable(
 
     /** Notes visible on the receipt. */
     notes: text("notes"),
+
+    /** Total cost of items sold (USD). For profit calculation. */
+    totalCostUsd: numeric("total_cost_usd", { precision: 12, scale: 2 }).default("0"),
+
+    /** Sale channel: pos, whatsapp, delivery, online. */
+    channel: text("channel").notNull().default("pos"),
+
+    /** Surcharges applied to this sale (delivery, tips, etc.). */
+    surcharges: jsonb("surcharges").default([]),
 
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
@@ -825,6 +849,8 @@ export const expenses = pgTable("expenses", {
   /** URL of the invoice image in MinIO. */
   imageUrl: text("image_url"),
   status: text("status").notNull().default("confirmed"),
+  /** Expense category: variable (default), fixed, cogs. */
+  category: text("category").notNull().default("variable"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
@@ -877,5 +903,84 @@ export const productAliases = pgTable(
     ),
   ],
 );
+
+// ============================================================
+// Phase 7 tables: Feature parity
+// ============================================================
+
+/** Surcharge types - configurable extra charges per business (delivery, tips, etc.). */
+export const surchargeTypes = pgTable(
+  "surcharge_types",
+  {
+    id: uuid("id")
+      .default(sql`gen_random_uuid()`)
+      .primaryKey(),
+    businessId: uuid("business_id")
+      .notNull()
+      .references(() => businesses.id),
+    /** Display name: "Delivery", "Propina", "Empaque". */
+    name: text("name").notNull(),
+    /** Fixed amount in USD (null if percentage-based). */
+    amount: numeric("amount", { precision: 12, scale: 2 }),
+    /** Percentage of sale total (null if fixed amount). */
+    percentage: numeric("percentage", { precision: 5, scale: 2 }),
+    isActive: boolean("is_active").notNull().default(true),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [index("idx_surcharge_types_business").on(table.businessId)],
+);
+
+/** Bank accounts - track balances across payment methods. */
+export const bankAccounts = pgTable(
+  "bank_accounts",
+  {
+    id: uuid("id")
+      .default(sql`gen_random_uuid()`)
+      .primaryKey(),
+    businessId: uuid("business_id")
+      .notNull()
+      .references(() => businesses.id),
+    /** Account display name: "Banesco Corriente", "Caja chica". */
+    name: text("name").notNull(),
+    /** Bank name (optional). */
+    bankName: text("bank_name"),
+    /** Account type: checking, savings, cash, digital. */
+    accountType: text("account_type").notNull().default("checking"),
+    /** Starting balance when the account was added. */
+    initialBalance: numeric("initial_balance", { precision: 12, scale: 2 })
+      .notNull()
+      .default("0"),
+    isActive: boolean("is_active").notNull().default(true),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [index("idx_bank_accounts_business").on(table.businessId)],
+);
+
+/** Notification preferences per business. */
+export const notificationPreferences = pgTable("notification_preferences", {
+  id: uuid("id")
+    .default(sql`gen_random_uuid()`)
+    .primaryKey(),
+  businessId: uuid("business_id")
+    .notNull()
+    .references(() => businesses.id),
+  /** Whether to send daily alert emails. */
+  emailDailyAlerts: boolean("email_daily_alerts").notNull().default(false),
+  /** Email address for alert delivery (defaults to accountantEmail). */
+  alertEmail: text("alert_email"),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
 
 

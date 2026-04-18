@@ -18,6 +18,16 @@ export const createProductSchema = z.object({
   stockMin: z.number().int().min(0).default(5),
   stockCritical: z.number().int().min(0).default(2),
   hasVariants: z.boolean().default(false),
+  /** Service products have no stock tracking. */
+  isService: z.boolean().default(false),
+  /** Wholesale price in USD (optional). */
+  wholesalePrice: z.number().min(0).optional(),
+  /** Minimum qty to trigger wholesale price. */
+  wholesaleMinQty: z.number().int().min(1).default(1),
+  /** Brand name (free text). */
+  brand: z.string().max(100).optional(),
+  /** Physical location in the store. */
+  location: z.string().max(100).optional(),
   imageUrl: z.string().url().optional(),
   expiresAt: z.string().datetime().optional(),
 });
@@ -59,16 +69,27 @@ export const createCategorySchema = z.object({
   sortOrder: z.number().int().min(0).default(0),
 });
 
+/** Valid expense categories. */
+export const EXPENSE_CATEGORIES = ["variable", "fixed", "cogs"] as const;
+export type ExpenseCategory = (typeof EXPENSE_CATEGORIES)[number];
+
 /** Stock semaphore status calculation. */
 export type StockSemaphore = "green" | "yellow" | "red" | "gray";
 
-/** Calculate stock semaphore color based on current stock and thresholds. */
+/**
+ * Calculate stock semaphore color based on current stock and thresholds.
+ * Services always return "green" (no stock tracking).
+ */
 export function calculateStockSemaphore(
   stock: number,
   stockMin: number,
   stockCritical: number,
   lastSoldAt: string | null,
+  isService: boolean = false,
 ): StockSemaphore {
+  // Services don't track stock
+  if (isService) return "green";
+
   // Gray: no movement in 60+ days
   if (lastSoldAt) {
     const daysSinceLastSale = Math.floor(

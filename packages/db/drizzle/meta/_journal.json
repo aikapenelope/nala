@@ -50,6 +50,13 @@
       "when": 1776648000000,
       "tag": "0006_remove_seniat_fields",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1776734400000,
+      "tag": "0007_feature_parity",
+      "breakpoints": true
     }
   ]
 }
