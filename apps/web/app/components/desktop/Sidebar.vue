@@ -1,10 +1,9 @@
 <script setup lang="ts">
 /**
- * Desktop sidebar navigation.
- * Shows all sections for admin, restricted set for employees.
- * Visible only on desktop (>1025px).
+ * Desktop sidebar - premium glassmorphism design.
  *
- * Uses Lucide Vue icons instead of text placeholders.
+ * Dark pill for active nav item, glass background,
+ * spring animations on hover.
  */
 
 import {
@@ -50,39 +49,51 @@ const visibleItems = computed(() =>
 </script>
 
 <template>
-  <aside class="flex h-screen w-56 flex-col border-r border-gray-200 bg-white">
+  <aside class="glass-strong flex h-full w-60 flex-col rounded-3xl p-4">
     <!-- Logo -->
-    <div class="flex h-16 items-center px-6">
-      <span class="text-xl font-bold text-nova-primary">Nova</span>
+    <div class="mb-6 flex items-center gap-3 px-3 pt-2">
+      <div
+        class="dark-pill flex h-10 w-10 items-center justify-center rounded-xl"
+      >
+        <span class="text-sm font-extrabold text-white">N</span>
+      </div>
+      <span class="text-xl font-extrabold text-gradient">Nova</span>
     </div>
 
     <!-- Navigation -->
-    <nav class="flex-1 space-y-1 px-3 py-4">
+    <nav class="flex-1 space-y-1">
       <NuxtLink
         v-for="item in visibleItems"
         :key="item.to"
         :to="item.to"
-        class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 hover:text-nova-primary"
-        active-class="bg-blue-50 text-nova-primary"
+        class="flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-semibold text-gray-500 transition-spring hover:bg-white/60 hover:text-gray-900 hover:shadow-[0_4px_12px_-2px_rgba(0,0,0,0.05)]"
+        active-class="dark-pill !text-white !shadow-[0_10px_25px_-5px_rgba(0,0,0,0.3),inset_0_2px_3px_rgba(255,255,255,0.15)]"
       >
         <component :is="item.icon" :size="18" class="flex-shrink-0" />
         <span>{{ item.label }}</span>
       </NuxtLink>
     </nav>
 
-    <!-- User switch button -->
-    <div class="border-t border-gray-200 px-4 py-3">
+    <!-- User -->
+    <div class="mt-auto border-t border-white/50 px-3 pt-4">
       <NuxtLink
         to="/auth/pin"
-        class="flex items-center gap-2 text-xs text-gray-500 hover:text-nova-primary"
+        class="flex items-center gap-3 rounded-2xl px-2 py-2 text-xs text-gray-500 transition-spring hover:bg-white/60"
       >
         <span
-          class="flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold text-white"
-          :class="isAdmin ? 'bg-nova-primary' : 'bg-gray-400'"
+          class="flex h-8 w-8 items-center justify-center rounded-xl text-xs font-bold text-white"
+          :class="isAdmin ? 'dark-pill' : 'bg-gray-400'"
         >
           {{ user?.name?.charAt(0) ?? "?" }}
         </span>
-        <span>{{ user?.name ?? "Sin usuario" }}</span>
+        <div class="min-w-0 flex-1">
+          <p class="truncate font-semibold text-gray-700">
+            {{ user?.name ?? "Sin usuario" }}
+          </p>
+          <p class="text-[10px] text-gray-400">
+            {{ isAdmin ? "Administrador" : "Empleado" }}
+          </p>
+        </div>
       </NuxtLink>
     </div>
   </aside>

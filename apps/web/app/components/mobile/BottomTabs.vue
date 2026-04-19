@@ -1,10 +1,6 @@
 <script setup lang="ts">
 /**
- * Mobile bottom tab navigation.
- * 5 tabs: Inicio, Vender, Inventario, Clientes, Mas.
- * Visible only on mobile (<768px).
- *
- * Uses Lucide Vue icons instead of text placeholders.
+ * Mobile bottom tabs - premium glass design.
  */
 
 import { Home, ShoppingCart, Package, Users, Menu } from "lucide-vue-next";
@@ -27,14 +23,14 @@ const tabs: TabItem[] = [
 
 <template>
   <nav
-    class="fixed bottom-0 left-0 right-0 z-50 flex border-t border-gray-200 bg-white"
+    class="glass-strong fixed bottom-0 left-0 right-0 z-50 flex rounded-t-3xl shadow-[0_-4px_20px_-4px_rgba(0,0,0,0.06)]"
   >
     <NuxtLink
       v-for="tab in tabs"
       :key="tab.to"
       :to="tab.to"
-      class="flex flex-1 flex-col items-center gap-0.5 py-2 text-xs text-gray-500 transition-colors"
-      active-class="text-nova-primary"
+      class="flex flex-1 flex-col items-center gap-0.5 py-3 text-[10px] font-semibold text-gray-400 transition-spring"
+      active-class="!text-gray-900"
     >
       <component :is="tab.icon" :size="20" />
       <span>{{ tab.label }}</span>
