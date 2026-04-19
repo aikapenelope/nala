@@ -178,10 +178,56 @@ reports.get("/reports/daily", zValidator("query", periodQuery), async (c) => {
     salesByMethod[row.method] = row.total;
   }
 
+  // Today's profit (revenue - cost)
+  const [profitResult] = await db
+    .select({
+      totalCost: sql<number>`COALESCE(SUM(${sales.totalCostUsd}::numeric), 0)::float`,
+    })
+    .from(sales)
+    .where(
+      and(
+        bizCond,
+        completedCond,
+        gte(sales.createdAt, todayStart),
+        lte(sales.createdAt, todayEnd),
+      ),
+    );
+  const totalProfit =
+    Math.round((totalSales - (profitResult?.totalCost ?? 0)) * 100) / 100;
+
+  // Top seller today (employee with highest sales)
+  const topSellerRows = await db
+    .select({
+      name: users.name,
+      total: sql<number>`COALESCE(SUM(${sales.totalUsd}::numeric), 0)::float`,
+    })
+    .from(sales)
+    .innerJoin(users, eq(sales.userId, users.id))
+    .where(
+      and(
+        bizCond,
+        completedCond,
+        gte(sales.createdAt, todayStart),
+        lte(sales.createdAt, todayEnd),
+      ),
+    )
+    .groupBy(users.name)
+    .orderBy(sql`SUM(${sales.totalUsd}::numeric) DESC`)
+    .limit(1);
+
+  const topSeller = topSellerRows[0]
+    ? {
+        name: topSellerRows[0].name,
+        total: Math.round(topSellerRows[0].total * 100) / 100,
+      }
+    : null;
+
   const data = {
     totalSales,
     totalCount,
     avgTicket,
+    totalProfit,
+    topSeller,
     vsPreviousDay,
     vsSameDayLastWeek,
     topProducts,
