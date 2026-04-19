@@ -1,27 +1,176 @@
 @import "tailwindcss";
+@import url("https://api.fontshare.com/v2/css?f[]=plus-jakarta-sans@500,700,800&display=swap");
 
 /*
- * Nova design tokens and custom styles.
- * Tailwind CSS v4 uses CSS-first configuration.
+ * Nova design system - Premium visual language.
+ *
+ * Inspired by glassmorphism + dark accent pattern.
+ * Optimized for PWA on mobile (no heavy blur, limited shadows).
  */
 
 @theme {
+  /* Brand */
   --color-nova-primary: #1e40af;
   --color-nova-primary-light: #3b82f6;
   --color-nova-primary-dark: #1e3a8a;
+  --color-nova-accent: #8b5cf6;
+
+  /* Semantic */
   --color-nova-success: #16a34a;
   --color-nova-warning: #d97706;
   --color-nova-danger: #dc2626;
   --color-nova-gray: #6b7280;
 
-  /* Stock semaphore colors */
+  /* Stock semaphore */
   --color-stock-green: #16a34a;
   --color-stock-yellow: #d97706;
   --color-stock-red: #dc2626;
   --color-stock-gray: #9ca3af;
 
-  /* Aging colors for accounts */
+  /* Aging */
   --color-aging-green: #16a34a;
   --color-aging-yellow: #d97706;
   --color-aging-red: #dc2626;
+}
+
+/* ============================================
+   Typography
+   ============================================ */
+
+body {
+  font-family: "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ============================================
+   Premium scrollbar
+   ============================================ */
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(203, 213, 225, 0.5);
+  border-radius: 12px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.7);
+}
+
+/* ============================================
+   Glassmorphism utilities
+   ============================================ */
+
+.glass {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+}
+
+.glass-strong {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+}
+
+/* ============================================
+   Dark accent pill (nav active, CTA)
+   ============================================ */
+
+.dark-pill {
+  background: linear-gradient(to bottom, #3a3a3a, #222222, #0a0a0a);
+  color: white;
+  box-shadow:
+    0 10px 25px -5px rgba(0, 0, 0, 0.3),
+    inset 0 2px 3px rgba(255, 255, 255, 0.15),
+    inset 0 -2px 3px rgba(0, 0, 0, 0.5);
+}
+
+.dark-pill:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 15px 30px -5px rgba(0, 0, 0, 0.35),
+    inset 0 2px 3px rgba(255, 255, 255, 0.2),
+    inset 0 -2px 3px rgba(0, 0, 0, 0.5);
+}
+
+/* ============================================
+   Gradient text
+   ============================================ */
+
+.text-gradient {
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  background-image: linear-gradient(to right, #111111, #333333, #555555);
+}
+
+/* ============================================
+   Spring animation
+   ============================================ */
+
+.transition-spring {
+  transition-property: all;
+  transition-duration: 400ms;
+  transition-timing-function: cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+/* ============================================
+   Card hover lift
+   ============================================ */
+
+.card-lift {
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.card-lift:hover {
+  transform: translateY(-4px);
+  box-shadow:
+    0 20px 40px -10px rgba(0, 0, 0, 0.08),
+    0 10px 20px -5px rgba(0, 0, 0, 0.04);
+}
+
+/* ============================================
+   Premium card base
+   ============================================ */
+
+.card-premium {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  border-radius: 24px;
+  box-shadow:
+    0 10px 30px -10px rgba(0, 0, 0, 0.06),
+    inset 0 2px 4px rgba(255, 255, 255, 0.8);
+}
+
+/* ============================================
+   Progress bar with glow
+   ============================================ */
+
+.progress-glow {
+  position: relative;
+  overflow: hidden;
+  border-radius: 9999px;
+}
+
+.progress-glow::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 40px;
+  height: 100%;
+  background: linear-gradient(to right, transparent, rgba(255, 255, 255, 0.5));
 }

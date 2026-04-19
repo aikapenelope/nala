@@ -1,11 +1,10 @@
 <script setup lang="ts">
 /**
- * Dashboard - single screen, zero scroll on 6" phone.
+ * Dashboard - premium glassmorphism design, single screen, zero scroll.
  *
- * Answers 3 questions in 5 seconds:
- * 1. "How did I do today?" - sales total, profit, trend
- * 2. "What needs attention?" - debts, stock, cash flow, alerts
- * 3. "What's happening?" - top seller, star product, payment mix
+ * Visual language: glass cards, dark accent pills, gradient text,
+ * spring animations, progress bars with glow. Adapted from EdTech
+ * reference design for mobile-first POS.
  *
  * Connected to:
  * - GET /api/reports/daily (sales, profit, topSeller, topProducts, salesByMethod)
@@ -99,7 +98,7 @@ const topMethods = computed(() => {
   if (total === 0) return [];
   return entries
     .sort((a, b) => b[1] - a[1])
-    .slice(0, 3)
+    .slice(0, 4)
     .map(([method, amount]) => ({
       label: methodLabels[method] ?? method,
       percent: Math.round((amount / total) * 100),
@@ -154,7 +153,6 @@ async function loadDashboard() {
       $api<{ opening: unknown | null }>("/api/cash-opening/latest"),
     ]);
 
-    // Daily
     if (dailyResult.status === "fulfilled") {
       const d = dailyResult.value.data;
       todaySales.value = d.totalSales;
@@ -168,34 +166,28 @@ async function loadDashboard() {
       salesByMethod.value = d.salesByMethod ?? {};
     }
 
-    // Receivables
     if (receivableResult.status === "fulfilled") {
       receivableTotal.value = receivableResult.value.totalPending;
     }
 
-    // Inventory
     if (inventoryResult.status === "fulfilled") {
       const inv = inventoryResult.value.data;
       lowStockCount.value = (inv.lowStock ?? 0) + (inv.criticalStock ?? 0);
     }
 
-    // Alerts
     if (alertsResult.status === "fulfilled") {
       alertCount.value = alertsResult.value.alerts.length;
     }
 
-    // Exchange rate
     if (rateResult.status === "fulfilled") {
       exchangeRate.value = rateResult.value.rateBcv;
       euroRate.value = rateResult.value.rateEur;
     }
 
-    // Cash flow
     if (cashFlowResult.status === "fulfilled") {
       cashFlow7d.value = cashFlowResult.value.data.projection7d.net;
     }
 
-    // Cash opening
     if (cashOpenResult.status === "fulfilled") {
       cashOpened.value = cashOpenResult.value.opening !== null;
     }
@@ -209,7 +201,6 @@ async function loadDashboard() {
   }
 }
 
-/** Online status. */
 function updateOnlineStatus() {
   if (import.meta.client) {
     syncStatus.value = navigator.onLine ? "online" : "offline";
@@ -229,7 +220,6 @@ onMounted(() => {
   loadDashboard();
 });
 
-/** Save exchange rate. */
 async function saveRate() {
   const usd = Number(rateInputUsd.value);
   const eur = rateInputEur.value ? Number(rateInputEur.value) : undefined;
@@ -269,27 +259,27 @@ function openRateEditor() {
 <template>
   <div>
     <!-- ================================================ -->
-    <!-- Skeleton loading                                  -->
+    <!-- Skeleton loading with glass effect                 -->
     <!-- ================================================ -->
-    <div v-if="isLoading" class="animate-pulse space-y-3">
-      <div class="h-6 w-48 rounded bg-gray-200"/>
-      <div class="h-32 rounded-xl bg-gray-200"/>
+    <div v-if="isLoading" class="animate-pulse space-y-4">
+      <div class="h-7 w-52 rounded-xl bg-white/50"/>
+      <div class="h-36 rounded-[28px] bg-white/40"/>
       <div class="grid grid-cols-3 gap-3">
-        <div class="h-20 rounded-xl bg-gray-200"/>
-        <div class="h-20 rounded-xl bg-gray-200"/>
-        <div class="h-20 rounded-xl bg-gray-200"/>
+        <div class="h-24 rounded-[24px] bg-white/40"/>
+        <div class="h-24 rounded-[24px] bg-white/40"/>
+        <div class="h-24 rounded-[24px] bg-white/40"/>
       </div>
-      <div class="h-12 rounded-xl bg-gray-200"/>
+      <div class="h-14 rounded-[20px] bg-white/40"/>
     </div>
 
     <!-- Error state -->
     <div
       v-else-if="loadError"
-      class="rounded-xl bg-red-50 p-6 text-center text-sm text-red-600"
+      class="card-premium p-8 text-center"
     >
-      {{ loadError }}
+      <p class="text-sm font-semibold text-red-500">{{ loadError }}</p>
       <button
-        class="mt-2 block w-full text-xs font-medium text-red-700 underline"
+        class="mt-3 text-xs font-bold text-nova-primary underline"
         @click="loadDashboard"
       >
         Reintentar
@@ -300,29 +290,30 @@ function openRateEditor() {
       <!-- ================================================ -->
       <!-- HEADER: Greeting + Rate + Cash status             -->
       <!-- ================================================ -->
-      <div class="mb-3 flex items-center justify-between">
+      <div class="mb-5 flex items-center justify-between">
         <div>
-          <h1 class="text-lg font-bold text-gray-900">
-            {{ greeting }}, {{ user?.businessName ?? "Nova" }}
+          <h1 class="text-2xl font-extrabold tracking-tight text-gradient">
+            {{ greeting }}
           </h1>
-          <p class="text-xs text-gray-400">
+          <p class="mt-0.5 text-sm font-medium text-gray-500">
+            {{ user?.businessName ?? "Nova" }}
+            <span class="text-gray-300"> · </span>
             {{ user?.name ?? "" }}
-            <span v-if="isAdmin"> · Admin</span>
             <span
               v-if="isAdmin && cashOpened === false"
-              class="ml-1 text-yellow-600"
+              class="ml-1 rounded-full bg-yellow-100 px-2 py-0.5 text-[10px] font-bold text-yellow-700"
             >
-              · Caja sin abrir
+              Caja sin abrir
             </span>
           </p>
         </div>
-        <!-- BCV rate badge -->
+        <!-- BCV rate pill -->
         <button
           v-if="isAdmin"
-          class="rounded-lg px-3 py-1.5 text-xs font-medium"
+          class="rounded-2xl px-4 py-2 text-xs font-bold transition-spring"
           :class="
             exchangeRate
-              ? 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              ? 'glass text-gray-700 hover:shadow-[0_8px_20px_-4px_rgba(0,0,0,0.08)]'
               : 'bg-yellow-100 text-yellow-700'
           "
           @click="openRateEditor"
@@ -330,193 +321,298 @@ function openRateEditor() {
           <template v-if="exchangeRate">
             Bs.{{ exchangeRate.toFixed(2) }}
           </template>
-          <template v-else> Configurar tasa </template>
+          <template v-else>Configurar tasa</template>
         </button>
         <span
           v-else-if="exchangeRate"
-          class="rounded-lg bg-gray-100 px-3 py-1.5 text-xs text-gray-500"
+          class="glass rounded-2xl px-4 py-2 text-xs font-bold text-gray-500"
         >
           Bs.{{ exchangeRate.toFixed(2) }}
         </span>
       </div>
 
       <!-- ================================================ -->
-      <!-- HERO: Today's sales + profit + trend              -->
+      <!-- HERO: Today's sales - gradient card                -->
       <!-- ================================================ -->
       <NuxtLink
         to="/sales/history"
-        class="block rounded-xl bg-white p-5 shadow-sm transition-colors hover:bg-gray-50"
+        class="card-lift relative block overflow-hidden rounded-[28px] bg-gradient-to-br from-[#EFECFF] via-[#E2DEFF] to-[#D0CCF9] p-6 shadow-[0_15px_35px_-10px_rgba(208,204,249,0.5)] border border-white/80"
       >
-        <div class="flex items-start justify-between">
-          <div>
-            <p class="text-sm font-medium text-gray-500">Vendido hoy</p>
-            <p class="mt-1 text-3xl font-bold text-gray-900">
-              ${{ todaySales.toFixed(2) }}
-            </p>
+        <!-- Decorative orb -->
+        <div class="absolute -top-8 -right-8 h-28 w-28 rounded-full bg-white/40 blur-2xl"/>
+
+        <div class="relative z-10">
+          <div class="flex items-start justify-between">
+            <div>
+              <p class="text-sm font-bold text-gray-600/80">Vendido hoy</p>
+              <p class="mt-1 text-4xl font-extrabold tracking-tighter text-gradient">
+                ${{ todaySales.toFixed(2) }}
+              </p>
+            </div>
+            <span
+              v-if="trendPercent > 0"
+              class="flex items-center gap-1.5 rounded-2xl px-3 py-1.5 text-xs font-bold shadow-sm"
+              :class="
+                trendPositive
+                  ? 'bg-white/60 text-green-700'
+                  : 'bg-white/60 text-red-700'
+              "
+            >
+              <component
+                :is="trendPositive ? TrendingUp : TrendingDown"
+                :size="14"
+              />
+              {{ trendPercent }}%
+            </span>
           </div>
-          <span
-            v-if="trendPercent > 0"
-            class="flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold"
-            :class="
-              trendPositive
-                ? 'bg-green-100 text-green-700'
-                : 'bg-red-100 text-red-700'
-            "
-          >
-            <component
-              :is="trendPositive ? TrendingUp : TrendingDown"
-              :size="12"
-            />
-            {{ trendPercent }}%
-          </span>
-        </div>
-        <div class="mt-2 flex items-center gap-3 text-xs text-gray-400">
-          <span>{{ todayCount }} venta{{ todayCount !== 1 ? "s" : "" }}</span>
-          <span v-if="todayCount > 0">
-            · ${{ todayAvgTicket.toFixed(2) }} prom
-          </span>
-          <span
-            v-if="todayProfit !== 0"
-            class="font-medium"
-            :class="todayProfit >= 0 ? 'text-green-600' : 'text-red-500'"
-          >
-            · Ganancia ${{ todayProfit.toFixed(2) }}
-          </span>
+
+          <div class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] font-semibold text-gray-600/70">
+            <span>{{ todayCount }} venta{{ todayCount !== 1 ? "s" : "" }}</span>
+            <span v-if="todayCount > 0">
+              ${{ todayAvgTicket.toFixed(2) }} prom
+            </span>
+            <span
+              v-if="todayProfit !== 0"
+              class="rounded-xl px-2 py-0.5 text-xs font-bold"
+              :class="
+                todayProfit >= 0
+                  ? 'bg-green-500/15 text-green-700'
+                  : 'bg-red-500/15 text-red-700'
+              "
+            >
+              {{ todayProfit >= 0 ? "+" : "" }}${{ todayProfit.toFixed(2) }} ganancia
+            </span>
+          </div>
         </div>
       </NuxtLink>
 
       <!-- ================================================ -->
-      <!-- 3 CARDS: Debts, Stock, Cash flow                  -->
+      <!-- 3 CARDS: Gradient backgrounds like course cards    -->
       <!-- ================================================ -->
-      <div class="mt-3 grid grid-cols-3 gap-3">
+      <div class="mt-4 grid grid-cols-3 gap-3">
         <!-- Te deben -->
         <NuxtLink
           to="/accounts"
-          class="rounded-xl bg-white p-3 shadow-sm transition-colors hover:bg-gray-50"
+          class="card-lift relative overflow-hidden rounded-[22px] border border-white/80 p-4"
+          :class="
+            receivableTotal > 0
+              ? 'bg-gradient-to-br from-[#FFF7ED] to-[#FED7AA]'
+              : 'bg-gradient-to-br from-[#F0FDF4] to-[#BBF7D0]'
+          "
         >
-          <Wallet
-            :size="16"
-            class="mb-1"
-            :class="receivableTotal > 0 ? 'text-yellow-500' : 'text-green-500'"
-          />
-          <p class="text-lg font-bold text-gray-900">
-            ${{ receivableTotal.toFixed(0) }}
-          </p>
-          <p class="text-[11px] text-gray-500">Te deben</p>
+          <div class="absolute -top-4 -right-4 h-12 w-12 rounded-full bg-white/40 blur-xl"/>
+          <div class="relative z-10">
+            <div
+              class="mb-2 flex h-9 w-9 items-center justify-center rounded-xl"
+              :class="receivableTotal > 0 ? 'dark-pill' : 'bg-green-600/20'"
+            >
+              <Wallet
+                :size="16"
+                :class="receivableTotal > 0 ? 'text-orange-300' : 'text-green-600'"
+              />
+            </div>
+            <p class="text-xl font-extrabold tracking-tight text-gray-900">
+              ${{ receivableTotal.toFixed(0) }}
+            </p>
+            <p class="text-[11px] font-semibold text-gray-600/70">Te deben</p>
+          </div>
         </NuxtLink>
 
         <!-- Stock bajo -->
         <NuxtLink
           to="/inventory?status=red"
-          class="rounded-xl bg-white p-3 shadow-sm transition-colors hover:bg-gray-50"
+          class="card-lift relative overflow-hidden rounded-[22px] border border-white/80 p-4"
+          :class="
+            lowStockCount > 0
+              ? 'bg-gradient-to-br from-[#FEF2F2] to-[#FECACA]'
+              : 'bg-gradient-to-br from-[#F0FDF4] to-[#BBF7D0]'
+          "
         >
-          <Package
-            :size="16"
-            class="mb-1"
-            :class="lowStockCount > 0 ? 'text-red-500' : 'text-green-500'"
-          />
-          <p class="text-lg font-bold text-gray-900">
-            {{ lowStockCount }}
-          </p>
-          <p class="text-[11px] text-gray-500">
-            {{ lowStockCount > 0 ? "Se acaban" : "Stock OK" }}
-          </p>
+          <div class="absolute -top-4 -right-4 h-12 w-12 rounded-full bg-white/40 blur-xl"/>
+          <div class="relative z-10">
+            <div
+              class="mb-2 flex h-9 w-9 items-center justify-center rounded-xl"
+              :class="lowStockCount > 0 ? 'dark-pill' : 'bg-green-600/20'"
+            >
+              <Package
+                :size="16"
+                :class="lowStockCount > 0 ? 'text-red-300' : 'text-green-600'"
+              />
+            </div>
+            <p class="text-xl font-extrabold tracking-tight text-gray-900">
+              {{ lowStockCount }}
+            </p>
+            <p class="text-[11px] font-semibold text-gray-600/70">
+              {{ lowStockCount > 0 ? "Se acaban" : "Stock OK" }}
+            </p>
+          </div>
         </NuxtLink>
 
         <!-- Cash flow 7d -->
         <NuxtLink
           to="/reports/cash-flow"
-          class="rounded-xl bg-white p-3 shadow-sm transition-colors hover:bg-gray-50"
+          class="card-lift relative overflow-hidden rounded-[22px] border border-white/80 p-4"
+          :class="
+            cashFlow7d >= 0
+              ? 'bg-gradient-to-br from-[#EEF7FD] to-[#CAE8F8]'
+              : 'bg-gradient-to-br from-[#FEF2F2] to-[#FECACA]'
+          "
         >
-          <CreditCard
-            :size="16"
-            class="mb-1"
-            :class="cashFlow7d >= 0 ? 'text-green-500' : 'text-red-500'"
-          />
-          <p
-            class="text-lg font-bold"
-            :class="cashFlow7d >= 0 ? 'text-green-700' : 'text-red-600'"
-          >
-            {{ cashFlow7d >= 0 ? "+" : "" }}${{
-              Math.abs(cashFlow7d).toFixed(0)
-            }}
-          </p>
-          <p class="text-[11px] text-gray-500">En 7 dias</p>
+          <div class="absolute -top-4 -right-4 h-12 w-12 rounded-full bg-white/40 blur-xl"/>
+          <div class="relative z-10">
+            <div
+              class="mb-2 flex h-9 w-9 items-center justify-center rounded-xl"
+              :class="cashFlow7d >= 0 ? 'bg-blue-600/15' : 'dark-pill'"
+            >
+              <CreditCard
+                :size="16"
+                :class="cashFlow7d >= 0 ? 'text-blue-600' : 'text-red-300'"
+              />
+            </div>
+            <p
+              class="text-xl font-extrabold tracking-tight"
+              :class="cashFlow7d >= 0 ? 'text-gray-900' : 'text-red-700'"
+            >
+              {{ cashFlow7d >= 0 ? "+" : "" }}${{ Math.abs(cashFlow7d).toFixed(0) }}
+            </p>
+            <p class="text-[11px] font-semibold text-gray-600/70">En 7 dias</p>
+          </div>
         </NuxtLink>
       </div>
 
       <!-- ================================================ -->
-      <!-- INSIGHTS: Top seller, star product, alerts        -->
+      <!-- INSIGHTS: Dark pill icons + progress style         -->
       <!-- ================================================ -->
-      <div class="mt-3 space-y-1.5">
+      <div class="mt-4 space-y-2.5">
         <!-- Top seller -->
         <div
           v-if="topSeller"
-          class="flex items-center gap-2 rounded-lg bg-white px-4 py-2.5 shadow-sm"
+          class="card-premium flex items-center gap-4 p-4 transition-spring hover:shadow-[0_12px_30px_-10px_rgba(0,0,0,0.08)]"
         >
-          <Trophy :size="14" class="flex-shrink-0 text-yellow-500" />
-          <p class="flex-1 truncate text-sm text-gray-700">
-            <span class="font-medium">{{ topSeller.name }}</span>
-            vendio mas: ${{ topSeller.total.toFixed(0) }}
+          <div class="dark-pill flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-[16px]">
+            <Trophy :size="20" class="text-yellow-300 drop-shadow-[0_0_6px_rgba(253,224,71,0.6)]" />
+          </div>
+          <div class="min-w-0 flex-1">
+            <p class="text-[13px] font-extrabold text-gray-800 tracking-wide">
+              {{ topSeller.name }} vendio mas
+            </p>
+            <div class="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-gray-100/80 border border-white">
+              <div
+                class="progress-glow h-full rounded-full bg-gradient-to-r from-[#4ade80] to-[#3b82f6]"
+                :style="{ width: todaySales > 0 ? `${Math.min((topSeller.total / todaySales) * 100, 100)}%` : '0%' }"
+              />
+            </div>
+          </div>
+          <p class="text-xl font-extrabold tracking-tighter text-gradient">
+            ${{ topSeller.total.toFixed(0) }}
           </p>
         </div>
 
         <!-- Star product -->
         <div
           v-if="topProduct"
-          class="flex items-center gap-2 rounded-lg bg-white px-4 py-2.5 shadow-sm"
+          class="card-premium flex items-center gap-4 p-4 transition-spring hover:shadow-[0_12px_30px_-10px_rgba(0,0,0,0.08)]"
         >
-          <Star :size="14" class="flex-shrink-0 text-blue-500" />
-          <p class="flex-1 truncate text-sm text-gray-700">
-            <span class="font-medium">{{ topProduct.name }}</span>:
-            {{ topProduct.quantity }} uds hoy
+          <div class="dark-pill flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-[16px]">
+            <Star :size="20" class="text-blue-300 drop-shadow-[0_0_6px_rgba(147,197,253,0.6)]" />
+          </div>
+          <div class="min-w-0 flex-1">
+            <p class="truncate text-[13px] font-extrabold text-gray-800 tracking-wide">
+              {{ topProduct.name }}
+            </p>
+            <p class="text-[11px] font-semibold text-gray-400">
+              Producto estrella del dia
+            </p>
+          </div>
+          <p class="text-xl font-extrabold tracking-tighter text-gradient">
+            {{ topProduct.quantity }}
           </p>
         </div>
 
-        <!-- Alerts summary -->
+        <!-- Alerts -->
         <NuxtLink
           v-if="alertCount > 0"
           to="/reports"
-          class="flex items-center gap-2 rounded-lg bg-white px-4 py-2.5 shadow-sm transition-colors hover:bg-gray-50"
+          class="card-premium flex items-center gap-4 p-4 transition-spring hover:shadow-[0_12px_30px_-10px_rgba(0,0,0,0.08)]"
         >
-          <AlertTriangle :size="14" class="flex-shrink-0 text-orange-500" />
-          <p class="flex-1 text-sm text-gray-700">
-            {{ alertCount }} alerta{{ alertCount > 1 ? "s" : "" }} pendiente{{
-              alertCount > 1 ? "s" : ""
-            }}
-          </p>
-          <span class="text-xs text-nova-primary">Ver</span>
+          <div class="dark-pill flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-[16px]">
+            <AlertTriangle :size="20" class="text-orange-300 drop-shadow-[0_0_6px_rgba(251,146,60,0.6)]" />
+          </div>
+          <div class="min-w-0 flex-1">
+            <p class="text-[13px] font-extrabold text-gray-800 tracking-wide">
+              {{ alertCount }} alerta{{ alertCount > 1 ? "s" : "" }} pendiente{{ alertCount > 1 ? "s" : "" }}
+            </p>
+            <p class="text-[11px] font-semibold text-gray-400">
+              Requiere tu atencion
+            </p>
+          </div>
+          <span class="text-xs font-bold text-nova-accent">Ver</span>
         </NuxtLink>
       </div>
 
       <!-- ================================================ -->
-      <!-- CTA: Nueva venta                                  -->
+      <!-- CTA: Dark gradient button                          -->
       <!-- ================================================ -->
       <NuxtLink
         to="/sales"
-        class="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-nova-primary py-3.5 text-center font-semibold text-white shadow-lg shadow-nova-primary/25"
+        class="dark-pill mt-4 flex w-full items-center justify-center gap-2.5 rounded-[20px] py-4 text-center text-[15px] font-extrabold tracking-wide transition-spring"
       >
-        <DollarSign :size="18" />
+        <DollarSign :size="20" />
         Nueva venta
       </NuxtLink>
 
       <!-- ================================================ -->
-      <!-- FOOTER: Payment mix + connection + refresh         -->
+      <!-- PAYMENT MIX: Glass pill with mini bars             -->
       <!-- ================================================ -->
-      <div class="mt-3 flex items-center justify-between">
-        <!-- Payment method mix -->
-        <div v-if="topMethods.length > 0" class="flex gap-2 text-[10px]">
-          <span
+      <div
+        v-if="topMethods.length > 0"
+        class="glass mt-4 rounded-[20px] px-5 py-3"
+      >
+        <div class="flex items-center justify-between">
+          <p class="text-[11px] font-bold text-gray-500 tracking-wide">Metodos de pago</p>
+          <div class="flex items-center gap-2">
+            <span
+              class="h-1.5 w-1.5 rounded-full"
+              :class="{
+                'bg-green-500': syncStatus === 'online',
+                'bg-gray-400': syncStatus === 'offline',
+                'bg-yellow-500 animate-pulse': syncStatus === 'syncing',
+              }"
+            />
+            <span v-if="syncStatus === 'offline'" class="text-[10px] font-semibold text-gray-400">
+              Offline
+              <template v-if="pendingSyncCount > 0"> · {{ pendingSyncCount }}</template>
+            </span>
+            <button
+              class="text-gray-300 transition-spring hover:text-gray-500 hover:scale-110"
+              @click="loadDashboard"
+            >
+              <RefreshCw :size="13" />
+            </button>
+          </div>
+        </div>
+        <div class="mt-2.5 space-y-2">
+          <div
             v-for="m in topMethods"
             :key="m.label"
-            class="text-gray-400"
+            class="flex items-center gap-3"
           >
-            {{ m.label }} {{ m.percent }}%
-          </span>
+            <span class="w-14 text-[11px] font-bold text-gray-600">{{ m.label }}</span>
+            <div class="h-2 flex-1 overflow-hidden rounded-full bg-gray-100/80 border border-white">
+              <div
+                class="progress-glow h-full rounded-full bg-gradient-to-r from-[#c4b5fd] to-[#8b5cf6]"
+                :style="{ width: `${m.percent}%` }"
+              />
+            </div>
+            <span class="w-8 text-right text-[11px] font-extrabold text-gray-700">{{ m.percent }}%</span>
+          </div>
         </div>
-        <div v-else class="text-[10px] text-gray-300">Sin ventas hoy</div>
-
-        <!-- Connection + refresh -->
+      </div>
+      <div
+        v-else
+        class="glass mt-4 flex items-center justify-between rounded-[20px] px-5 py-3"
+      >
+        <span class="text-[11px] font-semibold text-gray-400">Sin ventas hoy</span>
         <div class="flex items-center gap-2">
           <span
             class="h-1.5 w-1.5 rounded-full"
@@ -526,37 +622,31 @@ function openRateEditor() {
               'bg-yellow-500 animate-pulse': syncStatus === 'syncing',
             }"
           />
-          <span v-if="syncStatus === 'offline'" class="text-[10px] text-gray-400">
-            Offline
-            <template v-if="pendingSyncCount > 0">
-              · {{ pendingSyncCount }}
-            </template>
-          </span>
           <button
-            class="text-gray-300 hover:text-gray-500"
+            class="text-gray-300 transition-spring hover:text-gray-500"
             @click="loadDashboard"
           >
-            <RefreshCw :size="12" />
+            <RefreshCw :size="13" />
           </button>
         </div>
       </div>
 
       <!-- ================================================ -->
-      <!-- Rate editor modal                                 -->
+      <!-- Rate editor modal - glass panel                    -->
       <!-- ================================================ -->
       <Teleport to="body">
         <div
           v-if="showRateEditor"
-          class="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+          class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
           @click.self="showRateEditor = false"
         >
-          <div class="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
-            <h3 class="mb-4 text-lg font-semibold text-gray-900">
+          <div class="glass-strong w-full max-w-sm rounded-[32px] p-7 shadow-[0_30px_60px_-15px_rgba(0,0,0,0.2)]">
+            <h3 class="mb-5 text-xl font-extrabold tracking-tight text-gradient">
               Tasa de cambio BCV
             </h3>
-            <div class="space-y-3">
+            <div class="space-y-4">
               <div>
-                <label class="mb-1 block text-sm text-gray-600">
+                <label class="mb-1.5 block text-[13px] font-bold text-gray-600">
                   Dolar (USD)
                 </label>
                 <input
@@ -565,12 +655,12 @@ function openRateEditor() {
                   step="0.01"
                   min="0"
                   placeholder="86.48"
-                  class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-nova-primary focus:outline-none"
+                  class="w-full rounded-2xl border border-white bg-white/60 px-4 py-3 text-sm font-semibold text-gray-800 shadow-[inset_0_2px_4px_rgba(0,0,0,0.03)] outline-none focus:ring-[3px] focus:ring-nova-accent/20 focus:bg-white transition-spring placeholder:text-gray-400"
                   autofocus
                 >
               </div>
               <div>
-                <label class="mb-1 block text-sm text-gray-600">
+                <label class="mb-1.5 block text-[13px] font-bold text-gray-600">
                   Euro (EUR)
                 </label>
                 <input
@@ -579,25 +669,25 @@ function openRateEditor() {
                   step="0.01"
                   min="0"
                   placeholder="96.20"
-                  class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-nova-primary focus:outline-none"
+                  class="w-full rounded-2xl border border-white bg-white/60 px-4 py-3 text-sm font-semibold text-gray-800 shadow-[inset_0_2px_4px_rgba(0,0,0,0.03)] outline-none focus:ring-[3px] focus:ring-nova-accent/20 focus:bg-white transition-spring placeholder:text-gray-400"
                 >
               </div>
             </div>
-            <p v-if="rateSaveError" class="mt-2 text-sm text-red-500">
+            <p v-if="rateSaveError" class="mt-3 text-sm font-semibold text-red-500">
               {{ rateSaveError }}
             </p>
-            <p class="mt-2 text-[10px] text-gray-400">
+            <p class="mt-3 text-[10px] font-semibold text-gray-400">
               Consulta la tasa oficial en bcv.org.ve
             </p>
-            <div class="mt-4 flex gap-3">
+            <div class="mt-5 flex gap-3">
               <button
-                class="flex-1 rounded-lg border border-gray-300 py-2.5 text-sm font-medium text-gray-700"
+                class="glass flex-1 rounded-2xl py-3 text-sm font-bold text-gray-700 transition-spring hover:shadow-[0_8px_20px_-4px_rgba(0,0,0,0.08)]"
                 @click="showRateEditor = false"
               >
                 Cancelar
               </button>
               <button
-                class="flex-1 rounded-lg bg-nova-primary py-2.5 text-sm font-medium text-white disabled:opacity-50"
+                class="dark-pill flex-1 rounded-2xl py-3 text-sm font-bold transition-spring disabled:opacity-50"
                 :disabled="rateSaving"
                 @click="saveRate"
               >
