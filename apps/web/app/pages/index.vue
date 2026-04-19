@@ -1,13 +1,14 @@
 <script setup lang="ts">
 /**
- * Dashboard - premium glassmorphism design, single screen, zero scroll.
+ * Dashboard - data-rich, single screen with weekly chart.
  *
- * Visual language: glass cards, dark accent pills, gradient text,
- * spring animations, progress bars with glow. Adapted from EdTech
- * reference design for mobile-first POS.
+ * Shows: sales hero, 3 summary cards, weekly bar chart, payment mix,
+ * 4 insight tiles (seller, product, alerts, margin), CTA.
  *
  * Connected to:
  * - GET /api/reports/daily (sales, profit, topSeller, topProducts, salesByMethod)
+ * - GET /api/reports/weekly (dailyBreakdown for chart)
+ * - GET /api/reports/financial (grossMargin)
  * - GET /api/accounts/receivable (totalPending)
  * - GET /api/reports/inventory (lowStock + criticalStock)
  * - GET /api/reports/cash-flow (projection7d.net)
@@ -27,12 +28,12 @@ import {
   Star,
   Wallet,
   RefreshCw,
+  BarChart3,
 } from "lucide-vue-next";
 
 const { isAdmin, user } = useNovaAuth();
 const { $api } = useApi();
 
-/** Loading and error state. */
 const isLoading = ref(true);
 const loadError = ref("");
 
@@ -46,6 +47,15 @@ const trendPositive = ref(true);
 const topSeller = ref<{ name: string; total: number } | null>(null);
 const topProduct = ref<{ name: string; quantity: number } | null>(null);
 const salesByMethod = ref<Record<string, number>>({});
+
+/** Weekly chart data. */
+const weeklyDays = ref<Array<{ day: string; amount: number }>>([]);
+const weeklyMax = computed(() =>
+  Math.max(...weeklyDays.value.map((d) => d.amount), 1),
+);
+
+/** Financial margin. */
+const grossMargin = ref(0);
 
 /** Summary cards. */
 const receivableTotal = ref(0);
@@ -71,7 +81,6 @@ const cashOpened = ref<boolean | null>(null);
 const syncStatus = ref<"online" | "offline" | "syncing">("online");
 const pendingSyncCount = ref(0);
 
-/** Time-of-day greeting. */
 const greeting = computed(() => {
   const hour = new Date().getHours();
   if (hour < 12) return "Buenos dias";
@@ -80,17 +89,16 @@ const greeting = computed(() => {
 });
 
 /** Payment method config with colors. */
-const methodConfig: Record<string, { label: string; color: string }> = {
-  efectivo: { label: "Efectivo", color: "from-[#4ade80] to-[#16a34a]" },
-  pago_movil: { label: "Movil", color: "from-[#60a5fa] to-[#2563eb]" },
-  binance: { label: "Binance", color: "from-[#fbbf24] to-[#d97706]" },
-  zinli: { label: "Zinli", color: "from-[#a78bfa] to-[#7c3aed]" },
-  transferencia: { label: "Transf.", color: "from-[#38bdf8] to-[#0284c7]" },
-  zelle: { label: "Zelle", color: "from-[#818cf8] to-[#4f46e5]" },
-  fiado: { label: "Fiado", color: "from-[#fb923c] to-[#ea580c]" },
+const methodConfig: Record<string, { label: string; from: string; to: string }> = {
+  efectivo: { label: "Efectivo", from: "#4ade80", to: "#16a34a" },
+  pago_movil: { label: "Movil", from: "#60a5fa", to: "#2563eb" },
+  binance: { label: "Binance", from: "#fbbf24", to: "#d97706" },
+  zinli: { label: "Zinli", from: "#a78bfa", to: "#7c3aed" },
+  transferencia: { label: "Transf.", from: "#38bdf8", to: "#0284c7" },
+  zelle: { label: "Zelle", from: "#818cf8", to: "#4f46e5" },
+  fiado: { label: "Fiado", from: "#fb923c", to: "#ea580c" },
 };
 
-/** Top 4 payment methods by amount with colors. */
 const topMethods = computed(() => {
   const entries = Object.entries(salesByMethod.value);
   if (entries.length === 0) return [];
@@ -101,8 +109,10 @@ const topMethods = computed(() => {
     .slice(0, 4)
     .map(([method, amount]) => ({
       label: methodConfig[method]?.label ?? method,
-      color: methodConfig[method]?.color ?? "from-gray-400 to-gray-500",
+      from: methodConfig[method]?.from ?? "#9ca3af",
+      to: methodConfig[method]?.to ?? "#6b7280",
       percent: Math.round((amount / total) * 100),
+      amount: Math.round(amount * 100) / 100,
     }));
 });
 
@@ -117,6 +127,8 @@ async function loadDashboard() {
   try {
     const [
       dailyResult,
+      weeklyResult,
+      financialResult,
       receivableResult,
       inventoryResult,
       alertsResult,
@@ -136,6 +148,14 @@ async function loadDashboard() {
           salesByMethod: Record<string, number>;
         };
       }>("/api/reports/daily"),
+
+      $api<{
+        data: { dailyBreakdown: Array<{ day: string; amount: number }> };
+      }>("/api/reports/weekly?period=week"),
+
+      $api<{
+        data: { grossMargin: number };
+      }>("/api/reports/financial?period=month"),
 
       $api<{ totalPending: number }>("/api/accounts/receivable"),
 
@@ -165,6 +185,14 @@ async function loadDashboard() {
       topSeller.value = d.topSeller;
       topProduct.value = d.topProducts?.[0] ?? null;
       salesByMethod.value = d.salesByMethod ?? {};
+    }
+
+    if (weeklyResult.status === "fulfilled") {
+      weeklyDays.value = weeklyResult.value.data.dailyBreakdown;
+    }
+
+    if (financialResult.status === "fulfilled") {
+      grossMargin.value = financialResult.value.data.grossMargin;
     }
 
     if (receivableResult.status === "fulfilled") {
@@ -224,15 +252,12 @@ onMounted(() => {
 async function saveRate() {
   const usd = Number(rateInputUsd.value);
   const eur = rateInputEur.value ? Number(rateInputEur.value) : undefined;
-
   if (!usd || usd <= 0) {
     rateSaveError.value = "La tasa del dolar debe ser mayor a 0";
     return;
   }
-
   rateSaving.value = true;
   rateSaveError.value = "";
-
   try {
     const result = await $api<{ rateBcv: number; rateEur: number | null }>(
       "/api/exchange-rate",
@@ -259,43 +284,32 @@ function openRateEditor() {
 
 <template>
   <div>
-    <!-- ================================================ -->
-    <!-- Skeleton loading with glass effect                 -->
-    <!-- ================================================ -->
-    <div v-if="isLoading" class="animate-pulse space-y-4">
+    <!-- Skeleton -->
+    <div v-if="isLoading" class="animate-pulse space-y-3">
       <div class="h-7 w-52 rounded-xl bg-white/50"/>
-      <div class="h-36 rounded-[28px] bg-white/40"/>
+      <div class="h-32 rounded-[28px] bg-white/40"/>
       <div class="grid grid-cols-3 gap-3">
         <div class="h-24 rounded-[24px] bg-white/40"/>
         <div class="h-24 rounded-[24px] bg-white/40"/>
         <div class="h-24 rounded-[24px] bg-white/40"/>
       </div>
-      <div class="h-14 rounded-[20px] bg-white/40"/>
+      <div class="h-28 rounded-[24px] bg-white/40"/>
+      <div class="h-20 rounded-[24px] bg-white/40"/>
     </div>
 
-    <!-- Error state -->
-    <div
-      v-else-if="loadError"
-      class="card-premium p-8 text-center"
-    >
+    <!-- Error -->
+    <div v-else-if="loadError" class="card-premium p-8 text-center">
       <p class="text-sm font-semibold text-red-500">{{ loadError }}</p>
-      <button
-        class="mt-3 text-xs font-bold text-nova-primary underline"
-        @click="loadDashboard"
-      >
+      <button class="mt-3 text-xs font-bold text-nova-primary underline" @click="loadDashboard">
         Reintentar
       </button>
     </div>
 
     <template v-else>
-      <!-- ================================================ -->
-      <!-- HEADER: Greeting + Rate + Cash status             -->
-      <!-- ================================================ -->
-      <div class="mb-5 flex items-center justify-between">
+      <!-- HEADER -->
+      <div class="mb-4 flex items-center justify-between">
         <div>
-          <h1 class="text-2xl font-extrabold tracking-tight text-gradient">
-            {{ greeting }}
-          </h1>
+          <h1 class="text-2xl font-extrabold tracking-tight text-gradient">{{ greeting }}</h1>
           <p class="mt-0.5 text-sm font-medium text-gray-500">
             {{ user?.businessName ?? "Nova" }}
             <span class="text-gray-300"> · </span>
@@ -308,314 +322,235 @@ function openRateEditor() {
             </span>
           </p>
         </div>
-        <!-- BCV rate pill -->
         <button
           v-if="isAdmin"
           class="rounded-2xl px-4 py-2 text-xs font-bold transition-spring"
-          :class="
-            exchangeRate
-              ? 'glass text-gray-700 hover:shadow-[0_8px_20px_-4px_rgba(0,0,0,0.08)]'
-              : 'bg-yellow-100 text-yellow-700'
-          "
+          :class="exchangeRate ? 'glass text-gray-700' : 'bg-yellow-100 text-yellow-700'"
           @click="openRateEditor"
         >
-          <template v-if="exchangeRate">
-            Bs.{{ exchangeRate.toFixed(2) }}
-          </template>
+          <template v-if="exchangeRate">Bs.{{ exchangeRate.toFixed(2) }}</template>
           <template v-else>Configurar tasa</template>
         </button>
-        <span
-          v-else-if="exchangeRate"
-          class="glass rounded-2xl px-4 py-2 text-xs font-bold text-gray-500"
-        >
+        <span v-else-if="exchangeRate" class="glass rounded-2xl px-4 py-2 text-xs font-bold text-gray-500">
           Bs.{{ exchangeRate.toFixed(2) }}
         </span>
       </div>
 
-      <!-- ================================================ -->
-      <!-- HERO: Today's sales - gradient card                -->
-      <!-- ================================================ -->
+      <!-- HERO: Sales + Profit -->
       <NuxtLink
         to="/sales/history"
-        class="card-lift relative block overflow-hidden rounded-[28px] bg-gradient-to-br from-[#ecfdf5] via-[#d1fae5] to-[#a7f3d0] p-6 shadow-[0_15px_35px_-10px_rgba(167,243,208,0.5)] border border-white/80"
+        class="card-lift relative block overflow-hidden rounded-[28px] bg-gradient-to-br from-[#ecfdf5] via-[#d1fae5] to-[#a7f3d0] p-5 shadow-[0_15px_35px_-10px_rgba(167,243,208,0.5)] border border-white/80"
       >
-        <!-- Decorative orbs -->
         <div class="absolute -top-10 -right-10 h-36 w-36 rounded-full bg-white/50 blur-3xl"/>
         <div class="absolute bottom-0 left-0 h-20 w-20 rounded-full bg-[#6ee7b7]/20 blur-2xl"/>
-
-        <div class="relative z-10">
-          <div class="flex items-start justify-between">
-            <div>
-              <p class="text-sm font-bold text-gray-600/80">Vendido hoy</p>
-              <p class="mt-1 text-4xl font-extrabold tracking-tighter text-gradient">
-                ${{ todaySales.toFixed(2) }}
-              </p>
+        <div class="relative z-10 flex items-start justify-between">
+          <div>
+            <p class="text-[13px] font-bold text-gray-600/80">Vendido hoy</p>
+            <p class="mt-0.5 text-4xl font-extrabold tracking-tighter text-gradient">
+              ${{ todaySales.toFixed(2) }}
+            </p>
+            <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] font-semibold text-gray-600/70">
+              <span>{{ todayCount }} venta{{ todayCount !== 1 ? "s" : "" }}</span>
+              <span v-if="todayCount > 0">${{ todayAvgTicket.toFixed(2) }} prom</span>
+              <span
+                v-if="todayProfit !== 0"
+                class="rounded-lg px-1.5 py-0.5 text-[11px] font-bold"
+                :class="todayProfit >= 0 ? 'bg-green-600/15 text-green-700' : 'bg-red-500/15 text-red-700'"
+              >
+                {{ todayProfit >= 0 ? "+" : "" }}${{ todayProfit.toFixed(2) }}
+              </span>
             </div>
-            <span
-              v-if="trendPercent > 0"
-              class="flex items-center gap-1.5 rounded-2xl px-3 py-1.5 text-xs font-bold shadow-sm"
-              :class="
-                trendPositive
-                  ? 'bg-white/60 text-green-700'
-                  : 'bg-white/60 text-red-700'
-              "
-            >
-              <component
-                :is="trendPositive ? TrendingUp : TrendingDown"
-                :size="14"
-              />
-              {{ trendPercent }}%
-            </span>
           </div>
-
-          <div class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] font-semibold text-gray-600/70">
-            <span>{{ todayCount }} venta{{ todayCount !== 1 ? "s" : "" }}</span>
-            <span v-if="todayCount > 0">
-              ${{ todayAvgTicket.toFixed(2) }} prom
-            </span>
-            <span
-              v-if="todayProfit !== 0"
-              class="rounded-xl px-2 py-0.5 text-xs font-bold"
-              :class="
-                todayProfit >= 0
-                  ? 'bg-green-500/15 text-green-700'
-                  : 'bg-red-500/15 text-red-700'
-              "
-            >
-              {{ todayProfit >= 0 ? "+" : "" }}${{ todayProfit.toFixed(2) }} ganancia
-            </span>
-          </div>
+          <span
+            v-if="trendPercent > 0"
+            class="flex items-center gap-1 rounded-2xl px-3 py-1.5 text-xs font-bold shadow-sm"
+            :class="trendPositive ? 'bg-white/60 text-green-700' : 'bg-white/60 text-red-700'"
+          >
+            <component :is="trendPositive ? TrendingUp : TrendingDown" :size="14" />
+            {{ trendPercent }}%
+          </span>
         </div>
       </NuxtLink>
 
-      <!-- ================================================ -->
-      <!-- 3 CARDS: Gradient backgrounds like course cards    -->
-      <!-- ================================================ -->
-      <div class="mt-4 grid grid-cols-3 gap-3">
-        <!-- Te deben -->
+      <!-- 3 CARDS -->
+      <div class="mt-3 grid grid-cols-3 gap-2.5">
         <NuxtLink
           to="/accounts"
-          class="card-lift relative overflow-hidden rounded-[22px] border border-white/80 p-4"
-          :class="
-            receivableTotal > 0
-              ? 'bg-gradient-to-br from-[#FFF7ED] to-[#FED7AA]'
-              : 'bg-gradient-to-br from-[#F0FDF4] to-[#BBF7D0]'
-          "
+          class="card-lift relative overflow-hidden rounded-[20px] border border-white/80 p-3"
+          :class="receivableTotal > 0 ? 'bg-gradient-to-br from-[#FFF7ED] to-[#FED7AA]' : 'bg-gradient-to-br from-[#F0FDF4] to-[#BBF7D0]'"
         >
-          <div class="absolute -top-4 -right-4 h-12 w-12 rounded-full bg-white/40 blur-xl"/>
+          <div class="absolute -top-3 -right-3 h-10 w-10 rounded-full bg-white/40 blur-lg"/>
           <div class="relative z-10">
-            <div
-              class="mb-2 flex h-9 w-9 items-center justify-center rounded-xl"
-              :class="receivableTotal > 0 ? 'dark-pill' : 'bg-green-600/20'"
-            >
-              <Wallet
-                :size="16"
-                :class="receivableTotal > 0 ? 'text-orange-300' : 'text-green-600'"
-              />
+            <div class="mb-1.5 flex h-8 w-8 items-center justify-center rounded-lg" :class="receivableTotal > 0 ? 'dark-pill' : 'bg-green-600/20'">
+              <Wallet :size="14" :class="receivableTotal > 0 ? 'text-orange-300' : 'text-green-600'" />
             </div>
-            <p class="text-xl font-extrabold tracking-tight text-gray-900">
-              ${{ receivableTotal.toFixed(0) }}
-            </p>
-            <p class="text-[11px] font-semibold text-gray-600/70">Te deben</p>
+            <p class="text-lg font-extrabold tracking-tight text-gray-900">${{ receivableTotal.toFixed(0) }}</p>
+            <p class="text-[10px] font-semibold text-gray-600/70">Te deben</p>
           </div>
         </NuxtLink>
 
-        <!-- Stock bajo -->
         <NuxtLink
           to="/inventory?status=red"
-          class="card-lift relative overflow-hidden rounded-[22px] border border-white/80 p-4"
-          :class="
-            lowStockCount > 0
-              ? 'bg-gradient-to-br from-[#FEF2F2] to-[#FECACA]'
-              : 'bg-gradient-to-br from-[#F0FDF4] to-[#BBF7D0]'
-          "
+          class="card-lift relative overflow-hidden rounded-[20px] border border-white/80 p-3"
+          :class="lowStockCount > 0 ? 'bg-gradient-to-br from-[#FEF2F2] to-[#FECACA]' : 'bg-gradient-to-br from-[#F0FDF4] to-[#BBF7D0]'"
         >
-          <div class="absolute -top-4 -right-4 h-12 w-12 rounded-full bg-white/40 blur-xl"/>
+          <div class="absolute -top-3 -right-3 h-10 w-10 rounded-full bg-white/40 blur-lg"/>
           <div class="relative z-10">
-            <div
-              class="mb-2 flex h-9 w-9 items-center justify-center rounded-xl"
-              :class="lowStockCount > 0 ? 'dark-pill' : 'bg-green-600/20'"
-            >
-              <Package
-                :size="16"
-                :class="lowStockCount > 0 ? 'text-red-300' : 'text-green-600'"
-              />
+            <div class="mb-1.5 flex h-8 w-8 items-center justify-center rounded-lg" :class="lowStockCount > 0 ? 'dark-pill' : 'bg-green-600/20'">
+              <Package :size="14" :class="lowStockCount > 0 ? 'text-red-300' : 'text-green-600'" />
             </div>
-            <p class="text-xl font-extrabold tracking-tight text-gray-900">
-              {{ lowStockCount }}
-            </p>
-            <p class="text-[11px] font-semibold text-gray-600/70">
-              {{ lowStockCount > 0 ? "Se acaban" : "Stock OK" }}
-            </p>
+            <p class="text-lg font-extrabold tracking-tight text-gray-900">{{ lowStockCount }}</p>
+            <p class="text-[10px] font-semibold text-gray-600/70">{{ lowStockCount > 0 ? "Se acaban" : "Stock OK" }}</p>
           </div>
         </NuxtLink>
 
-        <!-- Cash flow 7d -->
         <NuxtLink
           to="/reports/cash-flow"
-          class="card-lift relative overflow-hidden rounded-[22px] border border-white/80 p-4"
-          :class="
-            cashFlow7d >= 0
-              ? 'bg-gradient-to-br from-[#EEF7FD] to-[#CAE8F8]'
-              : 'bg-gradient-to-br from-[#FEF2F2] to-[#FECACA]'
-          "
+          class="card-lift relative overflow-hidden rounded-[20px] border border-white/80 p-3"
+          :class="cashFlow7d >= 0 ? 'bg-gradient-to-br from-[#EEF7FD] to-[#CAE8F8]' : 'bg-gradient-to-br from-[#FEF2F2] to-[#FECACA]'"
         >
-          <div class="absolute -top-4 -right-4 h-12 w-12 rounded-full bg-white/40 blur-xl"/>
+          <div class="absolute -top-3 -right-3 h-10 w-10 rounded-full bg-white/40 blur-lg"/>
           <div class="relative z-10">
-            <div
-              class="mb-2 flex h-9 w-9 items-center justify-center rounded-xl"
-              :class="cashFlow7d >= 0 ? 'bg-blue-600/15' : 'dark-pill'"
-            >
-              <CreditCard
-                :size="16"
-                :class="cashFlow7d >= 0 ? 'text-blue-600' : 'text-red-300'"
-              />
+            <div class="mb-1.5 flex h-8 w-8 items-center justify-center rounded-lg" :class="cashFlow7d >= 0 ? 'bg-blue-600/15' : 'dark-pill'">
+              <CreditCard :size="14" :class="cashFlow7d >= 0 ? 'text-blue-600' : 'text-red-300'" />
             </div>
-            <p
-              class="text-xl font-extrabold tracking-tight"
-              :class="cashFlow7d >= 0 ? 'text-gray-900' : 'text-red-700'"
-            >
+            <p class="text-lg font-extrabold tracking-tight" :class="cashFlow7d >= 0 ? 'text-gray-900' : 'text-red-700'">
               {{ cashFlow7d >= 0 ? "+" : "" }}${{ Math.abs(cashFlow7d).toFixed(0) }}
             </p>
-            <p class="text-[11px] font-semibold text-gray-600/70">En 7 dias</p>
+            <p class="text-[10px] font-semibold text-gray-600/70">En 7 dias</p>
           </div>
         </NuxtLink>
       </div>
 
-      <!-- ================================================ -->
-      <!-- INSIGHTS: Dark pill icons + progress style         -->
-      <!-- ================================================ -->
-      <div class="mt-4 space-y-2.5">
+      <!-- WEEKLY CHART -->
+      <NuxtLink
+        v-if="weeklyDays.length > 0"
+        to="/reports/weekly"
+        class="card-premium mt-3 block p-4 transition-spring hover:shadow-[0_12px_30px_-10px_rgba(0,0,0,0.08)]"
+      >
+        <div class="mb-3 flex items-center justify-between">
+          <p class="text-[12px] font-bold text-gray-500 tracking-wide">Ventas 7 dias</p>
+          <BarChart3 :size="14" class="text-gray-400" />
+        </div>
+        <div class="flex items-end gap-1.5" style="height: 56px">
+          <div
+            v-for="(d, i) in weeklyDays"
+            :key="i"
+            class="flex flex-1 flex-col items-center gap-1"
+          >
+            <div
+              class="w-full rounded-t-md bg-gradient-to-t from-[#16a34a] to-[#4ade80] transition-all duration-500"
+              :style="{
+                height: `${Math.max((d.amount / weeklyMax) * 100, 4)}%`,
+              }"
+            />
+            <span class="text-[9px] font-bold text-gray-400">{{ d.day.slice(0, 2) }}</span>
+          </div>
+        </div>
+      </NuxtLink>
+
+      <!-- PAYMENT MIX -->
+      <div
+        v-if="topMethods.length > 0"
+        class="glass mt-3 rounded-[20px] px-4 py-3"
+      >
+        <p class="mb-2 text-[11px] font-bold text-gray-500 tracking-wide">Metodos de pago hoy</p>
+        <div class="space-y-1.5">
+          <div
+            v-for="m in topMethods"
+            :key="m.label"
+            class="flex items-center gap-2.5"
+          >
+            <span class="w-12 text-[10px] font-bold text-gray-600">{{ m.label }}</span>
+            <div class="h-2 flex-1 overflow-hidden rounded-full bg-gray-100/80 border border-white">
+              <div
+                class="progress-glow h-full rounded-full"
+                :style="{
+                  width: `${m.percent}%`,
+                  background: `linear-gradient(to right, ${m.from}, ${m.to})`,
+                }"
+              />
+            </div>
+            <span class="w-14 text-right text-[10px] font-extrabold text-gray-700">
+              ${{ m.amount.toFixed(0) }}
+              <span class="text-gray-400">{{ m.percent }}%</span>
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 4 INSIGHT TILES -->
+      <div class="mt-3 grid grid-cols-2 gap-2.5">
         <!-- Top seller -->
         <div
           v-if="topSeller"
-          class="card-premium flex items-center gap-4 p-4 transition-spring hover:shadow-[0_12px_30px_-10px_rgba(0,0,0,0.08)]"
+          class="card-premium flex items-center gap-3 p-3.5"
         >
-          <div class="dark-pill flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-[16px]">
-            <Trophy :size="20" class="text-yellow-300 drop-shadow-[0_0_6px_rgba(253,224,71,0.6)]" />
+          <div class="dark-pill flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-[14px]">
+            <Trophy :size="16" class="text-yellow-300 drop-shadow-[0_0_6px_rgba(253,224,71,0.6)]" />
           </div>
-          <div class="min-w-0 flex-1">
-            <p class="text-[13px] font-extrabold text-gray-800 tracking-wide">
-              {{ topSeller.name }} vendio mas
-            </p>
-            <div class="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-gray-100/80 border border-white">
-              <div
-                class="progress-glow h-full rounded-full bg-gradient-to-r from-[#4ade80] to-[#3b82f6]"
-                :style="{ width: todaySales > 0 ? `${Math.min((topSeller.total / todaySales) * 100, 100)}%` : '0%' }"
-              />
-            </div>
+          <div class="min-w-0">
+            <p class="truncate text-[12px] font-extrabold text-gray-800">{{ topSeller.name }}</p>
+            <p class="text-[11px] font-bold text-gray-400">${{ topSeller.total.toFixed(0) }} vendido</p>
           </div>
-          <p class="text-xl font-extrabold tracking-tighter text-gradient">
-            ${{ topSeller.total.toFixed(0) }}
-          </p>
         </div>
 
         <!-- Star product -->
         <div
           v-if="topProduct"
-          class="card-premium flex items-center gap-4 p-4 transition-spring hover:shadow-[0_12px_30px_-10px_rgba(0,0,0,0.08)]"
+          class="card-premium flex items-center gap-3 p-3.5"
         >
-          <div class="dark-pill flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-[16px]">
-            <Star :size="20" class="text-blue-300 drop-shadow-[0_0_6px_rgba(147,197,253,0.6)]" />
+          <div class="dark-pill flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-[14px]">
+            <Star :size="16" class="text-blue-300 drop-shadow-[0_0_6px_rgba(147,197,253,0.6)]" />
           </div>
-          <div class="min-w-0 flex-1">
-            <p class="truncate text-[13px] font-extrabold text-gray-800 tracking-wide">
-              {{ topProduct.name }}
-            </p>
-            <p class="text-[11px] font-semibold text-gray-400">
-              Producto estrella del dia
-            </p>
+          <div class="min-w-0">
+            <p class="truncate text-[12px] font-extrabold text-gray-800">{{ topProduct.name }}</p>
+            <p class="text-[11px] font-bold text-gray-400">{{ topProduct.quantity }} uds hoy</p>
           </div>
-          <p class="text-xl font-extrabold tracking-tighter text-gradient">
-            {{ topProduct.quantity }}
-          </p>
         </div>
 
         <!-- Alerts -->
         <NuxtLink
           v-if="alertCount > 0"
           to="/reports"
-          class="card-premium flex items-center gap-4 p-4 transition-spring hover:shadow-[0_12px_30px_-10px_rgba(0,0,0,0.08)]"
+          class="card-premium flex items-center gap-3 p-3.5 transition-spring hover:shadow-[0_8px_20px_-5px_rgba(0,0,0,0.06)]"
         >
-          <div class="dark-pill flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-[16px]">
-            <AlertTriangle :size="20" class="text-orange-300 drop-shadow-[0_0_6px_rgba(251,146,60,0.6)]" />
+          <div class="dark-pill flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-[14px]">
+            <AlertTriangle :size="16" class="text-orange-300 drop-shadow-[0_0_6px_rgba(251,146,60,0.6)]" />
           </div>
-          <div class="min-w-0 flex-1">
-            <p class="text-[13px] font-extrabold text-gray-800 tracking-wide">
-              {{ alertCount }} alerta{{ alertCount > 1 ? "s" : "" }} pendiente{{ alertCount > 1 ? "s" : "" }}
-            </p>
-            <p class="text-[11px] font-semibold text-gray-400">
-              Requiere tu atencion
-            </p>
+          <div class="min-w-0">
+            <p class="text-[12px] font-extrabold text-gray-800">{{ alertCount }} alerta{{ alertCount > 1 ? "s" : "" }}</p>
+            <p class="text-[11px] font-bold text-gray-400">Requiere atencion</p>
           </div>
-          <span class="text-xs font-bold text-nova-accent">Ver</span>
+        </NuxtLink>
+
+        <!-- Gross margin -->
+        <NuxtLink
+          v-if="grossMargin > 0"
+          to="/reports/financial"
+          class="card-premium flex items-center gap-3 p-3.5 transition-spring hover:shadow-[0_8px_20px_-5px_rgba(0,0,0,0.06)]"
+        >
+          <div class="dark-pill flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-[14px]">
+            <BarChart3 :size="16" class="text-green-300 drop-shadow-[0_0_6px_rgba(134,239,172,0.6)]" />
+          </div>
+          <div class="min-w-0">
+            <p class="text-[12px] font-extrabold text-gray-800">{{ grossMargin }}% margen</p>
+            <p class="text-[11px] font-bold text-gray-400">Ganancia bruta</p>
+          </div>
         </NuxtLink>
       </div>
 
-      <!-- ================================================ -->
-      <!-- CTA: Dark gradient button                          -->
-      <!-- ================================================ -->
+      <!-- CTA -->
       <NuxtLink
         to="/sales"
-        class="dark-pill mt-4 flex w-full items-center justify-center gap-2.5 rounded-[20px] py-4 text-center text-[15px] font-extrabold tracking-wide transition-spring"
+        class="dark-pill mt-3 flex w-full items-center justify-center gap-2.5 rounded-[20px] py-4 text-center text-[15px] font-extrabold tracking-wide transition-spring"
       >
         <DollarSign :size="20" />
         Nueva venta
       </NuxtLink>
 
-      <!-- ================================================ -->
-      <!-- PAYMENT MIX: Glass pill with mini bars             -->
-      <!-- ================================================ -->
-      <div
-        v-if="topMethods.length > 0"
-        class="glass mt-4 rounded-[20px] px-5 py-3"
-      >
-        <div class="flex items-center justify-between">
-          <p class="text-[11px] font-bold text-gray-500 tracking-wide">Metodos de pago</p>
-          <div class="flex items-center gap-2">
-            <span
-              class="h-1.5 w-1.5 rounded-full"
-              :class="{
-                'bg-green-500': syncStatus === 'online',
-                'bg-gray-400': syncStatus === 'offline',
-                'bg-yellow-500 animate-pulse': syncStatus === 'syncing',
-              }"
-            />
-            <span v-if="syncStatus === 'offline'" class="text-[10px] font-semibold text-gray-400">
-              Offline
-              <template v-if="pendingSyncCount > 0"> · {{ pendingSyncCount }}</template>
-            </span>
-            <button
-              class="text-gray-300 transition-spring hover:text-gray-500 hover:scale-110"
-              @click="loadDashboard"
-            >
-              <RefreshCw :size="13" />
-            </button>
-          </div>
-        </div>
-        <div class="mt-2.5 space-y-2">
-          <div
-            v-for="m in topMethods"
-            :key="m.label"
-            class="flex items-center gap-3"
-          >
-            <span class="w-14 text-[11px] font-bold text-gray-600">{{ m.label }}</span>
-            <div class="h-2 flex-1 overflow-hidden rounded-full bg-gray-100/80 border border-white">
-              <div
-                class="progress-glow h-full rounded-full bg-gradient-to-r"
-                :class="m.color"
-                :style="{ width: `${m.percent}%` }"
-              />
-            </div>
-            <span class="w-8 text-right text-[11px] font-extrabold text-gray-700">{{ m.percent }}%</span>
-          </div>
-        </div>
-      </div>
-      <div
-        v-else
-        class="glass mt-4 flex items-center justify-between rounded-[20px] px-5 py-3"
-      >
-        <span class="text-[11px] font-semibold text-gray-400">Sin ventas hoy</span>
+      <!-- FOOTER -->
+      <div class="mt-2.5 flex items-center justify-between px-1">
         <div class="flex items-center gap-2">
           <span
             class="h-1.5 w-1.5 rounded-full"
@@ -625,18 +560,21 @@ function openRateEditor() {
               'bg-yellow-500 animate-pulse': syncStatus === 'syncing',
             }"
           />
-          <button
-            class="text-gray-300 transition-spring hover:text-gray-500"
-            @click="loadDashboard"
-          >
-            <RefreshCw :size="13" />
-          </button>
+          <span class="text-[10px] font-semibold text-gray-400">
+            <template v-if="syncStatus === 'online'">Actualizado</template>
+            <template v-else-if="syncStatus === 'syncing'">Sincronizando...</template>
+            <template v-else>
+              Offline
+              <template v-if="pendingSyncCount > 0"> · {{ pendingSyncCount }}</template>
+            </template>
+          </span>
         </div>
+        <button class="text-gray-300 transition-spring hover:text-gray-500 hover:scale-110" @click="loadDashboard">
+          <RefreshCw :size="13" />
+        </button>
       </div>
 
-      <!-- ================================================ -->
-      <!-- Rate editor modal - glass panel                    -->
-      <!-- ================================================ -->
+      <!-- Rate editor modal -->
       <Teleport to="body">
         <div
           v-if="showRateEditor"
@@ -644,56 +582,30 @@ function openRateEditor() {
           @click.self="showRateEditor = false"
         >
           <div class="glass-strong w-full max-w-sm rounded-[32px] p-7 shadow-[0_30px_60px_-15px_rgba(0,0,0,0.2)]">
-            <h3 class="mb-5 text-xl font-extrabold tracking-tight text-gradient">
-              Tasa de cambio BCV
-            </h3>
+            <h3 class="mb-5 text-xl font-extrabold tracking-tight text-gradient">Tasa de cambio BCV</h3>
             <div class="space-y-4">
               <div>
-                <label class="mb-1.5 block text-[13px] font-bold text-gray-600">
-                  Dolar (USD)
-                </label>
+                <label class="mb-1.5 block text-[13px] font-bold text-gray-600">Dolar (USD)</label>
                 <input
-                  v-model="rateInputUsd"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  placeholder="86.48"
+                  v-model="rateInputUsd" type="number" step="0.01" min="0" placeholder="86.48" autofocus
                   class="w-full rounded-2xl border border-white bg-white/60 px-4 py-3 text-sm font-semibold text-gray-800 shadow-[inset_0_2px_4px_rgba(0,0,0,0.03)] outline-none focus:ring-[3px] focus:ring-nova-accent/20 focus:bg-white transition-spring placeholder:text-gray-400"
-                  autofocus
                 >
               </div>
               <div>
-                <label class="mb-1.5 block text-[13px] font-bold text-gray-600">
-                  Euro (EUR)
-                </label>
+                <label class="mb-1.5 block text-[13px] font-bold text-gray-600">Euro (EUR)</label>
                 <input
-                  v-model="rateInputEur"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  placeholder="96.20"
+                  v-model="rateInputEur" type="number" step="0.01" min="0" placeholder="96.20"
                   class="w-full rounded-2xl border border-white bg-white/60 px-4 py-3 text-sm font-semibold text-gray-800 shadow-[inset_0_2px_4px_rgba(0,0,0,0.03)] outline-none focus:ring-[3px] focus:ring-nova-accent/20 focus:bg-white transition-spring placeholder:text-gray-400"
                 >
               </div>
             </div>
-            <p v-if="rateSaveError" class="mt-3 text-sm font-semibold text-red-500">
-              {{ rateSaveError }}
-            </p>
-            <p class="mt-3 text-[10px] font-semibold text-gray-400">
-              Consulta la tasa oficial en bcv.org.ve
-            </p>
+            <p v-if="rateSaveError" class="mt-3 text-sm font-semibold text-red-500">{{ rateSaveError }}</p>
+            <p class="mt-3 text-[10px] font-semibold text-gray-400">Consulta la tasa oficial en bcv.org.ve</p>
             <div class="mt-5 flex gap-3">
-              <button
-                class="glass flex-1 rounded-2xl py-3 text-sm font-bold text-gray-700 transition-spring hover:shadow-[0_8px_20px_-4px_rgba(0,0,0,0.08)]"
-                @click="showRateEditor = false"
-              >
+              <button class="glass flex-1 rounded-2xl py-3 text-sm font-bold text-gray-700 transition-spring" @click="showRateEditor = false">
                 Cancelar
               </button>
-              <button
-                class="dark-pill flex-1 rounded-2xl py-3 text-sm font-bold transition-spring disabled:opacity-50"
-                :disabled="rateSaving"
-                @click="saveRate"
-              >
+              <button class="dark-pill flex-1 rounded-2xl py-3 text-sm font-bold transition-spring disabled:opacity-50" :disabled="rateSaving" @click="saveRate">
                 {{ rateSaving ? "Guardando..." : "Guardar" }}
               </button>
             </div>
