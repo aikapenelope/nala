@@ -19,7 +19,7 @@ function reAuthenticate() {
 </script>
 
 <template>
-  <div class="min-h-screen bg-gradient-to-br from-[#f8f7ff] via-[#f0eef9] to-[#e8e4f3]">
+  <div class="min-h-screen bg-gradient-to-br from-[#f0faf4] via-[#e6f5ec] to-[#daf0e3]">
     <!-- Session expired banner -->
     <div
       v-if="sessionExpired"
@@ -39,13 +39,13 @@ function reAuthenticate() {
     <!-- Desktop layout -->
     <div
       v-if="isDesktop"
-      class="flex h-screen p-4"
+      class="flex h-screen p-3"
       :class="{ 'pt-16': sessionExpired }"
     >
       <DesktopSidebar />
-      <div class="flex flex-1 flex-col overflow-hidden pl-4">
+      <div class="flex flex-1 flex-col overflow-hidden pl-3">
         <SharedAppHeader :business-name="businessName" />
-        <main class="flex-1 overflow-y-auto rounded-3xl p-6">
+        <main class="flex-1 overflow-y-auto p-5">
           <slot />
         </main>
       </div>
@@ -58,7 +58,7 @@ function reAuthenticate() {
       :class="{ 'pt-16': sessionExpired }"
     >
       <SharedAppHeader :business-name="businessName" />
-      <main class="flex-1 p-4 pb-24">
+      <main class="flex-1 px-4 pb-24">
         <slot />
       </main>
       <MobileBottomTabs />

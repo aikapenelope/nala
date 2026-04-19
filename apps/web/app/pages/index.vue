@@ -79,18 +79,18 @@ const greeting = computed(() => {
   return "Buenas noches";
 });
 
-/** Payment method labels. */
-const methodLabels: Record<string, string> = {
-  efectivo: "Efectivo",
-  pago_movil: "Movil",
-  binance: "Binance",
-  zinli: "Zinli",
-  transferencia: "Transf.",
-  zelle: "Zelle",
-  fiado: "Fiado",
+/** Payment method config with colors. */
+const methodConfig: Record<string, { label: string; color: string }> = {
+  efectivo: { label: "Efectivo", color: "from-[#4ade80] to-[#16a34a]" },
+  pago_movil: { label: "Movil", color: "from-[#60a5fa] to-[#2563eb]" },
+  binance: { label: "Binance", color: "from-[#fbbf24] to-[#d97706]" },
+  zinli: { label: "Zinli", color: "from-[#a78bfa] to-[#7c3aed]" },
+  transferencia: { label: "Transf.", color: "from-[#38bdf8] to-[#0284c7]" },
+  zelle: { label: "Zelle", color: "from-[#818cf8] to-[#4f46e5]" },
+  fiado: { label: "Fiado", color: "from-[#fb923c] to-[#ea580c]" },
 };
 
-/** Top 3 payment methods by amount. */
+/** Top 4 payment methods by amount with colors. */
 const topMethods = computed(() => {
   const entries = Object.entries(salesByMethod.value);
   if (entries.length === 0) return [];
@@ -100,7 +100,8 @@ const topMethods = computed(() => {
     .sort((a, b) => b[1] - a[1])
     .slice(0, 4)
     .map(([method, amount]) => ({
-      label: methodLabels[method] ?? method,
+      label: methodConfig[method]?.label ?? method,
+      color: methodConfig[method]?.color ?? "from-gray-400 to-gray-500",
       percent: Math.round((amount / total) * 100),
     }));
 });
@@ -336,10 +337,11 @@ function openRateEditor() {
       <!-- ================================================ -->
       <NuxtLink
         to="/sales/history"
-        class="card-lift relative block overflow-hidden rounded-[28px] bg-gradient-to-br from-[#EFECFF] via-[#E2DEFF] to-[#D0CCF9] p-6 shadow-[0_15px_35px_-10px_rgba(208,204,249,0.5)] border border-white/80"
+        class="card-lift relative block overflow-hidden rounded-[28px] bg-gradient-to-br from-[#ecfdf5] via-[#d1fae5] to-[#a7f3d0] p-6 shadow-[0_15px_35px_-10px_rgba(167,243,208,0.5)] border border-white/80"
       >
-        <!-- Decorative orb -->
-        <div class="absolute -top-8 -right-8 h-28 w-28 rounded-full bg-white/40 blur-2xl"/>
+        <!-- Decorative orbs -->
+        <div class="absolute -top-10 -right-10 h-36 w-36 rounded-full bg-white/50 blur-3xl"/>
+        <div class="absolute bottom-0 left-0 h-20 w-20 rounded-full bg-[#6ee7b7]/20 blur-2xl"/>
 
         <div class="relative z-10">
           <div class="flex items-start justify-between">
@@ -600,7 +602,8 @@ function openRateEditor() {
             <span class="w-14 text-[11px] font-bold text-gray-600">{{ m.label }}</span>
             <div class="h-2 flex-1 overflow-hidden rounded-full bg-gray-100/80 border border-white">
               <div
-                class="progress-glow h-full rounded-full bg-gradient-to-r from-[#c4b5fd] to-[#8b5cf6]"
+                class="progress-glow h-full rounded-full bg-gradient-to-r"
+                :class="m.color"
                 :style="{ width: `${m.percent}%` }"
               />
             </div>
