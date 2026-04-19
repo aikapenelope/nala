@@ -46,3 +46,14 @@ export function initRedis(): Redis | null {
 export function getRedis(): Redis | null {
   return _redis;
 }
+
+/**
+ * Close the Redis connection gracefully.
+ * Called during shutdown to release resources.
+ */
+export async function closeRedis(): Promise<void> {
+  if (_redis) {
+    await _redis.quit();
+    _redis = null;
+  }
+}
