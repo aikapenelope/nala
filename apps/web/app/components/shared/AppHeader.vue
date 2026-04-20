@@ -14,31 +14,13 @@ defineProps<{
 
 const { user, isAdmin } = useNovaAuth();
 const { $api } = useApi();
-
-/** Business open/close state. */
-const isOpen = ref<boolean | null>(null);
-const isCheckingStatus = ref(true);
+const { isOpen, isChecking: isCheckingStatus, checkOpenStatus, setOpen } = useCashStatus();
 
 /** Quick open modal. */
 const showOpenModal = ref(false);
 const openAmount = ref(0);
 const isOpening = ref(false);
 const openError = ref("");
-
-/** Check if business is open today. */
-async function checkOpenStatus() {
-  isCheckingStatus.value = true;
-  try {
-    const result = await $api<{ opening: unknown | null }>(
-      "/api/cash-opening/latest",
-    );
-    isOpen.value = result.opening !== null;
-  } catch {
-    isOpen.value = null;
-  } finally {
-    isCheckingStatus.value = false;
-  }
-}
 
 /** Toggle: if closed, show open modal. If open, do nothing (close is in day-close page). */
 function handleToggle() {
@@ -66,7 +48,7 @@ async function submitOpen() {
       method: "POST",
       body: { cashAmount: openAmount.value },
     });
-    isOpen.value = true;
+    setOpen(true);
     showOpenModal.value = false;
   } catch (err) {
     const fetchError = err as { data?: { error?: string } };
