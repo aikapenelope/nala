@@ -14,7 +14,7 @@ const businessName = computed(() => user.value?.businessName || "Nova");
 
 function reAuthenticate() {
   sessionExpired.value = false;
-  // Clear stale user state so resolve page starts fresh
+  // Clear all stale user state so the login flow starts completely fresh
   const novaUser = useState("nova-user");
   novaUser.value = null;
   if (import.meta.client) {

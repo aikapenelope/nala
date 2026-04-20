@@ -55,12 +55,11 @@ export function useApi() {
   /**
    * Handle a 401 response from the API.
    *
-   * This means the Clerk JWT expired or was revoked. The device is no
-   * longer authenticated. Clear the stale Nova user and show a message
-   * so the owner knows they need to re-authenticate.
+   * This means the Clerk JWT expired or was revoked. Clear the stale
+   * Nova user and show a banner so the owner knows to re-authenticate.
    *
    * We don't auto-redirect because the user might be mid-sale. Instead
-   * we set a reactive flag that the layout can show as a banner.
+   * we set a reactive flag that the layout shows as a banner.
    */
   function handle401() {
     if (!import.meta.client) return;
@@ -69,7 +68,7 @@ export function useApi() {
     if (sessionExpired.value) return;
     sessionExpired.value = true;
 
-    // Clear the stale Nova user (but keep roster for PIN re-entry)
+    // Clear the stale Nova user from both state and localStorage
     const novaUser = useState<unknown>("nova-user");
     novaUser.value = null;
     localStorage.removeItem("nova:user");

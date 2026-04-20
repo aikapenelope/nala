@@ -3,11 +3,20 @@
  * Owner login page using Clerk's SignIn component.
  *
  * Shown when the owner taps "Iniciar como dueno" on the PIN screen.
- * After sign-in, Clerk redirects to the dashboard where the auth
- * middleware picks up the session.
+ * After sign-in, Clerk redirects to /auth/resolve which resolves
+ * the Nova account and sets the user state.
+ *
+ * Clears the session-expired banner on mount so the user doesn't
+ * see it while logging in.
  */
 
 definePageMeta({ layout: false });
+
+// Clear session-expired banner when arriving at login page
+if (import.meta.client) {
+  const sessionExpired = useState<boolean>("session-expired");
+  sessionExpired.value = false;
+}
 </script>
 
 <template>
