@@ -74,9 +74,6 @@ const rateInputEur = ref("");
 const rateSaving = ref(false);
 const rateSaveError = ref("");
 
-/** Cash opening status. */
-const cashOpened = ref<boolean | null>(null);
-
 /** Sync status. */
 const syncStatus = ref<"online" | "offline" | "syncing">("online");
 const pendingSyncCount = ref(0);
@@ -134,7 +131,6 @@ async function loadDashboard() {
       alertsResult,
       rateResult,
       cashFlowResult,
-      cashOpenResult,
     ] = await Promise.allSettled([
       $api<{
         data: {
@@ -170,8 +166,6 @@ async function loadDashboard() {
       $api<{ data: { projection7d: { net: number } } }>(
         "/api/reports/cash-flow",
       ),
-
-      $api<{ opening: unknown | null }>("/api/cash-opening/latest"),
     ]);
 
     if (dailyResult.status === "fulfilled") {
@@ -215,10 +209,6 @@ async function loadDashboard() {
 
     if (cashFlowResult.status === "fulfilled") {
       cashFlow7d.value = cashFlowResult.value.data.projection7d.net;
-    }
-
-    if (cashOpenResult.status === "fulfilled") {
-      cashOpened.value = cashOpenResult.value.opening !== null;
     }
   } catch (err) {
     const message =
@@ -314,12 +304,6 @@ function openRateEditor() {
             {{ user?.businessName ?? "Nova" }}
             <span class="text-gray-300"> · </span>
             {{ user?.name ?? "" }}
-            <span
-              v-if="isAdmin && cashOpened === false"
-              class="ml-1 rounded-full bg-yellow-100 px-2 py-0.5 text-[10px] font-bold text-yellow-700"
-            >
-              Caja sin abrir
-            </span>
           </p>
         </div>
         <button
