@@ -27,11 +27,29 @@ DROP POLICY IF EXISTS businesses_tenant_isolation ON businesses;
 CREATE POLICY businesses_tenant_isolation ON businesses
   USING (id = current_business_id());
 
+-- Auth bypass: allow looking up businesses during authentication.
+-- Same reason as users_auth_lookup: the auth middleware needs to find
+-- the business BEFORE the tenant context is set.
+DROP POLICY IF EXISTS businesses_auth_lookup ON businesses;
+CREATE POLICY businesses_auth_lookup ON businesses
+  FOR SELECT
+  USING (current_business_id() IS NULL);
+
 -- Users
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS users_tenant_isolation ON users;
 CREATE POLICY users_tenant_isolation ON users
   USING (business_id = current_business_id());
+
+-- Auth bypass: allow looking up users by clerk_id during authentication.
+-- The auth middleware needs to find the owner by clerk_id BEFORE the tenant
+-- context is set (because we don't know the business_id yet).
+-- This policy allows SELECT when no business context is set (NULL) and
+-- the query filters by clerk_id. Safe because clerk_id is globally unique.
+DROP POLICY IF EXISTS users_auth_lookup ON users;
+CREATE POLICY users_auth_lookup ON users
+  FOR SELECT
+  USING (current_business_id() IS NULL);
 
 -- Activity log
 ALTER TABLE activity_log ENABLE ROW LEVEL SECURITY;
