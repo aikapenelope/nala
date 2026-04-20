@@ -21,6 +21,8 @@ import {
   Receipt,
   PanelLeftClose,
   PanelLeftOpen,
+  ArrowLeftRight,
+  LogOut,
 } from "lucide-vue-next";
 import type { Component } from "vue";
 
@@ -55,11 +57,18 @@ const navItems: NavItem[] = [
   { to: "/settings", icon: Settings, label: "Config.", adminOnly: true },
 ];
 
-const { isAdmin, user } = useNovaAuth();
+const { isAdmin, user, clearUser } = useNovaAuth();
+const { isStoreMode } = useDeviceMode();
 
 const visibleItems = computed(() =>
   navItems.filter((item) => !item.adminOnly || isAdmin.value),
 );
+
+/** Switch user: clear current session and go to PIN screen (store mode only). */
+function switchShift() {
+  clearUser();
+  navigateTo("/auth/pin");
+}
 
 /** Sidebar collapsed state, persisted in localStorage. */
 const isCollapsed = ref(false);
@@ -137,13 +146,12 @@ function toggleCollapsed() {
       <component :is="isCollapsed ? PanelLeftOpen : PanelLeftClose" :size="16" />
     </button>
 
-    <!-- User -->
+    <!-- User section -->
     <div class="border-t border-white/50 px-1.5 pt-3">
-      <NuxtLink
-        to="/auth/pin"
-        class="flex items-center rounded-2xl px-1.5 py-2 text-xs text-gray-500 transition-spring hover:bg-white/60"
+      <!-- User info -->
+      <div
+        class="flex items-center rounded-2xl px-1.5 py-2 text-xs text-gray-500"
         :class="isCollapsed ? 'justify-center' : 'gap-3'"
-        :title="isCollapsed ? (user?.name ?? 'Usuario') : undefined"
       >
         <span
           class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-xl text-xs font-bold text-white"
@@ -159,6 +167,30 @@ function toggleCollapsed() {
             {{ isAdmin ? "Administrador" : "Empleado" }}
           </p>
         </div>
+      </div>
+
+      <!-- Store mode: switch shift button -->
+      <button
+        v-if="isStoreMode"
+        class="mt-1 flex w-full items-center rounded-xl px-2 py-2 text-[11px] font-bold text-gray-400 transition-spring hover:bg-white/60 hover:text-gray-600"
+        :class="isCollapsed ? 'justify-center' : 'gap-2'"
+        :title="isCollapsed ? 'Cambiar turno' : undefined"
+        @click="switchShift"
+      >
+        <ArrowLeftRight :size="14" />
+        <span v-if="!isCollapsed">Cambiar turno</span>
+      </button>
+
+      <!-- Owner mode: logout link (only for admin) -->
+      <NuxtLink
+        v-if="!isStoreMode && isAdmin"
+        to="/auth/login"
+        class="mt-1 flex w-full items-center rounded-xl px-2 py-2 text-[11px] font-bold text-gray-400 transition-spring hover:bg-white/60 hover:text-gray-600"
+        :class="isCollapsed ? 'justify-center' : 'gap-2'"
+        :title="isCollapsed ? 'Cerrar sesion' : undefined"
+      >
+        <LogOut :size="14" />
+        <span v-if="!isCollapsed">Cerrar sesion</span>
       </NuxtLink>
     </div>
   </aside>

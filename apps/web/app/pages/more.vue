@@ -29,6 +29,7 @@ import {
 import type { Component } from "vue";
 
 const { isAdmin, user, clearUser } = useNovaAuth();
+const { isStoreMode } = useDeviceMode();
 
 interface MenuItem {
   to: string;
@@ -140,14 +141,17 @@ function switchUser() {
 
       <!-- User actions -->
       <div class="mt-3 flex gap-2">
+        <!-- Store mode: switch shift -->
         <button
+          v-if="isStoreMode"
           class="flex flex-1 items-center justify-center gap-2 rounded-lg border border-gray-200 py-2 text-xs font-medium text-gray-600"
           @click="switchUser"
         >
           <ArrowRightLeft :size="14" />
-          Cambiar usuario
+          Cambiar turno
         </button>
-        <Show when="signed-in">
+        <!-- Owner mode: no switch button, only logout -->
+        <Show v-if="!isStoreMode" when="signed-in">
           <button
             class="flex flex-1 items-center justify-center gap-2 rounded-lg border border-gray-200 py-2 text-xs font-medium text-gray-600"
           >
