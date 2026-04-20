@@ -23,6 +23,8 @@ import {
   ArrowRightLeft,
   LogOut,
   Truck,
+  ClipboardList,
+  DollarSign,
 } from "lucide-vue-next";
 import type { Component } from "vue";
 
@@ -56,6 +58,20 @@ const menuItems: MenuItem[] = [
     icon: CalendarCheck,
     label: "Cierre de caja",
     description: "Cuadre del dia",
+    adminOnly: true,
+  },
+  {
+    to: "/accounts/cash-opening",
+    icon: DollarSign,
+    label: "Apertura de caja",
+    description: "Declarar efectivo al inicio",
+    adminOnly: true,
+  },
+  {
+    to: "/sales/quotations",
+    icon: ClipboardList,
+    label: "Cotizaciones",
+    description: "Crear y convertir a venta",
     adminOnly: true,
   },
   {

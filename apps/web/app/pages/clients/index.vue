@@ -79,6 +79,46 @@ function getSegments(c: Customer): CustomerSegment[] {
   if (c.totalPurchases >= 20) segments.push("frequent");
   return segments;
 }
+
+/** Edit customer modal. */
+const showEditModal = ref(false);
+const editId = ref("");
+const editForm = reactive({ name: "", phone: "" });
+const editSubmitting = ref(false);
+const editError = ref("");
+
+function openEdit(c: Customer) {
+  editId.value = c.id;
+  editForm.name = c.name;
+  editForm.phone = c.phone ?? "";
+  editError.value = "";
+  showEditModal.value = true;
+}
+
+async function submitEdit() {
+  if (!editForm.name.trim()) {
+    editError.value = "Nombre es obligatorio";
+    return;
+  }
+  editSubmitting.value = true;
+  editError.value = "";
+  try {
+    await $api(`/api/customers/${editId.value}`, {
+      method: "PATCH",
+      body: {
+        name: editForm.name.trim(),
+        phone: editForm.phone || undefined,
+      },
+    });
+    showEditModal.value = false;
+    await fetchCustomers();
+  } catch (err) {
+    const fetchError = err as { data?: { error?: string } };
+    editError.value = fetchError.data?.error ?? "Error al guardar";
+  } finally {
+    editSubmitting.value = false;
+  }
+}
 </script>
 
 <template>
@@ -193,12 +233,20 @@ function getSegments(c: Customer): CustomerSegment[] {
                 </div>
               </td>
               <td class="px-4 py-3">
-                <NuxtLink
-                  :to="`/clients/${c.id}`"
-                  class="text-xs text-nova-primary hover:underline"
-                >
-                  Stats
-                </NuxtLink>
+                <div class="flex gap-2">
+                  <NuxtLink
+                    :to="`/clients/${c.id}`"
+                    class="text-xs text-nova-primary hover:underline"
+                  >
+                    Stats
+                  </NuxtLink>
+                  <button
+                    class="text-xs text-gray-500 hover:text-gray-700"
+                    @click="openEdit(c)"
+                  >
+                    Editar
+                  </button>
+                </div>
               </td>
             </tr>
           </tbody>
@@ -237,8 +285,75 @@ function getSegments(c: Customer): CustomerSegment[] {
           >
             ${{ Number(c.balanceUsd).toFixed(2) }}
           </div>
+          <div class="flex flex-col items-end gap-1">
+            <NuxtLink
+              :to="`/clients/${c.id}`"
+              class="text-[10px] text-nova-primary"
+            >
+              Stats
+            </NuxtLink>
+            <button
+              class="text-[10px] text-gray-400"
+              @click="openEdit(c)"
+            >
+              Editar
+            </button>
+          </div>
         </div>
       </div>
     </template>
+
+    <!-- Edit customer modal -->
+    <Teleport to="body">
+      <div
+        v-if="showEditModal"
+        class="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+        @click.self="showEditModal = false"
+      >
+        <div class="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
+          <h3 class="mb-4 text-lg font-semibold text-gray-900">
+            Editar cliente
+          </h3>
+          <div class="space-y-3">
+            <div>
+              <label class="mb-1 block text-sm text-gray-600">Nombre *</label>
+              <input
+                v-model="editForm.name"
+                type="text"
+                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-nova-primary focus:outline-none"
+                autofocus
+              >
+            </div>
+            <div>
+              <label class="mb-1 block text-sm text-gray-600">Telefono</label>
+              <input
+                v-model="editForm.phone"
+                type="tel"
+                placeholder="+58 412 1234567"
+                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-nova-primary focus:outline-none"
+              >
+            </div>
+          </div>
+          <p v-if="editError" class="mt-2 text-sm text-red-500">
+            {{ editError }}
+          </p>
+          <div class="mt-4 flex gap-3">
+            <button
+              class="flex-1 rounded-lg border border-gray-300 py-2 text-sm font-medium text-gray-700"
+              @click="showEditModal = false"
+            >
+              Cancelar
+            </button>
+            <button
+              class="flex-1 rounded-lg bg-nova-primary py-2 text-sm font-medium text-white disabled:opacity-50"
+              :disabled="editSubmitting"
+              @click="submitEdit"
+            >
+              {{ editSubmitting ? "Guardando..." : "Guardar" }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
