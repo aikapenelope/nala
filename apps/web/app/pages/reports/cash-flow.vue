@@ -61,10 +61,18 @@ onMounted(loadReport);
 
 <template>
   <div class="mx-auto max-w-2xl">
-    <h1 class="mb-2 text-xl font-bold text-gray-900">Flujo de caja</h1>
-    <p class="mb-6 text-sm text-gray-500">
-      Proyeccion basada en los ultimos 30 dias
-    </p>
+    <div class="mb-6">
+      <NuxtLink
+        to="/reports"
+        class="mb-2 inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700"
+      >
+        ← Reportes
+      </NuxtLink>
+      <h1 class="text-xl font-bold text-gray-900">Flujo de caja</h1>
+      <p class="text-sm text-gray-500">
+        Proyeccion basada en los ultimos 30 dias
+      </p>
+    </div>
 
     <!-- Loading -->
     <div v-if="isLoading" class="animate-pulse space-y-4">
