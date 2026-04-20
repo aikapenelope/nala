@@ -766,6 +766,23 @@ customersRoutes.get("/cash-opening/latest", async (c) => {
   const todayStr = new Date().toISOString().split("T")[0];
   const todayStart = new Date(`${todayStr}T00:00:00.000Z`);
 
+  // Check if there's already a day-close for today (business is closed)
+  const [todayClose] = await db
+    .select({ id: dayCloses.id })
+    .from(dayCloses)
+    .where(
+      and(
+        eq(dayCloses.businessId, businessId),
+        gte(dayCloses.date, todayStart),
+      ),
+    )
+    .limit(1);
+
+  if (todayClose) {
+    // Day was already closed -- business is not open
+    return c.json({ opening: null });
+  }
+
   const [latest] = await db
     .select()
     .from(cashOpenings)
