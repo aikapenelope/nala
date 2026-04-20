@@ -339,10 +339,10 @@ function openRateEditor() {
       <!-- HERO: Sales + Profit -->
       <NuxtLink
         to="/sales/history"
-        class="card-lift relative block overflow-hidden rounded-[28px] bg-gradient-to-br from-[#ecfdf5] via-[#d1fae5] to-[#a7f3d0] p-5 shadow-[0_15px_35px_-10px_rgba(167,243,208,0.5)] border border-white/80"
+        class="card-lift relative block overflow-hidden rounded-[28px] bg-gradient-to-br from-[#EFECFF] via-[#E2DEFF] to-[#D0CCF9] p-5 shadow-[0_15px_35px_-10px_rgba(208,204,249,0.5)] border border-white/80"
       >
         <div class="absolute -top-10 -right-10 h-36 w-36 rounded-full bg-white/50 blur-3xl"/>
-        <div class="absolute bottom-0 left-0 h-20 w-20 rounded-full bg-[#6ee7b7]/20 blur-2xl"/>
+        <div class="absolute bottom-0 left-0 h-20 w-20 rounded-full bg-[#a78bfa]/20 blur-2xl"/>
         <div class="relative z-10 flex items-start justify-between">
           <div>
             <p class="text-[13px] font-bold text-gray-600/80">Vendido hoy</p>
@@ -439,7 +439,7 @@ function openRateEditor() {
             class="flex flex-1 flex-col items-center gap-1"
           >
             <div
-              class="w-full rounded-t-md bg-gradient-to-t from-[#16a34a] to-[#4ade80] transition-all duration-500"
+              class="w-full rounded-t-md bg-gradient-to-t from-[#7c3aed] to-[#a78bfa] transition-all duration-500"
               :style="{
                 height: `${Math.max((d.amount / weeklyMax) * 100, 4)}%`,
               }"

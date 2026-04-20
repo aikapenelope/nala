@@ -19,7 +19,7 @@ function reAuthenticate() {
 </script>
 
 <template>
-  <div class="min-h-screen bg-gradient-to-br from-[#f0faf4] via-[#e6f5ec] to-[#daf0e3]">
+  <div class="min-h-screen bg-gradient-to-br from-[#f8f7ff] via-[#f0eef9] to-[#e8e4f3]">
     <!-- Session expired banner -->
     <div
       v-if="sessionExpired"
