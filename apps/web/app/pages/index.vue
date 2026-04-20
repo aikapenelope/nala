@@ -29,6 +29,9 @@ import {
   Wallet,
   RefreshCw,
   BarChart3,
+  UserPlus,
+  Upload,
+  ClipboardList,
 } from "lucide-vue-next";
 
 const { isAdmin, user } = useNovaAuth();
@@ -532,6 +535,38 @@ function openRateEditor() {
         <DollarSign :size="20" />
         Nueva venta
       </NuxtLink>
+
+      <!-- QUICK ACTIONS -->
+      <div v-if="isAdmin" class="mt-3 grid grid-cols-4 gap-2">
+        <NuxtLink
+          to="/inventory/new"
+          class="card-premium flex flex-col items-center gap-1.5 p-3 transition-spring hover:shadow-[0_8px_20px_-5px_rgba(0,0,0,0.06)]"
+        >
+          <Package :size="18" class="text-gray-500" />
+          <span class="text-[10px] font-bold text-gray-600">Producto</span>
+        </NuxtLink>
+        <NuxtLink
+          to="/inventory/import"
+          class="card-premium flex flex-col items-center gap-1.5 p-3 transition-spring hover:shadow-[0_8px_20px_-5px_rgba(0,0,0,0.06)]"
+        >
+          <Upload :size="18" class="text-gray-500" />
+          <span class="text-[10px] font-bold text-gray-600">Importar</span>
+        </NuxtLink>
+        <NuxtLink
+          to="/clients/new"
+          class="card-premium flex flex-col items-center gap-1.5 p-3 transition-spring hover:shadow-[0_8px_20px_-5px_rgba(0,0,0,0.06)]"
+        >
+          <UserPlus :size="18" class="text-gray-500" />
+          <span class="text-[10px] font-bold text-gray-600">Cliente</span>
+        </NuxtLink>
+        <NuxtLink
+          to="/sales/quotations"
+          class="card-premium flex flex-col items-center gap-1.5 p-3 transition-spring hover:shadow-[0_8px_20px_-5px_rgba(0,0,0,0.06)]"
+        >
+          <ClipboardList :size="18" class="text-gray-500" />
+          <span class="text-[10px] font-bold text-gray-600">Cotizar</span>
+        </NuxtLink>
+      </div>
 
       <!-- FOOTER -->
       <div class="mt-2.5 flex items-center justify-between px-1">
