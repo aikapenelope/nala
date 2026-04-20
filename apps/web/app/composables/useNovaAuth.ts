@@ -214,20 +214,33 @@ export function useNovaAuth() {
   }
 
   /**
-   * Full logout: clears everything from this device.
+   * Full logout: signs out of Clerk and clears everything from this device.
    * Use when the device needs to be completely reset (e.g., changing
    * business, device stuck, or transferring device to someone else).
    * After this, the device is as if Nova was never configured on it.
    */
-  function fullLogout() {
+  async function fullLogout() {
     novaUser.value = null;
     if (import.meta.client) {
+      // Clear all Nova state from localStorage
       localStorage.removeItem("nova:user");
       localStorage.removeItem("nova:businessId");
       localStorage.removeItem("nova:team-roster");
       localStorage.removeItem("nova:device-mode");
       localStorage.removeItem("nova:device-activated-at");
       localStorage.removeItem("nova:sidebar-collapsed");
+
+      // Sign out of Clerk so the JWT is invalidated.
+      // Without this, Clerk auto-restores the session on next visit
+      // and the user sees the old account again.
+      try {
+        const clerk = useClerk();
+        if (clerk.value?.session) {
+          await clerk.value.signOut();
+        }
+      } catch {
+        // Clerk may not be initialized -- continue with local cleanup
+      }
     }
   }
 
