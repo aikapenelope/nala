@@ -2,17 +2,12 @@
 /**
  * Settings hub page (owner only).
  *
- * Links to sub-sections:
- * - Team management (employees, PINs) -- available
- * - Business info (name, type, logo) -- coming soon
- * - Payment methods -- coming soon
- * - Exchange rate -- coming soon
+ * All sections link to functional pages.
  */
 
 import {
   Store,
   Users,
-  CreditCard,
   ArrowLeftRight,
   Tag,
   Landmark,
@@ -28,8 +23,7 @@ interface SettingsSection {
   icon: Component;
   label: string;
   description: string;
-  to?: string;
-  available: boolean;
+  to: string;
 }
 
 const sections: SettingsSection[] = [
@@ -38,47 +32,36 @@ const sections: SettingsSection[] = [
     label: "Equipo",
     description: "Empleados, PINs, permisos",
     to: "/settings/team",
-    available: true,
   },
   {
     icon: Store,
     label: "Negocio",
     description: "Email del contador, WhatsApp del negocio",
     to: "/settings/business",
-    available: true,
+  },
+  {
+    icon: ArrowLeftRight,
+    label: "Tasa de cambio",
+    description: "Configurar tasa BCV y EUR",
+    to: "/settings/exchange-rate",
   },
   {
     icon: Tag,
     label: "Cargos adicionales",
     description: "Delivery, propinas, empaques",
     to: "/settings/surcharges",
-    available: true,
   },
   {
     icon: Landmark,
     label: "Cuentas bancarias",
     description: "Bancos para referencia de pagos",
     to: "/settings/bank-accounts",
-    available: true,
   },
   {
     icon: Bell,
     label: "Notificaciones",
     description: "Alertas diarias por email",
     to: "/settings/notifications",
-    available: true,
-  },
-  {
-    icon: CreditCard,
-    label: "Metodos de pago",
-    description: "Configurar metodos aceptados",
-    available: false,
-  },
-  {
-    icon: ArrowLeftRight,
-    label: "Tasa de cambio",
-    description: "Configurar tasa BCV y paralela",
-    available: false,
   },
 ];
 </script>
@@ -91,15 +74,11 @@ const sections: SettingsSection[] = [
     </p>
 
     <div class="space-y-3">
-      <component
-        :is="section.to ? 'NuxtLink' : 'div'"
+      <NuxtLink
         v-for="section in sections"
         :key="section.label"
         :to="section.to"
-        class="flex items-center gap-4 rounded-xl bg-white p-4 shadow-sm"
-        :class="
-          section.available ? 'cursor-pointer hover:bg-gray-50' : 'opacity-60'
-        "
+        class="flex items-center gap-4 rounded-xl bg-white p-4 shadow-sm cursor-pointer hover:bg-gray-50"
       >
         <div
           class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-gray-100"
@@ -110,13 +89,7 @@ const sections: SettingsSection[] = [
           <p class="text-sm font-medium text-gray-900">{{ section.label }}</p>
           <p class="text-xs text-gray-500">{{ section.description }}</p>
         </div>
-        <span
-          v-if="!section.available"
-          class="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-400"
-        >
-          Proximamente
-        </span>
-      </component>
+      </NuxtLink>
     </div>
   </div>
 </template>

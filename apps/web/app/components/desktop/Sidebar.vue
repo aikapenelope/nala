@@ -15,6 +15,8 @@ import {
   BarChart3,
   FileText,
   Settings,
+  Truck,
+  ClipboardList,
 } from "lucide-vue-next";
 import type { Component } from "vue";
 
@@ -31,6 +33,13 @@ const navItems: NavItem[] = [
   { to: "/inventory", icon: Package, label: "Inventario", adminOnly: false },
   { to: "/clients", icon: Users, label: "Clientes", adminOnly: false },
   { to: "/accounts", icon: Wallet, label: "Cuentas", adminOnly: true },
+  { to: "/suppliers", icon: Truck, label: "Proveedores", adminOnly: true },
+  {
+    to: "/sales/quotations",
+    icon: ClipboardList,
+    label: "Cotizaciones",
+    adminOnly: true,
+  },
   { to: "/reports", icon: BarChart3, label: "Reportes", adminOnly: true },
   {
     to: "/accounting",
