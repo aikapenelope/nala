@@ -86,34 +86,34 @@ const keypadRows = [
   <Teleport to="body">
     <div
       v-if="props.modelValue"
-      class="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+      class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
       @click.self="cancel"
     >
-      <div class="w-full max-w-xs rounded-2xl bg-white p-6 shadow-xl">
+      <div class="glass-strong w-full max-w-xs rounded-[32px] p-7 shadow-[0_30px_60px_-15px_rgba(0,0,0,0.2)]">
         <!-- Title -->
-        <h3 class="mb-1 text-center text-lg font-semibold text-gray-900">
-          PIN del dueño
+        <h3 class="mb-1 text-center text-xl font-extrabold tracking-tight text-gradient">
+          PIN del dueno
         </h3>
-        <p class="mb-4 text-center text-sm text-gray-500">
-          {{ actionLabel ?? "Esta acción requiere aprobación" }}
+        <p class="mb-5 text-center text-[13px] font-medium text-gray-500">
+          {{ actionLabel ?? "Esta accion requiere aprobacion" }}
         </p>
 
         <!-- PIN dots -->
-        <div class="mb-4 flex justify-center gap-3">
+        <div class="mb-5 flex justify-center gap-3">
           <div
             v-for="i in PIN_LENGTH"
             :key="i"
-            class="h-3 w-3 rounded-full transition-colors"
+            class="h-3.5 w-3.5 rounded-full transition-all duration-300"
             :class="
               i <= pin.length
-                ? 'bg-nova-primary'
-                : 'border-2 border-gray-300 bg-white'
+                ? 'bg-nova-accent shadow-[0_0_8px_rgba(139,92,246,0.4)] scale-110'
+                : 'border-2 border-gray-300/60 bg-white/60'
             "
           />
         </div>
 
         <!-- Error -->
-        <p v-if="error" class="mb-3 text-center text-sm text-red-500">
+        <p v-if="error" class="mb-3 text-center text-sm font-semibold text-red-500">
           {{ error }}
         </p>
 
@@ -127,7 +127,7 @@ const keypadRows = [
             <button
               v-for="digit in row"
               :key="digit"
-              class="flex h-12 w-12 items-center justify-center rounded-full bg-gray-50 text-xl font-semibold text-gray-800 active:bg-gray-200"
+              class="flex h-13 w-13 items-center justify-center rounded-2xl bg-white/60 text-xl font-bold text-gray-800 transition-spring active:scale-90 active:bg-white"
               @click="pressDigit(digit)"
             >
               {{ digit }}
@@ -135,19 +135,19 @@ const keypadRows = [
           </div>
           <div class="flex justify-center gap-2">
             <button
-              class="flex h-12 w-12 items-center justify-center rounded-full text-lg text-gray-500"
+              class="flex h-13 w-13 items-center justify-center rounded-2xl text-lg text-gray-400 transition-spring hover:bg-white/40"
               @click="deleteDigit"
             >
               ←
             </button>
             <button
-              class="flex h-12 w-12 items-center justify-center rounded-full bg-gray-50 text-xl font-semibold text-gray-800 active:bg-gray-200"
+              class="flex h-13 w-13 items-center justify-center rounded-2xl bg-white/60 text-xl font-bold text-gray-800 transition-spring active:scale-90 active:bg-white"
               @click="pressDigit('0')"
             >
               0
             </button>
             <button
-              class="flex h-12 w-12 items-center justify-center rounded-full text-sm text-gray-500"
+              class="flex h-13 w-13 items-center justify-center rounded-2xl text-[11px] font-bold text-gray-400 transition-spring hover:bg-white/40 hover:text-gray-600"
               @click="cancel"
             >
               Cancelar

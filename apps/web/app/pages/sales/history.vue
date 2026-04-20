@@ -7,6 +7,8 @@
  * - POST /api/sales/:id/void
  */
 
+import { Plus, Calendar } from "lucide-vue-next";
+
 const { isDesktop } = useDevice();
 const { isAdmin } = useNovaAuth();
 const { $api } = useApi();
@@ -144,25 +146,29 @@ async function handleVoidConfirmed() {
   <div>
     <!-- Header -->
     <div class="mb-4 flex items-center justify-between">
-      <h1 class="text-xl font-bold text-gray-900">Historial de ventas</h1>
+      <h1 class="text-2xl font-extrabold tracking-tight text-gradient">Historial de ventas</h1>
       <NuxtLink
         to="/sales"
-        class="rounded-lg bg-nova-primary px-4 py-2 text-sm font-medium text-white"
+        class="dark-pill flex items-center gap-1.5 rounded-2xl px-4 py-2 text-sm font-bold transition-spring"
       >
-        + Nueva venta
+        <Plus :size="14" />
+        Nueva venta
       </NuxtLink>
     </div>
 
     <!-- Filters -->
     <div class="mb-4 flex gap-3">
-      <input
-        v-model="dateFilter"
-        type="date"
-        class="rounded-lg border border-gray-300 px-3 py-2 text-sm"
-      >
+      <div class="glass relative flex items-center rounded-2xl px-4 py-2.5">
+        <Calendar :size="14" class="mr-2 flex-shrink-0 text-gray-400" />
+        <input
+          v-model="dateFilter"
+          type="date"
+          class="bg-transparent text-sm font-medium text-gray-700 outline-none"
+        >
+      </div>
       <select
         v-model="methodFilter"
-        class="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+        class="glass rounded-2xl border-0 px-4 py-2.5 text-sm font-bold text-gray-700 outline-none"
       >
         <option :value="null">Todos los metodos</option>
         <option value="efectivo">Efectivo</option>
@@ -176,21 +182,24 @@ async function handleVoidConfirmed() {
     </div>
 
     <!-- Void error -->
-    <p v-if="voidError" class="mb-4 text-sm text-red-500">{{ voidError }}</p>
+    <div v-if="voidError" class="mb-4 card-premium p-3">
+      <p class="text-sm font-semibold text-red-500">{{ voidError }}</p>
+    </div>
 
     <!-- Loading -->
     <div v-if="isLoading" class="py-12 text-center text-gray-400">
+      <div class="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2 border-gray-200 border-t-nova-primary" />
       Cargando ventas...
     </div>
 
     <!-- Error -->
     <div
       v-else-if="loadError"
-      class="rounded-xl bg-red-50 p-6 text-center text-sm text-red-600"
+      class="card-premium p-6 text-center"
     >
-      {{ loadError }}
+      <p class="text-sm font-semibold text-red-500">{{ loadError }}</p>
       <button
-        class="mt-2 block w-full text-xs font-medium text-red-700 underline"
+        class="mt-3 text-xs font-bold text-nova-primary underline"
         @click="fetchSales"
       >
         Reintentar
@@ -200,81 +209,86 @@ async function handleVoidConfirmed() {
     <!-- Empty -->
     <div
       v-else-if="salesList.length === 0"
-      class="py-12 text-center text-gray-400"
+      class="card-premium py-12 text-center"
     >
-      No hay ventas{{ dateFilter ? " en esta fecha" : "" }}
+      <p class="text-sm font-medium text-gray-400">
+        No hay ventas{{ dateFilter ? " en esta fecha" : "" }}
+      </p>
     </div>
 
     <template v-else>
       <!-- Desktop: Table -->
       <div
         v-if="isDesktop"
-        class="overflow-hidden rounded-xl bg-white shadow-sm"
+        class="card-premium overflow-hidden"
       >
         <table class="w-full text-left text-sm">
-          <thead class="border-b border-gray-200 bg-gray-50">
+          <thead class="border-b border-white/50">
             <tr>
-              <th class="px-4 py-3 font-medium text-gray-500">Fecha</th>
-              <th class="px-4 py-3 text-right font-medium text-gray-500">
+              <th class="px-4 py-3.5 text-[11px] font-bold tracking-wider text-gray-400 uppercase">Fecha</th>
+              <th class="px-4 py-3.5 text-right text-[11px] font-bold tracking-wider text-gray-400 uppercase">
                 Total
               </th>
-              <th class="px-4 py-3 text-right font-medium text-gray-500">
+              <th class="px-4 py-3.5 text-right text-[11px] font-bold tracking-wider text-gray-400 uppercase">
                 Utilidad
               </th>
-              <th class="px-4 py-3 font-medium text-gray-500">Canal</th>
-              <th class="px-4 py-3 font-medium text-gray-500">Estado</th>
-              <th v-if="isAdmin" class="px-4 py-3" />
+              <th class="px-4 py-3.5 text-[11px] font-bold tracking-wider text-gray-400 uppercase">Canal</th>
+              <th class="px-4 py-3.5 text-[11px] font-bold tracking-wider text-gray-400 uppercase">Estado</th>
+              <th v-if="isAdmin" class="px-4 py-3.5" />
             </tr>
           </thead>
-          <tbody class="divide-y divide-gray-100">
+          <tbody class="divide-y divide-white/30">
             <tr
               v-for="sale in salesList"
               :key="sale.id"
-              class="hover:bg-gray-50"
-              :class="{ 'opacity-50': sale.status === 'voided' }"
+              class="transition-spring hover:bg-white/60"
+              :class="{ 'opacity-40': sale.status === 'voided' }"
             >
-              <td class="px-4 py-3 text-gray-700">
+              <td class="px-4 py-3.5 font-medium text-gray-700">
                 {{ formatDate(sale.createdAt) }}
               </td>
-              <td class="px-4 py-3 text-right font-medium text-gray-900">
-                ${{ Number(sale.totalUsd).toFixed(2) }}
-                <span v-if="sale.totalBs" class="text-xs text-gray-400">
+              <td class="px-4 py-3.5 text-right">
+                <span class="font-bold text-gray-800">${{ Number(sale.totalUsd).toFixed(2) }}</span>
+                <span v-if="sale.totalBs" class="ml-1 text-xs text-gray-400">
                   Bs.{{ Number(sale.totalBs).toFixed(2) }}
                 </span>
               </td>
-              <td class="px-4 py-3 text-right text-sm">
+              <td class="px-4 py-3.5 text-right text-sm">
                 <template v-if="saleProfit(sale) !== null">
                   <span
+                    class="rounded-lg px-1.5 py-0.5 text-xs font-bold"
                     :class="
                       saleProfit(sale)! >= 0
-                        ? 'text-green-600'
-                        : 'text-red-600'
+                        ? 'bg-green-50 text-green-700'
+                        : 'bg-red-50 text-red-600'
                     "
                   >
-                    ${{ saleProfit(sale)!.toFixed(2) }}
+                    {{ saleProfit(sale)! >= 0 ? "+" : "" }}${{ saleProfit(sale)!.toFixed(2) }}
                   </span>
                 </template>
                 <span v-else class="text-gray-300">--</span>
               </td>
-              <td class="px-4 py-3 text-xs text-gray-500">
-                {{ sale.channel ?? "pos" }}
+              <td class="px-4 py-3.5">
+                <span class="rounded-lg bg-gray-100/80 px-2 py-0.5 text-[11px] font-bold text-gray-500">
+                  {{ sale.channel ?? "pos" }}
+                </span>
               </td>
-              <td class="px-4 py-3">
+              <td class="px-4 py-3.5">
                 <span
-                  class="rounded-full px-2 py-0.5 text-xs font-medium"
+                  class="rounded-full px-2.5 py-0.5 text-[10px] font-bold"
                   :class="
                     sale.status === 'voided'
-                      ? 'bg-red-100 text-red-700'
-                      : 'bg-green-100 text-green-700'
+                      ? 'bg-red-50 text-red-700'
+                      : 'bg-green-50 text-green-700'
                   "
                 >
                   {{ sale.status === "voided" ? "Anulada" : "Completada" }}
                 </span>
               </td>
-              <td v-if="isAdmin" class="px-4 py-3">
+              <td v-if="isAdmin" class="px-4 py-3.5">
                 <button
                   v-if="sale.status === 'completed'"
-                  class="text-xs text-red-500 hover:text-red-700"
+                  class="rounded-xl bg-red-50 px-2.5 py-1 text-[11px] font-bold text-red-600 transition-spring hover:bg-red-100"
                   @click="requestVoid(sale.id)"
                 >
                   Anular
@@ -286,31 +300,31 @@ async function handleVoidConfirmed() {
       </div>
 
       <!-- Mobile: Card list -->
-      <div v-else class="space-y-2">
+      <div v-else class="space-y-2.5">
         <div
           v-for="sale in salesList"
           :key="sale.id"
-          class="rounded-xl bg-white p-4 shadow-sm"
-          :class="{ 'opacity-50': sale.status === 'voided' }"
+          class="card-premium p-4"
+          :class="{ 'opacity-40': sale.status === 'voided' }"
         >
           <div class="flex items-center justify-between">
             <div>
-              <p class="font-medium text-gray-900">
+              <p class="font-bold text-gray-800">
                 ${{ Number(sale.totalUsd).toFixed(2) }}
                 <span
                   v-if="saleProfit(sale) !== null"
-                  class="ml-1 text-xs"
+                  class="ml-1 rounded-lg px-1.5 py-0.5 text-[10px] font-bold"
                   :class="
                     saleProfit(sale)! >= 0
-                      ? 'text-green-600'
-                      : 'text-red-600'
+                      ? 'bg-green-50 text-green-600'
+                      : 'bg-red-50 text-red-600'
                   "
                 >
-                  ({{ saleProfit(sale)! >= 0 ? "+" : ""
-                  }}${{ saleProfit(sale)!.toFixed(2) }})
+                  {{ saleProfit(sale)! >= 0 ? "+" : ""
+                  }}${{ saleProfit(sale)!.toFixed(2) }}
                 </span>
               </p>
-              <p class="text-xs text-gray-500">
+              <p class="mt-0.5 text-xs font-medium text-gray-500">
                 {{ formatDate(sale.createdAt) }}
                 <span v-if="sale.channel" class="ml-1 text-gray-400">
                   · {{ sale.channel }}
@@ -319,18 +333,18 @@ async function handleVoidConfirmed() {
             </div>
             <div class="flex items-center gap-2">
               <span
-                class="rounded-full px-2 py-0.5 text-xs font-medium"
+                class="rounded-full px-2 py-0.5 text-[10px] font-bold"
                 :class="
                   sale.status === 'voided'
-                    ? 'bg-red-100 text-red-700'
-                    : 'bg-green-100 text-green-700'
+                    ? 'bg-red-50 text-red-700'
+                    : 'bg-green-50 text-green-700'
                 "
               >
                 {{ sale.status === "voided" ? "Anulada" : "Completada" }}
               </span>
               <button
                 v-if="isAdmin && sale.status === 'completed'"
-                class="text-xs text-red-500"
+                class="rounded-lg bg-red-50 px-2 py-0.5 text-[10px] font-bold text-red-500 transition-spring hover:bg-red-100"
                 @click="requestVoid(sale.id)"
               >
                 Anular
@@ -343,7 +357,7 @@ async function handleVoidConfirmed() {
       <!-- Pagination -->
       <p
         v-if="totalSales > limit"
-        class="mt-4 text-center text-xs text-gray-400"
+        class="mt-4 text-center text-xs font-medium text-gray-400"
       >
         Mostrando {{ salesList.length }} de {{ totalSales }} ventas
       </p>
@@ -353,14 +367,14 @@ async function handleVoidConfirmed() {
     <Teleport to="body">
       <div
         v-if="showReasonModal"
-        class="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+        class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
         @click.self="showReasonModal = false"
       >
-        <div class="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
-          <h3 class="mb-1 text-lg font-semibold text-gray-900">
+        <div class="glass-strong w-full max-w-sm rounded-[32px] p-7 shadow-[0_30px_60px_-15px_rgba(0,0,0,0.2)]">
+          <h3 class="mb-1 text-xl font-extrabold tracking-tight text-gradient">
             Motivo de anulacion
           </h3>
-          <p class="mb-4 text-sm text-gray-500">
+          <p class="mb-5 text-[13px] font-medium text-gray-500">
             Indica por que se anula esta venta
           </p>
 
@@ -369,11 +383,11 @@ async function handleVoidConfirmed() {
             <button
               v-for="reason in commonReasons"
               :key="reason"
-              class="rounded-full border px-3 py-1 text-xs transition-colors"
+              class="rounded-full border px-3 py-1.5 text-xs font-bold transition-spring"
               :class="
                 voidReason === reason
-                  ? 'border-nova-primary bg-blue-50 text-nova-primary'
-                  : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                  ? 'border-nova-accent bg-purple-50 text-nova-accent'
+                  : 'border-white/80 bg-white/40 text-gray-600 hover:bg-white/70'
               "
               @click="voidReason = reason"
             >
@@ -386,18 +400,18 @@ async function handleVoidConfirmed() {
             v-model="voidReason"
             rows="2"
             placeholder="O escribe el motivo..."
-            class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-nova-primary focus:outline-none"
+            class="w-full rounded-2xl border border-white bg-white/60 px-4 py-3 text-sm font-semibold text-gray-800 shadow-[inset_0_2px_4px_rgba(0,0,0,0.03)] outline-none transition-spring placeholder:text-gray-400 focus:bg-white focus:ring-[3px] focus:ring-nova-accent/20"
           />
 
-          <div class="mt-4 flex gap-3">
+          <div class="mt-5 flex gap-3">
             <button
-              class="flex-1 rounded-lg border border-gray-300 py-2 text-sm font-medium text-gray-700"
+              class="glass flex-1 rounded-2xl py-3 text-sm font-bold text-gray-700 transition-spring"
               @click="showReasonModal = false"
             >
               Cancelar
             </button>
             <button
-              class="flex-1 rounded-lg bg-red-600 py-2 text-sm font-medium text-white disabled:opacity-50"
+              class="flex-1 rounded-2xl bg-red-600 py-3 text-sm font-bold text-white transition-spring disabled:opacity-50"
               :disabled="!voidReason.trim()"
               @click="confirmReason"
             >

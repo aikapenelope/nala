@@ -21,6 +21,7 @@
 
 import { usdToBs } from "@nova/shared";
 import type { PaymentMethod, SaleChannel } from "@nova/shared";
+import { Check, Wifi, WifiOff, X, MessageCircle, ShoppingCart } from "lucide-vue-next";
 
 const router = useRouter();
 const { $api } = useApi();
@@ -299,36 +300,47 @@ function newSale() {
 <template>
   <div class="mx-auto max-w-md">
     <!-- Sale complete screen -->
-    <div v-if="saleComplete" class="py-12 text-center">
-      <div class="mb-4 text-5xl">{{ queuedOffline ? "📡" : "✓" }}</div>
-      <h1 class="text-2xl font-bold text-gray-900">
+    <div v-if="saleComplete" class="py-8 text-center">
+      <div
+        class="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-[28px]"
+        :class="queuedOffline ? 'bg-gradient-to-br from-[#FEF3C7] to-[#FDE68A]' : 'bg-gradient-to-br from-[#D1FAE5] to-[#6EE7B7]'"
+      >
+        <component
+          :is="queuedOffline ? WifiOff : Check"
+          :size="32"
+          :class="queuedOffline ? 'text-yellow-700' : 'text-green-700'"
+        />
+      </div>
+      <h1 class="text-2xl font-extrabold tracking-tight text-gradient">
         {{ queuedOffline ? "Venta guardada" : "Venta registrada" }}
       </h1>
-      <p class="mt-2 text-lg text-gray-500">
+      <p class="mt-2 text-lg font-bold text-gray-600">
         ${{ totalUsd.toFixed(2) }}
-        <span v-if="exchangeRate > 0" class="text-sm">
+        <span v-if="exchangeRate > 0" class="text-sm font-medium text-gray-400">
           (Bs.{{ totalBs.toFixed(2) }})
         </span>
       </p>
-      <p
+      <div
         v-if="queuedOffline"
-        class="mt-3 rounded-lg bg-yellow-50 px-4 py-2 text-sm text-yellow-700"
+        class="mx-auto mt-4 max-w-xs rounded-2xl bg-yellow-50 px-4 py-3 text-[13px] font-medium text-yellow-700"
       >
         Sin conexion. La venta se sincronizara automaticamente cuando vuelva el
         internet.
-      </p>
+      </div>
 
       <div class="mt-8 space-y-3">
         <button
-          class="w-full rounded-xl bg-green-600 py-3 font-medium text-white"
+          class="flex w-full items-center justify-center gap-2 rounded-2xl bg-green-600 py-3.5 font-bold text-white transition-spring"
           @click="sendWhatsAppReceipt"
         >
+          <MessageCircle :size="18" />
           Enviar recibo por WhatsApp
         </button>
         <button
-          class="w-full rounded-xl bg-nova-primary py-3 font-medium text-white"
+          class="dark-pill flex w-full items-center justify-center gap-2 rounded-2xl py-3.5 font-bold transition-spring"
           @click="newSale"
         >
+          <ShoppingCart :size="18" />
           Nueva venta
         </button>
       </div>
@@ -337,38 +349,38 @@ function newSale() {
     <!-- Checkout form -->
     <template v-else>
       <!-- Total display -->
-      <div class="mb-6 rounded-xl bg-white p-6 text-center shadow-sm">
-        <p class="text-sm text-gray-500">Total a cobrar</p>
-        <p class="text-4xl font-bold text-gray-900">
+      <div class="card-premium mb-6 p-6 text-center">
+        <p class="text-[13px] font-bold text-gray-500">Total a cobrar</p>
+        <p class="mt-1 text-4xl font-extrabold tracking-tighter text-gradient">
           ${{ totalUsd.toFixed(2) }}
         </p>
         <p
           v-if="surchargesTotal > 0"
-          class="mt-1 text-xs text-gray-400"
+          class="mt-1.5 text-xs font-medium text-gray-400"
         >
           Subtotal ${{ subtotalUsd.toFixed(2) }} + cargos
           ${{ surchargesTotal.toFixed(2) }}
         </p>
-        <p v-if="exchangeRate > 0" class="mt-1 text-sm text-gray-400">
+        <p v-if="exchangeRate > 0" class="mt-1 text-sm font-medium text-gray-400">
           Bs.{{ totalBs.toFixed(2) }} · Tasa {{ exchangeRate.toFixed(2) }}
         </p>
-        <p v-if="rateError" class="mt-1 text-xs text-yellow-600">
+        <p v-if="rateError" class="mt-1.5 text-xs font-semibold text-yellow-600">
           {{ rateError }}
         </p>
       </div>
 
       <!-- Sale channel selector -->
       <div class="mb-4">
-        <p class="mb-2 text-sm font-semibold text-gray-700">Canal de venta</p>
+        <p class="mb-2 text-[13px] font-bold text-gray-600">Canal de venta</p>
         <div class="flex gap-2">
           <button
             v-for="ch in channelOptions"
             :key="ch.value"
-            class="rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors"
+            class="rounded-2xl border px-3.5 py-2 text-xs font-bold transition-spring"
             :class="
               selectedChannel === ch.value
-                ? 'border-nova-primary bg-blue-50 text-nova-primary'
-                : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                ? 'border-nova-accent bg-purple-50 text-nova-accent'
+                : 'border-white/80 bg-white/40 text-gray-600 hover:bg-white/70'
             "
             @click="selectedChannel = ch.value"
           >
@@ -379,7 +391,7 @@ function newSale() {
 
       <!-- Surcharges -->
       <div v-if="surchargeTypes.length > 0" class="mb-4">
-        <p class="mb-2 text-sm font-semibold text-gray-700">
+        <p class="mb-2 text-[13px] font-bold text-gray-600">
           Cargos adicionales
         </p>
 
@@ -388,9 +400,10 @@ function newSale() {
           <button
             v-for="st in surchargeTypes"
             :key="st.id"
-            class="rounded-full border border-dashed border-gray-300 px-3 py-1 text-xs text-gray-600 transition-colors hover:border-nova-primary hover:text-nova-primary"
+            class="rounded-full border border-dashed px-3 py-1.5 text-xs font-bold transition-spring"
             :class="{
               'opacity-40': appliedSurcharges.some((s) => s.name === st.name),
+              'border-gray-300/80 text-gray-600 hover:border-nova-accent hover:text-nova-accent': !appliedSurcharges.some((s) => s.name === st.name),
             }"
             :disabled="appliedSurcharges.some((s) => s.name === st.name)"
             @click="addSurcharge(st)"
@@ -404,24 +417,24 @@ function newSale() {
           <div
             v-for="(surcharge, idx) in appliedSurcharges"
             :key="idx"
-            class="flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2"
+            class="glass flex items-center gap-2 rounded-2xl px-4 py-2.5"
           >
-            <span class="flex-1 text-sm text-gray-700">
+            <span class="flex-1 text-sm font-semibold text-gray-700">
               {{ surcharge.name }}
             </span>
-            <span class="text-xs text-gray-400">$</span>
+            <span class="text-xs font-bold text-gray-400">$</span>
             <input
               v-model.number="surcharge.amount"
               type="number"
               step="0.01"
               min="0"
-              class="w-20 rounded border border-gray-200 px-2 py-1 text-right text-sm focus:border-nova-primary focus:outline-none"
+              class="w-20 rounded-xl border border-white bg-white/60 px-2 py-1.5 text-right text-sm font-bold text-gray-800 outline-none transition-spring focus:ring-[2px] focus:ring-nova-accent/20"
             >
             <button
-              class="text-xs text-red-400 hover:text-red-600"
+              class="flex h-6 w-6 items-center justify-center rounded-lg text-gray-300 transition-spring hover:bg-red-50 hover:text-red-500"
               @click="removeSurcharge(idx)"
             >
-              x
+              <X :size="12" />
             </button>
           </div>
         </div>
@@ -429,21 +442,21 @@ function newSale() {
 
       <!-- Payment method selector -->
       <div class="mb-4">
-        <p class="mb-3 text-sm font-semibold text-gray-700">Metodo de pago</p>
+        <p class="mb-3 text-[13px] font-bold text-gray-600">Metodo de pago</p>
         <div class="grid grid-cols-4 gap-2">
           <button
             v-for="method in paymentMethods"
             :key="method.value"
-            class="flex flex-col items-center gap-1 rounded-xl border-2 p-3 transition-colors"
+            class="card-premium flex flex-col items-center gap-1.5 p-3 transition-spring"
             :class="
               selectedMethod === method.value
-                ? 'border-nova-primary bg-blue-50'
-                : 'border-gray-200 bg-white'
+                ? '!border-nova-accent !bg-purple-50/80 ring-[3px] ring-nova-accent/20'
+                : ''
             "
             @click="selectedMethod = method.value"
           >
             <span class="text-2xl">{{ method.icon }}</span>
-            <span class="text-[10px] font-medium text-gray-700">
+            <span class="text-[10px] font-bold text-gray-700">
               {{ method.label }}
             </span>
           </button>
@@ -452,29 +465,29 @@ function newSale() {
 
       <!-- Reference number (for digital payments) -->
       <div v-if="needsReference" class="mb-4">
-        <label class="mb-1 block text-sm text-gray-600">
+        <label class="mb-1.5 block text-[13px] font-bold text-gray-600">
           Referencia de pago
         </label>
         <input
           v-model="reference"
           type="text"
           placeholder="Numero de referencia"
-          class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-nova-primary focus:outline-none"
+          class="w-full rounded-2xl border border-white bg-white/60 px-4 py-3 text-sm font-semibold text-gray-800 shadow-[inset_0_2px_4px_rgba(0,0,0,0.03)] outline-none transition-spring placeholder:text-gray-400 focus:bg-white focus:ring-[3px] focus:ring-nova-accent/20"
         >
       </div>
 
       <!-- Customer selector (for fiado) -->
-      <div v-if="isFiado" class="mb-4 rounded-xl bg-yellow-50 p-4">
-        <p class="mb-2 text-sm font-medium text-yellow-800">
+      <div v-if="isFiado" class="mb-4 rounded-2xl bg-yellow-50/80 p-4">
+        <p class="mb-2 text-[13px] font-bold text-yellow-800">
           Fiado requiere seleccionar un cliente
         </p>
         <input
           v-model="selectedCustomerId"
           type="text"
           placeholder="ID del cliente..."
-          class="w-full rounded-lg border border-yellow-300 px-3 py-2 text-sm focus:border-yellow-500 focus:outline-none"
+          class="w-full rounded-2xl border border-yellow-200 bg-white/60 px-4 py-3 text-sm font-semibold text-gray-800 outline-none transition-spring placeholder:text-gray-400 focus:ring-[3px] focus:ring-yellow-400/20"
         >
-        <p class="mt-1 text-xs text-yellow-600">
+        <p class="mt-2 text-[11px] font-medium text-yellow-600">
           Se generara una cuenta por cobrar automaticamente
         </p>
       </div>
@@ -482,21 +495,23 @@ function newSale() {
       <!-- Offline indicator -->
       <div
         v-if="!isOnline"
-        class="mb-4 flex items-center gap-2 rounded-lg bg-yellow-50 px-4 py-2 text-sm text-yellow-700"
+        class="mb-4 glass flex items-center gap-2.5 rounded-2xl px-4 py-3"
       >
-        <span class="h-2 w-2 rounded-full bg-yellow-500" />
-        Sin conexion. La venta se guardara localmente.
+        <Wifi :size="14" class="text-yellow-500" />
+        <span class="text-[13px] font-semibold text-yellow-700">
+          Sin conexion. La venta se guardara localmente.
+        </span>
       </div>
 
       <!-- Error -->
-      <p v-if="saleError" class="mb-4 text-sm text-red-500">
-        {{ saleError }}
-      </p>
+      <div v-if="saleError" class="mb-4 card-premium p-3">
+        <p class="text-sm font-semibold text-red-500">{{ saleError }}</p>
+      </div>
 
       <!-- Confirm button -->
       <button
-        class="w-full rounded-xl py-3 font-semibold text-white transition-colors disabled:opacity-50"
-        :class="canSubmit ? 'bg-nova-primary' : 'bg-gray-300'"
+        class="w-full rounded-2xl py-3.5 font-extrabold tracking-wide transition-spring disabled:opacity-50"
+        :class="canSubmit ? 'dark-pill' : 'bg-gray-200 text-gray-400'"
         :disabled="!canSubmit || isSubmitting"
         @click="confirmSale"
       >
@@ -508,7 +523,7 @@ function newSale() {
       <!-- Back link -->
       <NuxtLink
         to="/sales"
-        class="mt-4 block text-center text-sm text-gray-500 hover:text-gray-700"
+        class="mt-4 block text-center text-sm font-bold text-gray-400 transition-spring hover:text-gray-600"
       >
         Volver al ticket
       </NuxtLink>

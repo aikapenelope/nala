@@ -12,6 +12,8 @@
  *   </SharedReportLayout>
  */
 
+import { ArrowLeft, Download, FileSpreadsheet, Send } from "lucide-vue-next";
+
 const props = defineProps<{
   title: string;
   narrative?: string;
@@ -114,16 +116,19 @@ async function confirmSendEmail() {
     <!-- Header -->
     <div class="mb-4 flex items-center justify-between">
       <div class="flex items-center gap-3">
-        <NuxtLink to="/reports" class="text-gray-400 hover:text-gray-600">
-          ←
+        <NuxtLink
+          to="/reports"
+          class="flex h-8 w-8 items-center justify-center rounded-xl bg-white/60 text-gray-400 transition-spring hover:bg-white hover:text-gray-600"
+        >
+          <ArrowLeft :size="16" />
         </NuxtLink>
-        <h1 class="text-xl font-bold text-gray-900">{{ title }}</h1>
+        <h1 class="text-2xl font-extrabold tracking-tight text-gradient">{{ title }}</h1>
       </div>
 
       <!-- Period selector -->
       <select
         v-model="period"
-        class="rounded-lg border border-gray-300 px-3 py-1.5 text-sm"
+        class="glass rounded-2xl border-0 px-4 py-2 text-sm font-bold text-gray-700 outline-none"
       >
         <option v-for="p in periods" :key="p.value" :value="p.value">
           {{ p.label }}
@@ -134,68 +139,75 @@ async function confirmSendEmail() {
     <!-- AI Narrative -->
     <div
       v-if="narrative"
-      class="mb-4 rounded-xl bg-blue-50 p-4 text-sm text-blue-800 italic"
+      class="card-premium mb-4 p-4"
     >
-      "{{ narrative }}"
+      <p class="text-[13px] font-medium italic text-gray-600">
+        "{{ narrative }}"
+      </p>
     </div>
 
     <!-- Report content -->
     <slot />
 
     <!-- Export buttons -->
-    <div class="mt-6 flex gap-3">
+    <div class="mt-6 flex gap-2.5">
       <button
-        class="flex-1 rounded-lg border border-gray-300 py-2 text-sm font-medium text-gray-700"
+        class="glass card-lift flex flex-1 items-center justify-center gap-2 rounded-2xl py-3 text-sm font-bold text-gray-700 transition-spring"
         @click="exportPdf"
       >
-        Exportar PDF
+        <Download :size="14" />
+        PDF
       </button>
       <button
-        class="flex-1 rounded-lg border border-gray-300 py-2 text-sm font-medium text-gray-700"
+        class="glass card-lift flex flex-1 items-center justify-center gap-2 rounded-2xl py-3 text-sm font-bold text-gray-700 transition-spring"
         @click="exportExcel"
       >
-        Exportar Excel
+        <FileSpreadsheet :size="14" />
+        Excel
       </button>
       <button
-        class="flex-1 rounded-lg bg-green-600 py-2 text-sm font-medium text-white"
+        class="dark-pill flex flex-1 items-center justify-center gap-2 rounded-2xl py-3 text-sm font-bold transition-spring"
         @click="sendToAccountant"
       >
-        Enviar al contador
+        <Send :size="14" />
+        Contador
       </button>
     </div>
 
     <!-- Email modal -->
-    <div
-      v-if="showEmailModal"
-      class="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
-      @click.self="showEmailModal = false"
-    >
-      <div class="mx-4 w-full max-w-sm rounded-xl bg-white p-6 shadow-lg">
-        <h3 class="mb-3 text-lg font-semibold text-gray-900">
-          Enviar reporte por email
-        </h3>
-        <input
-          v-model="accountantEmail"
-          type="email"
-          placeholder="contador@email.com"
-          class="mb-4 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-        />
-        <div class="flex gap-3">
-          <button
-            class="flex-1 rounded-lg border border-gray-300 py-2 text-sm font-medium text-gray-700"
-            @click="showEmailModal = false"
-          >
-            Cancelar
-          </button>
-          <button
-            class="flex-1 rounded-lg bg-green-600 py-2 text-sm font-medium text-white disabled:opacity-50"
-            :disabled="!accountantEmail || sendingEmail"
-            @click="confirmSendEmail"
-          >
-            {{ sendingEmail ? "Enviando..." : "Enviar" }}
-          </button>
+    <Teleport to="body">
+      <div
+        v-if="showEmailModal"
+        class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+        @click.self="showEmailModal = false"
+      >
+        <div class="glass-strong mx-4 w-full max-w-sm rounded-[32px] p-7 shadow-[0_30px_60px_-15px_rgba(0,0,0,0.2)]">
+          <h3 class="mb-5 text-xl font-extrabold tracking-tight text-gradient">
+            Enviar reporte por email
+          </h3>
+          <input
+            v-model="accountantEmail"
+            type="email"
+            placeholder="contador@email.com"
+            class="mb-5 w-full rounded-2xl border border-white bg-white/60 px-4 py-3 text-sm font-semibold text-gray-800 shadow-[inset_0_2px_4px_rgba(0,0,0,0.03)] outline-none transition-spring placeholder:text-gray-400 focus:bg-white focus:ring-[3px] focus:ring-nova-accent/20"
+          />
+          <div class="flex gap-3">
+            <button
+              class="glass flex-1 rounded-2xl py-3 text-sm font-bold text-gray-700 transition-spring"
+              @click="showEmailModal = false"
+            >
+              Cancelar
+            </button>
+            <button
+              class="dark-pill flex-1 rounded-2xl py-3 text-sm font-bold transition-spring disabled:opacity-50"
+              :disabled="!accountantEmail || sendingEmail"
+              @click="confirmSendEmail"
+            >
+              {{ sendingEmail ? "Enviando..." : "Enviar" }}
+            </button>
+          </div>
         </div>
       </div>
-    </div>
+    </Teleport>
   </div>
 </template>
