@@ -65,8 +65,17 @@ const receivableTotal = ref(0);
 const lowStockCount = ref(0);
 const cashFlow7d = ref(0);
 
-/** Alerts count. */
-const alertCount = ref(0);
+/** Smart alerts for dashboard display. */
+interface SmartAlert {
+  id: string;
+  icon: string;
+  title: string;
+  suggestion: string;
+  actionLabel: string;
+  actionTo: string;
+  severity: "critical" | "warning" | "info";
+}
+const dashboardAlerts = ref<SmartAlert[]>([]);
 
 /** Exchange rate. */
 const exchangeRate = ref<number | null>(null);
@@ -162,7 +171,7 @@ async function loadDashboard() {
         "/api/reports/inventory",
       ),
 
-      $api<{ alerts: unknown[] }>("/api/reports/alerts"),
+      $api<{ alerts: SmartAlert[] }>("/api/reports/alerts"),
 
       $api<{ rateBcv: number; rateEur: number | null }>("/api/exchange-rate"),
 
@@ -202,7 +211,7 @@ async function loadDashboard() {
     }
 
     if (alertsResult.status === "fulfilled") {
-      alertCount.value = alertsResult.value.alerts.length;
+      dashboardAlerts.value = alertsResult.value.alerts.slice(0, 5);
     }
 
     if (rateResult.status === "fulfilled") {
@@ -496,9 +505,9 @@ function openRateEditor() {
           </div>
         </div>
 
-        <!-- Alerts -->
+        <!-- Alerts count tile (links to full alerts page) -->
         <NuxtLink
-          v-if="alertCount > 0"
+          v-if="dashboardAlerts.length > 0"
           to="/reports"
           class="card-premium flex items-center gap-3 p-3.5 transition-spring hover:shadow-[0_8px_20px_-5px_rgba(0,0,0,0.06)]"
         >
@@ -506,7 +515,7 @@ function openRateEditor() {
             <AlertTriangle :size="16" class="text-orange-300 drop-shadow-[0_0_6px_rgba(251,146,60,0.6)]" />
           </div>
           <div class="min-w-0">
-            <p class="text-[12px] font-extrabold text-gray-800">{{ alertCount }} alerta{{ alertCount > 1 ? "s" : "" }}</p>
+            <p class="text-[12px] font-extrabold text-gray-800">{{ dashboardAlerts.length }} alerta{{ dashboardAlerts.length > 1 ? "s" : "" }}</p>
             <p class="text-[11px] font-bold text-gray-400">Requiere atencion</p>
           </div>
         </NuxtLink>
@@ -524,6 +533,38 @@ function openRateEditor() {
             <p class="text-[12px] font-extrabold text-gray-800">{{ grossMargin }}% margen</p>
             <p class="text-[11px] font-bold text-gray-400">Ganancia bruta</p>
           </div>
+        </NuxtLink>
+      </div>
+
+      <!-- SMART ALERTS (actionable cards) -->
+      <div v-if="dashboardAlerts.length > 0" class="mt-3 space-y-2">
+        <p class="px-1 text-[11px] font-bold tracking-wider text-gray-400 uppercase">Requiere atencion</p>
+        <NuxtLink
+          v-for="alert in dashboardAlerts"
+          :key="alert.id"
+          :to="alert.actionTo"
+          class="card-lift flex items-center gap-3 rounded-[18px] border border-white/80 p-3.5 transition-spring"
+          :class="{
+            'bg-gradient-to-r from-red-50/80 to-red-100/40': alert.severity === 'critical',
+            'bg-gradient-to-r from-amber-50/80 to-amber-100/40': alert.severity === 'warning',
+            'bg-gradient-to-r from-blue-50/80 to-blue-100/40': alert.severity === 'info',
+          }"
+        >
+          <span class="text-lg flex-shrink-0">{{ alert.icon }}</span>
+          <div class="min-w-0 flex-1">
+            <p class="text-[12px] font-bold text-gray-800 leading-tight">{{ alert.title }}</p>
+            <p class="mt-0.5 text-[10px] font-semibold text-gray-500">{{ alert.suggestion }}</p>
+          </div>
+          <span
+            class="flex-shrink-0 rounded-xl px-2.5 py-1 text-[10px] font-bold transition-spring"
+            :class="{
+              'bg-red-600/10 text-red-700': alert.severity === 'critical',
+              'bg-amber-600/10 text-amber-700': alert.severity === 'warning',
+              'bg-blue-600/10 text-blue-700': alert.severity === 'info',
+            }"
+          >
+            {{ alert.actionLabel }}
+          </span>
         </NuxtLink>
       </div>
 

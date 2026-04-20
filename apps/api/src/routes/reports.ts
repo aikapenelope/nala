@@ -439,12 +439,46 @@ reports.get("/reports/inventory", async (c) => {
       and(eq(products.businessId, businessId), eq(products.isActive, true)),
     );
 
+  // Least-sold products: never sold or longest time since last sale
+  const leastSold = await db
+    .select({
+      id: products.id,
+      name: products.name,
+      stock: products.stock,
+      price: products.price,
+      lastSoldAt: products.lastSoldAt,
+    })
+    .from(products)
+    .where(
+      and(
+        eq(products.businessId, businessId),
+        eq(products.isActive, true),
+        sql`${products.stock} > 0`,
+        eq(products.isService, false),
+      ),
+    )
+    .orderBy(sql`${products.lastSoldAt} ASC NULLS FIRST`)
+    .limit(10);
+
+  const leastSoldProducts = leastSold.map((p) => ({
+    id: p.id,
+    name: p.name,
+    stock: p.stock,
+    price: Number(p.price),
+    daysSinceLastSale: p.lastSoldAt
+      ? Math.floor(
+          (Date.now() - p.lastSoldAt.getTime()) / (1000 * 60 * 60 * 24),
+        )
+      : null,
+  }));
+
   const data = {
     totalProducts: totals?.totalProducts ?? 0,
     totalValue: totals?.totalValue ?? 0,
     lowStock: totals?.lowStock ?? 0,
     criticalStock: totals?.criticalStock ?? 0,
     deadStock: totals?.deadStock ?? 0,
+    leastSoldProducts,
   };
 
   const narrative = await generateNarrative({
