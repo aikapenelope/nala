@@ -124,13 +124,20 @@ function margin(cost: string, price: string): string {
     <!-- Header -->
     <div class="mb-4 flex items-center justify-between">
       <h1 class="text-xl font-bold text-gray-900">Inventario</h1>
-      <NuxtLink
-        v-if="isAdmin"
-        to="/inventory/new"
-        class="rounded-lg bg-nova-primary px-4 py-2 text-sm font-medium text-white"
-      >
-        + Producto
-      </NuxtLink>
+      <div v-if="isAdmin" class="flex gap-2">
+        <NuxtLink
+          to="/inventory/import"
+          class="rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+        >
+          Importar Excel
+        </NuxtLink>
+        <NuxtLink
+          to="/inventory/new"
+          class="rounded-lg bg-nova-primary px-4 py-2 text-sm font-medium text-white"
+        >
+          + Producto
+        </NuxtLink>
+      </div>
     </div>
 
     <!-- Search and filters -->
@@ -141,7 +148,7 @@ function margin(cost: string, price: string): string {
         placeholder="Buscar producto..."
         class="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-nova-primary focus:outline-none"
         @input="onSearchInput"
-      />
+      >
       <select
         v-model="selectedStatus"
         class="rounded-lg border border-gray-300 px-3 py-2 text-sm"
