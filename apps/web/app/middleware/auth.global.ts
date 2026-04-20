@@ -47,7 +47,14 @@ export default defineNuxtRouteMiddleware((to) => {
 
   if (!import.meta.client) return;
 
-  const { isStoreMode } = useDeviceMode();
+  const { isStoreMode, isExpired } = useDeviceMode();
+
+  // Device session expired (30+ days) -- force re-login
+  if (isExpired.value) {
+    const { clearUser } = useNovaAuth();
+    clearUser();
+    return navigateTo("/auth/login");
+  }
 
   // STORE MODE: always go to PIN screen
   if (isStoreMode.value) {
