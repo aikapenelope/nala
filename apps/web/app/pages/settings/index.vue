@@ -24,6 +24,7 @@ interface SettingsSection {
   label: string;
   description: string;
   to: string;
+  gradient: string;
 }
 
 const sections: SettingsSection[] = [
@@ -32,62 +33,70 @@ const sections: SettingsSection[] = [
     label: "Equipo",
     description: "Empleados, PINs, permisos",
     to: "/settings/team",
+    gradient: "from-[#EFECFF] to-[#D0CCF9]",
   },
   {
     icon: Store,
     label: "Negocio",
     description: "Email del contador, WhatsApp del negocio",
     to: "/settings/business",
+    gradient: "from-[#EEF7FD] to-[#CAE8F8]",
   },
   {
     icon: ArrowLeftRight,
     label: "Tasa de cambio",
     description: "Configurar tasa BCV y EUR",
     to: "/settings/exchange-rate",
+    gradient: "from-[#F0FDF4] to-[#BBF7D0]",
   },
   {
     icon: Tag,
     label: "Cargos adicionales",
     description: "Delivery, propinas, empaques",
     to: "/settings/surcharges",
+    gradient: "from-[#FFF7ED] to-[#FED7AA]",
   },
   {
     icon: Landmark,
     label: "Cuentas bancarias",
     description: "Bancos para referencia de pagos",
     to: "/settings/bank-accounts",
+    gradient: "from-[#FAF5FF] to-[#E9D5FF]",
   },
   {
     icon: Bell,
     label: "Notificaciones",
     description: "Alertas diarias por email",
     to: "/settings/notifications",
+    gradient: "from-[#FFFBEB] to-[#FDE68A]",
   },
 ];
 </script>
 
 <template>
   <div>
-    <h1 class="mb-2 text-xl font-bold text-gray-900">Configuracion</h1>
-    <p class="mb-6 text-sm text-gray-500">
+    <h1 class="mb-1 text-2xl font-extrabold tracking-tight text-gradient">Configuracion</h1>
+    <p class="mb-6 text-sm font-medium text-gray-500">
       {{ user?.name ?? "Admin" }} · Administrador
     </p>
 
-    <div class="space-y-3">
+    <div class="space-y-2.5">
       <NuxtLink
         v-for="section in sections"
         :key="section.label"
         :to="section.to"
-        class="flex items-center gap-4 rounded-xl bg-white p-4 shadow-sm cursor-pointer hover:bg-gray-50"
+        class="card-lift relative flex items-center gap-4 overflow-hidden rounded-[20px] border border-white/80 p-4"
+        :class="`bg-gradient-to-br ${section.gradient}`"
       >
+        <div class="absolute -top-3 -right-3 h-12 w-12 rounded-full bg-white/30 blur-lg" />
         <div
-          class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-gray-100"
+          class="relative z-10 dark-pill flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-[14px]"
         >
-          <component :is="section.icon" :size="20" class="text-gray-600" />
+          <component :is="section.icon" :size="18" class="text-white" />
         </div>
-        <div class="flex-1">
-          <p class="text-sm font-medium text-gray-900">{{ section.label }}</p>
-          <p class="text-xs text-gray-500">{{ section.description }}</p>
+        <div class="relative z-10 flex-1">
+          <p class="text-sm font-bold text-gray-800">{{ section.label }}</p>
+          <p class="text-xs font-medium text-gray-600/70">{{ section.description }}</p>
         </div>
       </NuxtLink>
     </div>

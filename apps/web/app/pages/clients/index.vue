@@ -6,6 +6,7 @@
  */
 
 import type { CustomerSegment } from "@nova/shared";
+import { Search, UserPlus } from "lucide-vue-next";
 
 const { isDesktop } = useDevice();
 const { $api } = useApi();
@@ -16,11 +17,11 @@ const loadError = ref("");
 
 const segmentConfig: Record<CustomerSegment, { label: string; color: string }> =
   {
-    vip: { label: "VIP", color: "bg-purple-100 text-purple-700" },
-    frequent: { label: "Frecuente", color: "bg-blue-100 text-blue-700" },
-    at_risk: { label: "En riesgo", color: "bg-orange-100 text-orange-700" },
-    new: { label: "Nuevo", color: "bg-green-100 text-green-700" },
-    with_debt: { label: "Con deuda", color: "bg-red-100 text-red-700" },
+    vip: { label: "VIP", color: "bg-purple-50 text-purple-700" },
+    frequent: { label: "Frecuente", color: "bg-blue-50 text-blue-700" },
+    at_risk: { label: "En riesgo", color: "bg-orange-50 text-orange-700" },
+    new: { label: "Nuevo", color: "bg-green-50 text-green-700" },
+    with_debt: { label: "Con deuda", color: "bg-red-50 text-red-700" },
     inactive: { label: "Inactivo", color: "bg-gray-100 text-gray-500" },
   };
 
@@ -124,38 +125,43 @@ async function submitEdit() {
 <template>
   <div>
     <div class="mb-4 flex items-center justify-between">
-      <h1 class="text-xl font-bold text-gray-900">Clientes</h1>
+      <h1 class="text-2xl font-extrabold tracking-tight text-gradient">Clientes</h1>
       <NuxtLink
         to="/clients/new"
-        class="rounded-lg bg-nova-primary px-4 py-2 text-sm font-medium text-white"
+        class="dark-pill flex items-center gap-1.5 rounded-2xl px-4 py-2 text-sm font-bold transition-spring"
       >
-        + Cliente
+        <UserPlus :size="14" />
+        Cliente
       </NuxtLink>
     </div>
 
-    <div class="mb-4 flex gap-3">
-      <input
-        v-model="searchQuery"
-        type="text"
-        placeholder="Buscar cliente..."
-        class="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-nova-primary focus:outline-none"
-        @input="onSearchInput"
-      >
+    <div class="mb-4">
+      <div class="glass relative flex items-center rounded-2xl px-4 py-2.5">
+        <Search :size="16" class="mr-2 flex-shrink-0 text-gray-400" />
+        <input
+          v-model="searchQuery"
+          type="text"
+          placeholder="Buscar cliente..."
+          class="w-full bg-transparent text-sm font-medium text-gray-800 outline-none placeholder:text-gray-400"
+          @input="onSearchInput"
+        >
+      </div>
     </div>
 
     <!-- Loading -->
     <div v-if="isLoading" class="py-12 text-center text-gray-400">
+      <div class="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2 border-gray-200 border-t-nova-primary" />
       Cargando clientes...
     </div>
 
     <!-- Error -->
     <div
       v-else-if="loadError"
-      class="rounded-xl bg-red-50 p-6 text-center text-sm text-red-600"
+      class="card-premium p-6 text-center"
     >
-      {{ loadError }}
+      <p class="text-sm font-semibold text-red-500">{{ loadError }}</p>
       <button
-        class="mt-2 block w-full text-xs font-medium text-red-700 underline"
+        class="mt-3 text-xs font-bold text-nova-primary underline"
         @click="fetchCustomers"
       >
         Reintentar
@@ -165,53 +171,64 @@ async function submitEdit() {
     <!-- Empty -->
     <div
       v-else-if="customersList.length === 0"
-      class="py-12 text-center text-gray-400"
+      class="card-premium py-12 text-center"
     >
-      {{ searchQuery ? "Sin resultados" : "No hay clientes registrados" }}
+      <p class="text-sm font-medium text-gray-400">
+        {{ searchQuery ? "Sin resultados" : "No hay clientes registrados" }}
+      </p>
     </div>
 
     <template v-else>
       <!-- Desktop table -->
       <div
         v-if="isDesktop"
-        class="overflow-hidden rounded-xl bg-white shadow-sm"
+        class="card-premium overflow-hidden"
       >
         <table class="w-full text-left text-sm">
-          <thead class="border-b border-gray-200 bg-gray-50">
+          <thead class="border-b border-white/50">
             <tr>
-              <th class="px-4 py-3 font-medium text-gray-500">Cliente</th>
-              <th class="px-4 py-3 font-medium text-gray-500">Telefono</th>
-              <th class="px-4 py-3 text-right font-medium text-gray-500">
+              <th class="px-4 py-3.5 text-[11px] font-bold tracking-wider text-gray-400 uppercase">Cliente</th>
+              <th class="px-4 py-3.5 text-[11px] font-bold tracking-wider text-gray-400 uppercase">Telefono</th>
+              <th class="px-4 py-3.5 text-right text-[11px] font-bold tracking-wider text-gray-400 uppercase">
                 Compras
               </th>
-              <th class="px-4 py-3 text-right font-medium text-gray-500">
+              <th class="px-4 py-3.5 text-right text-[11px] font-bold tracking-wider text-gray-400 uppercase">
                 Ticket prom.
               </th>
-              <th class="px-4 py-3 text-right font-medium text-gray-500">
+              <th class="px-4 py-3.5 text-right text-[11px] font-bold tracking-wider text-gray-400 uppercase">
                 Saldo
               </th>
-              <th class="px-4 py-3 font-medium text-gray-500">Segmentos</th>
-              <th class="px-4 py-3" />
+              <th class="px-4 py-3.5 text-[11px] font-bold tracking-wider text-gray-400 uppercase">Segmentos</th>
+              <th class="px-4 py-3.5" />
             </tr>
           </thead>
-          <tbody class="divide-y divide-gray-100">
+          <tbody class="divide-y divide-white/30">
             <tr
               v-for="c in customersList"
               :key="c.id"
-              class="cursor-pointer hover:bg-gray-50"
+              class="cursor-pointer transition-spring hover:bg-white/60"
             >
-              <td class="px-4 py-3 font-medium text-gray-900">{{ c.name }}</td>
-              <td class="px-4 py-3 text-gray-500">{{ c.phone ?? "-" }}</td>
-              <td class="px-4 py-3 text-right text-gray-700">
+              <td class="px-4 py-3.5">
+                <div class="flex items-center gap-2.5">
+                  <div
+                    class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#EFECFF] to-[#D0CCF9] text-xs font-extrabold text-nova-accent"
+                  >
+                    {{ c.name.charAt(0) }}
+                  </div>
+                  <span class="font-semibold text-gray-800">{{ c.name }}</span>
+                </div>
+              </td>
+              <td class="px-4 py-3.5 text-gray-500">{{ c.phone ?? "-" }}</td>
+              <td class="px-4 py-3.5 text-right font-semibold text-gray-700">
                 {{ c.totalPurchases }}
               </td>
-              <td class="px-4 py-3 text-right text-gray-700">
+              <td class="px-4 py-3.5 text-right font-semibold text-gray-700">
                 ${{ Number(c.averageTicketUsd).toFixed(2) }}
               </td>
               <td
-                class="px-4 py-3 text-right font-medium"
+                class="px-4 py-3.5 text-right font-bold"
                 :class="
-                  Number(c.balanceUsd) > 0 ? 'text-red-600' : 'text-gray-500'
+                  Number(c.balanceUsd) > 0 ? 'text-red-600' : 'text-gray-400'
                 "
               >
                 {{
@@ -220,28 +237,28 @@ async function submitEdit() {
                     : "-"
                 }}
               </td>
-              <td class="px-4 py-3">
+              <td class="px-4 py-3.5">
                 <div class="flex flex-wrap gap-1">
                   <span
                     v-for="seg in getSegments(c)"
                     :key="seg"
-                    class="rounded-full px-2 py-0.5 text-[10px] font-medium"
+                    class="rounded-full px-2 py-0.5 text-[10px] font-bold"
                     :class="segmentConfig[seg].color"
                   >
                     {{ segmentConfig[seg].label }}
                   </span>
                 </div>
               </td>
-              <td class="px-4 py-3">
+              <td class="px-4 py-3.5">
                 <div class="flex gap-2">
                   <NuxtLink
                     :to="`/clients/${c.id}`"
-                    class="text-xs text-nova-primary hover:underline"
+                    class="rounded-xl bg-nova-primary/10 px-2.5 py-1 text-[11px] font-bold text-nova-primary transition-spring hover:bg-nova-primary/20"
                   >
                     Stats
                   </NuxtLink>
                   <button
-                    class="text-xs text-gray-500 hover:text-gray-700"
+                    class="rounded-xl bg-gray-100/80 px-2.5 py-1 text-[11px] font-bold text-gray-500 transition-spring hover:bg-gray-200"
                     @click="openEdit(c)"
                   >
                     Editar
@@ -254,46 +271,46 @@ async function submitEdit() {
       </div>
 
       <!-- Mobile cards -->
-      <div v-else class="space-y-2">
+      <div v-else class="space-y-2.5">
         <div
           v-for="c in customersList"
           :key="c.id"
-          class="flex items-center gap-3 rounded-xl bg-white p-4 shadow-sm"
+          class="card-premium card-lift flex items-center gap-3 p-4"
         >
           <div
-            class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-nova-primary text-sm font-bold text-white"
+            class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#EFECFF] to-[#D0CCF9] text-sm font-extrabold text-nova-accent"
           >
             {{ c.name.charAt(0) }}
           </div>
           <div class="min-w-0 flex-1">
             <div class="flex items-center gap-2">
-              <p class="truncate font-medium text-gray-900">{{ c.name }}</p>
+              <p class="truncate font-semibold text-gray-800">{{ c.name }}</p>
               <span
                 v-for="seg in getSegments(c).slice(0, 2)"
                 :key="seg"
-                class="rounded-full px-1.5 py-0.5 text-[9px] font-medium"
+                class="rounded-full px-1.5 py-0.5 text-[9px] font-bold"
                 :class="segmentConfig[seg].color"
               >
                 {{ segmentConfig[seg].label }}
               </span>
             </div>
-            <p class="text-xs text-gray-500">{{ c.totalPurchases }} compras</p>
+            <p class="text-xs font-medium text-gray-500">{{ c.totalPurchases }} compras</p>
           </div>
           <div
             v-if="Number(c.balanceUsd) > 0"
-            class="text-sm font-medium text-red-600"
+            class="rounded-lg bg-red-50 px-2 py-0.5 text-sm font-bold text-red-600"
           >
             ${{ Number(c.balanceUsd).toFixed(2) }}
           </div>
           <div class="flex flex-col items-end gap-1">
             <NuxtLink
               :to="`/clients/${c.id}`"
-              class="text-[10px] text-nova-primary"
+              class="rounded-lg bg-nova-primary/10 px-2 py-0.5 text-[10px] font-bold text-nova-primary"
             >
               Stats
             </NuxtLink>
             <button
-              class="text-[10px] text-gray-400"
+              class="text-[10px] font-bold text-gray-400 transition-spring hover:text-gray-600"
               @click="openEdit(c)"
             >
               Editar
@@ -307,45 +324,45 @@ async function submitEdit() {
     <Teleport to="body">
       <div
         v-if="showEditModal"
-        class="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+        class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
         @click.self="showEditModal = false"
       >
-        <div class="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
-          <h3 class="mb-4 text-lg font-semibold text-gray-900">
+        <div class="glass-strong w-full max-w-sm rounded-[32px] p-7 shadow-[0_30px_60px_-15px_rgba(0,0,0,0.2)]">
+          <h3 class="mb-5 text-xl font-extrabold tracking-tight text-gradient">
             Editar cliente
           </h3>
-          <div class="space-y-3">
+          <div class="space-y-4">
             <div>
-              <label class="mb-1 block text-sm text-gray-600">Nombre *</label>
+              <label class="mb-1.5 block text-[13px] font-bold text-gray-600">Nombre *</label>
               <input
                 v-model="editForm.name"
                 type="text"
-                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-nova-primary focus:outline-none"
+                class="w-full rounded-2xl border border-white bg-white/60 px-4 py-3 text-sm font-semibold text-gray-800 shadow-[inset_0_2px_4px_rgba(0,0,0,0.03)] outline-none transition-spring placeholder:text-gray-400 focus:bg-white focus:ring-[3px] focus:ring-nova-accent/20"
                 autofocus
               >
             </div>
             <div>
-              <label class="mb-1 block text-sm text-gray-600">Telefono</label>
+              <label class="mb-1.5 block text-[13px] font-bold text-gray-600">Telefono</label>
               <input
                 v-model="editForm.phone"
                 type="tel"
                 placeholder="+58 412 1234567"
-                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-nova-primary focus:outline-none"
+                class="w-full rounded-2xl border border-white bg-white/60 px-4 py-3 text-sm font-semibold text-gray-800 shadow-[inset_0_2px_4px_rgba(0,0,0,0.03)] outline-none transition-spring placeholder:text-gray-400 focus:bg-white focus:ring-[3px] focus:ring-nova-accent/20"
               >
             </div>
           </div>
-          <p v-if="editError" class="mt-2 text-sm text-red-500">
+          <p v-if="editError" class="mt-3 text-sm font-semibold text-red-500">
             {{ editError }}
           </p>
-          <div class="mt-4 flex gap-3">
+          <div class="mt-5 flex gap-3">
             <button
-              class="flex-1 rounded-lg border border-gray-300 py-2 text-sm font-medium text-gray-700"
+              class="glass flex-1 rounded-2xl py-3 text-sm font-bold text-gray-700 transition-spring"
               @click="showEditModal = false"
             >
               Cancelar
             </button>
             <button
-              class="flex-1 rounded-lg bg-nova-primary py-2 text-sm font-medium text-white disabled:opacity-50"
+              class="dark-pill flex-1 rounded-2xl py-3 text-sm font-bold transition-spring disabled:opacity-50"
               :disabled="editSubmitting"
               @click="submitEdit"
             >

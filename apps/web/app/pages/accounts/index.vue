@@ -13,6 +13,7 @@
 
 import { calculateAgingColor } from "@nova/shared";
 import type { AgingColor } from "@nova/shared";
+import { MessageCircle, Plus } from "lucide-vue-next";
 
 definePageMeta({ middleware: ["admin-only"] });
 
@@ -22,10 +23,10 @@ const activeTab = ref<"receivable" | "payable">("receivable");
 const isLoading = ref(true);
 const loadError = ref("");
 
-const agingColors: Record<AgingColor, string> = {
-  green: "text-green-600 bg-green-50",
-  yellow: "text-yellow-600 bg-yellow-50",
-  red: "text-red-600 bg-red-50",
+const agingBadge: Record<AgingColor, string> = {
+  green: "bg-green-50 text-green-700",
+  yellow: "bg-yellow-50 text-yellow-700",
+  red: "bg-red-50 text-red-700",
 };
 
 interface Receivable {
@@ -234,23 +235,24 @@ async function submitPayPayable() {
 <template>
   <div>
     <div class="mb-4 flex items-center justify-between">
-      <h1 class="text-xl font-bold text-gray-900">Cuentas</h1>
-      <div v-if="!isLoading" class="text-sm text-gray-500">
+      <h1 class="text-2xl font-extrabold tracking-tight text-gradient">Cuentas</h1>
+      <div v-if="!isLoading" class="glass rounded-2xl px-4 py-2 text-sm font-bold text-gray-700">
         Balance: ${{ (totalReceivable - totalPayable).toFixed(2) }}
       </div>
     </div>
 
-    <div class="mb-4 flex rounded-lg bg-gray-100 p-1">
+    <!-- Tab switcher -->
+    <div class="glass mb-4 flex rounded-2xl p-1">
       <button
-        class="flex-1 rounded-md py-2 text-sm font-medium transition-colors"
-        :class="activeTab === 'receivable' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'"
+        class="flex-1 rounded-xl py-2.5 text-sm font-bold transition-spring"
+        :class="activeTab === 'receivable' ? 'dark-pill' : 'text-gray-500 hover:text-gray-700'"
         @click="activeTab = 'receivable'"
       >
         Por cobrar (${{ totalReceivable.toFixed(2) }})
       </button>
       <button
-        class="flex-1 rounded-md py-2 text-sm font-medium transition-colors"
-        :class="activeTab === 'payable' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'"
+        class="flex-1 rounded-xl py-2.5 text-sm font-bold transition-spring"
+        :class="activeTab === 'payable' ? 'dark-pill' : 'text-gray-500 hover:text-gray-700'"
         @click="activeTab = 'payable'"
       >
         Por pagar (${{ totalPayable.toFixed(2) }})
@@ -258,15 +260,16 @@ async function submitPayPayable() {
     </div>
 
     <div v-if="isLoading" class="py-12 text-center text-gray-400">
+      <div class="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2 border-gray-200 border-t-nova-primary" />
       Cargando cuentas...
     </div>
 
     <div
       v-else-if="loadError"
-      class="rounded-xl bg-red-50 p-6 text-center text-sm text-red-600"
+      class="card-premium p-6 text-center"
     >
-      {{ loadError }}
-      <button class="mt-2 block w-full text-xs font-medium text-red-700 underline" @click="loadAccounts">
+      <p class="text-sm font-semibold text-red-500">{{ loadError }}</p>
+      <button class="mt-3 text-xs font-bold text-nova-primary underline" @click="loadAccounts">
         Reintentar
       </button>
     </div>
@@ -276,40 +279,41 @@ async function submitPayPayable() {
       <div v-if="activeTab === 'receivable'" class="space-y-3">
         <button
           v-if="receivables.length > 0"
-          class="w-full rounded-xl bg-green-600 py-3 text-sm font-medium text-white"
+          class="flex w-full items-center justify-center gap-2 rounded-2xl bg-green-600 py-3 text-sm font-bold text-white transition-spring hover:bg-green-700"
           @click="collectAll"
         >
+          <MessageCircle :size="16" />
           Cobrar a todos por WhatsApp
         </button>
 
-        <div v-if="receivables.length === 0" class="py-8 text-center text-gray-400">
-          No hay cuentas por cobrar
+        <div v-if="receivables.length === 0" class="card-premium py-8 text-center">
+          <p class="text-sm font-medium text-gray-400">No hay cuentas por cobrar</p>
         </div>
 
         <div
           v-for="a in receivables"
           :key="a.id"
-          class="rounded-xl bg-white p-4 shadow-sm"
+          class="card-premium p-4"
         >
           <div class="flex items-center justify-between">
             <div>
               <div class="flex items-center gap-2">
                 <span
-                  class="rounded-full px-2 py-0.5 text-xs font-medium"
-                  :class="agingColors[calculateAgingColor(a.createdAt)]"
+                  class="rounded-full px-2 py-0.5 text-[10px] font-bold"
+                  :class="agingBadge[calculateAgingColor(a.createdAt)]"
                 >
                   {{ daysSince(a.createdAt) }}d
                 </span>
-                <p class="font-medium text-gray-900">
+                <p class="text-lg font-extrabold text-gray-800">
                   ${{ Number(a.balanceUsd).toFixed(2) }}
                 </p>
               </div>
-              <p class="mt-0.5 text-xs text-gray-500">
+              <p class="mt-0.5 text-xs font-medium text-gray-500">
                 Total ${{ Number(a.amountUsd).toFixed(2) }} · Pagado ${{ Number(a.paidUsd).toFixed(2) }}
               </p>
             </div>
             <button
-              class="rounded-lg bg-nova-primary px-3 py-1.5 text-xs font-medium text-white"
+              class="dark-pill rounded-2xl px-4 py-2 text-xs font-bold transition-spring"
               @click="openPayment(a)"
             >
               Abonar
@@ -321,37 +325,38 @@ async function submitPayPayable() {
       <!-- PAYABLE TAB -->
       <div v-if="activeTab === 'payable'" class="space-y-3">
         <button
-          class="w-full rounded-xl bg-nova-primary py-3 text-sm font-medium text-white"
+          class="dark-pill flex w-full items-center justify-center gap-2 rounded-2xl py-3 text-sm font-bold transition-spring"
           @click="showCreatePayable = true"
         >
-          + Nueva deuda por pagar
+          <Plus :size="16" />
+          Nueva deuda por pagar
         </button>
 
-        <div v-if="payables.length === 0" class="py-8 text-center text-gray-400">
-          No hay cuentas por pagar
+        <div v-if="payables.length === 0" class="card-premium py-8 text-center">
+          <p class="text-sm font-medium text-gray-400">No hay cuentas por pagar</p>
         </div>
 
         <div
           v-for="a in payables"
           :key="a.id"
-          class="rounded-xl bg-white p-4 shadow-sm"
-          :class="{ 'opacity-50': a.status === 'paid' }"
+          class="card-premium p-4"
+          :class="{ 'opacity-40': a.status === 'paid' }"
         >
           <div class="flex items-center justify-between">
             <div>
-              <p class="font-medium text-gray-900">{{ a.supplierName }}</p>
-              <p class="text-xs text-gray-500">
+              <p class="font-bold text-gray-800">{{ a.supplierName }}</p>
+              <p class="text-xs font-medium text-gray-500">
                 {{ a.description ?? "" }} · ${{ Number(a.balanceUsd).toFixed(2) }} pendiente
               </p>
             </div>
             <button
               v-if="a.status !== 'paid'"
-              class="rounded-lg bg-nova-primary px-3 py-1.5 text-xs font-medium text-white"
+              class="dark-pill rounded-2xl px-4 py-2 text-xs font-bold transition-spring"
               @click="openPayPayable(a)"
             >
               Pagar
             </button>
-            <span v-else class="text-xs font-medium text-green-600">Pagado</span>
+            <span v-else class="rounded-full bg-green-50 px-2.5 py-0.5 text-xs font-bold text-green-600">Pagado</span>
           </div>
         </div>
       </div>
@@ -361,32 +366,32 @@ async function submitPayPayable() {
     <Teleport to="body">
       <div
         v-if="showPaymentModal"
-        class="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+        class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
         @click.self="showPaymentModal = false"
       >
-        <div class="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
-          <h3 class="mb-1 text-lg font-semibold text-gray-900">Registrar abono</h3>
-          <p class="mb-4 text-sm text-gray-500">
+        <div class="glass-strong w-full max-w-sm rounded-[32px] p-7 shadow-[0_30px_60px_-15px_rgba(0,0,0,0.2)]">
+          <h3 class="mb-1 text-xl font-extrabold tracking-tight text-gradient">Registrar abono</h3>
+          <p class="mb-5 text-[13px] font-medium text-gray-500">
             Saldo pendiente: ${{ paymentTargetBalance.toFixed(2) }}
           </p>
-          <div class="space-y-3">
+          <div class="space-y-4">
             <div>
-              <label class="mb-1 block text-sm text-gray-600">Monto ($)</label>
+              <label class="mb-1.5 block text-[13px] font-bold text-gray-600">Monto ($)</label>
               <input
                 v-model="paymentAmount"
                 type="number"
                 step="0.01"
                 min="0"
                 :max="paymentTargetBalance"
-                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-nova-primary focus:outline-none"
+                class="w-full rounded-2xl border border-white bg-white/60 px-4 py-3 text-sm font-semibold text-gray-800 shadow-[inset_0_2px_4px_rgba(0,0,0,0.03)] outline-none transition-spring placeholder:text-gray-400 focus:bg-white focus:ring-[3px] focus:ring-nova-accent/20"
                 autofocus
               >
             </div>
             <div>
-              <label class="mb-1 block text-sm text-gray-600">Metodo</label>
+              <label class="mb-1.5 block text-[13px] font-bold text-gray-600">Metodo</label>
               <select
                 v-model="paymentMethod"
-                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-nova-primary focus:outline-none"
+                class="w-full rounded-2xl border border-white bg-white/60 px-4 py-3 text-sm font-semibold text-gray-800 outline-none transition-spring focus:bg-white focus:ring-[3px] focus:ring-nova-accent/20"
               >
                 <option value="efectivo">Efectivo</option>
                 <option value="pago_movil">Pago Movil</option>
@@ -397,25 +402,25 @@ async function submitPayPayable() {
               </select>
             </div>
             <div>
-              <label class="mb-1 block text-sm text-gray-600">Referencia (opcional)</label>
+              <label class="mb-1.5 block text-[13px] font-bold text-gray-600">Referencia (opcional)</label>
               <input
                 v-model="paymentReference"
                 type="text"
                 placeholder="Numero de referencia"
-                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-nova-primary focus:outline-none"
+                class="w-full rounded-2xl border border-white bg-white/60 px-4 py-3 text-sm font-semibold text-gray-800 shadow-[inset_0_2px_4px_rgba(0,0,0,0.03)] outline-none transition-spring placeholder:text-gray-400 focus:bg-white focus:ring-[3px] focus:ring-nova-accent/20"
               >
             </div>
           </div>
-          <p v-if="paymentError" class="mt-2 text-sm text-red-500">{{ paymentError }}</p>
-          <div class="mt-4 flex gap-3">
+          <p v-if="paymentError" class="mt-3 text-sm font-semibold text-red-500">{{ paymentError }}</p>
+          <div class="mt-5 flex gap-3">
             <button
-              class="flex-1 rounded-lg border border-gray-300 py-2 text-sm font-medium text-gray-700"
+              class="glass flex-1 rounded-2xl py-3 text-sm font-bold text-gray-700 transition-spring"
               @click="showPaymentModal = false"
             >
               Cancelar
             </button>
             <button
-              class="flex-1 rounded-lg bg-nova-primary py-2 text-sm font-medium text-white disabled:opacity-50"
+              class="dark-pill flex-1 rounded-2xl py-3 text-sm font-bold transition-spring disabled:opacity-50"
               :disabled="paymentSubmitting"
               @click="submitPayment"
             >
@@ -430,52 +435,52 @@ async function submitPayPayable() {
     <Teleport to="body">
       <div
         v-if="showCreatePayable"
-        class="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+        class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
         @click.self="showCreatePayable = false"
       >
-        <div class="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
-          <h3 class="mb-4 text-lg font-semibold text-gray-900">Nueva deuda por pagar</h3>
-          <div class="space-y-3">
+        <div class="glass-strong w-full max-w-sm rounded-[32px] p-7 shadow-[0_30px_60px_-15px_rgba(0,0,0,0.2)]">
+          <h3 class="mb-5 text-xl font-extrabold tracking-tight text-gradient">Nueva deuda por pagar</h3>
+          <div class="space-y-4">
             <div>
-              <label class="mb-1 block text-sm text-gray-600">Proveedor *</label>
+              <label class="mb-1.5 block text-[13px] font-bold text-gray-600">Proveedor *</label>
               <input
                 v-model="newPayable.supplierName"
                 type="text"
                 placeholder="Nombre del proveedor"
-                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-nova-primary focus:outline-none"
+                class="w-full rounded-2xl border border-white bg-white/60 px-4 py-3 text-sm font-semibold text-gray-800 shadow-[inset_0_2px_4px_rgba(0,0,0,0.03)] outline-none transition-spring placeholder:text-gray-400 focus:bg-white focus:ring-[3px] focus:ring-nova-accent/20"
                 autofocus
               >
             </div>
             <div>
-              <label class="mb-1 block text-sm text-gray-600">Monto ($) *</label>
+              <label class="mb-1.5 block text-[13px] font-bold text-gray-600">Monto ($) *</label>
               <input
                 v-model.number="newPayable.amountUsd"
                 type="number"
                 step="0.01"
                 min="0"
-                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-nova-primary focus:outline-none"
+                class="w-full rounded-2xl border border-white bg-white/60 px-4 py-3 text-sm font-semibold text-gray-800 shadow-[inset_0_2px_4px_rgba(0,0,0,0.03)] outline-none transition-spring placeholder:text-gray-400 focus:bg-white focus:ring-[3px] focus:ring-nova-accent/20"
               >
             </div>
             <div>
-              <label class="mb-1 block text-sm text-gray-600">Descripcion</label>
+              <label class="mb-1.5 block text-[13px] font-bold text-gray-600">Descripcion</label>
               <input
                 v-model="newPayable.description"
                 type="text"
                 placeholder="Opcional"
-                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-nova-primary focus:outline-none"
+                class="w-full rounded-2xl border border-white bg-white/60 px-4 py-3 text-sm font-semibold text-gray-800 shadow-[inset_0_2px_4px_rgba(0,0,0,0.03)] outline-none transition-spring placeholder:text-gray-400 focus:bg-white focus:ring-[3px] focus:ring-nova-accent/20"
               >
             </div>
           </div>
-          <p v-if="createPayableError" class="mt-2 text-sm text-red-500">{{ createPayableError }}</p>
-          <div class="mt-4 flex gap-3">
+          <p v-if="createPayableError" class="mt-3 text-sm font-semibold text-red-500">{{ createPayableError }}</p>
+          <div class="mt-5 flex gap-3">
             <button
-              class="flex-1 rounded-lg border border-gray-300 py-2 text-sm font-medium text-gray-700"
+              class="glass flex-1 rounded-2xl py-3 text-sm font-bold text-gray-700 transition-spring"
               @click="showCreatePayable = false"
             >
               Cancelar
             </button>
             <button
-              class="flex-1 rounded-lg bg-nova-primary py-2 text-sm font-medium text-white disabled:opacity-50"
+              class="dark-pill flex-1 rounded-2xl py-3 text-sm font-bold transition-spring disabled:opacity-50"
               :disabled="createPayableSubmitting"
               @click="submitCreatePayable"
             >
@@ -490,36 +495,36 @@ async function submitPayPayable() {
     <Teleport to="body">
       <div
         v-if="showPayPayable"
-        class="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+        class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
         @click.self="showPayPayable = false"
       >
-        <div class="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
-          <h3 class="mb-1 text-lg font-semibold text-gray-900">Registrar pago</h3>
-          <p class="mb-4 text-sm text-gray-500">
+        <div class="glass-strong w-full max-w-sm rounded-[32px] p-7 shadow-[0_30px_60px_-15px_rgba(0,0,0,0.2)]">
+          <h3 class="mb-1 text-xl font-extrabold tracking-tight text-gradient">Registrar pago</h3>
+          <p class="mb-5 text-[13px] font-medium text-gray-500">
             Saldo pendiente: ${{ payPayableBalance.toFixed(2) }}
           </p>
           <div>
-            <label class="mb-1 block text-sm text-gray-600">Monto ($)</label>
+            <label class="mb-1.5 block text-[13px] font-bold text-gray-600">Monto ($)</label>
             <input
               v-model="payPayableAmount"
               type="number"
               step="0.01"
               min="0"
               :max="payPayableBalance"
-              class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-nova-primary focus:outline-none"
+              class="w-full rounded-2xl border border-white bg-white/60 px-4 py-3 text-sm font-semibold text-gray-800 shadow-[inset_0_2px_4px_rgba(0,0,0,0.03)] outline-none transition-spring placeholder:text-gray-400 focus:bg-white focus:ring-[3px] focus:ring-nova-accent/20"
               autofocus
             >
           </div>
-          <p v-if="payPayableError" class="mt-2 text-sm text-red-500">{{ payPayableError }}</p>
-          <div class="mt-4 flex gap-3">
+          <p v-if="payPayableError" class="mt-3 text-sm font-semibold text-red-500">{{ payPayableError }}</p>
+          <div class="mt-5 flex gap-3">
             <button
-              class="flex-1 rounded-lg border border-gray-300 py-2 text-sm font-medium text-gray-700"
+              class="glass flex-1 rounded-2xl py-3 text-sm font-bold text-gray-700 transition-spring"
               @click="showPayPayable = false"
             >
               Cancelar
             </button>
             <button
-              class="flex-1 rounded-lg bg-nova-primary py-2 text-sm font-medium text-white disabled:opacity-50"
+              class="dark-pill flex-1 rounded-2xl py-3 text-sm font-bold transition-spring disabled:opacity-50"
               :disabled="payPayableSubmitting"
               @click="submitPayPayable"
             >

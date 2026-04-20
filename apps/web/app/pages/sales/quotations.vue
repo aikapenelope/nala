@@ -8,6 +8,8 @@
  * - POST /api/quotations/:id/convert
  */
 
+import { Plus, X } from "lucide-vue-next";
+
 definePageMeta({ middleware: ["admin-only"] });
 
 const router = useRouter();
@@ -125,58 +127,60 @@ function formatDate(iso: string): string {
       <div>
         <NuxtLink
           to="/sales"
-          class="mb-1 inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700"
+          class="mb-1 inline-flex items-center gap-1 text-sm font-bold text-gray-400 transition-spring hover:text-gray-600"
         >
           ← Ventas
         </NuxtLink>
-        <h1 class="text-xl font-bold text-gray-900">Cotizaciones</h1>
+        <h1 class="text-2xl font-extrabold tracking-tight text-gradient">Cotizaciones</h1>
       </div>
       <button
-        class="rounded-lg bg-nova-primary px-4 py-2 text-sm font-medium text-white"
+        class="dark-pill flex items-center gap-1.5 rounded-2xl px-4 py-2 text-sm font-bold transition-spring"
         @click="showCreate = true"
       >
-        + Nueva
+        <Plus :size="14" />
+        Nueva
       </button>
     </div>
 
     <div v-if="isLoading" class="py-12 text-center text-gray-400">
+      <div class="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2 border-gray-200 border-t-nova-primary" />
       Cargando...
     </div>
 
     <div
       v-else-if="loadError"
-      class="rounded-xl bg-red-50 p-6 text-center text-sm text-red-600"
+      class="card-premium p-6 text-center"
     >
-      {{ loadError }}
+      <p class="text-sm font-semibold text-red-500">{{ loadError }}</p>
     </div>
 
     <div
       v-else-if="quotations.length === 0"
-      class="py-12 text-center text-gray-400"
+      class="card-premium py-12 text-center"
     >
-      No hay cotizaciones
+      <p class="text-sm font-medium text-gray-400">No hay cotizaciones</p>
     </div>
 
-    <div v-else class="space-y-3">
+    <div v-else class="space-y-2.5">
       <div
         v-for="q in quotations"
         :key="q.id"
-        class="rounded-xl bg-white p-4 shadow-sm"
+        class="card-premium p-4"
       >
         <div class="flex items-center justify-between">
           <div>
-            <p class="font-medium text-gray-900">
+            <p class="text-lg font-extrabold text-gray-800">
               ${{ Number(q.totalUsd).toFixed(2) }}
             </p>
-            <p class="text-xs text-gray-500">
+            <p class="text-xs font-medium text-gray-500">
               {{ formatDate(q.createdAt) }}
               <span
-                class="ml-1 rounded-full px-2 py-0.5 text-[10px] font-medium"
+                class="ml-1 rounded-full px-2 py-0.5 text-[10px] font-bold"
                 :class="
                   q.status === 'draft'
-                    ? 'bg-yellow-100 text-yellow-700'
+                    ? 'bg-yellow-50 text-yellow-700'
                     : q.status === 'converted'
-                      ? 'bg-green-100 text-green-700'
+                      ? 'bg-green-50 text-green-700'
                       : 'bg-gray-100 text-gray-500'
                 "
               >
@@ -186,7 +190,7 @@ function formatDate(iso: string): string {
           </div>
           <button
             v-if="q.status === 'draft'"
-            class="rounded-lg bg-green-600 px-3 py-1.5 text-xs font-medium text-white"
+            class="rounded-2xl bg-green-600 px-4 py-2 text-xs font-bold text-white transition-spring hover:bg-green-700"
             @click="convertToSale(q.id)"
           >
             Convertir a venta
@@ -199,44 +203,44 @@ function formatDate(iso: string): string {
     <Teleport to="body">
       <div
         v-if="showCreate"
-        class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 overflow-y-auto p-4"
+        class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/40 p-4 backdrop-blur-sm"
         @click.self="showCreate = false"
       >
-        <div class="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
-          <h3 class="mb-4 text-lg font-semibold text-gray-900">
+        <div class="glass-strong w-full max-w-md rounded-[32px] p-7 shadow-[0_30px_60px_-15px_rgba(0,0,0,0.2)]">
+          <h3 class="mb-5 text-xl font-extrabold tracking-tight text-gradient">
             Nueva cotizacion
           </h3>
 
           <div class="mb-4">
-            <label class="mb-1 block text-sm text-gray-600">
+            <label class="mb-1.5 block text-[13px] font-bold text-gray-600">
               Cliente (opcional)
             </label>
             <input
               v-model="newCustomerId"
               type="text"
               placeholder="ID del cliente"
-              class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-nova-primary focus:outline-none"
+              class="w-full rounded-2xl border border-white bg-white/60 px-4 py-3 text-sm font-semibold text-gray-800 shadow-[inset_0_2px_4px_rgba(0,0,0,0.03)] outline-none transition-spring placeholder:text-gray-400 focus:bg-white focus:ring-[3px] focus:ring-nova-accent/20"
             >
           </div>
 
-          <div class="space-y-3">
+          <div class="space-y-2.5">
             <div
               v-for="(item, idx) in newItems"
               :key="idx"
-              class="flex gap-2 rounded-lg border border-gray-200 p-3"
+              class="glass flex gap-2 rounded-2xl p-3"
             >
               <input
                 v-model="item.productId"
                 type="text"
                 placeholder="ID producto"
-                class="flex-1 rounded border border-gray-200 px-2 py-1 text-xs"
+                class="flex-1 rounded-xl border border-white bg-white/60 px-2.5 py-1.5 text-xs font-semibold text-gray-800 outline-none transition-spring focus:bg-white"
               >
               <input
                 v-model.number="item.quantity"
                 type="number"
                 min="1"
                 placeholder="Cant"
-                class="w-14 rounded border border-gray-200 px-2 py-1 text-xs"
+                class="w-14 rounded-xl border border-white bg-white/60 px-2 py-1.5 text-xs font-semibold text-gray-800 outline-none transition-spring focus:bg-white"
               >
               <input
                 v-model.number="item.unitPrice"
@@ -244,42 +248,42 @@ function formatDate(iso: string): string {
                 step="0.01"
                 min="0"
                 placeholder="Precio"
-                class="w-20 rounded border border-gray-200 px-2 py-1 text-xs"
+                class="w-20 rounded-xl border border-white bg-white/60 px-2 py-1.5 text-xs font-semibold text-gray-800 outline-none transition-spring focus:bg-white"
               >
               <button
                 v-if="newItems.length > 1"
-                class="text-xs text-red-400"
+                class="flex h-6 w-6 items-center justify-center rounded-lg text-gray-300 transition-spring hover:bg-red-50 hover:text-red-500"
                 @click="removeItem(idx)"
               >
-                x
+                <X :size="12" />
               </button>
             </div>
           </div>
 
           <button
-            class="mt-2 text-xs text-nova-primary"
+            class="mt-3 text-xs font-bold text-nova-primary transition-spring hover:text-nova-accent"
             @click="addItem"
           >
             + Agregar item
           </button>
 
-          <p class="mt-3 text-right text-sm font-bold text-gray-900">
+          <p class="mt-3 text-right text-sm font-extrabold text-gray-800">
             Total: ${{ newTotal.toFixed(2) }}
           </p>
 
-          <p v-if="createError" class="mt-2 text-sm text-red-500">
+          <p v-if="createError" class="mt-3 text-sm font-semibold text-red-500">
             {{ createError }}
           </p>
 
-          <div class="mt-4 flex gap-3">
+          <div class="mt-5 flex gap-3">
             <button
-              class="flex-1 rounded-lg border border-gray-300 py-2 text-sm font-medium text-gray-700"
+              class="glass flex-1 rounded-2xl py-3 text-sm font-bold text-gray-700 transition-spring"
               @click="showCreate = false"
             >
               Cancelar
             </button>
             <button
-              class="flex-1 rounded-lg bg-nova-primary py-2 text-sm font-medium text-white disabled:opacity-50"
+              class="dark-pill flex-1 rounded-2xl py-3 text-sm font-bold transition-spring disabled:opacity-50"
               :disabled="createSubmitting"
               @click="submitCreate"
             >

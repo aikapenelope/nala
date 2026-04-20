@@ -175,20 +175,20 @@ async function toggleActive(emp: Employee) {
     <div class="mb-6">
       <NuxtLink
         to="/settings"
-        class="mb-3 inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700"
+        class="mb-3 inline-flex items-center gap-1 text-sm font-bold text-gray-400 transition-spring hover:text-gray-600"
       >
         <ArrowLeft :size="16" />
         Configuracion
       </NuxtLink>
       <div class="flex items-center justify-between">
         <div>
-          <h1 class="text-xl font-bold text-gray-900">Equipo</h1>
-          <p class="text-sm text-gray-500">
+          <h1 class="text-2xl font-extrabold tracking-tight text-gradient">Equipo</h1>
+          <p class="text-sm font-medium text-gray-500">
             Gestiona empleados y sus PINs de acceso
           </p>
         </div>
         <button
-          class="flex items-center gap-2 rounded-lg bg-nova-primary px-4 py-2 text-sm font-medium text-white"
+          class="dark-pill flex items-center gap-2 rounded-2xl px-4 py-2 text-sm font-bold transition-spring"
           @click="openAddModal"
         >
           <UserPlus :size="16" />
@@ -198,12 +198,12 @@ async function toggleActive(emp: Employee) {
     </div>
 
     <!-- Permissions info -->
-    <div class="mb-4 rounded-xl bg-blue-50 p-4 text-sm text-blue-800">
-      <p class="font-semibold">Permisos por rol</p>
+    <div class="card-premium mb-4 p-4 text-sm text-gray-700">
+      <p class="font-bold text-gray-800">Permisos por rol</p>
       <div class="mt-2 grid grid-cols-2 gap-2 text-xs">
         <div>
-          <p class="font-bold text-blue-900">Dueno</p>
-          <ul class="mt-1 space-y-0.5 text-blue-700">
+          <p class="font-bold text-gray-800">Dueno</p>
+          <ul class="mt-1 space-y-0.5 text-gray-600">
             <li>Vender y cobrar</li>
             <li>Anular ventas</li>
             <li>Crear/editar productos</li>
@@ -214,14 +214,14 @@ async function toggleActive(emp: Employee) {
           </ul>
         </div>
         <div>
-          <p class="font-bold text-blue-900">Empleado</p>
-          <ul class="mt-1 space-y-0.5 text-blue-700">
+          <p class="font-bold text-gray-800">Empleado</p>
+          <ul class="mt-1 space-y-0.5 text-gray-600">
             <li>Vender y cobrar</li>
             <li>Ver inventario</li>
             <li>Ver clientes</li>
             <li>Ver historial de ventas</li>
           </ul>
-          <p class="mt-2 text-[10px] text-blue-600">
+          <p class="mt-2 text-[10px] text-gray-500">
             No puede: anular ventas, editar productos, ver reportes, configurar
           </p>
         </div>
@@ -230,17 +230,18 @@ async function toggleActive(emp: Employee) {
 
     <!-- Loading -->
     <div v-if="isLoading" class="py-12 text-center text-gray-400">
+      <div class="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2 border-gray-200 border-t-nova-primary" />
       Cargando equipo...
     </div>
 
     <!-- Error -->
     <div
       v-else-if="loadError"
-      class="rounded-xl bg-red-50 p-6 text-center text-sm text-red-600"
+      class="card-premium p-6 text-center"
     >
-      {{ loadError }}
+      <p class="text-sm font-semibold text-red-500">{{ loadError }}</p>
       <button
-        class="mt-2 block w-full text-xs font-medium text-red-700 underline"
+        class="mt-3 text-xs font-bold text-nova-primary underline"
         @click="fetchEmployees"
       >
         Reintentar
@@ -251,44 +252,44 @@ async function toggleActive(emp: Employee) {
       <!-- Owner card -->
       <div
         v-if="ownerEntry"
-        class="mb-4 flex items-center gap-4 rounded-xl bg-blue-50 p-4"
+        class="card-premium mb-4 flex items-center gap-4 p-4"
       >
-        <span
-          class="flex h-10 w-10 items-center justify-center rounded-full bg-nova-primary text-sm font-bold text-white"
+        <div
+          class="dark-pill flex h-10 w-10 items-center justify-center rounded-xl text-sm font-extrabold"
         >
           {{ ownerEntry.name.charAt(0) }}
-        </span>
+        </div>
         <div class="flex-1">
-          <p class="font-medium text-gray-900">{{ ownerEntry.name }}</p>
-          <p class="text-xs text-blue-600">Dueno</p>
+          <p class="font-bold text-gray-800">{{ ownerEntry.name }}</p>
+          <p class="text-xs font-bold text-nova-accent">Dueno</p>
         </div>
       </div>
 
       <!-- Active employees -->
-      <div v-if="activeEmployees.length > 0" class="space-y-2">
+      <div v-if="activeEmployees.length > 0" class="space-y-2.5">
         <div
           v-for="emp in activeEmployees"
           :key="emp.id"
-          class="flex items-center gap-4 rounded-xl bg-white p-4 shadow-sm"
+          class="card-premium flex items-center gap-4 p-4"
         >
-          <span
-            class="flex h-10 w-10 items-center justify-center rounded-full bg-gray-200 text-sm font-bold text-gray-600"
+          <div
+            class="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-[#EFECFF] to-[#D0CCF9] text-sm font-extrabold text-nova-accent"
           >
             {{ emp.name.charAt(0) }}
-          </span>
+          </div>
           <div class="flex-1">
-            <p class="font-medium text-gray-900">{{ emp.name }}</p>
-            <p class="text-xs text-gray-500">Empleado</p>
+            <p class="font-bold text-gray-800">{{ emp.name }}</p>
+            <p class="text-xs font-medium text-gray-500">Empleado</p>
           </div>
           <button
-            class="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+            class="rounded-xl p-2 text-gray-400 transition-spring hover:bg-white/80 hover:text-gray-600"
             title="Editar"
             @click="openEditModal(emp)"
           >
             <Pencil :size="16" />
           </button>
           <button
-            class="rounded-lg p-2 text-gray-400 hover:bg-red-50 hover:text-red-500"
+            class="rounded-xl p-2 text-gray-400 transition-spring hover:bg-red-50 hover:text-red-500"
             title="Desactivar"
             @click="toggleActive(emp)"
           >
@@ -300,11 +301,11 @@ async function toggleActive(emp: Employee) {
       <!-- Empty state -->
       <div
         v-else
-        class="rounded-xl border-2 border-dashed border-gray-200 py-12 text-center"
+        class="card-premium py-12 text-center"
       >
-        <p class="text-gray-400">No hay empleados registrados</p>
+        <p class="text-sm font-medium text-gray-400">No hay empleados registrados</p>
         <button
-          class="mt-3 text-sm font-medium text-nova-primary hover:underline"
+          class="mt-3 text-sm font-bold text-nova-primary hover:underline"
           @click="openAddModal"
         >
           Agregar primer empleado
@@ -313,23 +314,23 @@ async function toggleActive(emp: Employee) {
 
       <!-- Inactive employees -->
       <div v-if="inactiveEmployees.length > 0" class="mt-6">
-        <h2 class="mb-2 text-sm font-medium text-gray-500">Desactivados</h2>
-        <div class="space-y-2">
+        <h2 class="mb-2 text-sm font-bold text-gray-400">Desactivados</h2>
+        <div class="space-y-2.5">
           <div
             v-for="emp in inactiveEmployees"
             :key="emp.id"
-            class="flex items-center gap-4 rounded-xl bg-gray-50 p-4 opacity-60"
+            class="card-premium flex items-center gap-4 p-4 opacity-50"
           >
-            <span
-              class="flex h-10 w-10 items-center justify-center rounded-full bg-gray-200 text-sm font-bold text-gray-400"
+            <div
+              class="flex h-10 w-10 items-center justify-center rounded-xl bg-gray-100 text-sm font-bold text-gray-400"
             >
               {{ emp.name.charAt(0) }}
-            </span>
+            </div>
             <div class="flex-1">
-              <p class="font-medium text-gray-500">{{ emp.name }}</p>
+              <p class="font-semibold text-gray-500">{{ emp.name }}</p>
             </div>
             <button
-              class="rounded-lg p-2 text-gray-400 hover:bg-green-50 hover:text-green-600"
+              class="rounded-xl p-2 text-gray-400 transition-spring hover:bg-green-50 hover:text-green-600"
               title="Reactivar"
               @click="toggleActive(emp)"
             >
@@ -344,27 +345,27 @@ async function toggleActive(emp: Employee) {
     <Teleport to="body">
       <div
         v-if="showAddModal"
-        class="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+        class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
         @click.self="showAddModal = false"
       >
-        <div class="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
-          <h3 class="mb-4 text-lg font-semibold text-gray-900">
+        <div class="glass-strong w-full max-w-sm rounded-[32px] p-7 shadow-[0_30px_60px_-15px_rgba(0,0,0,0.2)]">
+          <h3 class="mb-5 text-xl font-extrabold tracking-tight text-gradient">
             Nuevo empleado
           </h3>
 
           <div class="space-y-4">
             <div>
-              <label class="mb-1 block text-sm text-gray-600">Nombre</label>
+              <label class="mb-1.5 block text-[13px] font-bold text-gray-600">Nombre</label>
               <input
                 v-model="newName"
                 type="text"
                 placeholder="Ej: Maria Garcia"
-                class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-nova-primary focus:outline-none"
+                class="w-full rounded-2xl border border-white bg-white/60 px-4 py-3 text-sm font-semibold text-gray-800 shadow-[inset_0_2px_4px_rgba(0,0,0,0.03)] outline-none transition-spring placeholder:text-gray-400 focus:bg-white focus:ring-[3px] focus:ring-nova-accent/20"
                 autofocus
               >
             </div>
             <div>
-              <label class="mb-1 block text-sm text-gray-600">
+              <label class="mb-1.5 block text-[13px] font-bold text-gray-600">
                 PIN ({{ PIN_LENGTH }} digitos)
               </label>
               <input
@@ -373,24 +374,24 @@ async function toggleActive(emp: Employee) {
                 inputmode="numeric"
                 :maxlength="PIN_LENGTH"
                 placeholder="0000"
-                class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-center text-xl tracking-[0.5em] focus:border-nova-primary focus:outline-none"
+                class="w-full rounded-2xl border border-white bg-white/60 px-4 py-3 text-center text-xl font-bold tracking-[0.5em] text-gray-800 shadow-[inset_0_2px_4px_rgba(0,0,0,0.03)] outline-none transition-spring focus:bg-white focus:ring-[3px] focus:ring-nova-accent/20"
               >
             </div>
           </div>
 
-          <p v-if="addError" class="mt-3 text-sm text-red-500">
+          <p v-if="addError" class="mt-3 text-sm font-semibold text-red-500">
             {{ addError }}
           </p>
 
           <div class="mt-5 flex gap-3">
             <button
-              class="flex-1 rounded-lg border border-gray-300 py-2.5 text-sm font-medium text-gray-700"
+              class="glass flex-1 rounded-2xl py-3 text-sm font-bold text-gray-700 transition-spring"
               @click="showAddModal = false"
             >
               Cancelar
             </button>
             <button
-              class="flex-1 rounded-lg bg-nova-primary py-2.5 text-sm font-medium text-white disabled:opacity-50"
+              class="dark-pill flex-1 rounded-2xl py-3 text-sm font-bold transition-spring disabled:opacity-50"
               :disabled="
                 !newName.trim() || newPin.length !== PIN_LENGTH || isAdding
               "
@@ -407,25 +408,25 @@ async function toggleActive(emp: Employee) {
     <Teleport to="body">
       <div
         v-if="showEditModal"
-        class="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+        class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
         @click.self="showEditModal = false"
       >
-        <div class="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
-          <h3 class="mb-4 text-lg font-semibold text-gray-900">
+        <div class="glass-strong w-full max-w-sm rounded-[32px] p-7 shadow-[0_30px_60px_-15px_rgba(0,0,0,0.2)]">
+          <h3 class="mb-5 text-xl font-extrabold tracking-tight text-gradient">
             Editar empleado
           </h3>
 
           <div class="space-y-4">
             <div>
-              <label class="mb-1 block text-sm text-gray-600">Nombre</label>
+              <label class="mb-1.5 block text-[13px] font-bold text-gray-600">Nombre</label>
               <input
                 v-model="editName"
                 type="text"
-                class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-nova-primary focus:outline-none"
+                class="w-full rounded-2xl border border-white bg-white/60 px-4 py-3 text-sm font-semibold text-gray-800 shadow-[inset_0_2px_4px_rgba(0,0,0,0.03)] outline-none transition-spring placeholder:text-gray-400 focus:bg-white focus:ring-[3px] focus:ring-nova-accent/20"
               >
             </div>
             <div>
-              <label class="mb-1 block text-sm text-gray-600">
+              <label class="mb-1.5 block text-[13px] font-bold text-gray-600">
                 Nuevo PIN (dejar vacio para no cambiar)
               </label>
               <input
@@ -434,24 +435,24 @@ async function toggleActive(emp: Employee) {
                 inputmode="numeric"
                 :maxlength="PIN_LENGTH"
                 placeholder="****"
-                class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-center text-xl tracking-[0.5em] focus:border-nova-primary focus:outline-none"
+                class="w-full rounded-2xl border border-white bg-white/60 px-4 py-3 text-center text-xl font-bold tracking-[0.5em] text-gray-800 shadow-[inset_0_2px_4px_rgba(0,0,0,0.03)] outline-none transition-spring focus:bg-white focus:ring-[3px] focus:ring-nova-accent/20"
               >
             </div>
           </div>
 
-          <p v-if="editError" class="mt-3 text-sm text-red-500">
+          <p v-if="editError" class="mt-3 text-sm font-semibold text-red-500">
             {{ editError }}
           </p>
 
           <div class="mt-5 flex gap-3">
             <button
-              class="flex-1 rounded-lg border border-gray-300 py-2.5 text-sm font-medium text-gray-700"
+              class="glass flex-1 rounded-2xl py-3 text-sm font-bold text-gray-700 transition-spring"
               @click="showEditModal = false"
             >
               Cancelar
             </button>
             <button
-              class="flex-1 rounded-lg bg-nova-primary py-2.5 text-sm font-medium text-white disabled:opacity-50"
+              class="dark-pill flex-1 rounded-2xl py-3 text-sm font-bold transition-spring disabled:opacity-50"
               :disabled="!editName.trim() || isEditing"
               @click="saveEdit"
             >
