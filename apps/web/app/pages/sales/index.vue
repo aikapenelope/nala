@@ -38,6 +38,7 @@ interface GridProduct {
   name: string;
   price: string;
   stock: number;
+  barcode: string | null;
 }
 
 const gridProducts = ref<GridProduct[]>([]);
@@ -123,12 +124,29 @@ const ticketTotal = computed(() => {
   );
 });
 
-/** Filtered products based on search. */
+/** Filtered products based on search (name or barcode). */
 const filteredProducts = computed(() => {
   if (!searchQuery.value) return gridProducts.value;
-  const q = searchQuery.value.toLowerCase();
-  return gridProducts.value.filter((p) => p.name.toLowerCase().includes(q));
+  const q = searchQuery.value.toLowerCase().trim();
+  return gridProducts.value.filter(
+    (p) =>
+      p.name.toLowerCase().includes(q) ||
+      (p.barcode && p.barcode.toLowerCase() === q),
+  );
 });
+
+/**
+ * Auto-add scanned product to ticket.
+ * Triggered by Enter key -- barcode guns send digits + Enter automatically.
+ * If exactly one product matches the search, add it and clear the field.
+ */
+function autoAddScannedProduct() {
+  const match = filteredProducts.value[0];
+  if (filteredProducts.value.length === 1 && match) {
+    addToTicket(match);
+    searchQuery.value = "";
+  }
+}
 
 /**
  * Navigate to checkout, passing ticket data via sessionStorage.
@@ -161,8 +179,9 @@ function goToCheckout() {
           <input
             v-model="searchQuery"
             type="text"
-            placeholder="Buscar producto..."
+            placeholder="Buscar o escanear..."
             class="w-full bg-transparent text-sm font-medium text-gray-800 outline-none placeholder:text-gray-400"
+            @keydown.enter="autoAddScannedProduct"
           />
         </div>
         <SharedBarcodeScanner
