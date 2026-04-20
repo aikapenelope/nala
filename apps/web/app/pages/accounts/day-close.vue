@@ -12,6 +12,7 @@ definePageMeta({ middleware: ["admin-only"] });
 
 const router = useRouter();
 const { $api } = useApi();
+const { setOpen } = useCashStatus();
 
 type CloseStep = "count" | "review" | "done";
 const step = ref<CloseStep>("count");
@@ -104,6 +105,8 @@ async function confirmClose() {
     });
 
     step.value = "done";
+    // Reset the header toggle to "Cerrado"
+    setOpen(false);
   } catch (err) {
     const fetchError = err as { data?: { error?: string } };
     submitError.value = fetchError.data?.error ?? "Error al cerrar el dia";
