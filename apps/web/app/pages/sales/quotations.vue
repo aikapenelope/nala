@@ -122,7 +122,15 @@ function formatDate(iso: string): string {
 <template>
   <div class="mx-auto max-w-2xl">
     <div class="mb-4 flex items-center justify-between">
-      <h1 class="text-xl font-bold text-gray-900">Cotizaciones</h1>
+      <div>
+        <NuxtLink
+          to="/sales"
+          class="mb-1 inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700"
+        >
+          ← Ventas
+        </NuxtLink>
+        <h1 class="text-xl font-bold text-gray-900">Cotizaciones</h1>
+      </div>
       <button
         class="rounded-lg bg-nova-primary px-4 py-2 text-sm font-medium text-white"
         @click="showCreate = true"

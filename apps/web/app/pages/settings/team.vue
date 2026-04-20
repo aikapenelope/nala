@@ -16,7 +16,7 @@
  */
 
 import { PIN_LENGTH } from "@nova/shared";
-import { UserPlus, Pencil, UserX, UserCheck } from "lucide-vue-next";
+import { UserPlus, Pencil, UserX, UserCheck, ArrowLeft } from "lucide-vue-next";
 
 definePageMeta({ middleware: ["admin-only"] });
 
@@ -172,20 +172,60 @@ async function toggleActive(emp: Employee) {
 
 <template>
   <div class="mx-auto max-w-2xl">
-    <div class="mb-6 flex items-center justify-between">
-      <div>
-        <h1 class="text-xl font-bold text-gray-900">Equipo</h1>
-        <p class="text-sm text-gray-500">
-          Gestiona empleados y sus PINs de acceso
-        </p>
-      </div>
-      <button
-        class="flex items-center gap-2 rounded-lg bg-nova-primary px-4 py-2 text-sm font-medium text-white"
-        @click="openAddModal"
+    <div class="mb-6">
+      <NuxtLink
+        to="/settings"
+        class="mb-3 inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700"
       >
-        <UserPlus :size="16" />
-        Agregar
-      </button>
+        <ArrowLeft :size="16" />
+        Configuracion
+      </NuxtLink>
+      <div class="flex items-center justify-between">
+        <div>
+          <h1 class="text-xl font-bold text-gray-900">Equipo</h1>
+          <p class="text-sm text-gray-500">
+            Gestiona empleados y sus PINs de acceso
+          </p>
+        </div>
+        <button
+          class="flex items-center gap-2 rounded-lg bg-nova-primary px-4 py-2 text-sm font-medium text-white"
+          @click="openAddModal"
+        >
+          <UserPlus :size="16" />
+          Agregar
+        </button>
+      </div>
+    </div>
+
+    <!-- Permissions info -->
+    <div class="mb-4 rounded-xl bg-blue-50 p-4 text-sm text-blue-800">
+      <p class="font-semibold">Permisos por rol</p>
+      <div class="mt-2 grid grid-cols-2 gap-2 text-xs">
+        <div>
+          <p class="font-bold text-blue-900">Dueno</p>
+          <ul class="mt-1 space-y-0.5 text-blue-700">
+            <li>Vender y cobrar</li>
+            <li>Anular ventas</li>
+            <li>Crear/editar productos</li>
+            <li>Ajustar inventario</li>
+            <li>Ver reportes y contabilidad</li>
+            <li>Gestionar empleados</li>
+            <li>Configurar negocio</li>
+          </ul>
+        </div>
+        <div>
+          <p class="font-bold text-blue-900">Empleado</p>
+          <ul class="mt-1 space-y-0.5 text-blue-700">
+            <li>Vender y cobrar</li>
+            <li>Ver inventario</li>
+            <li>Ver clientes</li>
+            <li>Ver historial de ventas</li>
+          </ul>
+          <p class="mt-2 text-[10px] text-blue-600">
+            No puede: anular ventas, editar productos, ver reportes, configurar
+          </p>
+        </div>
+      </div>
     </div>
 
     <!-- Loading -->
@@ -321,7 +361,7 @@ async function toggleActive(emp: Employee) {
                 placeholder="Ej: Maria Garcia"
                 class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-nova-primary focus:outline-none"
                 autofocus
-              />
+              >
             </div>
             <div>
               <label class="mb-1 block text-sm text-gray-600">
@@ -334,7 +374,7 @@ async function toggleActive(emp: Employee) {
                 :maxlength="PIN_LENGTH"
                 placeholder="0000"
                 class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-center text-xl tracking-[0.5em] focus:border-nova-primary focus:outline-none"
-              />
+              >
             </div>
           </div>
 
@@ -382,7 +422,7 @@ async function toggleActive(emp: Employee) {
                 v-model="editName"
                 type="text"
                 class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-nova-primary focus:outline-none"
-              />
+              >
             </div>
             <div>
               <label class="mb-1 block text-sm text-gray-600">
@@ -395,7 +435,7 @@ async function toggleActive(emp: Employee) {
                 :maxlength="PIN_LENGTH"
                 placeholder="****"
                 class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-center text-xl tracking-[0.5em] focus:border-nova-primary focus:outline-none"
-              />
+              >
             </div>
           </div>
 
