@@ -30,6 +30,12 @@ async function resolve() {
     return;
   }
 
+  // Clear any stale Nova user state before resolving.
+  // This prevents showing the old account after a re-login.
+  if (import.meta.client) {
+    localStorage.removeItem("nova:user");
+  }
+
   const result = await resolveClerkUser();
 
   if (result.status === "ok") {

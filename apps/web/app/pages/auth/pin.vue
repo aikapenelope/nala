@@ -90,8 +90,8 @@ async function submitPin() {
 }
 
 /** Reset device: clear everything and go to landing. */
-function resetDevice() {
-  fullLogout();
+async function resetDevice() {
+  await fullLogout();
   navigateTo("/landing");
 }
 

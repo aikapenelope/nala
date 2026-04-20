@@ -36,8 +36,8 @@ function disableStoreMode() {
 }
 
 /** Full logout: clear everything and redirect to landing. */
-function handleFullLogout() {
-  fullLogout();
+async function handleFullLogout() {
+  await fullLogout();
   navigateTo("/landing");
 }
 
