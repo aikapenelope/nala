@@ -20,8 +20,8 @@ import type { Component } from "vue";
 
 definePageMeta({ middleware: ["admin-only"] });
 
-const { user, clearUser } = useNovaAuth();
-const { isStoreMode, activateStoreMode, deactivateStoreMode } = useDeviceMode();
+const { user, clearUser, fullLogout } = useNovaAuth();
+const { isStoreMode, activateStoreMode, deactivateStoreMode, daysRemaining, activatedAtFormatted } = useDeviceMode();
 
 /** Activate store mode and redirect to PIN screen. */
 function enableStoreMode() {
@@ -33,6 +33,12 @@ function enableStoreMode() {
 /** Deactivate store mode (stays on settings page). */
 function disableStoreMode() {
   deactivateStoreMode();
+}
+
+/** Full logout: clear everything and redirect to landing. */
+function handleFullLogout() {
+  fullLogout();
+  navigateTo("/landing");
 }
 
 interface SettingsSection {
@@ -135,6 +141,19 @@ const sections: SettingsSection[] = [
           </button>
         </div>
       </div>
+
+      <!-- Device session info -->
+      <div v-if="activatedAtFormatted" class="mt-3 flex items-center justify-between rounded-xl bg-gray-50/80 px-3 py-2">
+        <p class="text-[11px] text-gray-500">
+          Activado: {{ activatedAtFormatted }}
+        </p>
+        <span
+          class="rounded-md px-2 py-0.5 text-[10px] font-bold"
+          :class="daysRemaining !== null && daysRemaining <= 7 ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-700'"
+        >
+          {{ daysRemaining }} dias restantes
+        </span>
+      </div>
     </div>
 
     <!-- How it works (only shown in owner mode) -->
@@ -147,7 +166,7 @@ const sections: SettingsSection[] = [
         </div>
         <div class="flex gap-2">
           <span class="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md bg-nova-accent/10 text-[10px] font-bold text-nova-accent">2</span>
-          <p><span class="font-bold text-gray-800">Tablet de la tienda</span> — Activa "Modo tienda" ahi. Los empleados entran con PIN.</p>
+          <p><span class="font-bold text-gray-800">PC de la tienda</span> — Activa "Modo tienda" ahi. Los empleados entran con PIN.</p>
         </div>
         <div class="flex gap-2">
           <span class="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md bg-nova-accent/10 text-[10px] font-bold text-nova-accent">3</span>
@@ -175,6 +194,19 @@ const sections: SettingsSection[] = [
           <p class="text-xs font-medium text-gray-600/70">{{ section.description }}</p>
         </div>
       </NuxtLink>
+    </div>
+
+    <!-- Full logout (reset device) -->
+    <div class="mt-6 px-1">
+      <button
+        class="w-full rounded-xl border border-red-200 py-2.5 text-sm font-bold text-red-500 transition-spring hover:bg-red-50"
+        @click="handleFullLogout"
+      >
+        Cerrar sesion y resetear dispositivo
+      </button>
+      <p class="mt-1.5 text-center text-[10px] text-gray-400">
+        Borra toda la configuracion de este dispositivo. Tendras que volver a iniciar sesion.
+      </p>
     </div>
   </div>
 </template>

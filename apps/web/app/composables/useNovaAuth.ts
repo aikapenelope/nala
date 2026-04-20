@@ -165,6 +165,10 @@ export function useNovaAuth() {
           clerkId: result.user.clerkId,
         });
 
+        // Mark device activation timestamp (30-day expiry counter starts now)
+        const { markActivated } = useDeviceMode();
+        markActivated();
+
         // Download team roster for local PIN verification.
         // Don't block login on roster download -- if it fails (e.g., Clerk
         // token not yet propagated), retry once after a short delay.
@@ -210,6 +214,24 @@ export function useNovaAuth() {
   }
 
   /**
+   * Full logout: clears everything from this device.
+   * Use when the device needs to be completely reset (e.g., changing
+   * business, device stuck, or transferring device to someone else).
+   * After this, the device is as if Nova was never configured on it.
+   */
+  function fullLogout() {
+    novaUser.value = null;
+    if (import.meta.client) {
+      localStorage.removeItem("nova:user");
+      localStorage.removeItem("nova:businessId");
+      localStorage.removeItem("nova:team-roster");
+      localStorage.removeItem("nova:device-mode");
+      localStorage.removeItem("nova:device-activated-at");
+      localStorage.removeItem("nova:sidebar-collapsed");
+    }
+  }
+
+  /**
    * Check if this device has been configured for a business.
    */
   function getDeviceBusinessId(): string | null {
@@ -229,5 +251,6 @@ export function useNovaAuth() {
     switchUser,
     verifyOwnerPin,
     clearUser,
+    fullLogout,
   };
 }
