@@ -11,12 +11,12 @@
  */
 
 import { PIN_LENGTH } from "@nova/shared";
-import { Store, User, ShieldCheck } from "lucide-vue-next";
+import { Store, User, ShieldCheck, RotateCcw } from "lucide-vue-next";
 
 definePageMeta({ layout: false });
 
 const router = useRouter();
-const { switchUser } = useNovaAuth();
+const { switchUser, fullLogout } = useNovaAuth();
 const { roster, isLoaded, loadFromCache, businessName } = useTeamRoster();
 const { isStoreMode } = useDeviceMode();
 
@@ -87,6 +87,12 @@ async function submitPin() {
   } finally {
     isVerifying.value = false;
   }
+}
+
+/** Reset device: clear everything and go to landing. */
+function resetDevice() {
+  fullLogout();
+  navigateTo("/landing");
 }
 
 /** Digits for the keypad grid. */
@@ -233,5 +239,14 @@ const keypadRows = [
         Solo necesario la primera vez o si la sesion expiro
       </p>
     </div>
+
+    <!-- Reset device (escape hatch when stuck) -->
+    <button
+      class="mt-6 inline-flex items-center gap-1.5 text-[11px] font-bold text-gray-400 transition-spring hover:text-red-500"
+      @click="resetDevice"
+    >
+      <RotateCcw :size="12" />
+      Resetear dispositivo
+    </button>
   </div>
 </template>
