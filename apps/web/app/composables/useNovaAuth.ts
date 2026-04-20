@@ -169,6 +169,11 @@ export function useNovaAuth() {
         const { markActivated } = useDeviceMode();
         markActivated();
 
+        // Clear the session-expired banner if it was showing.
+        // This happens when the owner re-authenticates after a 401.
+        const sessionExpired = useState<boolean>("session-expired");
+        sessionExpired.value = false;
+
         // Download team roster for local PIN verification.
         // Don't block login on roster download -- if it fails (e.g., Clerk
         // token not yet propagated), retry once after a short delay.
