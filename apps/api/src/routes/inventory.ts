@@ -39,6 +39,7 @@ import {
   activityLog,
 } from "@nova/db";
 import { handleDbError } from "../utils/db-errors";
+import { logActivity } from "../utils/audit";
 import { validateUuidParam } from "../middleware/validate-uuid";
 import type { AppEnv } from "../types";
 
@@ -413,6 +414,8 @@ inventory.patch(
       });
     }
 
+    logActivity({ db, businessId, userId: user.id, action: "product_updated", detail: `${updated.name}` });
+
     return c.json({ product: updated });
   },
 );
@@ -439,6 +442,9 @@ inventory.delete("/products/:id", validateUuidParam, async (c) => {
     .update(productVariants)
     .set({ isActive: false, updatedAt: new Date() })
     .where(eq(productVariants.productId, id));
+
+  const user = c.get("user");
+  logActivity({ db, businessId, userId: user.id, action: "product_deleted", detail: `${deleted.name}` });
 
   return c.json({ message: "Product deleted", id });
 });
@@ -534,6 +540,9 @@ inventory.patch(
       return c.json({ error: "Variant not found" }, 404);
     }
 
+    const user = c.get("user");
+    logActivity({ db, businessId, userId: user.id, action: "variant_updated", detail: `Variant ${updated.id.slice(0, 8)}` });
+
     return c.json({ variant: updated });
   },
 );
@@ -558,6 +567,9 @@ inventory.delete("/products/variants/:id", validateUuidParam, async (c) => {
   if (!deleted) {
     return c.json({ error: "Variant not found" }, 404);
   }
+
+  const user = c.get("user");
+  logActivity({ db, businessId, userId: user.id, action: "variant_deleted", detail: `Variant ${id.slice(0, 8)}` });
 
   return c.json({ message: "Variant deleted", id });
 });
@@ -726,7 +738,7 @@ inventory.post(
         .set({ stock: newStock, updatedAt: new Date() })
         .where(eq(products.id, id));
 
-      // Log stock movement
+      // Log stock movement with post-adjustment stock level
       await tx.insert(stockMovements).values({
         businessId,
         productId: id,
@@ -735,6 +747,7 @@ inventory.post(
         costUnit: product.cost,
         notes: reason,
         userId: user.id,
+        qtyAfterTransaction: newStock,
       });
 
       // Log activity

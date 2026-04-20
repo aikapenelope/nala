@@ -24,6 +24,7 @@ import {
   notificationPreferences,
 } from "@nova/db";
 import { handleDbError } from "../utils/db-errors";
+import { logActivity } from "../utils/audit";
 import { validateUuidParam } from "../middleware/validate-uuid";
 import type { AppEnv } from "../types";
 
@@ -122,6 +123,9 @@ configRoutes.patch(
       return c.json({ error: "Cargo adicional no encontrado" }, 404);
     }
 
+    const user = c.get("user");
+    logActivity({ db, businessId, userId: user.id, action: "surcharge_type_updated", detail: `${updated.name}` });
+
     return c.json({ surchargeType: updated });
   },
 );
@@ -146,6 +150,9 @@ configRoutes.delete("/surcharge-types/:id", validateUuidParam, async (c) => {
   if (!deleted) {
     return c.json({ error: "Cargo adicional no encontrado" }, 404);
   }
+
+  const user = c.get("user");
+  logActivity({ db, businessId, userId: user.id, action: "surcharge_type_deleted", detail: `${deleted.name}` });
 
   return c.json({ success: true });
 });
@@ -242,6 +249,9 @@ configRoutes.patch(
       return c.json({ error: "Cuenta bancaria no encontrada" }, 404);
     }
 
+    const user = c.get("user");
+    logActivity({ db, businessId, userId: user.id, action: "bank_account_updated", detail: `${updated.name}` });
+
     return c.json({ bankAccount: updated });
   },
 );
@@ -309,6 +319,9 @@ configRoutes.patch(
         })
         .returning();
     }
+
+    const user = c.get("user");
+    logActivity({ db, businessId, userId: user.id, action: "notification_preferences_updated" });
 
     return c.json({ preferences: result });
   },

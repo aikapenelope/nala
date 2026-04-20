@@ -430,6 +430,8 @@ export const sales = pgTable(
     index("idx_sales_created").on(table.createdAt),
     index("idx_sales_customer").on(table.customerId),
     index("idx_sales_channel").on(table.channel),
+    /** Composite index for report queries (business + date range). */
+    index("idx_sales_business_created").on(table.businessId, table.createdAt),
   ],
 );
 
@@ -529,6 +531,13 @@ export const stockMovements = pgTable(
 
     /** Optional note (e.g., "Ajuste por conteo fisico"). */
     notes: text("notes"),
+
+    /**
+     * Stock level after this movement was applied.
+     * Enables historical stock reconstruction at any point in time
+     * (inspired by ERPNext's Stock Ledger Entry pattern).
+     */
+    qtyAfterTransaction: integer("qty_after_transaction"),
 
     userId: uuid("user_id").references(() => users.id),
     createdAt: timestamp("created_at", { withTimezone: true })

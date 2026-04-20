@@ -484,6 +484,8 @@ salesRoutes.post("/sales", zValidator("json", createSaleSchema), async (c) => {
 
       // Decrement product stock atomically with WHERE stock >= qty guard.
       // This prevents overselling under concurrent requests (race condition fix).
+      // Track post-decrement stock for qty_after_transaction in movement log.
+      const stockAfterMap = new Map<string, number>();
       for (const item of data.items) {
         const product = productMap.get(item.productId);
         if (product?.isService) continue;
@@ -521,13 +523,16 @@ salesRoutes.post("/sales", zValidator("json", createSaleSchema), async (c) => {
               sql`${products.stock} >= ${item.quantity}`,
             ),
           )
-          .returning({ id: products.id });
+          .returning({ id: products.id, stock: products.stock });
 
         if (productResult.length === 0) {
           throw new Error(
             `Insufficient stock for "${product?.name ?? item.productId}"`,
           );
         }
+
+        // Store the post-decrement stock for the movement log
+        stockAfterMap.set(item.productId, productResult[0].stock);
       }
 
       // If fiado payment, create accounts_receivable and update customer balance
@@ -626,6 +631,7 @@ salesRoutes.post("/sales", zValidator("json", createSaleSchema), async (c) => {
           referenceType: "sale",
           referenceId: sale.id,
           userId: user.id,
+          qtyAfterTransaction: stockAfterMap.get(item.productId) ?? null,
         });
       }
 
@@ -689,7 +695,7 @@ salesRoutes.post(
           .from(saleItems)
           .where(eq(saleItems.saleId, saleId));
 
-        // Restore stock for each item
+        // Restore stock for each item and log movements
         for (const item of items) {
           if (item.variantId) {
             await tx
@@ -701,13 +707,27 @@ salesRoutes.post(
               .where(eq(productVariants.id, item.variantId));
           }
 
-          await tx
+          const [restored] = await tx
             .update(products)
             .set({
               stock: sql`${products.stock} + ${item.quantity}`,
               updatedAt: new Date(),
             })
-            .where(eq(products.id, item.productId));
+            .where(eq(products.id, item.productId))
+            .returning({ stock: products.stock });
+
+          await tx.insert(stockMovements).values({
+            businessId,
+            productId: item.productId,
+            variantId: item.variantId,
+            type: "void",
+            quantity: item.quantity,
+            costUnit: String(item.unitPrice),
+            referenceType: "sale",
+            referenceId: saleId,
+            userId: user.id,
+            qtyAfterTransaction: restored?.stock ?? null,
+          });
         }
 
         // Reverse fiado: restore customer balance and cancel accounts_receivable

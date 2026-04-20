@@ -20,6 +20,7 @@ import { eq, and } from "drizzle-orm";
 import { PIN_LENGTH } from "@nova/shared";
 import { users, businesses } from "@nova/db";
 import { handleDbError } from "../utils/db-errors";
+import { logActivity } from "../utils/audit";
 import { validateUuidParam } from "../middleware/validate-uuid";
 import type { AppEnv } from "../types";
 
@@ -317,6 +318,8 @@ team.patch(
         isActive: users.isActive,
       });
 
+    logActivity({ db, businessId: currentUser.businessId, userId: currentUser.id, action: "employee_updated", detail: `${updated.name}` });
+
     return c.json({ employee: updated });
   } catch (err) {
     const dbErr = handleDbError(err);
@@ -363,6 +366,8 @@ team.delete("/employees/:id", validateUuidParam, async (c) => {
     .update(users)
     .set({ isActive: false, updatedAt: new Date() })
     .where(eq(users.id, employeeId));
+
+  logActivity({ db, businessId: currentUser.businessId, userId: currentUser.id, action: "employee_deactivated", detail: `Employee ${employeeId.slice(0, 8)}` });
 
   return c.json({ success: true });
 });
