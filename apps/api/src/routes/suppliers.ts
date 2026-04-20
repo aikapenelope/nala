@@ -13,6 +13,7 @@ import { z } from "zod";
 import { eq, and, desc, ilike, sql } from "drizzle-orm";
 import { suppliers, expenses, accountsPayable } from "@nova/db";
 import { handleDbError } from "../utils/db-errors";
+import { logActivity } from "../utils/audit";
 import { validateUuidParam } from "../middleware/validate-uuid";
 import type { AppEnv } from "../types";
 
@@ -117,6 +118,9 @@ suppliersRoutes.patch(
     if (!updated) {
       return c.json({ error: "Proveedor no encontrado" }, 404);
     }
+
+    const user = c.get("user");
+    logActivity({ db, businessId, userId: user.id, action: "supplier_updated", detail: `${updated.name}` });
 
     return c.json({ supplier: updated });
   },
