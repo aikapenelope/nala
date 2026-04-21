@@ -4,8 +4,8 @@
  *
  * Allows the owner to:
  * - View all employees (active and inactive)
- * - Add new employees with name + PIN
- * - Edit employee name or PIN
+ * - Add new employees with name
+ * - Edit employee name
  * - Deactivate/reactivate employees
  *
  * Connected to:
@@ -15,13 +15,11 @@
  * - DELETE /api/employees/:id
  */
 
-import { PIN_LENGTH } from "@nova/shared";
 import { UserPlus, Pencil, UserX, UserCheck, ArrowLeft } from "lucide-vue-next";
 
 definePageMeta({ middleware: ["admin-only"] });
 
 const { $api } = useApi();
-const { refreshRoster } = useTeamRoster();
 
 /** Employee from API. */
 interface Employee {
@@ -69,19 +67,17 @@ const ownerEntry = computed(() =>
 
 const showAddModal = ref(false);
 const newName = ref("");
-const newPin = ref("");
 const addError = ref("");
 const isAdding = ref(false);
 
 function openAddModal() {
   newName.value = "";
-  newPin.value = "";
   addError.value = "";
   showAddModal.value = true;
 }
 
 async function addEmployee() {
-  if (!newName.value.trim() || newPin.value.length !== PIN_LENGTH) return;
+  if (!newName.value.trim()) return;
 
   isAdding.value = true;
   addError.value = "";
@@ -89,11 +85,10 @@ async function addEmployee() {
   try {
     await $api("/api/employees", {
       method: "POST",
-      body: { name: newName.value.trim(), pin: newPin.value },
+      body: { name: newName.value.trim() },
     });
     showAddModal.value = false;
     await fetchEmployees();
-    await refreshRoster();
   } catch (err) {
     const fetchError = err as { data?: { error?: string } };
     addError.value = fetchError.data?.error ?? "Error al agregar empleado";
@@ -109,14 +104,12 @@ async function addEmployee() {
 const showEditModal = ref(false);
 const editId = ref("");
 const editName = ref("");
-const editPin = ref("");
 const editError = ref("");
 const isEditing = ref(false);
 
 function openEditModal(emp: Employee) {
   editId.value = emp.id;
   editName.value = emp.name;
-  editPin.value = "";
   editError.value = "";
   showEditModal.value = true;
 }
@@ -127,19 +120,13 @@ async function saveEdit() {
   isEditing.value = true;
   editError.value = "";
 
-  const body: Record<string, string> = { name: editName.value.trim() };
-  if (editPin.value.length === PIN_LENGTH) {
-    body.pin = editPin.value;
-  }
-
   try {
     await $api(`/api/employees/${editId.value}`, {
       method: "PATCH",
-      body,
+      body: { name: editName.value.trim() },
     });
     showEditModal.value = false;
     await fetchEmployees();
-    await refreshRoster();
   } catch (err) {
     const fetchError = err as { data?: { error?: string } };
     editError.value = fetchError.data?.error ?? "Error al editar empleado";
@@ -163,7 +150,6 @@ async function toggleActive(emp: Employee) {
       });
     }
     await fetchEmployees();
-    await refreshRoster();
   } catch {
     // Silently fail -- the list will show the old state
   }
@@ -182,9 +168,11 @@ async function toggleActive(emp: Employee) {
       </NuxtLink>
       <div class="flex items-center justify-between">
         <div>
-          <h1 class="text-2xl font-extrabold tracking-tight text-gradient">Equipo</h1>
+          <h1 class="text-2xl font-extrabold tracking-tight text-gradient">
+            Equipo
+          </h1>
           <p class="text-sm font-medium text-gray-500">
-            Gestiona empleados y sus PINs de acceso
+            Gestiona empleados y sus accesos
           </p>
         </div>
         <button
@@ -230,15 +218,14 @@ async function toggleActive(emp: Employee) {
 
     <!-- Loading -->
     <div v-if="isLoading" class="py-12 text-center text-gray-400">
-      <div class="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2 border-gray-200 border-t-nova-primary" />
+      <div
+        class="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2 border-gray-200 border-t-nova-primary"
+      />
       Cargando equipo...
     </div>
 
     <!-- Error -->
-    <div
-      v-else-if="loadError"
-      class="card-premium p-6 text-center"
-    >
+    <div v-else-if="loadError" class="card-premium p-6 text-center">
       <p class="text-sm font-semibold text-red-500">{{ loadError }}</p>
       <button
         class="mt-3 text-xs font-bold text-nova-primary underline"
@@ -299,11 +286,10 @@ async function toggleActive(emp: Employee) {
       </div>
 
       <!-- Empty state -->
-      <div
-        v-else
-        class="card-premium py-12 text-center"
-      >
-        <p class="text-sm font-medium text-gray-400">No hay empleados registrados</p>
+      <div v-else class="card-premium py-12 text-center">
+        <p class="text-sm font-medium text-gray-400">
+          No hay empleados registrados
+        </p>
         <button
           class="mt-3 text-sm font-bold text-nova-primary hover:underline"
           @click="openAddModal"
@@ -348,35 +334,24 @@ async function toggleActive(emp: Employee) {
         class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
         @click.self="showAddModal = false"
       >
-        <div class="glass-strong w-full max-w-sm rounded-[32px] p-7 shadow-[0_30px_60px_-15px_rgba(0,0,0,0.2)]">
+        <div
+          class="glass-strong w-full max-w-sm rounded-[32px] p-7 shadow-[0_30px_60px_-15px_rgba(0,0,0,0.2)]"
+        >
           <h3 class="mb-5 text-xl font-extrabold tracking-tight text-gradient">
             Nuevo empleado
           </h3>
 
-          <div class="space-y-4">
-            <div>
-              <label class="mb-1.5 block text-[13px] font-bold text-gray-600">Nombre</label>
-              <input
-                v-model="newName"
-                type="text"
-                placeholder="Ej: Maria Garcia"
-                class="w-full rounded-2xl border border-white bg-white/60 px-4 py-3 text-sm font-semibold text-gray-800 shadow-[inset_0_2px_4px_rgba(0,0,0,0.03)] outline-none transition-spring placeholder:text-gray-400 focus:bg-white focus:ring-[3px] focus:ring-nova-accent/20"
-                autofocus
-              >
-            </div>
-            <div>
-              <label class="mb-1.5 block text-[13px] font-bold text-gray-600">
-                PIN ({{ PIN_LENGTH }} digitos)
-              </label>
-              <input
-                v-model="newPin"
-                type="password"
-                inputmode="numeric"
-                :maxlength="PIN_LENGTH"
-                placeholder="0000"
-                class="w-full rounded-2xl border border-white bg-white/60 px-4 py-3 text-center text-xl font-bold tracking-[0.5em] text-gray-800 shadow-[inset_0_2px_4px_rgba(0,0,0,0.03)] outline-none transition-spring focus:bg-white focus:ring-[3px] focus:ring-nova-accent/20"
-              >
-            </div>
+          <div>
+            <label class="mb-1.5 block text-[13px] font-bold text-gray-600"
+              >Nombre</label
+            >
+            <input
+              v-model="newName"
+              type="text"
+              placeholder="Ej: Maria Garcia"
+              class="w-full rounded-2xl border border-white bg-white/60 px-4 py-3 text-sm font-semibold text-gray-800 shadow-[inset_0_2px_4px_rgba(0,0,0,0.03)] outline-none transition-spring placeholder:text-gray-400 focus:bg-white focus:ring-[3px] focus:ring-nova-accent/20"
+              autofocus
+            />
           </div>
 
           <p v-if="addError" class="mt-3 text-sm font-semibold text-red-500">
@@ -392,9 +367,7 @@ async function toggleActive(emp: Employee) {
             </button>
             <button
               class="dark-pill flex-1 rounded-2xl py-3 text-sm font-bold transition-spring disabled:opacity-50"
-              :disabled="
-                !newName.trim() || newPin.length !== PIN_LENGTH || isAdding
-              "
+              :disabled="!newName.trim() || isAdding"
               @click="addEmployee"
             >
               {{ isAdding ? "Guardando..." : "Agregar" }}
@@ -411,33 +384,22 @@ async function toggleActive(emp: Employee) {
         class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
         @click.self="showEditModal = false"
       >
-        <div class="glass-strong w-full max-w-sm rounded-[32px] p-7 shadow-[0_30px_60px_-15px_rgba(0,0,0,0.2)]">
+        <div
+          class="glass-strong w-full max-w-sm rounded-[32px] p-7 shadow-[0_30px_60px_-15px_rgba(0,0,0,0.2)]"
+        >
           <h3 class="mb-5 text-xl font-extrabold tracking-tight text-gradient">
             Editar empleado
           </h3>
 
-          <div class="space-y-4">
-            <div>
-              <label class="mb-1.5 block text-[13px] font-bold text-gray-600">Nombre</label>
-              <input
-                v-model="editName"
-                type="text"
-                class="w-full rounded-2xl border border-white bg-white/60 px-4 py-3 text-sm font-semibold text-gray-800 shadow-[inset_0_2px_4px_rgba(0,0,0,0.03)] outline-none transition-spring placeholder:text-gray-400 focus:bg-white focus:ring-[3px] focus:ring-nova-accent/20"
-              >
-            </div>
-            <div>
-              <label class="mb-1.5 block text-[13px] font-bold text-gray-600">
-                Nuevo PIN (dejar vacio para no cambiar)
-              </label>
-              <input
-                v-model="editPin"
-                type="password"
-                inputmode="numeric"
-                :maxlength="PIN_LENGTH"
-                placeholder="****"
-                class="w-full rounded-2xl border border-white bg-white/60 px-4 py-3 text-center text-xl font-bold tracking-[0.5em] text-gray-800 shadow-[inset_0_2px_4px_rgba(0,0,0,0.03)] outline-none transition-spring focus:bg-white focus:ring-[3px] focus:ring-nova-accent/20"
-              >
-            </div>
+          <div>
+            <label class="mb-1.5 block text-[13px] font-bold text-gray-600"
+              >Nombre</label
+            >
+            <input
+              v-model="editName"
+              type="text"
+              class="w-full rounded-2xl border border-white bg-white/60 px-4 py-3 text-sm font-semibold text-gray-800 shadow-[inset_0_2px_4px_rgba(0,0,0,0.03)] outline-none transition-spring placeholder:text-gray-400 focus:bg-white focus:ring-[3px] focus:ring-nova-accent/20"
+            />
           </div>
 
           <p v-if="editError" class="mt-3 text-sm font-semibold text-red-500">
