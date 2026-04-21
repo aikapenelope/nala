@@ -10,7 +10,7 @@
  * - Accounting (owner only)
  * - Settings (owner only)
  *
- * Also shows the current user info and a switch-user option.
+ * Also shows the current user info and a logout option.
  */
 
 import {
@@ -20,7 +20,6 @@ import {
   BarChart3,
   FileText,
   Settings,
-  ArrowRightLeft,
   LogOut,
   Truck,
   ClipboardList,
@@ -28,8 +27,7 @@ import {
 } from "lucide-vue-next";
 import type { Component } from "vue";
 
-const { isAdmin, user, clearUser } = useNovaAuth();
-const { isStoreMode } = useDeviceMode();
+const { isAdmin, user, fullLogout } = useNovaAuth();
 
 interface MenuItem {
   to: string;
@@ -109,10 +107,10 @@ const visibleItems = computed(() =>
   menuItems.filter((item) => !item.adminOnly || isAdmin.value),
 );
 
-/** Switch user: clear current session and go to PIN screen. */
-function switchUser() {
-  clearUser();
-  navigateTo("/auth/pin");
+/** Logout and redirect to landing. */
+async function handleLogout() {
+  await fullLogout();
+  navigateTo("/landing");
 }
 </script>
 
@@ -139,26 +137,15 @@ function switchUser() {
         </div>
       </div>
 
-      <!-- User actions -->
-      <div class="mt-3 flex gap-2">
-        <!-- Store mode: switch shift -->
+      <!-- Logout button -->
+      <div class="mt-3">
         <button
-          v-if="isStoreMode"
           class="flex flex-1 items-center justify-center gap-2 rounded-lg border border-gray-200 py-2 text-xs font-medium text-gray-600"
-          @click="switchUser"
+          @click="handleLogout"
         >
-          <ArrowRightLeft :size="14" />
-          Cambiar turno
+          <LogOut :size="14" />
+          Cerrar sesion
         </button>
-        <!-- Owner mode: no switch button, only logout -->
-        <Show v-if="!isStoreMode" when="signed-in">
-          <button
-            class="flex flex-1 items-center justify-center gap-2 rounded-lg border border-gray-200 py-2 text-xs font-medium text-gray-600"
-          >
-            <LogOut :size="14" />
-            <SignOutButton />
-          </button>
-        </Show>
       </div>
     </div>
 

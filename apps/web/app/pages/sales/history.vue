@@ -88,9 +88,8 @@ function saleProfit(sale: Sale): number | null {
   return Number(sale.totalUsd) - Number(sale.totalCostUsd);
 }
 
-/** Void sale flow: reason input -> PIN verification -> API call. */
+/** Void sale flow: reason input -> API call (admin-only, no PIN needed). */
 const showReasonModal = ref(false);
-const showVoidModal = ref(false);
 const voidingSaleId = ref<string | null>(null);
 const voidReason = ref("");
 const voidError = ref("");
@@ -111,16 +110,10 @@ function requestVoid(saleId: string) {
   showReasonModal.value = true;
 }
 
-/** Step 2: Reason entered, now ask for PIN. */
-function confirmReason() {
-  if (!voidReason.value.trim()) return;
+/** Step 2: Reason entered, send void request directly. */
+async function confirmReason() {
+  if (!voidReason.value.trim() || !voidingSaleId.value) return;
   showReasonModal.value = false;
-  showVoidModal.value = true;
-}
-
-/** Step 3: PIN verified, send void request. */
-async function handleVoidConfirmed() {
-  if (!voidingSaleId.value) return;
 
   try {
     await $api(`/api/sales/${voidingSaleId.value}/void`, {
@@ -136,7 +129,6 @@ async function handleVoidConfirmed() {
     voidError.value = fetchError.data?.error ?? "Error al anular la venta";
   }
 
-  showVoidModal.value = false;
   voidingSaleId.value = null;
   voidReason.value = "";
 }
@@ -146,7 +138,9 @@ async function handleVoidConfirmed() {
   <div>
     <!-- Header -->
     <div class="mb-4 flex items-center justify-between">
-      <h1 class="text-2xl font-extrabold tracking-tight text-gradient">Historial de ventas</h1>
+      <h1 class="text-2xl font-extrabold tracking-tight text-gradient">
+        Historial de ventas
+      </h1>
       <NuxtLink
         to="/sales"
         class="dark-pill flex items-center gap-1.5 rounded-2xl px-4 py-2 text-sm font-bold transition-spring"
@@ -164,7 +158,7 @@ async function handleVoidConfirmed() {
           v-model="dateFilter"
           type="date"
           class="bg-transparent text-sm font-medium text-gray-700 outline-none"
-        >
+        />
       </div>
       <select
         v-model="methodFilter"
@@ -188,15 +182,14 @@ async function handleVoidConfirmed() {
 
     <!-- Loading -->
     <div v-if="isLoading" class="py-12 text-center text-gray-400">
-      <div class="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2 border-gray-200 border-t-nova-primary" />
+      <div
+        class="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2 border-gray-200 border-t-nova-primary"
+      />
       Cargando ventas...
     </div>
 
     <!-- Error -->
-    <div
-      v-else-if="loadError"
-      class="card-premium p-6 text-center"
-    >
+    <div v-else-if="loadError" class="card-premium p-6 text-center">
       <p class="text-sm font-semibold text-red-500">{{ loadError }}</p>
       <button
         class="mt-3 text-xs font-bold text-nova-primary underline"
@@ -218,22 +211,35 @@ async function handleVoidConfirmed() {
 
     <template v-else>
       <!-- Desktop: Table -->
-      <div
-        v-if="isDesktop"
-        class="card-premium overflow-hidden"
-      >
+      <div v-if="isDesktop" class="card-premium overflow-hidden">
         <table class="w-full text-left text-sm">
           <thead class="border-b border-white/50">
             <tr>
-              <th class="px-4 py-3.5 text-[11px] font-bold tracking-wider text-gray-400 uppercase">Fecha</th>
-              <th class="px-4 py-3.5 text-right text-[11px] font-bold tracking-wider text-gray-400 uppercase">
+              <th
+                class="px-4 py-3.5 text-[11px] font-bold tracking-wider text-gray-400 uppercase"
+              >
+                Fecha
+              </th>
+              <th
+                class="px-4 py-3.5 text-right text-[11px] font-bold tracking-wider text-gray-400 uppercase"
+              >
                 Total
               </th>
-              <th class="px-4 py-3.5 text-right text-[11px] font-bold tracking-wider text-gray-400 uppercase">
+              <th
+                class="px-4 py-3.5 text-right text-[11px] font-bold tracking-wider text-gray-400 uppercase"
+              >
                 Utilidad
               </th>
-              <th class="px-4 py-3.5 text-[11px] font-bold tracking-wider text-gray-400 uppercase">Canal</th>
-              <th class="px-4 py-3.5 text-[11px] font-bold tracking-wider text-gray-400 uppercase">Estado</th>
+              <th
+                class="px-4 py-3.5 text-[11px] font-bold tracking-wider text-gray-400 uppercase"
+              >
+                Canal
+              </th>
+              <th
+                class="px-4 py-3.5 text-[11px] font-bold tracking-wider text-gray-400 uppercase"
+              >
+                Estado
+              </th>
               <th v-if="isAdmin" class="px-4 py-3.5" />
             </tr>
           </thead>
@@ -248,7 +254,9 @@ async function handleVoidConfirmed() {
                 {{ formatDate(sale.createdAt) }}
               </td>
               <td class="px-4 py-3.5 text-right">
-                <span class="font-bold text-gray-800">${{ Number(sale.totalUsd).toFixed(2) }}</span>
+                <span class="font-bold text-gray-800"
+                  >${{ Number(sale.totalUsd).toFixed(2) }}</span
+                >
                 <span v-if="sale.totalBs" class="ml-1 text-xs text-gray-400">
                   Bs.{{ Number(sale.totalBs).toFixed(2) }}
                 </span>
@@ -263,13 +271,17 @@ async function handleVoidConfirmed() {
                         : 'bg-red-50 text-red-600'
                     "
                   >
-                    {{ saleProfit(sale)! >= 0 ? "+" : "" }}${{ saleProfit(sale)!.toFixed(2) }}
+                    {{ saleProfit(sale)! >= 0 ? "+" : "" }}${{
+                      saleProfit(sale)!.toFixed(2)
+                    }}
                   </span>
                 </template>
                 <span v-else class="text-gray-300">--</span>
               </td>
               <td class="px-4 py-3.5">
-                <span class="rounded-lg bg-gray-100/80 px-2 py-0.5 text-[11px] font-bold text-gray-500">
+                <span
+                  class="rounded-lg bg-gray-100/80 px-2 py-0.5 text-[11px] font-bold text-gray-500"
+                >
                   {{ sale.channel ?? "pos" }}
                 </span>
               </td>
@@ -320,8 +332,9 @@ async function handleVoidConfirmed() {
                       : 'bg-red-50 text-red-600'
                   "
                 >
-                  {{ saleProfit(sale)! >= 0 ? "+" : ""
-                  }}${{ saleProfit(sale)!.toFixed(2) }}
+                  {{ saleProfit(sale)! >= 0 ? "+" : "" }}${{
+                    saleProfit(sale)!.toFixed(2)
+                  }}
                 </span>
               </p>
               <p class="mt-0.5 text-xs font-medium text-gray-500">
@@ -370,7 +383,9 @@ async function handleVoidConfirmed() {
         class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
         @click.self="showReasonModal = false"
       >
-        <div class="glass-strong w-full max-w-sm rounded-[32px] p-7 shadow-[0_30px_60px_-15px_rgba(0,0,0,0.2)]">
+        <div
+          class="glass-strong w-full max-w-sm rounded-[32px] p-7 shadow-[0_30px_60px_-15px_rgba(0,0,0,0.2)]"
+        >
           <h3 class="mb-1 text-xl font-extrabold tracking-tight text-gradient">
             Motivo de anulacion
           </h3>
@@ -421,12 +436,5 @@ async function handleVoidConfirmed() {
         </div>
       </div>
     </Teleport>
-
-    <!-- Step 2: Owner PIN modal for voiding -->
-    <SharedOwnerPinModal
-      v-model="showVoidModal"
-      action-label="Anular esta venta requiere PIN del dueno"
-      @verified="handleVoidConfirmed"
-    />
   </div>
 </template>
