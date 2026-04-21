@@ -24,10 +24,15 @@ const pin = ref("");
 const error = ref("");
 const isVerifying = ref(false);
 
-/** Load roster from cache on mount. */
-onMounted(() => {
+/**
+ * Ensure roster is loaded. The plugin should have loaded it already,
+ * but if the app just started or the state was lost, load from cache.
+ * This runs during setup (not onMounted) so the template has data
+ * on first render.
+ */
+if (import.meta.client && !isLoaded.value) {
   loadFromCache();
-});
+}
 
 /** Separate owner and employees for display. */
 const owner = computed(() =>
