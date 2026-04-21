@@ -37,18 +37,19 @@ export function useApi() {
 
   // Capture Clerk's getToken during setup (not inside $api).
   // useAuth() uses inject() internally, which only works during setup.
-  let clerkGetToken: (() => Promise<string | null>) | null = null;
+  // We store the ref itself (not the value) so it stays reactive.
+  // If Clerk isn't initialized yet, we'll retry on each $api call.
+  let clerkGetTokenRef: { value: (() => Promise<string | null>) | undefined } | null = null;
+  let clerkInitFailed = false;
 
   if (import.meta.client) {
     try {
       const { getToken } = useAuth();
-      clerkGetToken = async () => {
-        const tokenFn = getToken.value;
-        if (!tokenFn) return null;
-        return await tokenFn();
-      };
+      clerkGetTokenRef = getToken;
     } catch {
-      // Clerk not initialized -- clerkGetToken stays null
+      // Clerk not initialized during plugin setup.
+      // We'll try again lazily on each $api call.
+      clerkInitFailed = true;
     }
   }
 
@@ -93,14 +94,31 @@ export function useApi() {
     };
 
     // Attach Clerk JWT (device authentication)
-    if (clerkGetToken) {
-      try {
-        const token = await clerkGetToken();
-        if (token) {
-          headers["Authorization"] = `Bearer ${token}`;
+    if (import.meta.client) {
+      // If Clerk wasn't ready during setup, try to get the ref now.
+      // This handles the case where the plugin runs before Clerk initializes.
+      if (clerkInitFailed && !clerkGetTokenRef) {
+        try {
+          const { getToken } = useAuth();
+          clerkGetTokenRef = getToken;
+          clerkInitFailed = false;
+        } catch {
+          // Still not ready -- proceed without auth
         }
-      } catch {
-        // Token retrieval failed -- proceed without auth header
+      }
+
+      if (clerkGetTokenRef) {
+        try {
+          const tokenFn = clerkGetTokenRef.value;
+          if (tokenFn) {
+            const token = await tokenFn();
+            if (token) {
+              headers["Authorization"] = `Bearer ${token}`;
+            }
+          }
+        } catch {
+          // Token retrieval failed -- proceed without auth header
+        }
       }
     }
 

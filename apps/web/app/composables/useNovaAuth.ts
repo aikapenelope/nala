@@ -175,13 +175,17 @@ export function useNovaAuth() {
         sessionExpired.value = false;
 
         // Download team roster for local PIN verification.
-        // Don't block login on roster download -- if it fails (e.g., Clerk
-        // token not yet propagated), retry once after a short delay.
-        // The auto-refresh (every 1 min) will catch it regardless.
+        // Retry aggressively because Clerk's token may not be ready
+        // immediately after sign-in. The roster is critical for PIN mode.
         const { refreshRoster, startAutoRefresh } = useTeamRoster();
-        refreshRoster().catch(() => {
-          setTimeout(() => refreshRoster().catch(() => {}), 2000);
-        });
+        let rosterLoaded = false;
+        for (let attempt = 0; attempt < 4; attempt++) {
+          if (attempt > 0) {
+            await new Promise((r) => setTimeout(r, 1500));
+          }
+          rosterLoaded = await refreshRoster();
+          if (rosterLoaded) break;
+        }
         startAutoRefresh();
 
         return { status: "ok" };
