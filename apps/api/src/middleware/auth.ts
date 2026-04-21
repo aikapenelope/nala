@@ -1,30 +1,17 @@
 /**
  * Authentication middleware.
  *
- * Verifies Clerk JWT tokens and resolves the active user for the request.
+ * Verifies Clerk JWT tokens and resolves the authenticated user.
  *
- * Two modes of operation:
- *
- * 1. **Owner direct** (no X-Acting-As header):
- *    JWT -> look up owner by clerkId -> set as active user.
- *
- * 2. **Employee acting** (X-Acting-As: <userId> header):
- *    JWT -> look up owner by clerkId (validates device auth) ->
- *    look up acting user by ID -> validate same business ->
- *    set acting user as active user.
- *
- * This implements the "Clerk authenticates the device, PIN identifies
- * the user" pattern from AUTH-REFACTOR-PLAN.md. The PIN verification
- * happens locally on the frontend; the backend only needs to know
- * which user is acting via the header.
+ * Every user (owner or employee) has their own Clerk account and JWT.
+ * The middleware verifies the JWT, looks up the user by clerkId,
+ * and sets the user context for downstream handlers.
  *
  * After auth, sets `user`, `businessId`, and `db` on the Hono context.
  */
 
 import { verifyToken } from "@clerk/backend";
 import { findUserByClerkId, findBusinessById } from "@nova/db";
-import { eq, and } from "drizzle-orm";
-import { users } from "@nova/db";
 import type { Context, Next } from "hono";
 import { getDb } from "../db";
 
@@ -55,9 +42,9 @@ async function verifyClerkJwt(token: string): Promise<string | null> {
 /**
  * Auth middleware for protected API routes.
  *
- * 1. Verify Clerk JWT -> identify the device owner
- * 2. If X-Acting-As header present -> resolve the acting employee
- * 3. Set the resolved user (owner or employee) on the context
+ * 1. Verify Clerk JWT
+ * 2. Look up user by clerkId (owner or employee)
+ * 3. Set the resolved user on the context
  */
 export async function authMiddleware(c: Context, next: Next) {
   const db = getDb();
@@ -87,7 +74,7 @@ export async function authMiddleware(c: Context, next: Next) {
     );
   }
 
-  // --- Step 1: Verify Clerk JWT (device authentication) ---
+  // --- Verify Clerk JWT ---
 
   const authHeader = c.req.header("Authorization");
   if (!authHeader?.startsWith("Bearer ")) {
@@ -101,10 +88,10 @@ export async function authMiddleware(c: Context, next: Next) {
     return c.json({ error: "Invalid or expired token" }, 401);
   }
 
-  // Look up the device owner (the Clerk account holder)
-  const ownerUser = await findUserByClerkId(db, clerkUserId);
+  // Look up the user (owner or employee) by their Clerk ID
+  const user = await findUserByClerkId(db, clerkUserId);
 
-  if (!ownerUser) {
+  if (!user) {
     return c.json(
       {
         error: "User not found. Complete onboarding first.",
@@ -114,11 +101,11 @@ export async function authMiddleware(c: Context, next: Next) {
     );
   }
 
-  if (!ownerUser.isActive) {
+  if (!user.isActive) {
     return c.json({ error: "Account is deactivated" }, 403);
   }
 
-  const business = await findBusinessById(db, ownerUser.businessId);
+  const business = await findBusinessById(db, user.businessId);
   if (!business) {
     return c.json(
       {
@@ -133,52 +120,14 @@ export async function authMiddleware(c: Context, next: Next) {
     return c.json({ error: "Business is deactivated" }, 403);
   }
 
-  // --- Step 2: Check for X-Acting-As (employee identification) ---
-
-  const actingAsUserId = c.req.header("X-Acting-As");
-  let activeUser: AuthUser;
-
-  if (actingAsUserId && actingAsUserId !== ownerUser.id) {
-    // An employee is acting on this device. Look them up and validate
-    // they belong to the same business as the device owner.
-    const [actingUser] = await db
-      .select()
-      .from(users)
-      .where(
-        and(
-          eq(users.id, actingAsUserId),
-          eq(users.businessId, ownerUser.businessId),
-          eq(users.isActive, true),
-        ),
-      )
-      .limit(1);
-
-    if (!actingUser) {
-      return c.json(
-        { error: "Acting user not found or not in this business" },
-        403,
-      );
-    }
-
-    activeUser = {
-      id: actingUser.id,
-      businessId: actingUser.businessId,
-      businessName: business.name,
-      name: actingUser.name,
-      role: actingUser.role as "owner" | "employee",
-      clerkId: actingUser.clerkId ?? undefined,
-    };
-  } else {
-    // Owner is acting directly
-    activeUser = {
-      id: ownerUser.id,
-      businessId: ownerUser.businessId,
-      businessName: business.name,
-      name: ownerUser.name,
-      role: ownerUser.role as "owner" | "employee",
-      clerkId: clerkUserId,
-    };
-  }
+  const activeUser: AuthUser = {
+    id: user.id,
+    businessId: user.businessId,
+    businessName: business.name,
+    name: user.name,
+    role: user.role as "owner" | "employee",
+    clerkId: clerkUserId,
+  };
 
   c.set("user", activeUser);
   c.set("businessId", activeUser.businessId);

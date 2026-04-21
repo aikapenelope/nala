@@ -72,7 +72,7 @@ export const users = pgTable(
     clerkId: text("clerk_id"),
     name: text("name").notNull(),
     role: text("role").notNull().default("employee"),
-    pinHash: text("pin_hash").notNull(),
+    pinHash: text("pin_hash"),
     phone: text("phone"),
     whatsappEnabled: boolean("whatsapp_enabled").notNull().default(false),
     isActive: boolean("is_active").notNull().default(true),
@@ -409,7 +409,10 @@ export const sales = pgTable(
     notes: text("notes"),
 
     /** Total cost of items sold (USD). For profit calculation. */
-    totalCostUsd: numeric("total_cost_usd", { precision: 12, scale: 2 }).default("0"),
+    totalCostUsd: numeric("total_cost_usd", {
+      precision: 12,
+      scale: 2,
+    }).default("0"),
 
     /** Sale channel: pos, whatsapp, delivery, online. */
     channel: text("channel").notNull().default("pos"),
@@ -993,5 +996,3 @@ export const notificationPreferences = pgTable("notification_preferences", {
     .notNull()
     .defaultNow(),
 });
-
-
