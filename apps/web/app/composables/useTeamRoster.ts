@@ -74,7 +74,12 @@ export function useTeamRoster() {
    */
   async function refreshRoster(): Promise<boolean> {
     try {
-      const result = await $api<CachedRoster>("/api/team-roster");
+      // Use silent mode to avoid triggering the session-expired banner.
+      // The roster refresh is a background operation that runs every minute.
+      // If it fails (e.g., JWT expired), we keep using the cached roster.
+      const result = await $api<CachedRoster>("/api/team-roster", {
+        silent: true,
+      });
 
       roster.value = result.roster;
       businessId.value = result.businessId;

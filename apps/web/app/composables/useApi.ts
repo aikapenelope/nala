@@ -79,11 +79,14 @@ export function useApi() {
    *
    * Always attaches the Clerk JWT (device auth).
    * If an employee is acting (PIN-identified), attaches X-Acting-As.
-   * On 401, clears session and sets sessionExpired flag.
+   * On 401, clears session and sets sessionExpired flag (unless silent).
+   *
+   * @param opts.silent - If true, 401 errors won't trigger the session-expired banner.
+   *   Use for background requests (roster refresh, etc.) that shouldn't interrupt the user.
    */
   async function $api<T = unknown>(
     path: string,
-    opts?: NitroFetchOptions<string>,
+    opts?: NitroFetchOptions<string> & { silent?: boolean },
   ): Promise<T> {
     const headers: Record<string, string> = {
       ...(opts?.headers as Record<string, string> | undefined),
@@ -120,8 +123,8 @@ export function useApi() {
       // Intercept 401: Clerk JWT expired or revoked
       const fetchError = err as { statusCode?: number; status?: number };
       if (
-        fetchError.statusCode === 401 ||
-        fetchError.status === 401
+        (fetchError.statusCode === 401 || fetchError.status === 401) &&
+        !opts?.silent
       ) {
         handle401();
       }
