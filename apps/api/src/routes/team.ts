@@ -183,6 +183,7 @@ team.post("/employees", zValidator("json", createEmployeeSchema), async (c) => {
     );
 
   for (const existing of existingUsers) {
+    if (!existing.pinHash) continue;
     const isDuplicate = await bcrypt.compare(pin, existing.pinHash);
     if (isDuplicate) {
       return c.json(
@@ -271,61 +272,68 @@ team.patch(
 
     // Build update payload
     try {
-    const updates: Record<string, unknown> = { updatedAt: new Date() };
+      const updates: Record<string, unknown> = { updatedAt: new Date() };
 
-    if (data.name !== undefined) {
-      updates.name = data.name;
-    }
-
-    if (data.isActive !== undefined) {
-      updates.isActive = data.isActive;
-    }
-
-    if (data.pin !== undefined) {
-      // Check for duplicate PIN
-      const otherUsers = await db
-        .select({ id: users.id, pinHash: users.pinHash })
-        .from(users)
-        .where(
-          and(
-            eq(users.businessId, currentUser.businessId),
-            eq(users.isActive, true),
-          ),
-        );
-
-      for (const other of otherUsers) {
-        if (other.id === employeeId) continue;
-        const isDuplicate = await bcrypt.compare(data.pin, other.pinHash);
-        if (isDuplicate) {
-          return c.json(
-            { error: "Este PIN ya esta en uso por otro miembro del equipo" },
-            409,
-          );
-        }
+      if (data.name !== undefined) {
+        updates.name = data.name;
       }
 
-      updates.pinHash = await bcrypt.hash(data.pin, 10);
-    }
+      if (data.isActive !== undefined) {
+        updates.isActive = data.isActive;
+      }
 
-    const [updated] = await db
-      .update(users)
-      .set(updates)
-      .where(eq(users.id, employeeId))
-      .returning({
-        id: users.id,
-        name: users.name,
-        role: users.role,
-        isActive: users.isActive,
+      if (data.pin !== undefined) {
+        // Check for duplicate PIN
+        const otherUsers = await db
+          .select({ id: users.id, pinHash: users.pinHash })
+          .from(users)
+          .where(
+            and(
+              eq(users.businessId, currentUser.businessId),
+              eq(users.isActive, true),
+            ),
+          );
+
+        for (const other of otherUsers) {
+          if (other.id === employeeId) continue;
+          if (!other.pinHash) continue;
+          const isDuplicate = await bcrypt.compare(data.pin, other.pinHash);
+          if (isDuplicate) {
+            return c.json(
+              { error: "Este PIN ya esta en uso por otro miembro del equipo" },
+              409,
+            );
+          }
+        }
+
+        updates.pinHash = await bcrypt.hash(data.pin, 10);
+      }
+
+      const [updated] = await db
+        .update(users)
+        .set(updates)
+        .where(eq(users.id, employeeId))
+        .returning({
+          id: users.id,
+          name: users.name,
+          role: users.role,
+          isActive: users.isActive,
+        });
+
+      logActivity({
+        db,
+        businessId: currentUser.businessId,
+        userId: currentUser.id,
+        action: "employee_updated",
+        detail: `${updated.name}`,
       });
 
-    logActivity({ db, businessId: currentUser.businessId, userId: currentUser.id, action: "employee_updated", detail: `${updated.name}` });
-
-    return c.json({ employee: updated });
-  } catch (err) {
-    const dbErr = handleDbError(err);
-    if (dbErr) return c.json({ error: dbErr.message }, dbErr.status);
-    throw err;
-  }
+      return c.json({ employee: updated });
+    } catch (err) {
+      const dbErr = handleDbError(err);
+      if (dbErr) return c.json({ error: dbErr.message }, dbErr.status);
+      throw err;
+    }
   },
 );
 
@@ -367,7 +375,13 @@ team.delete("/employees/:id", validateUuidParam, async (c) => {
     .set({ isActive: false, updatedAt: new Date() })
     .where(eq(users.id, employeeId));
 
-  logActivity({ db, businessId: currentUser.businessId, userId: currentUser.id, action: "employee_deactivated", detail: `Employee ${employeeId.slice(0, 8)}` });
+  logActivity({
+    db,
+    businessId: currentUser.businessId,
+    userId: currentUser.id,
+    action: "employee_deactivated",
+    detail: `Employee ${employeeId.slice(0, 8)}`,
+  });
 
   return c.json({ success: true });
 });
@@ -402,34 +416,30 @@ team.get("/settings", async (c) => {
 });
 
 /** PATCH /settings - Update business settings. */
-team.patch(
-  "/settings",
-  zValidator("json", updateSettingsSchema),
-  async (c) => {
-    const ownerCheck = requireOwner(c);
-    if (ownerCheck) return c.json(ownerCheck, 403);
+team.patch("/settings", zValidator("json", updateSettingsSchema), async (c) => {
+  const ownerCheck = requireOwner(c);
+  if (ownerCheck) return c.json(ownerCheck, 403);
 
-    const data = c.req.valid("json");
-    const currentUser = c.get("user");
-    const db = c.get("db");
+  const data = c.req.valid("json");
+  const currentUser = c.get("user");
+  const db = c.get("db");
 
-    const updates: Record<string, unknown> = { updatedAt: new Date() };
-    if (data.accountantEmail !== undefined)
-      updates.accountantEmail = data.accountantEmail;
-    if (data.whatsappNumber !== undefined)
-      updates.whatsappNumber = data.whatsappNumber;
+  const updates: Record<string, unknown> = { updatedAt: new Date() };
+  if (data.accountantEmail !== undefined)
+    updates.accountantEmail = data.accountantEmail;
+  if (data.whatsappNumber !== undefined)
+    updates.whatsappNumber = data.whatsappNumber;
 
-    const [updated] = await db
-      .update(businesses)
-      .set(updates)
-      .where(eq(businesses.id, currentUser.businessId))
-      .returning({
-        accountantEmail: businesses.accountantEmail,
-        whatsappNumber: businesses.whatsappNumber,
-      });
+  const [updated] = await db
+    .update(businesses)
+    .set(updates)
+    .where(eq(businesses.id, currentUser.businessId))
+    .returning({
+      accountantEmail: businesses.accountantEmail,
+      whatsappNumber: businesses.whatsappNumber,
+    });
 
-    return c.json({ settings: updated });
-  },
-);
+  return c.json({ settings: updated });
+});
 
 export { team };
