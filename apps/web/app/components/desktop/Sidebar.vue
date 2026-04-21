@@ -21,7 +21,6 @@ import {
   Receipt,
   PanelLeftClose,
   PanelLeftOpen,
-  ArrowLeftRight,
   LogOut,
 } from "lucide-vue-next";
 import type { Component } from "vue";
@@ -57,17 +56,16 @@ const navItems: NavItem[] = [
   { to: "/settings", icon: Settings, label: "Config.", adminOnly: true },
 ];
 
-const { isAdmin, user, clearUser } = useNovaAuth();
-const { isStoreMode } = useDeviceMode();
+const { isAdmin, user, fullLogout } = useNovaAuth();
 
 const visibleItems = computed(() =>
   navItems.filter((item) => !item.adminOnly || isAdmin.value),
 );
 
-/** Switch user: clear current session and go to PIN screen (store mode only). */
-function switchShift() {
-  clearUser();
-  navigateTo("/auth/pin");
+/** Logout and redirect to landing. */
+async function handleLogout() {
+  await fullLogout();
+  navigateTo("/landing");
 }
 
 /** Sidebar collapsed state, persisted in localStorage. */
@@ -105,10 +103,7 @@ function toggleCollapsed() {
       >
         <span class="text-sm font-extrabold text-white">N</span>
       </div>
-      <span
-        v-if="!isCollapsed"
-        class="text-xl font-extrabold text-gradient"
-      >
+      <span v-if="!isCollapsed" class="text-xl font-extrabold text-gradient">
         Nova
       </span>
     </div>
@@ -121,7 +116,9 @@ function toggleCollapsed() {
         :to="item.to"
         :title="isCollapsed ? item.label : undefined"
         class="group relative flex items-center rounded-2xl text-sm font-semibold text-gray-500 transition-spring hover:bg-white/60 hover:text-gray-900 hover:shadow-[0_4px_12px_-2px_rgba(0,0,0,0.05)]"
-        :class="isCollapsed ? 'justify-center px-0 py-2.5' : 'gap-3 px-4 py-2.5'"
+        :class="
+          isCollapsed ? 'justify-center px-0 py-2.5' : 'gap-3 px-4 py-2.5'
+        "
         active-class="dark-pill !text-white !shadow-[0_10px_25px_-5px_rgba(0,0,0,0.3),inset_0_2px_3px_rgba(255,255,255,0.15)]"
       >
         <component :is="item.icon" :size="18" class="flex-shrink-0" />
@@ -143,7 +140,10 @@ function toggleCollapsed() {
       :title="isCollapsed ? 'Expandir' : 'Colapsar'"
       @click="toggleCollapsed"
     >
-      <component :is="isCollapsed ? PanelLeftOpen : PanelLeftClose" :size="16" />
+      <component
+        :is="isCollapsed ? PanelLeftOpen : PanelLeftClose"
+        :size="16"
+      />
     </button>
 
     <!-- User section -->
@@ -169,29 +169,16 @@ function toggleCollapsed() {
         </div>
       </div>
 
-      <!-- Store mode: switch shift button -->
+      <!-- Logout button -->
       <button
-        v-if="isStoreMode"
-        class="mt-1 flex w-full items-center rounded-xl px-2 py-2 text-[11px] font-bold text-gray-400 transition-spring hover:bg-white/60 hover:text-gray-600"
-        :class="isCollapsed ? 'justify-center' : 'gap-2'"
-        :title="isCollapsed ? 'Cambiar turno' : undefined"
-        @click="switchShift"
-      >
-        <ArrowLeftRight :size="14" />
-        <span v-if="!isCollapsed">Cambiar turno</span>
-      </button>
-
-      <!-- Owner mode: logout link (only for admin) -->
-      <NuxtLink
-        v-if="!isStoreMode && isAdmin"
-        to="/auth/login"
         class="mt-1 flex w-full items-center rounded-xl px-2 py-2 text-[11px] font-bold text-gray-400 transition-spring hover:bg-white/60 hover:text-gray-600"
         :class="isCollapsed ? 'justify-center' : 'gap-2'"
         :title="isCollapsed ? 'Cerrar sesion' : undefined"
+        @click="handleLogout"
       >
         <LogOut :size="14" />
         <span v-if="!isCollapsed">Cerrar sesion</span>
-      </NuxtLink>
+      </button>
     </div>
   </aside>
 </template>
