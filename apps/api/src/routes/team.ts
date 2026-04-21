@@ -1,23 +1,21 @@
 /**
  * Team management routes.
  *
- * GET    /team-roster       - Download employee list with PIN hashes for local cache (owner only)
- * POST   /switch-user       - Server-side user switch validation (fallback)
- * GET    /employees         - List employees (owner only)
- * POST   /employees         - Create employee with name + PIN (owner only)
- * PATCH  /employees/:id     - Update employee name or PIN (owner only)
- * DELETE /employees/:id     - Deactivate employee (owner only, soft delete)
+ * GET    /employees              - List employees (owner only)
+ * POST   /employees              - Create employee with Clerk account + access link (owner only)
+ * PATCH  /employees/:id          - Update employee name or active status (owner only)
+ * DELETE /employees/:id          - Deactivate employee (owner only, soft delete)
+ * POST   /employees/:id/access-link - Generate a new sign-in token link (owner only)
  *
- * These endpoints support the "Clerk authenticates device, PIN identifies user"
- * pattern from AUTH-REFACTOR-PLAN.md.
+ * Employees authenticate with their own Clerk JWT via sign-in tokens.
+ * The admin generates a link that the employee opens to get authenticated.
  */
 
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import bcrypt from "bcryptjs";
 import { eq, and } from "drizzle-orm";
-import { PIN_LENGTH } from "@nova/shared";
+import { createClerkClient } from "@clerk/backend";
 import { users, businesses } from "@nova/db";
 import { handleDbError } from "../utils/db-errors";
 import { logActivity } from "../utils/audit";
@@ -35,91 +33,19 @@ function requireOwner(c: { get: (key: string) => unknown }) {
   return null;
 }
 
-// ============================================================
-// Team Roster (for local PIN cache)
-// ============================================================
+/** Get a configured Clerk client. */
+function getClerkClient() {
+  return createClerkClient({
+    secretKey: process.env.CLERK_SECRET_KEY ?? "",
+  });
+}
 
 /**
- * GET /team-roster - Download employee roster for local PIN verification.
- * Owner only. Returns PIN hashes for client-side bcrypt comparison.
+ * Default sign-in token expiry: 30 days (maximum allowed by Clerk).
+ * On the Hobby plan, session lifetime is fixed at 7 days, but the
+ * sign-in token itself can last up to 30 days before being used.
  */
-team.get("/team-roster", async (c) => {
-  const ownerCheck = requireOwner(c);
-  if (ownerCheck) return c.json(ownerCheck, 403);
-
-  const currentUser = c.get("user");
-  const db = c.get("db");
-
-  const roster = await db
-    .select({
-      id: users.id,
-      name: users.name,
-      role: users.role,
-      pinHash: users.pinHash,
-    })
-    .from(users)
-    .where(
-      and(
-        eq(users.businessId, currentUser.businessId),
-        eq(users.isActive, true),
-      ),
-    );
-
-  return c.json({
-    roster,
-    businessId: currentUser.businessId,
-    businessName: currentUser.businessName,
-    generatedAt: new Date().toISOString(),
-  });
-});
-
-// ============================================================
-// Switch User (fallback)
-// ============================================================
-
-const switchUserSchema = z.object({
-  userId: z.string().uuid(),
-});
-
-/**
- * POST /switch-user - Server-side user switch (fallback when no local roster).
- */
-team.post("/switch-user", zValidator("json", switchUserSchema), async (c) => {
-  const { userId } = c.req.valid("json");
-  const currentUser = c.get("user");
-  const db = c.get("db");
-
-  const [targetUser] = await db
-    .select({
-      id: users.id,
-      name: users.name,
-      role: users.role,
-      businessId: users.businessId,
-    })
-    .from(users)
-    .where(
-      and(
-        eq(users.id, userId),
-        eq(users.businessId, currentUser.businessId),
-        eq(users.isActive, true),
-      ),
-    )
-    .limit(1);
-
-  if (!targetUser) {
-    return c.json({ error: "User not found or not in this business" }, 404);
-  }
-
-  return c.json({
-    user: {
-      id: targetUser.id,
-      name: targetUser.name,
-      role: targetUser.role,
-      businessId: targetUser.businessId,
-      businessName: currentUser.businessName,
-    },
-  });
-});
+const SIGN_IN_TOKEN_EXPIRY_SECONDS = 30 * 24 * 60 * 60;
 
 // ============================================================
 // Employee CRUD (owner only)
@@ -127,7 +53,7 @@ team.post("/switch-user", zValidator("json", switchUserSchema), async (c) => {
 
 /**
  * GET /employees - List all employees for the business.
- * Returns name, role, active status. No PIN hashes (use /team-roster for that).
+ * Returns name, role, active status, and whether they have a Clerk account.
  */
 team.get("/employees", async (c) => {
   const ownerCheck = requireOwner(c);
@@ -142,66 +68,78 @@ team.get("/employees", async (c) => {
       name: users.name,
       role: users.role,
       isActive: users.isActive,
+      clerkId: users.clerkId,
       createdAt: users.createdAt,
     })
     .from(users)
     .where(eq(users.businessId, currentUser.businessId));
 
-  return c.json({ employees });
+  return c.json({
+    employees: employees.map((e) => ({
+      ...e,
+      hasClerkAccount: !!e.clerkId,
+      clerkId: undefined, // Don't expose clerkId to frontend
+    })),
+  });
 });
 
 /** Schema for creating an employee. */
 const createEmployeeSchema = z.object({
   name: z.string().min(1).max(100),
-  pin: z.string().length(PIN_LENGTH),
 });
 
 /**
- * POST /employees - Create a new employee.
+ * POST /employees - Create a new employee with a Clerk account.
  *
- * Validates:
- * - PIN is not already used by another active user in the same business
- *   (bcrypt comparison against all existing hashes)
+ * 1. Creates a Clerk user (with username derived from business slug + name)
+ * 2. Creates the employee record in the DB linked to the Clerk user
+ * 3. Generates a sign-in token for the employee
+ * 4. Returns the access link
  */
 team.post("/employees", zValidator("json", createEmployeeSchema), async (c) => {
   const ownerCheck = requireOwner(c);
   if (ownerCheck) return c.json(ownerCheck, 403);
 
-  const { name, pin } = c.req.valid("json");
+  const { name } = c.req.valid("json");
   const currentUser = c.get("user");
   const db = c.get("db");
+  const clerk = getClerkClient();
 
-  // Check for duplicate PIN within the business
-  const existingUsers = await db
-    .select({ id: users.id, pinHash: users.pinHash })
-    .from(users)
-    .where(
-      and(
-        eq(users.businessId, currentUser.businessId),
-        eq(users.isActive, true),
-      ),
-    );
+  // Get business slug for username generation
+  const [business] = await db
+    .select({ slug: businesses.slug })
+    .from(businesses)
+    .where(eq(businesses.id, currentUser.businessId))
+    .limit(1);
 
-  for (const existing of existingUsers) {
-    const isDuplicate = await bcrypt.compare(pin, existing.pinHash);
-    if (isDuplicate) {
-      return c.json(
-        { error: "Este PIN ya esta en uso por otro miembro del equipo" },
-        409,
-      );
-    }
-  }
+  const slug = business?.slug ?? "nova";
 
-  const pinHash = await bcrypt.hash(pin, 10);
+  // Generate a unique username: {slug}-{sanitized-name}-{random}
+  const sanitizedName = name
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]/g, "")
+    .slice(0, 20);
+  const randomSuffix = Math.random().toString(36).slice(2, 7);
+  const username = `${slug}-${sanitizedName}-${randomSuffix}`;
 
   try {
+    // 1. Create Clerk user (no email required, username-only)
+    const clerkUser = await clerk.users.createUser({
+      username,
+      firstName: name,
+      skipPasswordRequirement: true,
+    });
+
+    // 2. Create employee record in DB
     const [employee] = await db
       .insert(users)
       .values({
         businessId: currentUser.businessId,
         name,
         role: "employee",
-        pinHash,
+        clerkId: clerkUser.id,
       })
       .returning({
         id: users.id,
@@ -211,8 +149,44 @@ team.post("/employees", zValidator("json", createEmployeeSchema), async (c) => {
         createdAt: users.createdAt,
       });
 
-    return c.json({ employee }, 201);
+    // 3. Generate sign-in token
+    const signInToken = await clerk.signInTokens.createSignInToken({
+      userId: clerkUser.id,
+      expiresInSeconds: SIGN_IN_TOKEN_EXPIRY_SECONDS,
+    });
+
+    // 4. Build the access link using the business subdomain
+    const tenantDomain = process.env.TENANT_DOMAIN ?? "novaincs.com";
+    const accessUrl = `https://${slug}.${tenantDomain}/auth/accept-token?token=${signInToken.token}`;
+
+    logActivity({
+      db,
+      businessId: currentUser.businessId,
+      userId: currentUser.id,
+      action: "employee_created",
+      detail: name,
+    });
+
+    return c.json(
+      {
+        employee: { ...employee, hasClerkAccount: true },
+        accessLink: accessUrl,
+      },
+      201,
+    );
   } catch (err) {
+    // Handle Clerk API errors
+    const clerkError = err as { errors?: Array<{ message: string }> };
+    if (clerkError.errors) {
+      return c.json(
+        {
+          error:
+            clerkError.errors[0]?.message ?? "Error creating Clerk account",
+        },
+        400,
+      );
+    }
+
     const dbErr = handleDbError(err);
     if (dbErr) return c.json({ error: dbErr.message }, dbErr.status);
     throw err;
@@ -222,15 +196,13 @@ team.post("/employees", zValidator("json", createEmployeeSchema), async (c) => {
 /** Schema for updating an employee. */
 const updateEmployeeSchema = z.object({
   name: z.string().min(1).max(100).optional(),
-  pin: z.string().length(PIN_LENGTH).optional(),
   isActive: z.boolean().optional(),
 });
 
 /**
  * PATCH /employees/:id - Update an employee.
  *
- * Can update name, PIN, or active status.
- * If PIN is changed, validates no duplicate within the business.
+ * Can update name or active status. No more PIN management.
  */
 team.patch(
   "/employees/:id",
@@ -269,70 +241,49 @@ team.patch(
       );
     }
 
-    // Build update payload
     try {
-    const updates: Record<string, unknown> = { updatedAt: new Date() };
+      const updates: Record<string, unknown> = { updatedAt: new Date() };
 
-    if (data.name !== undefined) {
-      updates.name = data.name;
-    }
-
-    if (data.isActive !== undefined) {
-      updates.isActive = data.isActive;
-    }
-
-    if (data.pin !== undefined) {
-      // Check for duplicate PIN
-      const otherUsers = await db
-        .select({ id: users.id, pinHash: users.pinHash })
-        .from(users)
-        .where(
-          and(
-            eq(users.businessId, currentUser.businessId),
-            eq(users.isActive, true),
-          ),
-        );
-
-      for (const other of otherUsers) {
-        if (other.id === employeeId) continue;
-        const isDuplicate = await bcrypt.compare(data.pin, other.pinHash);
-        if (isDuplicate) {
-          return c.json(
-            { error: "Este PIN ya esta en uso por otro miembro del equipo" },
-            409,
-          );
-        }
+      if (data.name !== undefined) {
+        updates.name = data.name;
       }
 
-      updates.pinHash = await bcrypt.hash(data.pin, 10);
-    }
+      if (data.isActive !== undefined) {
+        updates.isActive = data.isActive;
+      }
 
-    const [updated] = await db
-      .update(users)
-      .set(updates)
-      .where(eq(users.id, employeeId))
-      .returning({
-        id: users.id,
-        name: users.name,
-        role: users.role,
-        isActive: users.isActive,
+      const [updated] = await db
+        .update(users)
+        .set(updates)
+        .where(eq(users.id, employeeId))
+        .returning({
+          id: users.id,
+          name: users.name,
+          role: users.role,
+          isActive: users.isActive,
+        });
+
+      logActivity({
+        db,
+        businessId: currentUser.businessId,
+        userId: currentUser.id,
+        action: "employee_updated",
+        detail: `${updated.name}`,
       });
 
-    logActivity({ db, businessId: currentUser.businessId, userId: currentUser.id, action: "employee_updated", detail: `${updated.name}` });
-
-    return c.json({ employee: updated });
-  } catch (err) {
-    const dbErr = handleDbError(err);
-    if (dbErr) return c.json({ error: dbErr.message }, dbErr.status);
-    throw err;
-  }
+      return c.json({ employee: updated });
+    } catch (err) {
+      const dbErr = handleDbError(err);
+      if (dbErr) return c.json({ error: dbErr.message }, dbErr.status);
+      throw err;
+    }
   },
 );
 
 /**
  * DELETE /employees/:id - Deactivate an employee (soft delete).
  *
- * Sets isActive = false. The employee can no longer use PIN to identify.
+ * Sets isActive = false. The employee can no longer authenticate.
  * Their sales history is preserved.
  */
 team.delete("/employees/:id", validateUuidParam, async (c) => {
@@ -367,9 +318,117 @@ team.delete("/employees/:id", validateUuidParam, async (c) => {
     .set({ isActive: false, updatedAt: new Date() })
     .where(eq(users.id, employeeId));
 
-  logActivity({ db, businessId: currentUser.businessId, userId: currentUser.id, action: "employee_deactivated", detail: `Employee ${employeeId.slice(0, 8)}` });
+  logActivity({
+    db,
+    businessId: currentUser.businessId,
+    userId: currentUser.id,
+    action: "employee_deactivated",
+    detail: `Employee ${employeeId.slice(0, 8)}`,
+  });
 
   return c.json({ success: true });
+});
+
+// ============================================================
+// Access Link Generation
+// ============================================================
+
+/**
+ * POST /employees/:id/access-link - Generate a new sign-in token link.
+ *
+ * Creates a new Clerk sign-in token for the employee and returns
+ * a link that the admin can share (WhatsApp, QR, etc.).
+ * The previous token is implicitly invalidated when a new one is created.
+ */
+team.post("/employees/:id/access-link", validateUuidParam, async (c) => {
+  const ownerCheck = requireOwner(c);
+  if (ownerCheck) return c.json(ownerCheck, 403);
+
+  const employeeId = c.req.param("id");
+  const currentUser = c.get("user");
+  const db = c.get("db");
+  const clerk = getClerkClient();
+
+  // Find the employee
+  const [employee] = await db
+    .select({
+      id: users.id,
+      name: users.name,
+      role: users.role,
+      clerkId: users.clerkId,
+      isActive: users.isActive,
+    })
+    .from(users)
+    .where(
+      and(
+        eq(users.id, employeeId),
+        eq(users.businessId, currentUser.businessId),
+      ),
+    )
+    .limit(1);
+
+  if (!employee) {
+    return c.json({ error: "Empleado no encontrado" }, 404);
+  }
+
+  if (!employee.isActive) {
+    return c.json({ error: "El empleado esta desactivado" }, 400);
+  }
+
+  if (employee.role === "owner") {
+    return c.json(
+      { error: "El dueno no necesita link de acceso (usa Clerk directamente)" },
+      400,
+    );
+  }
+
+  if (!employee.clerkId) {
+    return c.json(
+      { error: "El empleado no tiene cuenta Clerk. Recrealo desde el panel." },
+      400,
+    );
+  }
+
+  try {
+    // Generate a new sign-in token
+    const signInToken = await clerk.signInTokens.createSignInToken({
+      userId: employee.clerkId,
+      expiresInSeconds: SIGN_IN_TOKEN_EXPIRY_SECONDS,
+    });
+
+    // Build the access link
+    const [business] = await db
+      .select({ slug: businesses.slug })
+      .from(businesses)
+      .where(eq(businesses.id, currentUser.businessId))
+      .limit(1);
+
+    const slug = business?.slug ?? "nova";
+    const tenantDomain = process.env.TENANT_DOMAIN ?? "novaincs.com";
+    const accessUrl = `https://${slug}.${tenantDomain}/auth/accept-token?token=${signInToken.token}`;
+
+    logActivity({
+      db,
+      businessId: currentUser.businessId,
+      userId: currentUser.id,
+      action: "access_link_generated",
+      detail: employee.name,
+    });
+
+    return c.json({ accessLink: accessUrl });
+  } catch (err) {
+    const clerkError = err as { errors?: Array<{ message: string }> };
+    if (clerkError.errors) {
+      return c.json(
+        {
+          error:
+            clerkError.errors[0]?.message ?? "Error generating access link",
+        },
+        500,
+      );
+    }
+    throw err;
+  }
 });
 
 // ============================================================
@@ -402,34 +461,30 @@ team.get("/settings", async (c) => {
 });
 
 /** PATCH /settings - Update business settings. */
-team.patch(
-  "/settings",
-  zValidator("json", updateSettingsSchema),
-  async (c) => {
-    const ownerCheck = requireOwner(c);
-    if (ownerCheck) return c.json(ownerCheck, 403);
+team.patch("/settings", zValidator("json", updateSettingsSchema), async (c) => {
+  const ownerCheck = requireOwner(c);
+  if (ownerCheck) return c.json(ownerCheck, 403);
 
-    const data = c.req.valid("json");
-    const currentUser = c.get("user");
-    const db = c.get("db");
+  const data = c.req.valid("json");
+  const currentUser = c.get("user");
+  const db = c.get("db");
 
-    const updates: Record<string, unknown> = { updatedAt: new Date() };
-    if (data.accountantEmail !== undefined)
-      updates.accountantEmail = data.accountantEmail;
-    if (data.whatsappNumber !== undefined)
-      updates.whatsappNumber = data.whatsappNumber;
+  const updates: Record<string, unknown> = { updatedAt: new Date() };
+  if (data.accountantEmail !== undefined)
+    updates.accountantEmail = data.accountantEmail;
+  if (data.whatsappNumber !== undefined)
+    updates.whatsappNumber = data.whatsappNumber;
 
-    const [updated] = await db
-      .update(businesses)
-      .set(updates)
-      .where(eq(businesses.id, currentUser.businessId))
-      .returning({
-        accountantEmail: businesses.accountantEmail,
-        whatsappNumber: businesses.whatsappNumber,
-      });
+  const [updated] = await db
+    .update(businesses)
+    .set(updates)
+    .where(eq(businesses.id, currentUser.businessId))
+    .returning({
+      accountantEmail: businesses.accountantEmail,
+      whatsappNumber: businesses.whatsappNumber,
+    });
 
-    return c.json({ settings: updated });
-  },
-);
+  return c.json({ settings: updated });
+});
 
 export { team };
