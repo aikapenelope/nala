@@ -3,18 +3,11 @@
  *
  * Provides a typed `$api` function that wraps `$fetch` with:
  * - Automatic base URL from runtime config (NUXT_PUBLIC_API_BASE)
- * - Clerk JWT token in Authorization header (device authentication)
- * - X-Acting-As header when an employee is identified via PIN
- * - 401 interceptor: clears stale session and redirects to re-auth
+ * - Clerk JWT token in Authorization header
+ * - 401 interceptor: clears stale session and shows re-auth banner
  *
- * IMPORTANT: useAuth() is called once during composable setup (not inside
- * the $api function) because Vue composables that use inject() must be
- * called during the setup phase, not in event handlers.
- *
- * Auth model (AUTH-REFACTOR-PLAN.md):
- * - Clerk JWT authenticates the device (owner signed in once)
- * - X-Acting-As identifies which employee is using the device
- * - The backend resolves the acting user and sets permissions accordingly
+ * Every user (owner and employee) has their own Clerk JWT.
+ * No X-Acting-As header is needed.
  *
  * Usage:
  *   const { $api } = useApi();
@@ -30,16 +23,13 @@ export function useApi() {
 
   /**
    * Reactive flag shown by layouts/components when session expires.
-   * Must be inside useApi() (not module-level) because useState requires
-   * the Nuxt instance context which is only available during setup/composables.
    */
   const sessionExpired = useState<boolean>("session-expired", () => false);
 
   // Capture Clerk's getToken during setup (not inside $api).
-  // useAuth() uses inject() internally, which only works during setup.
-  // We store the ref itself (not the value) so it stays reactive.
-  // If Clerk isn't initialized yet, we'll retry on each $api call.
-  let clerkGetTokenRef: { value: (() => Promise<string | null>) | undefined } | null = null;
+  let clerkGetTokenRef: {
+    value: (() => Promise<string | null>) | undefined;
+  } | null = null;
   let clerkInitFailed = false;
 
   if (import.meta.client) {
@@ -47,29 +37,18 @@ export function useApi() {
       const { getToken } = useAuth();
       clerkGetTokenRef = getToken;
     } catch {
-      // Clerk not initialized during plugin setup.
-      // We'll try again lazily on each $api call.
       clerkInitFailed = true;
     }
   }
 
   /**
    * Handle a 401 response from the API.
-   *
-   * This means the Clerk JWT expired or was revoked. Clear the stale
-   * Nova user and show a banner so the owner knows to re-authenticate.
-   *
-   * We don't auto-redirect because the user might be mid-sale. Instead
-   * we set a reactive flag that the layout shows as a banner.
    */
   function handle401() {
     if (!import.meta.client) return;
-
-    // Prevent multiple triggers
     if (sessionExpired.value) return;
     sessionExpired.value = true;
 
-    // Clear the stale Nova user from both state and localStorage
     const novaUser = useState<unknown>("nova-user");
     novaUser.value = null;
     localStorage.removeItem("nova:user");
@@ -78,12 +57,7 @@ export function useApi() {
   /**
    * Make an authenticated API request.
    *
-   * Always attaches the Clerk JWT (device auth).
-   * If an employee is acting (PIN-identified), attaches X-Acting-As.
-   * On 401, clears session and sets sessionExpired flag (unless silent).
-   *
    * @param opts.silent - If true, 401 errors won't trigger the session-expired banner.
-   *   Use for background requests (roster refresh, etc.) that shouldn't interrupt the user.
    */
   async function $api<T = unknown>(
     path: string,
@@ -93,17 +67,15 @@ export function useApi() {
       ...(opts?.headers as Record<string, string> | undefined),
     };
 
-    // Attach Clerk JWT (device authentication)
+    // Attach Clerk JWT
     if (import.meta.client) {
-      // If Clerk wasn't ready during setup, try to get the ref now.
-      // This handles the case where the plugin runs before Clerk initializes.
       if (clerkInitFailed && !clerkGetTokenRef) {
         try {
           const { getToken } = useAuth();
           clerkGetTokenRef = getToken;
           clerkInitFailed = false;
         } catch {
-          // Still not ready -- proceed without auth
+          // Still not ready
         }
       }
 
@@ -117,18 +89,9 @@ export function useApi() {
             }
           }
         } catch {
-          // Token retrieval failed -- proceed without auth header
+          // Token retrieval failed
         }
       }
-    }
-
-    // Attach X-Acting-As only when an employee is identified via PIN.
-    // The owner doesn't need this header -- the backend resolves them from the JWT.
-    const novaUser = useState<{ id?: string; role?: string } | null>(
-      "nova-user",
-    );
-    if (novaUser.value?.id && novaUser.value?.role === "employee") {
-      headers["X-Acting-As"] = novaUser.value.id;
     }
 
     try {
@@ -138,7 +101,6 @@ export function useApi() {
         headers,
       })) as T;
     } catch (err) {
-      // Intercept 401: Clerk JWT expired or revoked
       const fetchError = err as { statusCode?: number; status?: number };
       if (
         (fetchError.statusCode === 401 || fetchError.status === 401) &&

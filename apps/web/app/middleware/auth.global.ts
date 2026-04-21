@@ -1,21 +1,11 @@
 /**
  * Global authentication middleware.
  *
- * Device-mode aware auth flow:
- *
- * STORE MODE (shared tablet at the counter):
- *   1. NovaUser in state?        -> allow (employee identified via PIN)
+ * Simple auth flow:
+ *   1. NovaUser in state?        -> allow
  *   2. Route is public?          -> allow
- *   3. Has cached roster?        -> redirect to /auth/pin
- *   4. Nothing                   -> redirect to /auth/pin (shows "not configured")
- *
- * OWNER MODE (admin's personal device):
- *   1. NovaUser in state?        -> allow (owner identified)
- *   2. Route is public?          -> allow
- *   3. On tenant subdomain?      -> show catalog or PIN
- *   4. Clerk signed in?          -> redirect to /auth/resolve
- *   5. Has cached roster?        -> redirect to /auth/pin
- *   6. Nothing                   -> redirect to /landing
+ *   3. Clerk signed in?          -> redirect to /auth/resolve
+ *   4. Nothing                   -> redirect to /landing
  */
 
 /** Routes accessible without authentication. */
@@ -23,8 +13,8 @@ const PUBLIC_ROUTES = [
   "/landing",
   "/auth/login",
   "/auth/signup",
-  "/auth/pin",
   "/auth/resolve",
+  "/auth/accept-token",
   "/onboarding",
   "/catalogo",
 ];
@@ -47,33 +37,7 @@ export default defineNuxtRouteMiddleware((to) => {
 
   if (!import.meta.client) return;
 
-  const { isStoreMode, isExpired } = useDeviceMode();
-
-  // Device session expired (30+ days) -- force re-login
-  if (isExpired.value) {
-    const { clearUser } = useNovaAuth();
-    clearUser();
-    return navigateTo("/auth/login");
-  }
-
-  // STORE MODE: always go to PIN screen
-  if (isStoreMode.value) {
-    return navigateTo("/auth/pin");
-  }
-
-  // OWNER MODE: follow the full auth flow
-
-  // 3. On a tenant subdomain with no auth -> show public catalog
-  const { tenantSlug } = useTenant();
-  if (tenantSlug.value) {
-    const { hasRoster } = useTeamRoster();
-    if (hasRoster()) {
-      return navigateTo("/auth/pin");
-    }
-    return navigateTo(`/catalogo/${tenantSlug.value}`);
-  }
-
-  // 4. Clerk signed in but NovaUser not resolved yet
+  // 3. Clerk signed in but NovaUser not resolved yet
   try {
     const { isSignedIn } = useAuth();
     if (isSignedIn.value) {
@@ -83,12 +47,6 @@ export default defineNuxtRouteMiddleware((to) => {
     // Clerk not initialized -- continue to next check
   }
 
-  // 5. Device has cached roster (owner configured it before) -> PIN screen
-  const { hasRoster } = useTeamRoster();
-  if (hasRoster()) {
-    return navigateTo("/auth/pin");
-  }
-
-  // 6. New device, no auth at all -- show landing
+  // 4. No auth at all -- show landing
   return navigateTo("/landing");
 });
