@@ -5,7 +5,7 @@
  * 1. Security - block scanner bots, security headers
  * 2. Logger - request/response logging (only valid routes)
  * 3. CORS - cross-origin access for the frontend
- * 4. Auth - verify Clerk JWT + resolve X-Acting-As
+ * 4. Auth - verify Clerk JWT
  * 5. Tenant - set RLS business context
  *
  * Routes:
@@ -20,7 +20,6 @@ import { secureHeaders } from "hono/secure-headers";
 import { structuredLogger } from "./middleware/structured-logger";
 import { health } from "./routes/health";
 import { catalog } from "./routes/catalog";
-import { ownerPinRoute } from "./routes/auth";
 import { onboarding } from "./routes/onboarding";
 import { inventory } from "./routes/inventory";
 import { salesRoutes } from "./routes/sales";
@@ -114,8 +113,9 @@ app.use(
   "*",
   cors({
     origin: (origin) => {
-      const allowed =
-        process.env.CORS_ORIGIN?.split(",") ?? ["http://localhost:3000"];
+      const allowed = process.env.CORS_ORIGIN?.split(",") ?? [
+        "http://localhost:3000",
+      ];
 
       // Exact match (e.g., https://novaincs.com)
       if (allowed.includes(origin)) return origin;
@@ -133,12 +133,7 @@ app.use(
       return allowed[0] ?? "";
     },
     allowMethods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
-    allowHeaders: [
-      "Content-Type",
-      "Authorization",
-      "X-Business-Id",
-      "X-Acting-As",
-    ],
+    allowHeaders: ["Content-Type", "Authorization"],
   }),
 );
 
@@ -168,10 +163,7 @@ api.get("/me", (c) => {
   return c.json({ user });
 });
 
-// Owner PIN verification (protected - uses businessId from session)
-api.route("/", ownerPinRoute);
-
-// Team management (roster download, user switching)
+// Team management (employees, access links)
 api.route("/", team);
 
 // Inventory routes (products, categories, variants)
