@@ -5,13 +5,10 @@
  * and caches it in localStorage. Provides verifyPin() that compares PINs
  * locally using bcrypt -- no API call needed for daily PIN entry.
  *
- * This implements the "PIN is identification, not authentication" pattern
- * from AUTH-REFACTOR-PLAN.md. The Clerk JWT authenticates the device;
- * the PIN only identifies which employee is using it.
- *
- * Cache refresh: every 5 minutes while the app is open, or manually
- * via refreshRoster(). The roster is also refreshed when an employee
- * is added/edited (future Sprint D).
+ * IMPORTANT: State is at module level (outside the function) so it's shared
+ * across all components that call useTeamRoster(). This is critical because
+ * the plugin loads the roster on app init, and the PIN screen needs to
+ * read that same state.
  */
 
 import bcrypt from "bcryptjs";
@@ -35,14 +32,16 @@ interface CachedRoster {
 const STORAGE_KEY = "nova:team-roster";
 const REFRESH_INTERVAL_MS = 1 * 60 * 1000; // 1 minute
 
+// Module-level shared state -- same instance across all useTeamRoster() calls
+const _roster = ref<RosterEntry[]>([]);
+const _businessId = ref<string | null>(null);
+const _businessName = ref<string | null>(null);
+const _isLoaded = ref(false);
+const _lastRefresh = ref<string | null>(null);
+let _refreshInterval: ReturnType<typeof setInterval> | null = null;
+
 export function useTeamRoster() {
   const { $api } = useApi();
-
-  const roster = ref<RosterEntry[]>([]);
-  const businessId = ref<string | null>(null);
-  const businessName = ref<string | null>(null);
-  const isLoaded = ref(false);
-  const lastRefresh = ref<string | null>(null);
 
   /**
    * Load roster from localStorage cache.
@@ -56,11 +55,11 @@ export function useTeamRoster() {
 
     try {
       const cached = JSON.parse(stored) as CachedRoster;
-      roster.value = cached.roster;
-      businessId.value = cached.businessId;
-      businessName.value = cached.businessName;
-      lastRefresh.value = cached.generatedAt;
-      isLoaded.value = true;
+      _roster.value = cached.roster;
+      _businessId.value = cached.businessId;
+      _businessName.value = cached.businessName;
+      _lastRefresh.value = cached.generatedAt;
+      _isLoaded.value = true;
       return true;
     } catch {
       localStorage.removeItem(STORAGE_KEY);
@@ -75,17 +74,15 @@ export function useTeamRoster() {
   async function refreshRoster(): Promise<boolean> {
     try {
       // Use silent mode to avoid triggering the session-expired banner.
-      // The roster refresh is a background operation that runs every minute.
-      // If it fails (e.g., JWT expired), we keep using the cached roster.
       const result = await $api<CachedRoster>("/api/team-roster", {
         silent: true,
       });
 
-      roster.value = result.roster;
-      businessId.value = result.businessId;
-      businessName.value = result.businessName;
-      lastRefresh.value = result.generatedAt;
-      isLoaded.value = true;
+      _roster.value = result.roster;
+      _businessId.value = result.businessId;
+      _businessName.value = result.businessName;
+      _lastRefresh.value = result.generatedAt;
+      _isLoaded.value = true;
 
       if (import.meta.client) {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(result));
@@ -100,15 +97,10 @@ export function useTeamRoster() {
 
   /**
    * Verify a PIN locally against the cached roster.
-   *
-   * Iterates all roster entries and compares the PIN hash using bcrypt.
    * Returns the matching user entry, or null if no match.
-   *
-   * This is the core of the refactor: PIN verification happens here
-   * in the browser, not on the server. No API call is made.
    */
   async function verifyPin(pin: string): Promise<RosterEntry | null> {
-    for (const entry of roster.value) {
+    for (const entry of _roster.value) {
       const match = await bcrypt.compare(pin, entry.pinHash);
       if (match) return entry;
     }
@@ -120,7 +112,7 @@ export function useTeamRoster() {
    * Only checks roster entries with role "owner".
    */
   async function verifyOwnerPin(pin: string): Promise<RosterEntry | null> {
-    for (const entry of roster.value) {
+    for (const entry of _roster.value) {
       if (entry.role !== "owner") continue;
       const match = await bcrypt.compare(pin, entry.pinHash);
       if (match) return entry;
@@ -130,38 +122,36 @@ export function useTeamRoster() {
 
   /** Check if the roster has any entries (device is configured). */
   function hasRoster(): boolean {
+    if (_isLoaded.value && _roster.value.length > 0) return true;
     if (import.meta.client) {
       return localStorage.getItem(STORAGE_KEY) !== null;
     }
-    return roster.value.length > 0;
+    return false;
   }
 
   /**
    * Start periodic roster refresh (call once on app init).
-   * Refreshes every 5 minutes to pick up employee changes.
-   * Returns a cleanup function to clear the interval.
+   * Refreshes every 1 minute to pick up employee changes.
    */
-  let refreshInterval: ReturnType<typeof setInterval> | null = null;
   function startAutoRefresh() {
     if (!import.meta.client) return;
 
     // Prevent duplicate intervals
-    if (refreshInterval) clearInterval(refreshInterval);
+    if (_refreshInterval) clearInterval(_refreshInterval);
 
-    refreshInterval = setInterval(() => {
-      // Only refresh if we have a roster (device is configured)
-      if (isLoaded.value) {
+    _refreshInterval = setInterval(() => {
+      if (_isLoaded.value) {
         refreshRoster();
       }
     }, REFRESH_INTERVAL_MS);
   }
 
   return {
-    roster: readonly(roster),
-    businessId: readonly(businessId),
-    businessName: readonly(businessName),
-    isLoaded: readonly(isLoaded),
-    lastRefresh: readonly(lastRefresh),
+    roster: readonly(_roster),
+    businessId: readonly(_businessId),
+    businessName: readonly(_businessName),
+    isLoaded: readonly(_isLoaded),
+    lastRefresh: readonly(_lastRefresh),
     loadFromCache,
     refreshRoster,
     verifyPin,
