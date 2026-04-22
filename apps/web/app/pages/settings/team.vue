@@ -17,16 +17,7 @@
  * - POST /api/employees/:id/access-link
  */
 
-import {
-  UserPlus,
-  Pencil,
-  UserX,
-  UserCheck,
-  ArrowLeft,
-  Link2,
-  Copy,
-  Check,
-} from "lucide-vue-next";
+import { UserPlus, Pencil, UserX, UserCheck, ArrowLeft } from "lucide-vue-next";
 
 definePageMeta({ middleware: ["admin-only"] });
 
@@ -79,54 +70,42 @@ const ownerEntry = computed(() =>
 
 const showAddModal = ref(false);
 const newName = ref("");
+const newEmail = ref("");
 const addError = ref("");
 const isAdding = ref(false);
-const newAccessLink = ref("");
-const linkCopied = ref(false);
+const inviteSent = ref(false);
+const inviteEmail = ref("");
 
 function openAddModal() {
   newName.value = "";
+  newEmail.value = "";
   addError.value = "";
-  newAccessLink.value = "";
+  inviteSent.value = false;
   showAddModal.value = true;
 }
 
 async function addEmployee() {
-  if (!newName.value.trim()) return;
+  if (!newName.value.trim() || !newEmail.value.trim()) return;
 
   isAdding.value = true;
   addError.value = "";
-  newAccessLink.value = "";
 
   try {
-    const result = await $api<{
+    await $api<{
       employee: Employee;
-      accessLink: string;
+      message: string;
     }>("/api/employees", {
       method: "POST",
-      body: { name: newName.value.trim() },
+      body: { name: newName.value.trim(), email: newEmail.value.trim() },
     });
-    newAccessLink.value = result.accessLink;
+    inviteEmail.value = newEmail.value.trim();
+    inviteSent.value = true;
     await fetchEmployees();
   } catch (err) {
     const fetchError = err as { data?: { error?: string } };
-    addError.value = fetchError.data?.error ?? "Error al agregar empleado";
+    addError.value = fetchError.data?.error ?? "Error al invitar empleado";
   } finally {
     isAdding.value = false;
-  }
-}
-
-/** Copy the new access link to clipboard. */
-async function copyNewAccessLink() {
-  if (!newAccessLink.value) return;
-  try {
-    await window.navigator.clipboard.writeText(newAccessLink.value);
-    linkCopied.value = true;
-    window.setTimeout(() => {
-      linkCopied.value = false;
-    }, 2000);
-  } catch {
-    window.prompt("Copia este link:", newAccessLink.value);
   }
 }
 
@@ -166,52 +145,6 @@ async function saveEdit() {
   } finally {
     isEditing.value = false;
   }
-}
-
-// ============================================================
-// Access link generation
-// ============================================================
-
-const generatingLinkFor = ref<string | null>(null);
-const generatedLink = ref("");
-const genLinkCopied = ref(false);
-
-async function generateAccessLink(emp: Employee) {
-  generatingLinkFor.value = emp.id;
-  generatedLink.value = "";
-  genLinkCopied.value = false;
-
-  try {
-    const result = await $api<{ accessLink: string }>(
-      `/api/employees/${emp.id}/access-link`,
-      { method: "POST" },
-    );
-    generatedLink.value = result.accessLink;
-  } catch (err) {
-    const fetchError = err as { data?: { error?: string } };
-    generatedLink.value = "";
-    alert(fetchError.data?.error ?? "Error generando link");
-    generatingLinkFor.value = null;
-  }
-}
-
-async function copyGenLink() {
-  if (!generatedLink.value) return;
-  try {
-    await navigator.clipboard.writeText(generatedLink.value);
-    genLinkCopied.value = true;
-    setTimeout(() => {
-      genLinkCopied.value = false;
-    }, 2000);
-  } catch {
-    prompt("Copia este link:", generatedLink.value);
-  }
-}
-
-function closeLinkModal() {
-  generatingLinkFor.value = null;
-  generatedLink.value = "";
-  genLinkCopied.value = false;
 }
 
 // ============================================================
@@ -268,10 +201,10 @@ async function toggleActive(emp: Employee) {
     <div class="card-premium mb-4 p-4 text-sm text-gray-700">
       <p class="font-bold text-gray-800">Como funciona</p>
       <div class="mt-2 space-y-1.5 text-xs text-gray-600">
-        <p>1. Agrega un empleado con su nombre</p>
-        <p>2. Se genera un link de acceso unico</p>
-        <p>3. Comparte el link por WhatsApp o como prefieras</p>
-        <p>4. El empleado abre el link y queda autenticado</p>
+        <p>1. Agrega un empleado con su nombre y email</p>
+        <p>2. Clerk le envia una invitacion por email</p>
+        <p>3. El empleado acepta, crea su password, y queda autenticado</p>
+        <p>4. Puede entrar cuando quiera con su email y password</p>
       </div>
     </div>
 
@@ -327,13 +260,6 @@ async function toggleActive(emp: Employee) {
             <p class="font-bold text-gray-800">{{ emp.name }}</p>
             <p class="text-xs font-medium text-gray-500">Empleado</p>
           </div>
-          <button
-            class="rounded-xl p-2 text-gray-400 transition-spring hover:bg-nova-accent/10 hover:text-nova-accent"
-            title="Generar link de acceso"
-            @click="generateAccessLink(emp)"
-          >
-            <Link2 :size="16" />
-          </button>
           <button
             class="rounded-xl p-2 text-gray-400 transition-spring hover:bg-white/80 hover:text-gray-600"
             title="Editar"
@@ -403,25 +329,38 @@ async function toggleActive(emp: Employee) {
         <div
           class="glass-strong w-full max-w-sm rounded-[32px] p-7 shadow-[0_30px_60px_-15px_rgba(0,0,0,0.2)]"
         >
-          <!-- Before link is generated -->
-          <template v-if="!newAccessLink">
+          <!-- Form (before invitation sent) -->
+          <template v-if="!inviteSent">
             <h3
               class="mb-5 text-xl font-extrabold tracking-tight text-gradient"
             >
               Nuevo empleado
             </h3>
 
-            <div>
-              <label class="mb-1.5 block text-[13px] font-bold text-gray-600"
-                >Nombre</label
-              >
-              <input
-                v-model="newName"
-                type="text"
-                placeholder="Ej: Maria Garcia"
-                class="w-full rounded-2xl border border-white bg-white/60 px-4 py-3 text-sm font-semibold text-gray-800 shadow-[inset_0_2px_4px_rgba(0,0,0,0.03)] outline-none transition-spring placeholder:text-gray-400 focus:bg-white focus:ring-[3px] focus:ring-nova-accent/20"
-                autofocus
-              />
+            <div class="space-y-4">
+              <div>
+                <label class="mb-1.5 block text-[13px] font-bold text-gray-600"
+                  >Nombre</label
+                >
+                <input
+                  v-model="newName"
+                  type="text"
+                  placeholder="Ej: Maria Garcia"
+                  class="w-full rounded-2xl border border-white bg-white/60 px-4 py-3 text-sm font-semibold text-gray-800 shadow-[inset_0_2px_4px_rgba(0,0,0,0.03)] outline-none transition-spring placeholder:text-gray-400 focus:bg-white focus:ring-[3px] focus:ring-nova-accent/20"
+                  autofocus
+                />
+              </div>
+              <div>
+                <label class="mb-1.5 block text-[13px] font-bold text-gray-600"
+                  >Email</label
+                >
+                <input
+                  v-model="newEmail"
+                  type="email"
+                  placeholder="maria@ejemplo.com"
+                  class="w-full rounded-2xl border border-white bg-white/60 px-4 py-3 text-sm font-semibold text-gray-800 shadow-[inset_0_2px_4px_rgba(0,0,0,0.03)] outline-none transition-spring placeholder:text-gray-400 focus:bg-white focus:ring-[3px] focus:ring-nova-accent/20"
+                />
+              </div>
             </div>
 
             <p v-if="addError" class="mt-3 text-sm font-semibold text-red-500">
@@ -437,41 +376,28 @@ async function toggleActive(emp: Employee) {
               </button>
               <button
                 class="dark-pill flex-1 rounded-2xl py-3 text-sm font-bold transition-spring disabled:opacity-50"
-                :disabled="!newName.trim() || isAdding"
+                :disabled="!newName.trim() || !newEmail.trim() || isAdding"
                 @click="addEmployee"
               >
-                {{ isAdding ? "Creando..." : "Crear empleado" }}
+                {{ isAdding ? "Enviando..." : "Invitar empleado" }}
               </button>
             </div>
           </template>
 
-          <!-- After link is generated -->
+          <!-- Confirmation (after invitation sent) -->
           <template v-else>
             <h3
               class="mb-2 text-xl font-extrabold tracking-tight text-gradient"
             >
-              Empleado creado
+              Invitacion enviada
             </h3>
             <p class="mb-4 text-[13px] font-medium text-gray-500">
-              Comparte este link con {{ newName }} para que pueda acceder:
+              Se envio un email a <strong>{{ inviteEmail }}</strong> con un link
+              para crear su cuenta. Cuando acepte, podra acceder a Nova.
             </p>
 
-            <div
-              class="mb-4 break-all rounded-2xl bg-white/60 p-3 font-mono text-xs text-gray-600"
-            >
-              {{ newAccessLink }}
-            </div>
-
             <button
-              class="dark-pill mb-3 flex w-full items-center justify-center gap-2 rounded-2xl py-3 text-sm font-bold transition-spring"
-              @click="copyNewAccessLink"
-            >
-              <component :is="linkCopied ? Check : Copy" :size="16" />
-              {{ linkCopied ? "Copiado!" : "Copiar link" }}
-            </button>
-
-            <button
-              class="glass w-full rounded-2xl py-3 text-sm font-bold text-gray-700 transition-spring"
+              class="dark-pill w-full rounded-2xl py-3 text-sm font-bold transition-spring"
               @click="showAddModal = false"
             >
               Listo
@@ -525,60 +451,6 @@ async function toggleActive(emp: Employee) {
               {{ isEditing ? "Guardando..." : "Guardar" }}
             </button>
           </div>
-        </div>
-      </div>
-    </Teleport>
-
-    <!-- Access link modal -->
-    <Teleport to="body">
-      <div
-        v-if="generatingLinkFor"
-        class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
-        @click.self="closeLinkModal"
-      >
-        <div
-          class="glass-strong w-full max-w-sm rounded-[32px] p-7 shadow-[0_30px_60px_-15px_rgba(0,0,0,0.2)]"
-        >
-          <h3 class="mb-2 text-xl font-extrabold tracking-tight text-gradient">
-            Link de acceso
-          </h3>
-
-          <!-- Loading -->
-          <div v-if="!generatedLink" class="py-6 text-center">
-            <div
-              class="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2 border-gray-200 border-t-nova-accent"
-            />
-            <p class="text-sm text-gray-500">Generando link...</p>
-          </div>
-
-          <!-- Link ready -->
-          <template v-else>
-            <p class="mb-4 text-[13px] font-medium text-gray-500">
-              Comparte este link con el empleado. Es de un solo uso y expira en
-              30 dias.
-            </p>
-
-            <div
-              class="mb-4 break-all rounded-2xl bg-white/60 p-3 font-mono text-xs text-gray-600"
-            >
-              {{ generatedLink }}
-            </div>
-
-            <button
-              class="dark-pill mb-3 flex w-full items-center justify-center gap-2 rounded-2xl py-3 text-sm font-bold transition-spring"
-              @click="copyGenLink"
-            >
-              <component :is="genLinkCopied ? Check : Copy" :size="16" />
-              {{ genLinkCopied ? "Copiado!" : "Copiar link" }}
-            </button>
-          </template>
-
-          <button
-            class="glass w-full rounded-2xl py-3 text-sm font-bold text-gray-700 transition-spring"
-            @click="closeLinkModal"
-          >
-            Cerrar
-          </button>
         </div>
       </div>
     </Teleport>
