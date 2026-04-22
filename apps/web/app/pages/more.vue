@@ -2,15 +2,8 @@
 /**
  * "More" page for mobile navigation.
  *
- * Provides access to sections not in the bottom tabs:
- * - Sales history
- * - Accounts (owner only)
- * - Day close (owner only)
- * - Reports (owner only)
- * - Accounting (owner only)
- * - Settings (owner only)
- *
- * Also shows the current user info and a logout option.
+ * Provides access to sections not in the bottom tabs.
+ * Logout is handled by the Clerk UserButton in the header.
  */
 
 import {
@@ -20,14 +13,13 @@ import {
   BarChart3,
   FileText,
   Settings,
-  LogOut,
   Truck,
   ClipboardList,
   DollarSign,
 } from "lucide-vue-next";
 import type { Component } from "vue";
 
-const { isAdmin, user, fullLogout } = useNovaAuth();
+const { isAdmin, user } = useNovaAuth();
 
 interface MenuItem {
   to: string;
@@ -106,12 +98,6 @@ const menuItems: MenuItem[] = [
 const visibleItems = computed(() =>
   menuItems.filter((item) => !item.adminOnly || isAdmin.value),
 );
-
-/** Logout and redirect to landing. */
-async function handleLogout() {
-  await fullLogout();
-  navigateTo("/landing");
-}
 </script>
 
 <template>
@@ -135,17 +121,6 @@ async function handleLogout() {
             {{ isAdmin ? "Dueno" : "Empleado" }}
           </p>
         </div>
-      </div>
-
-      <!-- Logout button -->
-      <div class="mt-3">
-        <button
-          class="flex flex-1 items-center justify-center gap-2 rounded-lg border border-gray-200 py-2 text-xs font-medium text-gray-600"
-          @click="handleLogout"
-        >
-          <LogOut :size="14" />
-          Cerrar sesion
-        </button>
       </div>
     </div>
 
