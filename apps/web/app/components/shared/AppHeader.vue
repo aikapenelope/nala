@@ -14,7 +14,12 @@ defineProps<{
 
 const { user, isAdmin } = useNovaAuth();
 const { $api } = useApi();
-const { isOpen, isChecking: isCheckingStatus, checkOpenStatus, setOpen } = useCashStatus();
+const {
+  isOpen,
+  isChecking: isCheckingStatus,
+  checkOpenStatus,
+  setOpen,
+} = useCashStatus();
 
 /** Quick open modal. */
 const showOpenModal = ref(false);
@@ -66,105 +71,109 @@ onMounted(() => {
 </script>
 
 <template>
-  <header
-    class="glass-strong mx-2 mb-3 mt-2 flex h-14 items-center justify-between rounded-2xl px-4 shadow-[0_4px_15px_-3px_rgba(0,0,0,0.04)]"
-  >
-    <!-- Left: Business name + role -->
-    <div class="flex items-center gap-2">
-      <span class="text-sm font-extrabold tracking-tight text-gray-900">
-        {{ businessName ?? "Nova" }}
-      </span>
-      <span
-        v-if="user && !isAdmin"
-        class="rounded-xl bg-gray-100 px-2 py-0.5 text-[10px] font-bold text-gray-600"
-      >
-        {{ user.name }}
-      </span>
-    </div>
-
-    <!-- Right: Open/Close toggle + Clerk -->
-    <div class="flex items-center gap-3">
-      <!-- Open/Close toggle (admin only) -->
-      <button
-        v-if="isAdmin && !isCheckingStatus"
-        class="flex items-center gap-2 rounded-full py-1 pl-3 pr-1 text-[11px] font-bold transition-spring"
-        :class="
-          isOpen
-            ? 'bg-green-500/15 text-green-700'
-            : 'bg-gray-200 text-gray-500'
-        "
-        @click="handleToggle"
-      >
-        <span>{{ isOpen ? "Abierto" : "Cerrado" }}</span>
-        <!-- Apple-style toggle -->
-        <div
-          class="relative h-6 w-11 rounded-full transition-colors duration-300"
-          :class="isOpen ? 'bg-green-500' : 'bg-gray-300'"
-        >
-          <div
-            class="absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-all duration-300"
-            :class="isOpen ? 'left-[22px]' : 'left-0.5'"
-          />
-        </div>
-      </button>
-
-      <!-- Clerk UserButton -->
-      <Show when="signed-in">
-        <UserButton />
-      </Show>
-
-      <Show when="signed-out">
-        <SignInButton mode="modal">
-          <button class="dark-pill rounded-xl px-4 py-1.5 text-xs font-bold">
-            Iniciar sesion
-          </button>
-        </SignInButton>
-      </Show>
-    </div>
-  </header>
-
-  <!-- Quick open modal -->
-  <Teleport to="body">
-    <div
-      v-if="showOpenModal"
-      class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
-      @click.self="showOpenModal = false"
+  <div>
+    <header
+      class="glass-strong mx-2 mb-3 mt-2 flex h-14 items-center justify-between rounded-2xl px-4 shadow-[0_4px_15px_-3px_rgba(0,0,0,0.04)]"
     >
-      <div class="glass-strong w-full max-w-xs rounded-[28px] p-6 shadow-[0_20px_50px_-10px_rgba(0,0,0,0.2)]">
-        <h3 class="mb-1 text-lg font-extrabold tracking-tight text-gray-900">
-          Abrir caja
-        </h3>
-        <p class="mb-4 text-[13px] text-gray-500">
-          Cuanto efectivo hay en caja?
-        </p>
-        <input
-          v-model.number="openAmount"
-          type="number"
-          step="0.01"
-          min="0"
-          placeholder="0.00"
-          class="w-full rounded-2xl border border-white bg-white/60 px-4 py-3 text-center text-2xl font-extrabold text-gray-900 shadow-[inset_0_2px_4px_rgba(0,0,0,0.03)] outline-none focus:ring-[3px] focus:ring-green-500/20 transition-spring placeholder:text-gray-300"
-          autofocus
+      <!-- Left: Business name + role -->
+      <div class="flex items-center gap-2">
+        <span class="text-sm font-extrabold tracking-tight text-gray-900">
+          {{ businessName ?? "Nova" }}
+        </span>
+        <span
+          v-if="user && !isAdmin"
+          class="rounded-xl bg-gray-100 px-2 py-0.5 text-[10px] font-bold text-gray-600"
         >
-        <p v-if="openError" class="mt-2 text-center text-xs text-red-500">
-          {{ openError }}
-        </p>
-        <div class="mt-4 flex gap-3">
-          <button
-            class="glass flex-1 rounded-2xl py-2.5 text-sm font-bold text-gray-600 transition-spring"
-            @click="showOpenModal = false"
+          {{ user.name }}
+        </span>
+      </div>
+
+      <!-- Right: Open/Close toggle + Clerk -->
+      <div class="flex items-center gap-3">
+        <!-- Open/Close toggle (admin only) -->
+        <button
+          v-if="isAdmin && !isCheckingStatus"
+          class="flex items-center gap-2 rounded-full py-1 pl-3 pr-1 text-[11px] font-bold transition-spring"
+          :class="
+            isOpen
+              ? 'bg-green-500/15 text-green-700'
+              : 'bg-gray-200 text-gray-500'
+          "
+          @click="handleToggle"
+        >
+          <span>{{ isOpen ? "Abierto" : "Cerrado" }}</span>
+          <!-- Apple-style toggle -->
+          <div
+            class="relative h-6 w-11 rounded-full transition-colors duration-300"
+            :class="isOpen ? 'bg-green-500' : 'bg-gray-300'"
           >
-            Cancelar
-          </button>
-          <button
-            class="flex-1 rounded-2xl bg-green-600 py-2.5 text-sm font-bold text-white transition-spring disabled:opacity-50"
-            :disabled="isOpening"
-            @click="submitOpen"
-          >
-            {{ isOpening ? "Abriendo..." : "Abrir" }}
-          </button>
+            <div
+              class="absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-all duration-300"
+              :class="isOpen ? 'left-[22px]' : 'left-0.5'"
+            />
+          </div>
+        </button>
+
+        <!-- Clerk UserButton -->
+        <Show when="signed-in">
+          <UserButton />
+        </Show>
+
+        <Show when="signed-out">
+          <SignInButton mode="modal">
+            <button class="dark-pill rounded-xl px-4 py-1.5 text-xs font-bold">
+              Iniciar sesion
+            </button>
+          </SignInButton>
+        </Show>
+      </div>
+    </header>
+
+    <!-- Quick open modal -->
+    <Teleport to="body">
+      <div
+        v-if="showOpenModal"
+        class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+        @click.self="showOpenModal = false"
+      >
+        <div
+          class="glass-strong w-full max-w-xs rounded-[28px] p-6 shadow-[0_20px_50px_-10px_rgba(0,0,0,0.2)]"
+        >
+          <h3 class="mb-1 text-lg font-extrabold tracking-tight text-gray-900">
+            Abrir caja
+          </h3>
+          <p class="mb-4 text-[13px] text-gray-500">
+            Cuanto efectivo hay en caja?
+          </p>
+          <input
+            v-model.number="openAmount"
+            type="number"
+            step="0.01"
+            min="0"
+            placeholder="0.00"
+            class="w-full rounded-2xl border border-white bg-white/60 px-4 py-3 text-center text-2xl font-extrabold text-gray-900 shadow-[inset_0_2px_4px_rgba(0,0,0,0.03)] outline-none focus:ring-[3px] focus:ring-green-500/20 transition-spring placeholder:text-gray-300"
+            autofocus
+          />
+          <p v-if="openError" class="mt-2 text-center text-xs text-red-500">
+            {{ openError }}
+          </p>
+          <div class="mt-4 flex gap-3">
+            <button
+              class="glass flex-1 rounded-2xl py-2.5 text-sm font-bold text-gray-600 transition-spring"
+              @click="showOpenModal = false"
+            >
+              Cancelar
+            </button>
+            <button
+              class="flex-1 rounded-2xl bg-green-600 py-2.5 text-sm font-bold text-white transition-spring disabled:opacity-50"
+              :disabled="isOpening"
+              @click="submitOpen"
+            >
+              {{ isOpening ? "Abriendo..." : "Abrir" }}
+            </button>
+          </div>
         </div>
       </div>
-    </div>
-  </Teleport>
+    </Teleport>
+  </div>
 </template>
