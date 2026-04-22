@@ -62,10 +62,13 @@ const visibleItems = computed(() =>
   navItems.filter((item) => !item.adminOnly || isAdmin.value),
 );
 
-/** Logout and redirect to landing. */
+/** Logout: clear Nova state, sign out of Clerk, hard redirect. */
 async function handleLogout() {
   await fullLogout();
-  navigateTo("/landing");
+  // Hard redirect to force full page reload (clears all client state)
+  if (import.meta.client) {
+    window.location.href = "/landing";
+  }
 }
 
 /** Sidebar collapsed state, persisted in localStorage. */

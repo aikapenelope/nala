@@ -3,6 +3,7 @@
  * Settings hub page (owner only).
  *
  * All sections link to functional pages.
+ * Logout is handled by the Clerk UserButton in the header.
  */
 
 import {
@@ -17,13 +18,7 @@ import type { Component } from "vue";
 
 definePageMeta({ middleware: ["admin-only"] });
 
-const { user, fullLogout } = useNovaAuth();
-
-/** Full logout: clear everything and redirect to landing. */
-async function handleFullLogout() {
-  await fullLogout();
-  navigateTo("/landing");
-}
+const { user } = useNovaAuth();
 
 interface SettingsSection {
   icon: Component;
@@ -37,7 +32,7 @@ const sections: SettingsSection[] = [
   {
     icon: Users,
     label: "Equipo",
-    description: "Empleados y links de acceso",
+    description: "Empleados e invitaciones",
     to: "/settings/team",
     gradient: "from-[#EFECFF] to-[#D0CCF9]",
   },
@@ -111,19 +106,6 @@ const sections: SettingsSection[] = [
           </p>
         </div>
       </NuxtLink>
-    </div>
-
-    <!-- Full logout -->
-    <div class="mt-6 px-1">
-      <button
-        class="w-full rounded-xl border border-red-200 py-2.5 text-sm font-bold text-red-500 transition-spring hover:bg-red-50"
-        @click="handleFullLogout"
-      >
-        Cerrar sesion
-      </button>
-      <p class="mt-1.5 text-center text-[10px] text-gray-400">
-        Cierra tu sesion en este dispositivo.
-      </p>
     </div>
   </div>
 </template>

@@ -75,28 +75,38 @@ team.get("/employees", async (c) => {
   });
 });
 
-/** Schema for creating an employee. */
-const createEmployeeSchema = z.object({
-  name: z.string().min(1).max(100),
-  email: z.string().email("Email invalido"),
-});
+// ============================================================
+// Employee creation
+// ============================================================
 
 /**
  * POST /employees - Invite a new employee via Clerk.
  *
- * 1. Creates the employee record in the DB (without clerkId yet)
- * 2. Sends a Clerk invitation to the employee's email
- * 3. When the employee accepts, Clerk creates their account
- * 4. The employee signs up, gets redirected to /auth/resolve, and is linked
- *
- * The clerkId is set later when the employee completes sign-up and
- * /auth/resolve calls GET /api/me (matched by email in publicMetadata).
+ * Accepts { name, email }. Creates the employee record in the DB,
+ * then tries Clerk invitation. If invitation fails, falls back to
+ * creating the Clerk user directly with the real email + temp password.
  */
-team.post("/employees", zValidator("json", createEmployeeSchema), async (c) => {
+team.post("/employees", async (c) => {
   const ownerCheck = requireOwner(c);
   if (ownerCheck) return c.json(ownerCheck, 403);
 
-  const { name, email } = c.req.valid("json");
+  // Manual validation for clear error messages
+  let body: { name?: string; email?: string };
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: "Body JSON invalido" }, 400);
+  }
+
+  const name = body.name?.trim();
+  const email = body.email?.trim();
+
+  if (!name || name.length === 0) {
+    return c.json({ error: "El nombre es obligatorio" }, 400);
+  }
+  if (!email || !email.includes("@")) {
+    return c.json({ error: "El email es obligatorio y debe ser valido" }, 400);
+  }
   const currentUser = c.get("user");
   const db = c.get("db");
   const clerk = getClerkClient();

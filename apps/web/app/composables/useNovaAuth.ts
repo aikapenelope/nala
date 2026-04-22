@@ -129,18 +129,22 @@ export function useNovaAuth() {
    * After this, the user must re-authenticate.
    */
   async function fullLogout() {
+    // Clear Nova state first
     novaUser.value = null;
     if (import.meta.client) {
       localStorage.removeItem("nova:user");
       localStorage.removeItem("nova:sidebar-collapsed");
+    }
 
+    // Sign out of Clerk (this invalidates the JWT)
+    if (import.meta.client) {
       try {
         const clerk = useClerk();
-        if (clerk.value?.session) {
+        if (clerk.value) {
           await clerk.value.signOut();
         }
       } catch {
-        // Clerk may not be initialized -- continue with local cleanup
+        // Clerk may not be initialized -- session is already cleared locally
       }
     }
   }
