@@ -90,7 +90,7 @@ function toggleCollapsed() {
 
 <template>
   <aside
-    class="glass-strong flex h-full flex-col rounded-3xl p-3 transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]"
+    class="glass-strong flex h-full flex-col overflow-hidden rounded-3xl p-3 transition-[width] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]"
     :class="isCollapsed ? 'w-[68px]' : 'w-60'"
   >
     <!-- Logo -->
