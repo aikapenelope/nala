@@ -9,7 +9,6 @@
  * Connected to: POST /onboarding
  */
 
-import { PIN_LENGTH } from "@nova/shared";
 import type { BusinessType } from "@nova/shared";
 
 definePageMeta({ layout: false });
@@ -47,7 +46,6 @@ const businessType = ref<BusinessType | null>(null);
 const businessName = ref("");
 const businessSlug = ref("");
 const ownerName = ref("");
-const ownerPin = ref("");
 const isSubmitting = ref(false);
 const slugAvailable = ref<boolean | null>(null);
 const slugChecking = ref(false);
@@ -126,7 +124,6 @@ const canSubmit = computed(() => {
     businessSlug.value.length >= 3 &&
     slugAvailable.value !== false &&
     ownerName.value.trim().length > 0 &&
-    ownerPin.value.length === PIN_LENGTH &&
     !isSubmitting.value
   );
 });
@@ -148,7 +145,6 @@ async function createBusiness() {
         businessName: businessName.value.trim(),
         businessSlug: businessSlug.value,
         ownerName: ownerName.value.trim(),
-        ownerPin: ownerPin.value,
       },
     });
 
@@ -258,9 +254,7 @@ function goToDashboard() {
               <template v-else-if="slugAvailable === false">
                 <span class="text-red-500">No disponible, elige otro</span>
               </template>
-              <template v-else>
-                Tus clientes veran esta URL
-              </template>
+              <template v-else> Tus clientes veran esta URL </template>
             </p>
           </div>
 
@@ -274,24 +268,6 @@ function goToDashboard() {
               placeholder="Ej: Pedro Rodriguez"
               class="w-full rounded-xl border border-gray-300 px-4 py-3 focus:border-nova-primary focus:outline-none focus:ring-2 focus:ring-nova-primary/20"
             />
-          </div>
-
-          <div>
-            <label class="mb-1 block text-left text-sm text-gray-600">
-              PIN de acceso ({{ PIN_LENGTH }} digitos)
-            </label>
-            <input
-              v-model="ownerPin"
-              type="password"
-              inputmode="numeric"
-              :maxlength="PIN_LENGTH"
-              placeholder="0000"
-              class="w-full rounded-xl border border-gray-300 px-4 py-3 text-center text-2xl tracking-[0.5em] focus:border-nova-primary focus:outline-none focus:ring-2 focus:ring-nova-primary/20"
-              @keyup.enter="createBusiness"
-            />
-            <p class="mt-1 text-left text-xs text-gray-400">
-              Este PIN lo usaras para acceder y autorizar acciones
-            </p>
           </div>
 
           <p v-if="error" class="text-sm text-red-500">{{ error }}</p>

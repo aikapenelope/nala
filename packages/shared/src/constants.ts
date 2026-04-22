@@ -2,15 +2,6 @@
  * Shared constants used across the Nova monorepo.
  */
 
-/** PIN length for employee authentication. */
-export const PIN_LENGTH = 4;
-
-/** Maximum failed PIN attempts before lockout. */
-export const MAX_PIN_ATTEMPTS = 5;
-
-/** PIN lockout duration in minutes. */
-export const PIN_LOCKOUT_MINUTES = 5;
-
 /** Days without movement to mark a product as "dead stock". */
 export const DEAD_STOCK_DAYS = 60;
 
