@@ -14,7 +14,6 @@ const PUBLIC_ROUTES = [
   "/auth/login",
   "/auth/signup",
   "/auth/resolve",
-  "/auth/accept-token",
   "/onboarding",
   "/catalogo",
 ];

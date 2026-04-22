@@ -2,13 +2,12 @@
  * Team management routes.
  *
  * GET    /employees              - List employees (owner only)
- * POST   /employees              - Create employee with Clerk account + access link (owner only)
+ * POST   /employees              - Invite employee via Clerk (owner only)
  * PATCH  /employees/:id          - Update employee name or active status (owner only)
  * DELETE /employees/:id          - Deactivate employee (owner only, soft delete)
- * POST   /employees/:id/access-link - Generate a new sign-in token link (owner only)
  *
- * Employees authenticate with their own Clerk JWT via sign-in tokens.
- * The admin generates a link that the employee opens to get authenticated.
+ * Employees receive a Clerk invitation email. When they accept and sign up,
+ * their Clerk account is linked to the Nova employee record via /auth/resolve.
  */
 
 import { Hono } from "hono";
@@ -39,13 +38,6 @@ function getClerkClient() {
     secretKey: process.env.CLERK_SECRET_KEY ?? "",
   });
 }
-
-/**
- * Default sign-in token expiry: 30 days (maximum allowed by Clerk).
- * On the Hobby plan, session lifetime is fixed at 7 days, but the
- * sign-in token itself can last up to 30 days before being used.
- */
-const SIGN_IN_TOKEN_EXPIRY_SECONDS = 30 * 24 * 60 * 60;
 
 // ============================================================
 // Employee CRUD (owner only)
@@ -86,26 +78,30 @@ team.get("/employees", async (c) => {
 /** Schema for creating an employee. */
 const createEmployeeSchema = z.object({
   name: z.string().min(1).max(100),
+  email: z.string().email("Email invalido"),
 });
 
 /**
- * POST /employees - Create a new employee with a Clerk account.
+ * POST /employees - Invite a new employee via Clerk.
  *
- * 1. Creates a Clerk user (with username derived from business slug + name)
- * 2. Creates the employee record in the DB linked to the Clerk user
- * 3. Generates a sign-in token for the employee
- * 4. Returns the access link
+ * 1. Creates the employee record in the DB (without clerkId yet)
+ * 2. Sends a Clerk invitation to the employee's email
+ * 3. When the employee accepts, Clerk creates their account
+ * 4. The employee signs up, gets redirected to /auth/resolve, and is linked
+ *
+ * The clerkId is set later when the employee completes sign-up and
+ * /auth/resolve calls GET /api/me (matched by email in publicMetadata).
  */
 team.post("/employees", zValidator("json", createEmployeeSchema), async (c) => {
   const ownerCheck = requireOwner(c);
   if (ownerCheck) return c.json(ownerCheck, 403);
 
-  const { name } = c.req.valid("json");
+  const { name, email } = c.req.valid("json");
   const currentUser = c.get("user");
   const db = c.get("db");
   const clerk = getClerkClient();
 
-  // Get business slug for username generation
+  // Get business slug for redirect URL
   const [business] = await db
     .select({ slug: businesses.slug })
     .from(businesses)
@@ -113,45 +109,17 @@ team.post("/employees", zValidator("json", createEmployeeSchema), async (c) => {
     .limit(1);
 
   const slug = business?.slug ?? "nova";
-
-  // Generate a unique username: {slug}-{sanitized-name}-{random}
-  const sanitizedName = name
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]/g, "")
-    .slice(0, 20);
-  const randomSuffix = Math.random().toString(36).slice(2, 7);
-  const username = `${slug}-${sanitizedName}-${randomSuffix}`;
+  const tenantDomain = process.env.TENANT_DOMAIN ?? "novaincs.com";
+  const redirectUrl = `https://${slug}.${tenantDomain}/auth/resolve`;
 
   try {
-    // 1. Create Clerk user for the employee.
-    //
-    // We generate a random password because Clerk may require one depending
-    // on the instance auth settings. The employee will never use it -- they
-    // authenticate via sign-in token links. We also provide a synthetic
-    // email so Clerk doesn't reject the request if email is required.
-    const randomPassword =
-      `Emp!${crypto.randomUUID().slice(0, 16)}` +
-      Math.random().toString(36).slice(2, 6);
-    const syntheticEmail = `${username}@employees.internal`;
-
-    const clerkUser = await clerk.users.createUser({
-      username,
-      firstName: name,
-      emailAddress: [syntheticEmail],
-      password: randomPassword,
-      skipPasswordChecks: true,
-    });
-
-    // 2. Create employee record in DB
+    // 1. Create employee record in DB (clerkId will be set after sign-up)
     const [employee] = await db
       .insert(users)
       .values({
         businessId: currentUser.businessId,
         name,
         role: "employee",
-        clerkId: clerkUser.id,
       })
       .returning({
         id: users.id,
@@ -161,28 +129,30 @@ team.post("/employees", zValidator("json", createEmployeeSchema), async (c) => {
         createdAt: users.createdAt,
       });
 
-    // 3. Generate sign-in token
-    const signInToken = await clerk.signInTokens.createSignInToken({
-      userId: clerkUser.id,
-      expiresInSeconds: SIGN_IN_TOKEN_EXPIRY_SECONDS,
+    // 2. Send Clerk invitation to the employee's email
+    await clerk.invitations.createInvitation({
+      emailAddress: email,
+      redirectUrl,
+      publicMetadata: {
+        businessId: currentUser.businessId,
+        novaUserId: employee.id,
+        role: "employee",
+        name,
+      },
     });
-
-    // 4. Build the access link using the business subdomain
-    const tenantDomain = process.env.TENANT_DOMAIN ?? "novaincs.com";
-    const accessUrl = `https://${slug}.${tenantDomain}/auth/accept-token?token=${signInToken.token}`;
 
     logActivity({
       db,
       businessId: currentUser.businessId,
       userId: currentUser.id,
-      action: "employee_created",
-      detail: name,
+      action: "employee_invited",
+      detail: `${name} (${email})`,
     });
 
     return c.json(
       {
-        employee: { ...employee, hasClerkAccount: true },
-        accessLink: accessUrl,
+        employee: { ...employee, hasClerkAccount: false, email },
+        message: `Invitacion enviada a ${email}`,
       },
       201,
     );
@@ -195,7 +165,7 @@ team.post("/employees", zValidator("json", createEmployeeSchema), async (c) => {
     if (clerkError.errors) {
       const firstErr = clerkError.errors[0];
       console.error(
-        "[team] Clerk createUser failed:",
+        "[team] Clerk invitation failed:",
         JSON.stringify(clerkError.errors),
       );
       return c.json(
@@ -203,7 +173,7 @@ team.post("/employees", zValidator("json", createEmployeeSchema), async (c) => {
           error:
             firstErr?.longMessage ??
             firstErr?.message ??
-            "Error creando cuenta de empleado",
+            "Error enviando invitacion",
         },
         400,
       );
@@ -349,108 +319,6 @@ team.delete("/employees/:id", validateUuidParam, async (c) => {
   });
 
   return c.json({ success: true });
-});
-
-// ============================================================
-// Access Link Generation
-// ============================================================
-
-/**
- * POST /employees/:id/access-link - Generate a new sign-in token link.
- *
- * Creates a new Clerk sign-in token for the employee and returns
- * a link that the admin can share (WhatsApp, QR, etc.).
- * The previous token is implicitly invalidated when a new one is created.
- */
-team.post("/employees/:id/access-link", validateUuidParam, async (c) => {
-  const ownerCheck = requireOwner(c);
-  if (ownerCheck) return c.json(ownerCheck, 403);
-
-  const employeeId = c.req.param("id");
-  const currentUser = c.get("user");
-  const db = c.get("db");
-  const clerk = getClerkClient();
-
-  // Find the employee
-  const [employee] = await db
-    .select({
-      id: users.id,
-      name: users.name,
-      role: users.role,
-      clerkId: users.clerkId,
-      isActive: users.isActive,
-    })
-    .from(users)
-    .where(
-      and(
-        eq(users.id, employeeId),
-        eq(users.businessId, currentUser.businessId),
-      ),
-    )
-    .limit(1);
-
-  if (!employee) {
-    return c.json({ error: "Empleado no encontrado" }, 404);
-  }
-
-  if (!employee.isActive) {
-    return c.json({ error: "El empleado esta desactivado" }, 400);
-  }
-
-  if (employee.role === "owner") {
-    return c.json(
-      { error: "El dueno no necesita link de acceso (usa Clerk directamente)" },
-      400,
-    );
-  }
-
-  if (!employee.clerkId) {
-    return c.json(
-      { error: "El empleado no tiene cuenta Clerk. Recrealo desde el panel." },
-      400,
-    );
-  }
-
-  try {
-    // Generate a new sign-in token
-    const signInToken = await clerk.signInTokens.createSignInToken({
-      userId: employee.clerkId,
-      expiresInSeconds: SIGN_IN_TOKEN_EXPIRY_SECONDS,
-    });
-
-    // Build the access link
-    const [business] = await db
-      .select({ slug: businesses.slug })
-      .from(businesses)
-      .where(eq(businesses.id, currentUser.businessId))
-      .limit(1);
-
-    const slug = business?.slug ?? "nova";
-    const tenantDomain = process.env.TENANT_DOMAIN ?? "novaincs.com";
-    const accessUrl = `https://${slug}.${tenantDomain}/auth/accept-token?token=${signInToken.token}`;
-
-    logActivity({
-      db,
-      businessId: currentUser.businessId,
-      userId: currentUser.id,
-      action: "access_link_generated",
-      detail: employee.name,
-    });
-
-    return c.json({ accessLink: accessUrl });
-  } catch (err) {
-    const clerkError = err as { errors?: Array<{ message: string }> };
-    if (clerkError.errors) {
-      return c.json(
-        {
-          error:
-            clerkError.errors[0]?.message ?? "Error generating access link",
-        },
-        500,
-      );
-    }
-    throw err;
-  }
 });
 
 // ============================================================
