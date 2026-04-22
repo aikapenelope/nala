@@ -27,13 +27,9 @@ import {
 } from "@nova/db";
 import { sql } from "drizzle-orm";
 
-/** Pre-computed bcrypt hash for PIN "0000" (cost 10). */
+/** Pre-computed bcrypt hash for test PIN "0000" (cost 10). Legacy, kept for backward compat. */
 const PIN_HASH_0000 =
   "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy";
-
-/** Pre-computed bcrypt hash for PIN "1234" (cost 10). */
-const PIN_HASH_1234 =
-  "$2a$10$YQ8HhvBRz5OaTIGYTYMT4.2rxSFBMP.kDJOiZE6OU/.VjEbMmx9V.";
 
 let _testDb: Database | null = null;
 
@@ -195,7 +191,7 @@ export async function createTestEmployee(
       businessId,
       name: overrides?.name ?? `Employee ${suffix}`,
       role: "employee",
-      pinHash: PIN_HASH_1234,
+      clerkId: `test-clerk-emp-${suffix}`,
     })
     .returning();
   return employee;
@@ -231,9 +227,7 @@ export async function cleanupTestData(db: Database): Promise<void> {
     await db
       .delete(accountingAccounts)
       .where(sql`${accountingAccounts.businessId} = ${bizId}`);
-    await db
-      .delete(categories)
-      .where(sql`${categories.businessId} = ${bizId}`);
+    await db.delete(categories).where(sql`${categories.businessId} = ${bizId}`);
     await db.delete(users).where(sql`${users.businessId} = ${bizId}`);
     await db.delete(businesses).where(sql`${businesses.id} = ${bizId}`);
   }

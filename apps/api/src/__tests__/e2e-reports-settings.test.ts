@@ -204,7 +204,7 @@ describe.skipIf(!hasDb)("E2E: Settings and team", () => {
     const res = await app.request("/api/employees", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: "Carlos Vendedor", pin: "5678" }),
+      body: JSON.stringify({ name: "Carlos Vendedor" }),
     });
     expect(res.status).toBe(201);
     const data = (await res.json()) as {

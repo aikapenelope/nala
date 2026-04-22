@@ -175,11 +175,11 @@ definePageMeta({ layout: false });
             <span class="text-2xl">🔐</span>
             <div>
               <h3 class="font-semibold text-gray-900">
-                Multi-empleado con PIN
+                Multi-empleado con link de acceso
               </h3>
               <p class="mt-1 text-sm text-gray-500">
-                Cada empleado tiene su PIN. Sabes quien vendio que. El dueno
-                autoriza acciones sensibles.
+                Cada empleado recibe su link. Sabes quien vendio que. El dueno
+                controla los accesos desde el panel.
               </p>
             </div>
           </div>
