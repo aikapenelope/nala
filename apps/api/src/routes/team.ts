@@ -129,17 +129,50 @@ team.post("/employees", zValidator("json", createEmployeeSchema), async (c) => {
         createdAt: users.createdAt,
       });
 
-    // 2. Send Clerk invitation to the employee's email
-    await clerk.invitations.createInvitation({
-      emailAddress: email,
-      redirectUrl,
-      publicMetadata: {
-        businessId: currentUser.businessId,
-        novaUserId: employee.id,
-        role: "employee",
-        name,
-      },
-    });
+    // 2. Try to send Clerk invitation. If it fails (e.g., username required
+    //    in Clerk dashboard), fall back to creating the user directly.
+    let method: "invitation" | "direct" = "invitation";
+
+    try {
+      await clerk.invitations.createInvitation({
+        emailAddress: email,
+        redirectUrl,
+        publicMetadata: {
+          businessId: currentUser.businessId,
+          novaUserId: employee.id,
+          role: "employee",
+          name,
+        },
+      });
+    } catch (inviteErr) {
+      // Invitation failed -- fall back to direct user creation
+      console.warn(
+        "[team] Invitation failed, falling back to createUser:",
+        inviteErr instanceof Error ? inviteErr.message : inviteErr,
+      );
+      method = "direct";
+
+      // Generate a temporary password (employee can reset later)
+      const tempPassword = `Nova!${crypto.randomUUID().slice(0, 12)}`;
+
+      const clerkUser = await clerk.users.createUser({
+        emailAddress: [email],
+        firstName: name,
+        password: tempPassword,
+        skipPasswordChecks: true,
+        publicMetadata: {
+          businessId: currentUser.businessId,
+          novaUserId: employee.id,
+          role: "employee",
+        },
+      });
+
+      // Link the Clerk user to the Nova employee record
+      await db
+        .update(users)
+        .set({ clerkId: clerkUser.id, updatedAt: new Date() })
+        .where(eq(users.id, employee.id));
+    }
 
     logActivity({
       db,
@@ -151,29 +184,49 @@ team.post("/employees", zValidator("json", createEmployeeSchema), async (c) => {
 
     return c.json(
       {
-        employee: { ...employee, hasClerkAccount: false, email },
-        message: `Invitacion enviada a ${email}`,
+        employee: {
+          ...employee,
+          hasClerkAccount: method === "direct",
+          email,
+        },
+        message:
+          method === "invitation"
+            ? `Invitacion enviada a ${email}`
+            : `Cuenta creada para ${email}. El empleado puede iniciar sesion con su email.`,
+        method,
       },
       201,
     );
   } catch (err) {
     // Handle Clerk API errors
     const clerkError = err as {
-      errors?: Array<{ message: string; code: string; longMessage?: string }>;
+      errors?: Array<{
+        message: string;
+        code: string;
+        longMessage?: string;
+        meta?: Record<string, unknown>;
+      }>;
       status?: number;
+      clerkError?: boolean;
     };
     if (clerkError.errors) {
-      const firstErr = clerkError.errors[0];
       console.error(
         "[team] Clerk invitation failed:",
-        JSON.stringify(clerkError.errors),
+        JSON.stringify(clerkError.errors, null, 2),
       );
+      // Return all error details for debugging
+      const messages = clerkError.errors
+        .map(
+          (e) =>
+            e.longMessage ??
+            e.message ??
+            `${e.code}: ${JSON.stringify(e.meta)}`,
+        )
+        .join(". ");
       return c.json(
         {
-          error:
-            firstErr?.longMessage ??
-            firstErr?.message ??
-            "Error enviando invitacion",
+          error: messages || "Error enviando invitacion",
+          clerkErrors: clerkError.errors,
         },
         400,
       );
