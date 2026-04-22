@@ -125,11 +125,23 @@ team.post("/employees", zValidator("json", createEmployeeSchema), async (c) => {
   const username = `${slug}-${sanitizedName}-${randomSuffix}`;
 
   try {
-    // 1. Create Clerk user (no email required, username-only)
+    // 1. Create Clerk user for the employee.
+    //
+    // We generate a random password because Clerk may require one depending
+    // on the instance auth settings. The employee will never use it -- they
+    // authenticate via sign-in token links. We also provide a synthetic
+    // email so Clerk doesn't reject the request if email is required.
+    const randomPassword =
+      `Emp!${crypto.randomUUID().slice(0, 16)}` +
+      Math.random().toString(36).slice(2, 6);
+    const syntheticEmail = `${username}@employees.internal`;
+
     const clerkUser = await clerk.users.createUser({
       username,
       firstName: name,
-      skipPasswordRequirement: true,
+      emailAddress: [syntheticEmail],
+      password: randomPassword,
+      skipPasswordChecks: true,
     });
 
     // 2. Create employee record in DB
@@ -176,12 +188,22 @@ team.post("/employees", zValidator("json", createEmployeeSchema), async (c) => {
     );
   } catch (err) {
     // Handle Clerk API errors
-    const clerkError = err as { errors?: Array<{ message: string }> };
+    const clerkError = err as {
+      errors?: Array<{ message: string; code: string; longMessage?: string }>;
+      status?: number;
+    };
     if (clerkError.errors) {
+      const firstErr = clerkError.errors[0];
+      console.error(
+        "[team] Clerk createUser failed:",
+        JSON.stringify(clerkError.errors),
+      );
       return c.json(
         {
           error:
-            clerkError.errors[0]?.message ?? "Error creating Clerk account",
+            firstErr?.longMessage ??
+            firstErr?.message ??
+            "Error creando cuenta de empleado",
         },
         400,
       );
