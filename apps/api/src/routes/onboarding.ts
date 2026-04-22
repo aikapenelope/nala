@@ -14,10 +14,9 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import bcrypt from "bcryptjs";
 import { verifyToken } from "@clerk/backend";
 import { eq } from "drizzle-orm";
-import { businessTypeSchema, PIN_LENGTH } from "@nova/shared";
+import { businessTypeSchema } from "@nova/shared";
 import {
   businesses,
   users,
@@ -51,7 +50,10 @@ const slugSchema = z
   .string()
   .min(3)
   .max(40)
-  .regex(/^[a-z0-9][a-z0-9-]*[a-z0-9]$/, "Slug must be lowercase alphanumeric with hyphens")
+  .regex(
+    /^[a-z0-9][a-z0-9-]*[a-z0-9]$/,
+    "Slug must be lowercase alphanumeric with hyphens",
+  )
   .refine((s) => !RESERVED_SLUGS.has(s), "This name is reserved");
 
 /** Schema for onboarding request. */
@@ -60,7 +62,6 @@ const onboardingSchema = z.object({
   businessName: z.string().min(1).max(100),
   businessSlug: slugSchema,
   ownerName: z.string().min(1).max(100),
-  ownerPin: z.string().length(PIN_LENGTH),
 });
 
 /**
@@ -206,7 +207,7 @@ onboarding.get("/check-slug/:slug", async (c) => {
  * 4. Pre-configured accounting chart
  */
 onboarding.post("/", zValidator("json", onboardingSchema), async (c) => {
-  const { businessType, businessName, businessSlug, ownerName, ownerPin } =
+  const { businessType, businessName, businessSlug, ownerName } =
     c.req.valid("json");
   const db = getDb();
 
@@ -257,57 +258,53 @@ onboarding.post("/", zValidator("json", onboardingSchema), async (c) => {
     );
   }
 
-  // Hash the owner's PIN
-  const pinHash = await bcrypt.hash(ownerPin, 10);
-
   // All-or-nothing: create business, owner, categories, accounts in one transaction
   let result;
   try {
     result = await db.transaction(async (tx) => {
-    // 1. Create business
-    const [business] = await tx
-      .insert(businesses)
-      .values({
-        name: businessName,
-        type: businessType,
-        slug: businessSlug,
-      })
-      .returning();
+      // 1. Create business
+      const [business] = await tx
+        .insert(businesses)
+        .values({
+          name: businessName,
+          type: businessType,
+          slug: businessSlug,
+        })
+        .returning();
 
-    // 2. Create owner user linked to Clerk ID
-    const [owner] = await tx
-      .insert(users)
-      .values({
-        businessId: business.id,
-        clerkId: clerkUserId,
-        name: ownerName,
-        role: "owner",
-        pinHash,
-      })
-      .returning();
+      // 2. Create owner user linked to Clerk ID
+      const [owner] = await tx
+        .insert(users)
+        .values({
+          businessId: business.id,
+          clerkId: clerkUserId,
+          name: ownerName,
+          role: "owner",
+        })
+        .returning();
 
-    // 3. Pre-configure categories for the business type
-    const categoryNames =
-      CATEGORIES_BY_TYPE[businessType] ?? CATEGORIES_BY_TYPE["otro"];
-    await tx.insert(categories).values(
-      categoryNames.map((name, idx) => ({
-        businessId: business.id,
-        name,
-        sortOrder: idx,
-      })),
-    );
+      // 3. Pre-configure categories for the business type
+      const categoryNames =
+        CATEGORIES_BY_TYPE[businessType] ?? CATEGORIES_BY_TYPE["otro"];
+      await tx.insert(categories).values(
+        categoryNames.map((name, idx) => ({
+          businessId: business.id,
+          name,
+          sortOrder: idx,
+        })),
+      );
 
-    // 4. Pre-configure accounting chart
-    await tx.insert(accountingAccounts).values(
-      DEFAULT_ACCOUNTS.map((acc) => ({
-        businessId: business.id,
-        code: acc.code,
-        name: acc.name,
-        type: acc.type,
-      })),
-    );
+      // 4. Pre-configure accounting chart
+      await tx.insert(accountingAccounts).values(
+        DEFAULT_ACCOUNTS.map((acc) => ({
+          businessId: business.id,
+          code: acc.code,
+          name: acc.name,
+          type: acc.type,
+        })),
+      );
 
-    return { business, owner };
+      return { business, owner };
     });
   } catch (err) {
     const dbErr = handleDbError(err);
