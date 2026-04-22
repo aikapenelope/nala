@@ -75,6 +75,7 @@ const addError = ref("");
 const isAdding = ref(false);
 const inviteSent = ref(false);
 const inviteEmail = ref("");
+const inviteMessage = ref("");
 
 function openAddModal() {
   newName.value = "";
@@ -91,19 +92,28 @@ async function addEmployee() {
   addError.value = "";
 
   try {
-    await $api<{
+    const result = await $api<{
       employee: Employee;
       message: string;
+      method: "invitation" | "direct";
     }>("/api/employees", {
       method: "POST",
       body: { name: newName.value.trim(), email: newEmail.value.trim() },
     });
     inviteEmail.value = newEmail.value.trim();
+    inviteMessage.value = result.message;
     inviteSent.value = true;
     await fetchEmployees();
   } catch (err) {
-    const fetchError = err as { data?: { error?: string } };
-    addError.value = fetchError.data?.error ?? "Error al invitar empleado";
+    const fetchError = err as {
+      data?: { error?: string; clerkErrors?: Array<Record<string, unknown>> };
+    };
+    // Show full error details for debugging
+    const clerkDetail = fetchError.data?.clerkErrors
+      ? ` (${JSON.stringify(fetchError.data.clerkErrors)})`
+      : "";
+    addError.value =
+      (fetchError.data?.error ?? "Error al invitar empleado") + clerkDetail;
   } finally {
     isAdding.value = false;
   }
@@ -389,11 +399,10 @@ async function toggleActive(emp: Employee) {
             <h3
               class="mb-2 text-xl font-extrabold tracking-tight text-gradient"
             >
-              Invitacion enviada
+              Empleado agregado
             </h3>
             <p class="mb-4 text-[13px] font-medium text-gray-500">
-              Se envio un email a <strong>{{ inviteEmail }}</strong> con un link
-              para crear su cuenta. Cuando acepte, podra acceder a Nova.
+              {{ inviteMessage }}
             </p>
 
             <button
