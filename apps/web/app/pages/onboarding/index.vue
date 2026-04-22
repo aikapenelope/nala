@@ -3,7 +3,7 @@
  * Onboarding flow after Clerk registration.
  *
  * Step 1: "What type of business do you have?" (visual selector)
- * Step 2: Business name + owner name + PIN
+ * Step 2: Business name + owner name
  * Step 3: Done - Nova pre-configures categories and accounts
  *
  * Connected to: POST /onboarding

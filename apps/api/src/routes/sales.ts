@@ -4,7 +4,7 @@
  * POST   /sales                    - Create a new sale
  * GET    /sales                    - List sales (with filters, pagination)
  * GET    /sales/:id                - Get sale detail with items and payments
- * POST   /sales/:id/void           - Void a sale (requires owner PIN)
+ * POST   /sales/:id/void           - Void a sale (owner only)
  *
  * GET    /exchange-rate             - Get current BCV exchange rate
  * POST   /exchange-rate             - Set exchange rate (owner only)
@@ -654,7 +654,7 @@ salesRoutes.post("/sales", zValidator("json", createSaleSchema), async (c) => {
 /**
  * POST /sales/:id/void - Void a sale.
  *
- * Requires owner PIN verification (handled by frontend modal).
+ * Requires owner role (enforced by role check in the handler).
  * Restores inventory, reverses fiado (customer balance + accounts_receivable),
  * reverses customer purchase stats, and marks sale as voided.
  */
