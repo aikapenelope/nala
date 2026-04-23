@@ -2,42 +2,50 @@
 /**
  * Team management page (owner only).
  *
- * Allows the owner to:
- * - View all employees (active and inactive)
- * - Add new employees (creates Clerk account + access link)
- * - Edit employee name
- * - Generate/regenerate access links for employees
+ * Uses Clerk Organizations for member management:
+ * - View active members and pending invitations
+ * - Invite new employees via Clerk org invitation
+ * - Edit employee name (local DB)
  * - Deactivate/reactivate employees
  *
  * Connected to:
- * - GET /api/employees
- * - POST /api/employees
+ * - GET /api/employees (lists Clerk org members + pending invitations)
+ * - POST /api/employees (sends Clerk org invitation)
  * - PATCH /api/employees/:id
  * - DELETE /api/employees/:id
- * - POST /api/employees/:id/access-link
  */
 
-import { UserPlus, Pencil, UserX, UserCheck, ArrowLeft } from "lucide-vue-next";
+import {
+  UserPlus,
+  Pencil,
+  UserX,
+  UserCheck,
+  ArrowLeft,
+  Clock,
+  Mail,
+} from "lucide-vue-next";
 
 definePageMeta({ middleware: ["admin-only"] });
 
 const { $api } = useApi();
 
-/** Employee from API. */
+/** Employee/member from API. */
 interface Employee {
   id: string;
   name: string;
   role: string;
   isActive: boolean;
   hasClerkAccount: boolean;
-  createdAt: string;
+  email?: string | null;
+  createdAt: string | null;
+  isPending?: boolean;
 }
 
 const employees = ref<Employee[]>([]);
 const isLoading = ref(true);
 const loadError = ref("");
 
-/** Fetch employees. */
+/** Fetch employees from Clerk Organization. */
 async function fetchEmployees() {
   isLoading.value = true;
   loadError.value = "";
@@ -53,15 +61,28 @@ async function fetchEmployees() {
 
 onMounted(fetchEmployees);
 
-/** Active employees (excluding owner). */
-const activeEmployees = computed(() =>
-  employees.value.filter((e) => e.isActive && e.role !== "owner"),
-);
-const inactiveEmployees = computed(() =>
-  employees.value.filter((e) => !e.isActive),
-);
+/** Owner (admin) entry. */
 const ownerEntry = computed(() =>
-  employees.value.find((e) => e.role === "owner" && e.isActive),
+  employees.value.find(
+    (e) => e.role === "owner" && e.isActive && !e.isPending,
+  ),
+);
+
+/** Active employees (excluding owner, excluding pending). */
+const activeEmployees = computed(() =>
+  employees.value.filter(
+    (e) => e.isActive && e.role !== "owner" && !e.isPending,
+  ),
+);
+
+/** Pending invitations. */
+const pendingInvites = computed(() =>
+  employees.value.filter((e) => e.isPending),
+);
+
+/** Inactive employees. */
+const inactiveEmployees = computed(() =>
+  employees.value.filter((e) => !e.isActive && !e.isPending),
 );
 
 // ============================================================
@@ -74,7 +95,6 @@ const newEmail = ref("");
 const addError = ref("");
 const isAdding = ref(false);
 const inviteSent = ref(false);
-const inviteEmail = ref("");
 const inviteMessage = ref("");
 
 function openAddModal() {
@@ -93,14 +113,13 @@ async function addEmployee() {
 
   try {
     const result = await $api<{
-      employee: Employee;
       message: string;
-      method: "invitation" | "direct";
+      email: string;
+      name: string;
     }>("/api/employees", {
       method: "POST",
       body: { name: newName.value.trim(), email: newEmail.value.trim() },
     });
-    inviteEmail.value = newEmail.value.trim();
     inviteMessage.value = result.message;
     inviteSent.value = true;
     await fetchEmployees();
@@ -108,7 +127,6 @@ async function addEmployee() {
     const fetchError = err as {
       data?: { error?: string; clerkErrors?: Array<Record<string, unknown>> };
     };
-    // Show full error details for debugging
     const clerkDetail = fetchError.data?.clerkErrors
       ? ` (${JSON.stringify(fetchError.data.clerkErrors)})`
       : "";
@@ -120,7 +138,7 @@ async function addEmployee() {
 }
 
 // ============================================================
-// Edit employee modal
+// Edit employee modal (only for active, non-pending members)
 // ============================================================
 
 const showEditModal = ref(false);
@@ -202,7 +220,7 @@ async function toggleActive(emp: Employee) {
           @click="openAddModal"
         >
           <UserPlus :size="16" />
-          Agregar
+          Invitar
         </button>
       </div>
     </div>
@@ -211,9 +229,9 @@ async function toggleActive(emp: Employee) {
     <div class="card-premium mb-4 p-4 text-sm text-gray-700">
       <p class="font-bold text-gray-800">Como funciona</p>
       <div class="mt-2 space-y-1.5 text-xs text-gray-600">
-        <p>1. Agrega un empleado con su nombre y email</p>
-        <p>2. Clerk le envia una invitacion por email</p>
-        <p>3. El empleado acepta, crea su password, y queda autenticado</p>
+        <p>1. Invita a un empleado con su email</p>
+        <p>2. Recibe un email para unirse al negocio</p>
+        <p>3. Acepta, crea su cuenta, y queda con acceso</p>
         <p>4. Puede entrar cuando quiera con su email y password</p>
       </div>
     </div>
@@ -250,7 +268,10 @@ async function toggleActive(emp: Employee) {
         </div>
         <div class="flex-1">
           <p class="font-bold text-gray-800">{{ ownerEntry.name }}</p>
-          <p class="text-xs font-bold text-nova-accent">Dueno</p>
+          <p class="text-xs font-bold text-nova-accent">Administrador</p>
+          <p v-if="ownerEntry.email" class="text-[11px] text-gray-400">
+            {{ ownerEntry.email }}
+          </p>
         </div>
       </div>
 
@@ -269,6 +290,9 @@ async function toggleActive(emp: Employee) {
           <div class="flex-1">
             <p class="font-bold text-gray-800">{{ emp.name }}</p>
             <p class="text-xs font-medium text-gray-500">Empleado</p>
+            <p v-if="emp.email" class="text-[11px] text-gray-400">
+              {{ emp.email }}
+            </p>
           </div>
           <button
             class="rounded-xl p-2 text-gray-400 transition-spring hover:bg-white/80 hover:text-gray-600"
@@ -287,8 +311,38 @@ async function toggleActive(emp: Employee) {
         </div>
       </div>
 
-      <!-- Empty state -->
-      <div v-else class="card-premium py-12 text-center">
+      <!-- Pending invitations -->
+      <div v-if="pendingInvites.length > 0" class="mt-6">
+        <h2 class="mb-2 flex items-center gap-1.5 text-sm font-bold text-gray-400">
+          <Clock :size="14" />
+          Invitaciones pendientes
+        </h2>
+        <div class="space-y-2.5">
+          <div
+            v-for="inv in pendingInvites"
+            :key="inv.id"
+            class="card-premium flex items-center gap-4 p-4 opacity-70"
+          >
+            <div
+              class="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-50 text-sm font-bold text-amber-500"
+            >
+              <Mail :size="18" />
+            </div>
+            <div class="flex-1">
+              <p class="font-semibold text-gray-700">{{ inv.name }}</p>
+              <p class="text-xs font-medium text-amber-600">
+                Esperando que acepte la invitacion
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Empty state (no employees and no pending) -->
+      <div
+        v-if="activeEmployees.length === 0 && pendingInvites.length === 0"
+        class="card-premium py-12 text-center"
+      >
         <p class="text-sm font-medium text-gray-400">
           No hay empleados registrados
         </p>
@@ -296,7 +350,7 @@ async function toggleActive(emp: Employee) {
           class="mt-3 text-sm font-bold text-nova-primary hover:underline"
           @click="openAddModal"
         >
-          Agregar primer empleado
+          Invitar primer empleado
         </button>
       </div>
 
@@ -344,7 +398,7 @@ async function toggleActive(emp: Employee) {
             <h3
               class="mb-5 text-xl font-extrabold tracking-tight text-gradient"
             >
-              Nuevo empleado
+              Invitar empleado
             </h3>
 
             <div class="space-y-4">
@@ -389,7 +443,7 @@ async function toggleActive(emp: Employee) {
                 :disabled="!newName.trim() || !newEmail.trim() || isAdding"
                 @click="addEmployee"
               >
-                {{ isAdding ? "Enviando..." : "Invitar empleado" }}
+                {{ isAdding ? "Enviando..." : "Enviar invitacion" }}
               </button>
             </div>
           </template>
@@ -399,7 +453,7 @@ async function toggleActive(emp: Employee) {
             <h3
               class="mb-2 text-xl font-extrabold tracking-tight text-gradient"
             >
-              Empleado agregado
+              Invitacion enviada
             </h3>
             <p class="mb-4 text-[13px] font-medium text-gray-500">
               {{ inviteMessage }}
