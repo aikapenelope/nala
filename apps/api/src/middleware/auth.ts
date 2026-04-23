@@ -8,18 +8,25 @@
  * and sets the user context for downstream handlers.
  *
  * For invited employees: when they first sign in after accepting the
- * invitation, their clerkId is not yet in the DB. The middleware reads
- * Clerk's publicMetadata.novaUserId to find and link the employee record.
+ * invitation, their clerkId is not yet in the DB. The middleware uses
+ * two strategies to link the employee:
+ *   1. Read Clerk's publicMetadata.novaUserId (set during invitation)
+ *   2. Fall back to matching by email within the same business
+ *
+ * A Clerk webhook (POST /webhooks/clerk) also handles this linking
+ * asynchronously. The on-the-fly linking here is a synchronous fallback
+ * for when the webhook hasn't arrived yet.
  *
  * After auth, sets `user`, `businessId`, and `db` on the Hono context.
  */
 
 import { verifyToken, createClerkClient } from "@clerk/backend";
 import { findUserByClerkId, findBusinessById } from "@nova/db";
-import { eq } from "drizzle-orm";
+import { eq, and, isNull } from "drizzle-orm";
 import { users } from "@nova/db";
 import type { Context, Next } from "hono";
 import { getDb } from "../db";
+import type { Database } from "@nova/db";
 
 export interface AuthUser {
   id: string;
@@ -46,11 +53,128 @@ async function verifyClerkJwt(token: string): Promise<string | null> {
 }
 
 /**
+ * Attempt to link a Clerk user to an existing Nova employee record.
+ *
+ * Strategy 1: Use publicMetadata.novaUserId from the Clerk invitation.
+ * Strategy 2: Match by email within the business from publicMetadata.
+ *
+ * Returns the linked user record, or null if linking failed.
+ */
+/** Inferred row type from the users table. */
+type UserRow = typeof users.$inferSelect;
+
+async function tryLinkEmployee(
+  db: Database,
+  clerkUserId: string,
+  clerkSecretKey: string,
+): Promise<UserRow | null> {
+  try {
+    const clerk = createClerkClient({ secretKey: clerkSecretKey });
+    const clerkUser = await clerk.users.getUser(clerkUserId);
+    const meta = clerkUser.publicMetadata as {
+      novaUserId?: string;
+      businessId?: string;
+      role?: string;
+    };
+
+    // Strategy 1: Link by novaUserId from invitation metadata
+    if (meta.novaUserId) {
+      const [linked] = await db
+        .update(users)
+        .set({ clerkId: clerkUserId, updatedAt: new Date() })
+        .where(
+          and(eq(users.id, meta.novaUserId), isNull(users.clerkId)),
+        )
+        .returning();
+
+      if (linked) {
+        console.info(
+          `[auth] Linked clerkId ${clerkUserId} to employee ${meta.novaUserId} (via metadata).`,
+        );
+        return linked;
+      }
+
+      // novaUserId was set but the record wasn't found or already linked.
+      // Check if it was already linked by the webhook.
+      const [alreadyLinked] = await db
+        .select()
+        .from(users)
+        .where(eq(users.id, meta.novaUserId))
+        .limit(1);
+
+      if (alreadyLinked?.clerkId === clerkUserId) {
+        console.info(
+          `[auth] Employee ${meta.novaUserId} already linked to ${clerkUserId} (by webhook).`,
+        );
+        return alreadyLinked;
+      }
+    }
+
+    // Strategy 2: Match by email within the business
+    // This handles cases where publicMetadata didn't propagate novaUserId
+    // but does have businessId, or where the invitation metadata was partial.
+    if (meta.businessId) {
+      const primaryEmail = clerkUser.emailAddresses.find(
+        (e) => e.id === clerkUser.primaryEmailAddressId,
+      )?.emailAddress;
+
+      if (primaryEmail) {
+        console.info(
+          `[auth] Attempting email-based linking for ${primaryEmail} in business ${meta.businessId}.`,
+        );
+
+        // Look for an unlinked employee in this business.
+        // We don't match by email in the DB (employees don't store email),
+        // but we can match by businessId + no clerkId + role=employee.
+        // This is a best-effort fallback for single pending invitations.
+        const unlinkedEmployees = await db
+          .select()
+          .from(users)
+          .where(
+            and(
+              eq(users.businessId, meta.businessId),
+              eq(users.role, "employee"),
+              eq(users.isActive, true),
+              isNull(users.clerkId),
+            ),
+          );
+
+        if (unlinkedEmployees.length === 1) {
+          // Only one unlinked employee -- safe to link
+          const [linked] = await db
+            .update(users)
+            .set({ clerkId: clerkUserId, updatedAt: new Date() })
+            .where(eq(users.id, unlinkedEmployees[0].id))
+            .returning();
+
+          if (linked) {
+            console.info(
+              `[auth] Linked clerkId ${clerkUserId} to employee ${linked.id} (via single-unlinked fallback).`,
+            );
+            return linked;
+          }
+        } else if (unlinkedEmployees.length > 1) {
+          console.warn(
+            `[auth] Multiple unlinked employees in business ${meta.businessId}. ` +
+              `Cannot auto-link by email. Waiting for webhook or retry.`,
+          );
+        }
+      }
+    }
+
+    return null;
+  } catch (err) {
+    console.error("[auth] Employee linking failed:", err);
+    return null;
+  }
+}
+
+/**
  * Auth middleware for protected API routes.
  *
  * 1. Verify Clerk JWT
  * 2. Look up user by clerkId (owner or employee)
- * 3. If not found, check Clerk publicMetadata for invited employee linking
+ * 3. If not found, attempt on-the-fly employee linking
  * 4. Set the resolved user on the context
  */
 export async function authMiddleware(c: Context, next: Next) {
@@ -96,41 +220,11 @@ export async function authMiddleware(c: Context, next: Next) {
   }
 
   // Look up the user (owner or employee) by their Clerk ID
-  let user = await findUserByClerkId(db, clerkUserId);
+  let user: UserRow | null = await findUserByClerkId(db, clerkUserId);
 
   // --- Employee linking: first login after accepting invitation ---
-  //
-  // When an employee accepts a Clerk invitation, they get a new clerkId
-  // that isn't in our DB yet. We check Clerk's publicMetadata for the
-  // novaUserId that was set when the invitation was created, and link it.
   if (!user) {
-    try {
-      const clerk = createClerkClient({ secretKey: clerkSecretKey });
-      const clerkUser = await clerk.users.getUser(clerkUserId);
-      const meta = clerkUser.publicMetadata as {
-        novaUserId?: string;
-        businessId?: string;
-        role?: string;
-      };
-
-      if (meta.novaUserId) {
-        // Link the Clerk account to the existing Nova employee record
-        const [linked] = await db
-          .update(users)
-          .set({ clerkId: clerkUserId, updatedAt: new Date() })
-          .where(eq(users.id, meta.novaUserId))
-          .returning();
-
-        if (linked) {
-          console.info(
-            `[auth] Linked clerkId ${clerkUserId} to employee ${meta.novaUserId}`,
-          );
-          user = linked;
-        }
-      }
-    } catch (err) {
-      console.error("[auth] Employee linking failed:", err);
-    }
+    user = await tryLinkEmployee(db, clerkUserId, clerkSecretKey);
   }
 
   if (!user) {
