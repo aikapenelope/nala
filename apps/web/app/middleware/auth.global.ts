@@ -1,51 +1,43 @@
 /**
  * Global authentication middleware.
  *
- * Simple auth flow using Clerk Organizations:
- *   1. NovaUser in state?        -> allow
- *   2. Route is public?          -> allow
- *   3. Clerk signed in?          -> redirect to /auth/resolve
- *   4. Nothing                   -> redirect to /landing
+ * Uses Clerk's recommended pattern for Nuxt page protection.
+ * See: https://clerk.com/docs/guides/secure/protect-pages
+ *
+ * Public routes are accessible without authentication.
+ * All other routes require the user to be signed in via Clerk.
+ * If signed in but NovaUser not resolved, redirect to /auth/resolve.
  */
 
-/** Routes accessible without authentication. */
-const PUBLIC_ROUTES = [
+/** Matcher for public routes that don't require authentication. */
+const isPublicRoute = createRouteMatcher([
   "/landing",
   "/auth/login",
   "/auth/signup",
   "/auth/resolve",
-  "/onboarding",
-  "/catalogo",
-];
+  "/onboarding(.*)",
+  "/catalogo(.*)",
+]);
 
 export default defineNuxtRouteMiddleware((to) => {
-  const { isAuthenticated } = useNovaAuth();
+  // Public routes -- always allow
+  if (isPublicRoute(to)) {
+    return;
+  }
 
-  // 1. Already identified -- allow
+  // Check if Nova user is resolved (app-level auth)
+  const { isAuthenticated } = useNovaAuth();
   if (isAuthenticated.value) {
     return;
   }
 
-  // 2. Public route -- allow
-  const isPublic = PUBLIC_ROUTES.some(
-    (route) => to.path === route || to.path.startsWith(route + "/"),
-  );
-  if (isPublic) {
-    return;
+  // Check if Clerk user is signed in (Clerk-level auth)
+  const { isSignedIn } = useAuth();
+  if (isSignedIn.value) {
+    // Signed in with Clerk but NovaUser not resolved yet
+    return navigateTo("/auth/resolve");
   }
 
-  if (!import.meta.client) return;
-
-  // 3. Clerk signed in but NovaUser not resolved yet
-  try {
-    const { isSignedIn } = useAuth();
-    if (isSignedIn.value) {
-      return navigateTo("/auth/resolve");
-    }
-  } catch {
-    // Clerk not initialized -- continue to next check
-  }
-
-  // 4. No auth at all -- show landing
+  // Not signed in at all
   return navigateTo("/landing");
 });
