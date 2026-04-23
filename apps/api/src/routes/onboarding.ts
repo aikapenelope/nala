@@ -1,20 +1,24 @@
 /**
  * Onboarding routes.
  *
- * POST /onboarding - Create a new business + owner user after Clerk registration.
+ * POST /onboarding - Create a new business + Clerk Organization after sign-up.
  *
- * This is called once per Clerk user, right after they sign up.
- * It creates the business record, the owner user linked to their Clerk ID,
- * and pre-configures categories and accounting chart based on business type.
+ * Flow:
+ * 1. Verify Clerk JWT to get the user's clerkId
+ * 2. Create a Clerk Organization with the business name
+ * 3. Add the user as org:admin of the Organization
+ * 4. Create the business record in DB (with clerkOrgId)
+ * 5. Create the owner user record in DB
+ * 6. Pre-configure categories and accounting chart
  *
- * The entire operation runs in a single database transaction. If any step
- * fails, everything is rolled back -- no orphaned records.
+ * After onboarding, the user's JWT will include orgId and orgRole,
+ * which the authMiddleware uses for all subsequent requests.
  */
 
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import { verifyToken } from "@clerk/backend";
+import { verifyToken, createClerkClient } from "@clerk/backend";
 import { eq } from "drizzle-orm";
 import { businessTypeSchema } from "@nova/shared";
 import {
@@ -66,7 +70,6 @@ const onboardingSchema = z.object({
 
 /**
  * Pre-configured categories per business type.
- * These give the user a head start so they don't have to create categories from scratch.
  */
 const CATEGORIES_BY_TYPE: Record<string, string[]> = {
   ferreteria: [
@@ -160,7 +163,6 @@ const CATEGORIES_BY_TYPE: Record<string, string[]> = {
 
 /**
  * Basic chart of accounts for Venezuelan small businesses.
- * Simplified for non-accountants but compatible with libro diario format.
  */
 const DEFAULT_ACCOUNTS: Array<{
   code: string;
@@ -179,9 +181,6 @@ const DEFAULT_ACCOUNTS: Array<{
 
 /**
  * GET /onboarding/check-slug/:slug - Check if a slug is available.
- *
- * Public endpoint (no auth required). Returns { available: boolean }.
- * Used by the onboarding form for real-time slug validation.
  */
 onboarding.get("/check-slug/:slug", async (c) => {
   const slug = c.req.param("slug");
@@ -197,14 +196,14 @@ onboarding.get("/check-slug/:slug", async (c) => {
 });
 
 /**
- * POST /onboarding - Create business + owner.
+ * POST /onboarding - Create business + Clerk Organization + owner.
  *
  * Requires a valid Clerk session (the user just signed up).
- * Creates in a single transaction:
- * 1. Business record with type and name
- * 2. Owner user linked to the Clerk ID
- * 3. Pre-configured categories for the business type
- * 4. Pre-configured accounting chart
+ * Creates:
+ * 1. Clerk Organization (the user becomes org:admin)
+ * 2. Business record in DB (linked to Clerk Org via clerkOrgId)
+ * 3. Owner user record in DB
+ * 4. Pre-configured categories and accounting chart
  */
 onboarding.post("/", zValidator("json", onboardingSchema), async (c) => {
   const { businessType, businessName, businessSlug, ownerName } =
@@ -228,7 +227,6 @@ onboarding.post("/", zValidator("json", onboardingSchema), async (c) => {
       return c.json({ error: "Invalid authentication token" }, 401);
     }
   } else if (!clerkSecretKey && process.env.NODE_ENV === "development") {
-    // Dev-only fallback, requires explicit NODE_ENV=development
     clerkUserId = "dev-clerk-001";
   } else if (!clerkSecretKey) {
     return c.json(
@@ -258,17 +256,45 @@ onboarding.post("/", zValidator("json", onboardingSchema), async (c) => {
     );
   }
 
-  // All-or-nothing: create business, owner, categories, accounts in one transaction
+  // --- Create Clerk Organization ---
+  // The owner becomes org:admin automatically (createdBy).
+  // In dev mode without Clerk, skip org creation.
+  let clerkOrgId: string | null = null;
+
+  if (clerkSecretKey) {
+    try {
+      const clerk = createClerkClient({ secretKey: clerkSecretKey });
+      const org = await clerk.organizations.createOrganization({
+        name: businessName,
+        slug: businessSlug,
+        createdBy: clerkUserId,
+      });
+      clerkOrgId = org.id;
+
+      console.info(
+        `[onboarding] Created Clerk Organization "${businessName}" (${clerkOrgId}) for user ${clerkUserId}`,
+      );
+    } catch (err) {
+      console.error("[onboarding] Failed to create Clerk Organization:", err);
+      return c.json(
+        { error: "Error al crear la organizacion. Intenta de nuevo." },
+        500,
+      );
+    }
+  }
+
+  // --- Create DB records in a single transaction ---
   let result;
   try {
     result = await db.transaction(async (tx) => {
-      // 1. Create business
+      // 1. Create business with Clerk Org link
       const [business] = await tx
         .insert(businesses)
         .values({
           name: businessName,
           type: businessType,
           slug: businessSlug,
+          clerkOrgId,
         })
         .returning();
 
@@ -318,6 +344,7 @@ onboarding.post("/", zValidator("json", onboardingSchema), async (c) => {
         id: result.business.id,
         name: result.business.name,
         type: result.business.type,
+        clerkOrgId: result.business.clerkOrgId,
       },
       user: {
         id: result.owner.id,

@@ -2,13 +2,9 @@
 /**
  * Root app component.
  *
- * Restores the Nova user session from localStorage on app init.
+ * With Clerk Organizations, auth state comes from Clerk's JWT.
+ * No localStorage restore needed.
  */
-const { restoreUser } = useNovaAuth();
-
-onMounted(() => {
-  restoreUser();
-});
 </script>
 
 <template>

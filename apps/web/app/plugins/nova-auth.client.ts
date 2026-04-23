@@ -1,13 +1,12 @@
 /**
- * Client-only plugin that restores auth state on app initialization.
+ * Client-only plugin for auth initialization.
  *
- * Runs before any route navigation to ensure the NovaUser is
- * restored from localStorage (for the global middleware).
+ * With Clerk Organizations, auth state comes from Clerk's JWT,
+ * not from localStorage. This plugin is kept as a placeholder
+ * for any future client-side auth initialization needs.
  */
 
 export default defineNuxtPlugin(() => {
-  const { restoreUser } = useNovaAuth();
-
-  // Restore the active user (owner or employee)
-  restoreUser();
+  // Auth state is managed by Clerk and resolved via /auth/resolve.
+  // No localStorage persistence needed with Organizations.
 });

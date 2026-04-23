@@ -5,7 +5,7 @@
  * to look up users and businesses.
  */
 
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import type { Database } from "./client";
 import { users, businesses } from "./schema";
 
@@ -25,6 +25,33 @@ export async function findBusinessById(db: Database, businessId: string) {
     .select()
     .from(businesses)
     .where(eq(businesses.id, businessId))
+    .limit(1);
+  return result[0] ?? null;
+}
+
+/** Find a business by its Clerk Organization ID. */
+export async function findBusinessByClerkOrgId(
+  db: Database,
+  clerkOrgId: string,
+) {
+  const result = await db
+    .select()
+    .from(businesses)
+    .where(eq(businesses.clerkOrgId, clerkOrgId))
+    .limit(1);
+  return result[0] ?? null;
+}
+
+/** Find a user by Clerk ID within a specific business. */
+export async function findUserInBusiness(
+  db: Database,
+  clerkId: string,
+  businessId: string,
+) {
+  const result = await db
+    .select()
+    .from(users)
+    .where(and(eq(users.clerkId, clerkId), eq(users.businessId, businessId)))
     .limit(1);
   return result[0] ?? null;
 }

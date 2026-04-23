@@ -3,30 +3,26 @@
  *
  * Verifies Clerk JWT tokens and resolves the authenticated user.
  *
- * Every user (owner or employee) has their own Clerk account and JWT.
- * The middleware verifies the JWT, looks up the user by clerkId,
- * and sets the user context for downstream handlers.
+ * Uses Clerk Organizations for multi-tenancy:
+ * - The JWT contains `orgId` (the Clerk Organization ID) and `orgRole`
+ * - The middleware looks up the business by `clerkOrgId` in the DB
+ * - The user is looked up by `clerkId` within that business
+ * - If the user doesn't exist yet (first login after accepting org invite),
+ *   the middleware creates the user record automatically
  *
- * For invited employees: when they first sign in after accepting the
- * invitation, their clerkId is not yet in the DB. The middleware uses
- * two strategies to link the employee:
- *   1. Read Clerk's publicMetadata.novaUserId (set during invitation)
- *   2. Fall back to matching by email within the same business
- *
- * A Clerk webhook (POST /webhooks/clerk) also handles this linking
- * asynchronously. The on-the-fly linking here is a synchronous fallback
- * for when the webhook hasn't arrived yet.
+ * No custom linking, no webhooks, no retry loops. Clerk handles everything.
  *
  * After auth, sets `user`, `businessId`, and `db` on the Hono context.
  */
 
-import { verifyToken, createClerkClient } from "@clerk/backend";
-import { findUserByClerkId, findBusinessById } from "@nova/db";
-import { eq, and, isNull } from "drizzle-orm";
+import { verifyToken } from "@clerk/backend";
+import {
+  findBusinessByClerkOrgId,
+  findUserInBusiness,
+} from "@nova/db";
 import { users } from "@nova/db";
 import type { Context, Next } from "hono";
 import { getDb } from "../db";
-import type { Database } from "@nova/db";
 
 export interface AuthUser {
   id: string;
@@ -34,148 +30,58 @@ export interface AuthUser {
   businessName: string;
   name: string;
   role: "owner" | "employee";
-  clerkId?: string;
+  clerkId: string;
 }
 
 /**
- * Verify a Clerk JWT and return the authenticated user's Clerk ID.
+ * Decoded Clerk JWT payload (subset we use).
+ */
+interface ClerkJwtPayload {
+  sub: string;
+  org_id?: string;
+  org_role?: string;
+  org_slug?: string;
+}
+
+/**
+ * Verify a Clerk JWT and return the decoded payload.
  * Returns null if the token is invalid or expired.
  */
-async function verifyClerkJwt(token: string): Promise<string | null> {
+async function verifyClerkJwt(
+  token: string,
+): Promise<ClerkJwtPayload | null> {
   try {
     const payload = await verifyToken(token, {
       secretKey: process.env.CLERK_SECRET_KEY ?? "",
     });
-    return payload.sub ?? null;
+    return {
+      sub: payload.sub ?? "",
+      org_id: payload.org_id as string | undefined,
+      org_role: payload.org_role as string | undefined,
+      org_slug: payload.org_slug as string | undefined,
+    };
   } catch {
     return null;
   }
 }
 
 /**
- * Attempt to link a Clerk user to an existing Nova employee record.
- *
- * Strategy 1: Use publicMetadata.novaUserId from the Clerk invitation.
- * Strategy 2: Match by email within the business from publicMetadata.
- *
- * Returns the linked user record, or null if linking failed.
+ * Map Clerk org role to Nova role.
+ * Clerk uses "org:admin" for admins and "org:member" for members.
  */
-/** Inferred row type from the users table. */
-type UserRow = typeof users.$inferSelect;
-
-async function tryLinkEmployee(
-  db: Database,
-  clerkUserId: string,
-  clerkSecretKey: string,
-): Promise<UserRow | null> {
-  try {
-    const clerk = createClerkClient({ secretKey: clerkSecretKey });
-    const clerkUser = await clerk.users.getUser(clerkUserId);
-    const meta = clerkUser.publicMetadata as {
-      novaUserId?: string;
-      businessId?: string;
-      role?: string;
-    };
-
-    // Strategy 1: Link by novaUserId from invitation metadata
-    if (meta.novaUserId) {
-      const [linked] = await db
-        .update(users)
-        .set({ clerkId: clerkUserId, updatedAt: new Date() })
-        .where(
-          and(eq(users.id, meta.novaUserId), isNull(users.clerkId)),
-        )
-        .returning();
-
-      if (linked) {
-        console.info(
-          `[auth] Linked clerkId ${clerkUserId} to employee ${meta.novaUserId} (via metadata).`,
-        );
-        return linked;
-      }
-
-      // novaUserId was set but the record wasn't found or already linked.
-      // Check if it was already linked by the webhook.
-      const [alreadyLinked] = await db
-        .select()
-        .from(users)
-        .where(eq(users.id, meta.novaUserId))
-        .limit(1);
-
-      if (alreadyLinked?.clerkId === clerkUserId) {
-        console.info(
-          `[auth] Employee ${meta.novaUserId} already linked to ${clerkUserId} (by webhook).`,
-        );
-        return alreadyLinked;
-      }
-    }
-
-    // Strategy 2: Match by email within the business
-    // This handles cases where publicMetadata didn't propagate novaUserId
-    // but does have businessId, or where the invitation metadata was partial.
-    if (meta.businessId) {
-      const primaryEmail = clerkUser.emailAddresses.find(
-        (e) => e.id === clerkUser.primaryEmailAddressId,
-      )?.emailAddress;
-
-      if (primaryEmail) {
-        console.info(
-          `[auth] Attempting email-based linking for ${primaryEmail} in business ${meta.businessId}.`,
-        );
-
-        // Look for an unlinked employee in this business.
-        // We don't match by email in the DB (employees don't store email),
-        // but we can match by businessId + no clerkId + role=employee.
-        // This is a best-effort fallback for single pending invitations.
-        const unlinkedEmployees = await db
-          .select()
-          .from(users)
-          .where(
-            and(
-              eq(users.businessId, meta.businessId),
-              eq(users.role, "employee"),
-              eq(users.isActive, true),
-              isNull(users.clerkId),
-            ),
-          );
-
-        if (unlinkedEmployees.length === 1) {
-          // Only one unlinked employee -- safe to link
-          const [linked] = await db
-            .update(users)
-            .set({ clerkId: clerkUserId, updatedAt: new Date() })
-            .where(eq(users.id, unlinkedEmployees[0].id))
-            .returning();
-
-          if (linked) {
-            console.info(
-              `[auth] Linked clerkId ${clerkUserId} to employee ${linked.id} (via single-unlinked fallback).`,
-            );
-            return linked;
-          }
-        } else if (unlinkedEmployees.length > 1) {
-          console.warn(
-            `[auth] Multiple unlinked employees in business ${meta.businessId}. ` +
-              `Cannot auto-link by email. Waiting for webhook or retry.`,
-          );
-        }
-      }
-    }
-
-    return null;
-  } catch (err) {
-    console.error("[auth] Employee linking failed:", err);
-    return null;
-  }
+function mapOrgRole(orgRole: string | undefined): "owner" | "employee" {
+  if (orgRole === "org:admin") return "owner";
+  return "employee";
 }
 
 /**
  * Auth middleware for protected API routes.
  *
  * 1. Verify Clerk JWT
- * 2. Look up user by clerkId (owner or employee)
- * 3. If not found, attempt on-the-fly employee linking
- * 4. Set the resolved user on the context
+ * 2. Extract orgId from JWT (required -- user must have an active org)
+ * 3. Look up business by clerkOrgId
+ * 4. Look up or auto-create user in that business
+ * 5. Set the resolved user on the context
  */
 export async function authMiddleware(c: Context, next: Next) {
   const db = getDb();
@@ -213,42 +119,39 @@ export async function authMiddleware(c: Context, next: Next) {
   }
 
   const token = authHeader.slice(7);
-  const clerkUserId = await verifyClerkJwt(token);
+  const payload = await verifyClerkJwt(token);
 
-  if (!clerkUserId) {
+  if (!payload || !payload.sub) {
     return c.json({ error: "Invalid or expired token" }, 401);
   }
 
-  // Look up the user (owner or employee) by their Clerk ID
-  let user: UserRow | null = await findUserByClerkId(db, clerkUserId);
+  const clerkUserId = payload.sub;
+  const clerkOrgId = payload.org_id;
+  const clerkOrgRole = payload.org_role;
 
-  // --- Employee linking: first login after accepting invitation ---
-  if (!user) {
-    user = await tryLinkEmployee(db, clerkUserId, clerkSecretKey);
-  }
-
-  if (!user) {
+  // --- Require an active Organization ---
+  // Users must select an Organization before accessing the API.
+  // This is enforced by Clerk's "choose-organization" session task.
+  if (!clerkOrgId) {
     return c.json(
       {
-        error: "User not found. Complete onboarding first.",
-        code: "USER_NOT_FOUND",
+        error: "No organization selected. Please select a business first.",
+        code: "NO_ORGANIZATION",
       },
-      404,
+      403,
     );
   }
 
-  if (!user.isActive) {
-    return c.json({ error: "Account is deactivated" }, 403);
-  }
+  // --- Look up the business by Clerk Organization ID ---
+  const business = await findBusinessByClerkOrgId(db, clerkOrgId);
 
-  const business = await findBusinessById(db, user.businessId);
   if (!business) {
     return c.json(
       {
-        error: "Business not found. Account may be corrupted.",
+        error: "Business not found for this organization.",
         code: "BUSINESS_NOT_FOUND",
       },
-      500,
+      404,
     );
   }
 
@@ -256,17 +159,62 @@ export async function authMiddleware(c: Context, next: Next) {
     return c.json({ error: "Business is deactivated" }, 403);
   }
 
+  // --- Look up or auto-create the user ---
+  // When an employee accepts a Clerk Organization invitation and logs in
+  // for the first time, they won't have a record in our `users` table yet.
+  // We auto-create it based on the Clerk JWT data.
+  let user = await findUserInBusiness(db, clerkUserId, business.id);
+
+  if (!user) {
+    // Auto-create user record for new org members.
+    // The role comes from the Clerk Organization membership.
+    const role = mapOrgRole(clerkOrgRole);
+
+    try {
+      const [created] = await db
+        .insert(users)
+        .values({
+          businessId: business.id,
+          clerkId: clerkUserId,
+          name: clerkOrgRole === "org:admin" ? "Owner" : "Employee",
+          role,
+        })
+        .returning();
+
+      user = created;
+      console.info(
+        `[auth] Auto-created user ${created.id} (${role}) in business ${business.id} for clerkId ${clerkUserId}`,
+      );
+    } catch (err) {
+      // If there's a unique constraint violation, the user was created
+      // concurrently (race condition). Try to find them again.
+      user = await findUserInBusiness(db, clerkUserId, business.id);
+      if (!user) {
+        console.error("[auth] Failed to create or find user:", err);
+        return c.json({ error: "Failed to initialize user account" }, 500);
+      }
+    }
+  }
+
+  if (!user.isActive) {
+    return c.json({ error: "Account is deactivated" }, 403);
+  }
+
+  // Use the Clerk org role as the source of truth for permissions.
+  // This ensures role changes in Clerk Dashboard take effect immediately.
+  const role = mapOrgRole(clerkOrgRole);
+
   const activeUser: AuthUser = {
     id: user.id,
-    businessId: user.businessId,
+    businessId: business.id,
     businessName: business.name,
     name: user.name,
-    role: user.role as "owner" | "employee",
+    role,
     clerkId: clerkUserId,
   };
 
   c.set("user", activeUser);
-  c.set("businessId", activeUser.businessId);
+  c.set("businessId", business.id);
 
   await next();
 }

@@ -3,20 +3,11 @@
  *
  * Provides a typed `$api` function that wraps `$fetch` with:
  * - Automatic base URL from runtime config (NUXT_PUBLIC_API_BASE)
- * - Clerk JWT token in Authorization header
+ * - Clerk JWT token in Authorization header (includes orgId)
  * - 401 interceptor: clears stale session and shows re-auth banner
  *
- * Every user (owner and employee) has their own Clerk JWT.
- * No X-Acting-As header is needed.
- *
- * Token acquisition is resilient: if Clerk isn't loaded when the
- * composable is first created, it retries on every $api call until
- * getToken becomes available.
- *
- * Usage:
- *   const { $api } = useApi();
- *   const data = await $api('/api/products');
- *   const sale = await $api('/api/sales', { method: 'POST', body: { ... } });
+ * With Clerk Organizations, the JWT automatically includes the
+ * active Organization's ID and role. No custom headers needed.
  */
 
 import type { NitroFetchOptions } from "nitropack";
@@ -30,8 +21,8 @@ export function useApi() {
    */
   const sessionExpired = useState<boolean>("session-expired", () => false);
 
-  // Capture Clerk's getToken during setup (not inside $api).
-  // If Clerk isn't loaded yet, we'll retry on each $api call.
+  // Capture Clerk's getToken during setup.
+  // If Clerk isn't loaded yet, we retry on each $api call.
   let clerkGetTokenRef: {
     value: (() => Promise<string | null>) | undefined;
   } | null = null;
@@ -45,15 +36,10 @@ export function useApi() {
     }
   }
 
-  /**
-   * Try to acquire Clerk's getToken ref if we don't have it yet.
-   * Called on every $api request to handle the case where Clerk
-   * wasn't loaded when the composable was first created.
-   */
+  /** Try to acquire Clerk's getToken ref if we don't have it yet. */
   function ensureGetToken(): void {
     if (clerkGetTokenRef) return;
     if (!import.meta.client) return;
-
     try {
       const { getToken } = useAuth();
       clerkGetTokenRef = getToken;
@@ -62,9 +48,7 @@ export function useApi() {
     }
   }
 
-  /**
-   * Handle a 401 response from the API.
-   */
+  /** Handle a 401 response from the API. */
   function handle401() {
     if (!import.meta.client) return;
     if (sessionExpired.value) return;
@@ -72,13 +56,10 @@ export function useApi() {
 
     const novaUser = useState<unknown>("nova-user");
     novaUser.value = null;
-    localStorage.removeItem("nova:user");
   }
 
   /**
    * Make an authenticated API request.
-   *
-   * @param opts.silent - If true, 401 errors won't trigger the session-expired banner.
    */
   async function $api<T = unknown>(
     path: string,
@@ -88,9 +69,8 @@ export function useApi() {
       ...(opts?.headers as Record<string, string> | undefined),
     };
 
-    // Attach Clerk JWT
+    // Attach Clerk JWT (includes orgId automatically)
     if (import.meta.client) {
-      // Re-attempt to get the token ref if we don't have it
       ensureGetToken();
 
       if (clerkGetTokenRef) {
@@ -103,7 +83,7 @@ export function useApi() {
             }
           }
         } catch {
-          // Token retrieval failed -- request will go without auth
+          // Token retrieval failed
         }
       }
     }
