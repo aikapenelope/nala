@@ -64,6 +64,13 @@
       "when": 1776820800000,
       "tag": "0008_sales_indexes",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1776907200000,
+      "tag": "0011_nullable_pin_hash",
+      "breakpoints": true
     }
   ]
 }
