@@ -136,8 +136,9 @@ async function createBusiness() {
 
   try {
     const result = await $api<{
-      business: { id: string; name: string; type: string };
+      business: { id: string; name: string; type: string; clerkOrgId?: string };
       user: { id: string; name: string; role: string; businessId: string };
+      migrated?: boolean;
     }>("/onboarding", {
       method: "POST",
       body: {
@@ -147,6 +148,21 @@ async function createBusiness() {
         ownerName: ownerName.value.trim(),
       },
     });
+
+    // If a Clerk Organization was created (new or migrated), set it as active.
+    // This ensures the JWT includes orgId on subsequent requests.
+    if (result.business.clerkOrgId && import.meta.client) {
+      try {
+        const clerk = useClerk();
+        if (clerk.value) {
+          await clerk.value.setActive({
+            organization: result.business.clerkOrgId,
+          });
+        }
+      } catch (orgErr) {
+        console.warn("[onboarding] Failed to set active org:", orgErr);
+      }
+    }
 
     // Set the Nova user from the onboarding response
     setUser({
@@ -160,9 +176,16 @@ async function createBusiness() {
     step.value = 3;
   } catch (err) {
     const fetchError = err as {
-      data?: { error?: string };
+      data?: { error?: string; businessId?: string };
       statusCode?: number;
     };
+
+    // 409 means user already has a business WITH a Clerk Org (fully migrated).
+    // Just redirect to dashboard -- the org should already be active.
+    if (fetchError.statusCode === 409) {
+      router.replace("/auth/resolve");
+      return;
+    }
 
     if (fetchError.data?.error) {
       error.value = fetchError.data.error;
