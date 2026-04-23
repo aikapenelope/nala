@@ -14,7 +14,7 @@ import type { BusinessType } from "@nova/shared";
 definePageMeta({ layout: false });
 
 const router = useRouter();
-const { setUser, isAuthenticated } = useNovaAuth();
+const { setUser, isAuthenticated, resolveUser } = useNovaAuth();
 const { $api } = useApi();
 
 /**
@@ -181,7 +181,7 @@ async function createBusiness() {
     };
 
     // 409 means user already has a business.
-    // Activate the Clerk Organization and redirect to dashboard.
+    // Activate the Clerk Organization, resolve the user, then go to dashboard.
     if (fetchError.statusCode === 409) {
       const clerkOrgId = (fetchError.data as { clerkOrgId?: string })
         ?.clerkOrgId;
@@ -191,8 +191,10 @@ async function createBusiness() {
           const clerk = useClerk();
           if (clerk.value) {
             await clerk.value.setActive({ organization: clerkOrgId });
-            // Wait a moment for the session token to update with orgId
-            await new Promise((r) => setTimeout(r, 500));
+            // Wait for the session token to update with orgId
+            await new Promise((r) => setTimeout(r, 800));
+            // Now resolve the Nova user so isAuthenticated becomes true
+            await resolveUser();
           }
         } catch (orgErr) {
           console.warn("[onboarding] Failed to set active org:", orgErr);
