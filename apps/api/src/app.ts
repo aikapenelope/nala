@@ -11,12 +11,15 @@
  * Routes:
  * - /health - health check (no auth required)
  * - /onboarding - business creation (Clerk JWT required, handled internally)
+ * - /webhooks/clerk - Clerk webhook receiver (Svix signature verified)
  * - /api/* - protected API routes (auth + tenant required)
  */
 
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { secureHeaders } from "hono/secure-headers";
+import { bodyLimit } from "hono/body-limit";
+import { timeout } from "hono/timeout";
 import { structuredLogger } from "./middleware/structured-logger";
 import { health } from "./routes/health";
 import { catalog } from "./routes/catalog";
@@ -29,6 +32,7 @@ import { accounting } from "./routes/accounting";
 import { team } from "./routes/team";
 import { suppliersRoutes } from "./routes/suppliers";
 import { configRoutes } from "./routes/config";
+import { webhooks } from "./routes/webhooks";
 import { authMiddleware } from "./middleware/auth";
 import { tenantMiddleware } from "./middleware/tenant";
 import { publicRateLimit, apiRateLimit } from "./middleware/rate-limit";
@@ -100,6 +104,18 @@ app.use("*", async (c, next) => {
 app.use("*", secureHeaders());
 
 // ---------------------------------------------------------------------------
+// Body size limit: reject requests larger than 1MB to prevent DoS
+// ---------------------------------------------------------------------------
+
+app.use("*", bodyLimit({ maxSize: 1024 * 1024 }));
+
+// ---------------------------------------------------------------------------
+// Request timeout: abort requests that take longer than 30 seconds
+// ---------------------------------------------------------------------------
+
+app.use("*", timeout(30_000));
+
+// ---------------------------------------------------------------------------
 // Logger (only runs for legitimate requests, scanners are already blocked)
 // ---------------------------------------------------------------------------
 
@@ -147,6 +163,7 @@ app.route("/catalog", catalog);
 app.use("/onboarding/check-slug/*", publicRateLimit);
 app.use("/onboarding", publicRateLimit);
 app.route("/onboarding", onboarding);
+app.route("/webhooks", webhooks);
 
 // ---------------------------------------------------------------------------
 // Protected API routes with typed context variables
