@@ -6,10 +6,9 @@
  * this page calls GET /api/me to look up their Nova account and
  * set the NovaUser state.
  *
- * Includes retry logic because:
- * - Clerk's JWT may not be immediately available after sign-in
- * - For employees: the webhook linking their Clerk account to the
- *   Nova record may not have arrived yet
+ * CRITICAL: Must wait for Clerk to finish loading (isLoaded = true)
+ * before attempting to resolve. Without this, getToken() returns null
+ * and all API calls fail with 401.
  *
  * Outcomes:
  * - User found: set NovaUser, redirect to dashboard (/)
@@ -36,7 +35,34 @@ const EMPLOYEE_MAX_RETRIES = 6;
 const EMPLOYEE_RETRY_DELAY = 2000;
 /** Standard retries for token propagation. */
 const STANDARD_MAX_RETRIES = 3;
-const STANDARD_RETRY_DELAY = 1500;
+const STANDARD_RETRY_DELAY = 2000;
+/** Maximum time to wait for Clerk to load (ms). */
+const CLERK_LOAD_TIMEOUT = 10_000;
+/** Polling interval to check if Clerk is loaded (ms). */
+const CLERK_LOAD_POLL = 200;
+
+/**
+ * Wait for Clerk to finish initializing.
+ * Returns true if Clerk loaded, false if timed out.
+ */
+async function waitForClerkLoaded(): Promise<boolean> {
+  try {
+    const { isLoaded } = useAuth();
+
+    if (isLoaded.value) return true;
+
+    // Poll until loaded or timeout
+    const start = Date.now();
+    while (!isLoaded.value && Date.now() - start < CLERK_LOAD_TIMEOUT) {
+      await new Promise((r) => setTimeout(r, CLERK_LOAD_POLL));
+    }
+
+    return isLoaded.value;
+  } catch {
+    // useAuth() not available (SSR or Clerk not initialized)
+    return false;
+  }
+}
 
 async function resolve() {
   isResolving.value = true;
@@ -57,8 +83,22 @@ async function resolve() {
     return;
   }
 
-  // Try to resolve with retry. Clerk's JWT may not be ready immediately
-  // after sign-in due to token propagation delay.
+  // --- Wait for Clerk to be ready ---
+  // This is critical: after accepting an invitation or signing in,
+  // Clerk needs time to initialize and make the JWT available.
+  // Without this wait, getToken() returns null and all API calls get 401.
+  if (import.meta.client) {
+    const clerkReady = await waitForClerkLoaded();
+    if (!clerkReady) {
+      error.value =
+        "El servicio de autenticacion no pudo cargar. Recarga la pagina e intenta de nuevo.";
+      isResolving.value = false;
+      return;
+    }
+  }
+
+  // Try to resolve with retry. Even after Clerk loads, the JWT may
+  // need a moment to propagate to getToken().
   let lastStatus: "ok" | "not_found" | "error" = "error";
 
   for (let attempt = 0; attempt < STANDARD_MAX_RETRIES; attempt++) {

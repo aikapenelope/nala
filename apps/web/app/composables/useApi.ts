@@ -9,6 +9,10 @@
  * Every user (owner and employee) has their own Clerk JWT.
  * No X-Acting-As header is needed.
  *
+ * Token acquisition is resilient: if Clerk isn't loaded when the
+ * composable is first created, it retries on every $api call until
+ * getToken becomes available.
+ *
  * Usage:
  *   const { $api } = useApi();
  *   const data = await $api('/api/products');
@@ -27,17 +31,34 @@ export function useApi() {
   const sessionExpired = useState<boolean>("session-expired", () => false);
 
   // Capture Clerk's getToken during setup (not inside $api).
+  // If Clerk isn't loaded yet, we'll retry on each $api call.
   let clerkGetTokenRef: {
     value: (() => Promise<string | null>) | undefined;
   } | null = null;
-  let clerkInitFailed = false;
 
   if (import.meta.client) {
     try {
       const { getToken } = useAuth();
       clerkGetTokenRef = getToken;
     } catch {
-      clerkInitFailed = true;
+      // Clerk not initialized yet -- will retry in $api
+    }
+  }
+
+  /**
+   * Try to acquire Clerk's getToken ref if we don't have it yet.
+   * Called on every $api request to handle the case where Clerk
+   * wasn't loaded when the composable was first created.
+   */
+  function ensureGetToken(): void {
+    if (clerkGetTokenRef) return;
+    if (!import.meta.client) return;
+
+    try {
+      const { getToken } = useAuth();
+      clerkGetTokenRef = getToken;
+    } catch {
+      // Still not ready
     }
   }
 
@@ -69,15 +90,8 @@ export function useApi() {
 
     // Attach Clerk JWT
     if (import.meta.client) {
-      if (clerkInitFailed && !clerkGetTokenRef) {
-        try {
-          const { getToken } = useAuth();
-          clerkGetTokenRef = getToken;
-          clerkInitFailed = false;
-        } catch {
-          // Still not ready
-        }
-      }
+      // Re-attempt to get the token ref if we don't have it
+      ensureGetToken();
 
       if (clerkGetTokenRef) {
         try {
@@ -89,7 +103,7 @@ export function useApi() {
             }
           }
         } catch {
-          // Token retrieval failed
+          // Token retrieval failed -- request will go without auth
         }
       }
     }
