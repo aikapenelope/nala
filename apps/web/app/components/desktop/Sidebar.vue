@@ -21,7 +21,6 @@ import {
   Receipt,
   PanelLeftClose,
   PanelLeftOpen,
-  LogOut,
 } from "lucide-vue-next";
 import type { Component } from "vue";
 
@@ -56,20 +55,11 @@ const navItems: NavItem[] = [
   { to: "/settings", icon: Settings, label: "Config.", adminOnly: true },
 ];
 
-const { isAdmin, user, fullLogout } = useNovaAuth();
+const { isAdmin, user } = useNovaAuth();
 
 const visibleItems = computed(() =>
   navItems.filter((item) => !item.adminOnly || isAdmin.value),
 );
-
-/** Logout: clear Nova state, sign out of Clerk, hard redirect. */
-async function handleLogout() {
-  await fullLogout();
-  // Hard redirect to force full page reload (clears all client state)
-  if (import.meta.client) {
-    window.location.href = "/landing";
-  }
-}
 
 /** Sidebar collapsed state, persisted in localStorage. */
 const isCollapsed = ref(false);
@@ -171,17 +161,6 @@ function toggleCollapsed() {
           </p>
         </div>
       </div>
-
-      <!-- Logout button -->
-      <button
-        class="mt-1 flex w-full items-center rounded-xl px-2 py-2 text-[11px] font-bold text-gray-400 transition-spring hover:bg-white/60 hover:text-gray-600"
-        :class="isCollapsed ? 'justify-center' : 'gap-2'"
-        :title="isCollapsed ? 'Cerrar sesion' : undefined"
-        @click="handleLogout"
-      >
-        <LogOut :size="14" />
-        <span v-if="!isCollapsed">Cerrar sesion</span>
-      </button>
     </div>
   </aside>
 </template>
