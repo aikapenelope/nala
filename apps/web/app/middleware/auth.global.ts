@@ -1,7 +1,7 @@
 /**
  * Global authentication middleware.
  *
- * Simple auth flow:
+ * Simple auth flow using Clerk Organizations:
  *   1. NovaUser in state?        -> allow
  *   2. Route is public?          -> allow
  *   3. Clerk signed in?          -> redirect to /auth/resolve

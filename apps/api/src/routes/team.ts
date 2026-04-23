@@ -1,13 +1,16 @@
 /**
  * Team management routes.
  *
- * GET    /employees              - List employees (owner only)
- * POST   /employees              - Invite employee via Clerk (owner only)
- * PATCH  /employees/:id          - Update employee name or active status (owner only)
- * DELETE /employees/:id          - Deactivate employee (owner only, soft delete)
+ * Uses Clerk Organizations for member management:
+ * - GET  /employees       - List org members via Clerk API
+ * - POST /employees       - Invite employee via Clerk org invitation
+ * - PATCH /employees/:id  - Update employee name or active status in DB
+ * - DELETE /employees/:id - Deactivate employee (soft delete in DB)
  *
- * Employees receive a Clerk invitation email. When they accept and sign up,
- * their Clerk account is linked to the Nova employee record via /auth/resolve.
+ * Clerk handles invitations, sign-up, and membership natively.
+ * No custom linking, no webhooks, no temp passwords.
+ * When an invited employee signs in, the authMiddleware auto-creates
+ * their DB record on first request.
  */
 
 import { Hono } from "hono";
@@ -40,12 +43,14 @@ function getClerkClient() {
 }
 
 // ============================================================
-// Employee CRUD (owner only)
+// List employees
 // ============================================================
 
 /**
- * GET /employees - List all employees for the business.
- * Returns name, role, active status, and whether they have a Clerk account.
+ * GET /employees - List all members of the Clerk Organization.
+ *
+ * Combines Clerk membership data (email, invitation status) with
+ * local DB data (name, active status) for a complete view.
  */
 team.get("/employees", async (c) => {
   const ownerCheck = requireOwner(c);
@@ -54,37 +59,115 @@ team.get("/employees", async (c) => {
   const currentUser = c.get("user");
   const db = c.get("db");
 
-  const employees = await db
-    .select({
-      id: users.id,
-      name: users.name,
-      role: users.role,
-      isActive: users.isActive,
-      clerkId: users.clerkId,
-      createdAt: users.createdAt,
-    })
-    .from(users)
-    .where(eq(users.businessId, currentUser.businessId));
+  // Get the Clerk org ID for this business
+  const [business] = await db
+    .select({ clerkOrgId: businesses.clerkOrgId })
+    .from(businesses)
+    .where(eq(businesses.id, currentUser.businessId))
+    .limit(1);
 
-  return c.json({
-    employees: employees.map((e) => ({
-      ...e,
-      hasClerkAccount: !!e.clerkId,
-      clerkId: undefined, // Don't expose clerkId to frontend
-    })),
-  });
+  if (!business?.clerkOrgId) {
+    // Fallback: list from DB only (no Clerk org linked)
+    const dbEmployees = await db
+      .select({
+        id: users.id,
+        name: users.name,
+        role: users.role,
+        isActive: users.isActive,
+        createdAt: users.createdAt,
+      })
+      .from(users)
+      .where(eq(users.businessId, currentUser.businessId));
+
+    return c.json({
+      employees: dbEmployees.map((e) => ({
+        ...e,
+        hasClerkAccount: !!e.role,
+      })),
+    });
+  }
+
+  // List members from Clerk Organization
+  const clerk = getClerkClient();
+  try {
+    const memberships =
+      await clerk.organizations.getOrganizationMembershipList({
+        organizationId: business.clerkOrgId,
+        limit: 100,
+      });
+
+    // Also get pending invitations
+    const invitations =
+      await clerk.organizations.getOrganizationInvitationList({
+        organizationId: business.clerkOrgId,
+        limit: 100,
+      });
+
+    // Build employee list from memberships
+    const employees = memberships.data.map((m) => ({
+      id: m.publicUserData?.userId ?? m.id,
+      name:
+        [m.publicUserData?.firstName, m.publicUserData?.lastName]
+          .filter(Boolean)
+          .join(" ") || "Sin nombre",
+      role: m.role === "org:admin" ? "owner" : "employee",
+      isActive: true,
+      hasClerkAccount: true,
+      email: m.publicUserData?.identifier ?? null,
+      createdAt: m.createdAt ? new Date(m.createdAt).toISOString() : null,
+    }));
+
+    // Add pending invitations as "pending" employees
+    const pendingInvites = invitations.data
+      .filter((inv) => inv.status === "pending")
+      .map((inv) => ({
+        id: inv.id,
+        name: inv.emailAddress,
+        role: inv.role === "org:admin" ? "owner" : "employee",
+        isActive: false,
+        hasClerkAccount: false,
+        email: inv.emailAddress,
+        createdAt: inv.createdAt ? new Date(inv.createdAt).toISOString() : null,
+        isPending: true,
+      }));
+
+    return c.json({ employees: [...employees, ...pendingInvites] });
+  } catch (err) {
+    console.error("[team] Failed to list Clerk org members:", err);
+
+    // Fallback to DB
+    const dbEmployees = await db
+      .select({
+        id: users.id,
+        name: users.name,
+        role: users.role,
+        isActive: users.isActive,
+        createdAt: users.createdAt,
+      })
+      .from(users)
+      .where(eq(users.businessId, currentUser.businessId));
+
+    return c.json({
+      employees: dbEmployees.map((e) => ({
+        ...e,
+        hasClerkAccount: true,
+      })),
+    });
+  }
 });
 
 // ============================================================
-// Employee creation
+// Invite employee via Clerk Organization
 // ============================================================
 
 /**
- * POST /employees - Invite a new employee via Clerk.
+ * POST /employees - Invite a new employee to the Clerk Organization.
  *
- * Accepts { name, email }. Creates the employee record in the DB,
- * then tries Clerk invitation. If invitation fails, falls back to
- * creating the Clerk user directly with the real email + temp password.
+ * Accepts { name, email }. Sends a Clerk Organization invitation.
+ * When the employee accepts, Clerk adds them to the org automatically.
+ * On their first API request, authMiddleware auto-creates the DB record.
+ *
+ * No DB record is created here. No linking. No webhooks.
  */
 team.post("/employees", async (c) => {
   const ownerCheck = requireOwner(c);
@@ -107,90 +190,39 @@ team.post("/employees", async (c) => {
   if (!email || !email.includes("@")) {
     return c.json({ error: "El email es obligatorio y debe ser valido" }, 400);
   }
+
   const currentUser = c.get("user");
   const db = c.get("db");
   const clerk = getClerkClient();
 
-  // Get business slug for redirect URL
+  // Get the Clerk org ID for this business
   const [business] = await db
-    .select({ slug: businesses.slug })
+    .select({ clerkOrgId: businesses.clerkOrgId, slug: businesses.slug })
     .from(businesses)
     .where(eq(businesses.id, currentUser.businessId))
     .limit(1);
 
-  const slug = business?.slug ?? "nova";
-  const tenantDomain = process.env.TENANT_DOMAIN ?? "novaincs.com";
-  const redirectUrl = `https://${slug}.${tenantDomain}/auth/resolve`;
+  if (!business?.clerkOrgId) {
+    return c.json(
+      { error: "Este negocio no tiene una organizacion configurada." },
+      400,
+    );
+  }
 
   try {
-    // 1. Create employee record in DB (clerkId will be set after sign-up)
-    const [employee] = await db
-      .insert(users)
-      .values({
-        businessId: currentUser.businessId,
-        name,
-        role: "employee",
-      })
-      .returning({
-        id: users.id,
-        name: users.name,
-        role: users.role,
-        isActive: users.isActive,
-        createdAt: users.createdAt,
-      });
+    // Send Clerk Organization invitation.
+    // Clerk handles the email, sign-up flow, and org membership.
+    const tenantDomain = process.env.TENANT_DOMAIN ?? "novaincs.com";
+    const slug = business.slug ?? "nova";
+    const redirectUrl = `https://${slug}.${tenantDomain}/`;
 
-    // 2. Try to send Clerk invitation. If it fails (e.g., username required
-    //    in Clerk dashboard), fall back to creating the user directly.
-    let method: "invitation" | "direct" = "invitation";
-
-    try {
-      await clerk.invitations.createInvitation({
-        emailAddress: email,
-        redirectUrl,
-        publicMetadata: {
-          businessId: currentUser.businessId,
-          novaUserId: employee.id,
-          role: "employee",
-          name,
-        },
-      });
-    } catch (inviteErr) {
-      // Invitation failed -- fall back to direct user creation.
-      // This can happen when Clerk dashboard requires username, or
-      // when the email domain is blocked by Clerk's settings.
-      console.warn(
-        "[team] Invitation failed, falling back to createUser:",
-        inviteErr instanceof Error ? inviteErr.message : inviteErr,
-      );
-      method = "direct";
-
-      // Generate a temporary password (will be replaced by the employee
-      // via the password reset email we trigger below).
-      const tempPassword = `Nova!${crypto.randomUUID().slice(0, 12)}`;
-
-      const clerkUser = await clerk.users.createUser({
-        emailAddress: [email],
-        firstName: name,
-        password: tempPassword,
-        skipPasswordChecks: true,
-        publicMetadata: {
-          businessId: currentUser.businessId,
-          novaUserId: employee.id,
-          role: "employee",
-        },
-      });
-
-      // Link the Clerk user to the Nova employee record immediately
-      await db
-        .update(users)
-        .set({ clerkId: clerkUser.id, updatedAt: new Date() })
-        .where(eq(users.id, employee.id));
-
-      console.info(
-        `[team] Direct-create fallback: created Clerk user for ${email}. ` +
-          `Employee should use "Forgot password" on the login page to set their own password.`,
-      );
-    }
+    await clerk.organizations.createOrganizationInvitation({
+      organizationId: business.clerkOrgId,
+      emailAddress: email,
+      role: "org:member",
+      inviterUserId: currentUser.clerkId,
+      redirectUrl,
+    });
 
     logActivity({
       db,
@@ -202,16 +234,9 @@ team.post("/employees", async (c) => {
 
     return c.json(
       {
-        employee: {
-          ...employee,
-          hasClerkAccount: method === "direct",
-          email,
-        },
-        message:
-          method === "invitation"
-            ? `Invitacion enviada a ${email}`
-            : `Cuenta creada para ${email}. El empleado debe ir a la pagina de login y usar "Olvide mi password" para configurar su acceso.`,
-        method,
+        message: `Invitacion enviada a ${email}. El empleado recibira un email para unirse al negocio.`,
+        email,
+        name,
       },
       201,
     );
@@ -224,15 +249,12 @@ team.post("/employees", async (c) => {
         longMessage?: string;
         meta?: Record<string, unknown>;
       }>;
-      status?: number;
-      clerkError?: boolean;
     };
     if (clerkError.errors) {
       console.error(
-        "[team] Clerk invitation failed:",
+        "[team] Clerk org invitation failed:",
         JSON.stringify(clerkError.errors, null, 2),
       );
-      // Return all error details for debugging
       const messages = clerkError.errors
         .map(
           (e) =>
@@ -256,6 +278,10 @@ team.post("/employees", async (c) => {
   }
 });
 
+// ============================================================
+// Update employee
+// ============================================================
+
 /** Schema for updating an employee. */
 const updateEmployeeSchema = z.object({
   name: z.string().min(1).max(100).optional(),
@@ -263,9 +289,7 @@ const updateEmployeeSchema = z.object({
 });
 
 /**
- * PATCH /employees/:id - Update an employee.
- *
- * Can update name or active status. No more PIN management.
+ * PATCH /employees/:id - Update an employee's name or active status.
  */
 team.patch(
   "/employees/:id",
@@ -296,7 +320,6 @@ team.patch(
       return c.json({ error: "Empleado no encontrado" }, 404);
     }
 
-    // Prevent editing the owner via this endpoint
     if (existing.role === "owner") {
       return c.json(
         { error: "No se puede editar al dueno desde esta seccion" },
@@ -345,9 +368,6 @@ team.patch(
 
 /**
  * DELETE /employees/:id - Deactivate an employee (soft delete).
- *
- * Sets isActive = false. The employee can no longer authenticate.
- * Their sales history is preserved.
  */
 team.delete("/employees/:id", validateUuidParam, async (c) => {
   const ownerCheck = requireOwner(c);

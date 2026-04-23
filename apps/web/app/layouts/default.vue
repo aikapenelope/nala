@@ -14,12 +14,8 @@ const businessName = computed(() => user.value?.businessName || "Nova");
 
 function reAuthenticate() {
   sessionExpired.value = false;
-  // Clear all stale user state so the login flow starts completely fresh
   const novaUser = useState("nova-user");
   novaUser.value = null;
-  if (import.meta.client) {
-    localStorage.removeItem("nova:user");
-  }
   navigateTo("/auth/login");
 }
 </script>

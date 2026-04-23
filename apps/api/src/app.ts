@@ -10,9 +10,8 @@
  *
  * Routes:
  * - /health - health check (no auth required)
- * - /onboarding - business creation (Clerk JWT required, handled internally)
- * - /webhooks/clerk - Clerk webhook receiver (Svix signature verified)
- * - /api/* - protected API routes (auth + tenant required)
+ * - /onboarding - business creation (Clerk JWT required, creates Clerk Org)
+ * - /api/* - protected API routes (auth + tenant required, uses Clerk Org JWT)
  */
 
 import { Hono } from "hono";
@@ -32,7 +31,6 @@ import { accounting } from "./routes/accounting";
 import { team } from "./routes/team";
 import { suppliersRoutes } from "./routes/suppliers";
 import { configRoutes } from "./routes/config";
-import { webhooks } from "./routes/webhooks";
 import { authMiddleware } from "./middleware/auth";
 import { tenantMiddleware } from "./middleware/tenant";
 import { publicRateLimit, apiRateLimit } from "./middleware/rate-limit";
@@ -163,7 +161,6 @@ app.route("/catalog", catalog);
 app.use("/onboarding/check-slug/*", publicRateLimit);
 app.use("/onboarding", publicRateLimit);
 app.route("/onboarding", onboarding);
-app.route("/webhooks", webhooks);
 
 // ---------------------------------------------------------------------------
 // Protected API routes with typed context variables
@@ -215,6 +212,6 @@ app.get("/", (c) => {
     name: "Nova API",
     version: "2.0.0",
     status: "running",
-    build: "clerk-invitations",
+    build: "clerk-organizations",
   });
 });

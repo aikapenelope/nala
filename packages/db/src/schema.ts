@@ -46,6 +46,9 @@ export const businesses = pgTable(
     /** Accountant email for report delivery. */
     accountantEmail: text("accountant_email"),
 
+    /** Clerk Organization ID. Links this business to a Clerk Organization. */
+    clerkOrgId: text("clerk_org_id"),
+
     isActive: boolean("is_active").notNull().default(true),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
@@ -54,7 +57,10 @@ export const businesses = pgTable(
       .notNull()
       .defaultNow(),
   },
-  (table) => [uniqueIndex("idx_businesses_slug").on(table.slug)],
+  (table) => [
+    uniqueIndex("idx_businesses_slug").on(table.slug),
+    uniqueIndex("idx_businesses_clerk_org_id").on(table.clerkOrgId),
+  ],
 );
 
 /**
