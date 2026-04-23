@@ -4,9 +4,13 @@
  * Uses Clerk's recommended pattern for Nuxt page protection.
  * See: https://clerk.com/docs/guides/secure/protect-pages
  *
- * Public routes are accessible without authentication.
- * All other routes require the user to be signed in via Clerk.
- * If signed in but NovaUser not resolved, redirect to /auth/resolve.
+ * Flow:
+ * 1. Public routes always pass through.
+ * 2. If NovaUser is already resolved, allow access.
+ * 3. If Clerk is still loading, allow access (avoid premature redirects).
+ * 4. If Clerk is loaded and user is signed in but NovaUser not resolved,
+ *    redirect to /auth/resolve.
+ * 5. If Clerk is loaded and user is NOT signed in, redirect to /landing.
  */
 
 /** Matcher for public routes that don't require authentication. */
@@ -25,19 +29,26 @@ export default defineNuxtRouteMiddleware((to) => {
     return;
   }
 
-  // Check if Nova user is resolved (app-level auth)
+  // If Nova user is already resolved, allow access
   const { isAuthenticated } = useNovaAuth();
   if (isAuthenticated.value) {
     return;
   }
 
-  // Check if Clerk user is signed in (Clerk-level auth)
-  const { isSignedIn } = useAuth();
+  // Check Clerk auth state
+  const { isSignedIn, isLoaded } = useAuth();
+
+  // If Clerk hasn't loaded yet, don't redirect -- let the page render.
+  // The resolve page or component-level guards will handle it once loaded.
+  if (!isLoaded.value) {
+    return;
+  }
+
+  // Clerk is loaded and user is signed in but NovaUser not resolved
   if (isSignedIn.value) {
-    // Signed in with Clerk but NovaUser not resolved yet
     return navigateTo("/auth/resolve");
   }
 
-  // Not signed in at all
+  // Clerk is loaded and user is NOT signed in
   return navigateTo("/landing");
 });

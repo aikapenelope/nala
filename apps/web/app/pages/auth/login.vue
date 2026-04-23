@@ -2,7 +2,9 @@
 /**
  * Login page using Clerk's SignIn component.
  *
- * After sign-in, Clerk redirects to /auth/resolve (configured in nuxt.config.ts).
+ * After sign-in, Clerk redirects to /auth/resolve via forceRedirectUrl.
+ * If Organizations are enabled with "Membership required", Clerk will
+ * show the choose-organization session task before redirecting.
  */
 
 definePageMeta({ layout: false });
@@ -23,8 +25,8 @@ onMounted(() => {
       </div>
 
       <SignIn
-        :routing="'hash'"
-        :redirect-url="'/auth/resolve'"
+        :force-redirect-url="'/auth/resolve'"
+        sign-up-url="/auth/signup"
         :appearance="{
           elements: {
             rootBox: 'mx-auto',

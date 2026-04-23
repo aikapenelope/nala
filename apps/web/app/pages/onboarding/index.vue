@@ -158,8 +158,11 @@ async function createBusiness() {
           await clerk.value.setActive({
             organization: result.business.clerkOrgId,
           });
-          // Wait for session token to refresh with orgId
-          await new Promise((r) => setTimeout(r, 1000));
+          // Force a fresh token so the JWT includes the new orgId.
+          const { getToken } = useAuth();
+          if (getToken.value) {
+            await getToken.value({ skipCache: true });
+          }
         }
       } catch (orgErr) {
         console.warn("[onboarding] Failed to set active org:", orgErr);
@@ -196,8 +199,11 @@ async function createBusiness() {
           const clerk = useClerk();
           if (clerk.value) {
             await clerk.value.setActive({ organization: clerkOrgId });
-            // Wait for the session token to update with orgId
-            await new Promise((r) => setTimeout(r, 1000));
+            // Force a fresh token so the JWT includes the org
+            const { getToken } = useAuth();
+            if (getToken.value) {
+              await getToken.value({ skipCache: true });
+            }
             // Now resolve the Nova user so isAuthenticated becomes true
             await resolveUser();
           }

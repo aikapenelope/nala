@@ -21,31 +21,24 @@ export function useApi() {
    */
   const sessionExpired = useState<boolean>("session-expired", () => false);
 
-  // Capture Clerk's getToken during setup.
-  // If Clerk isn't loaded yet, we retry on each $api call.
-  let clerkGetTokenRef: {
-    value: (() => Promise<string | null>) | undefined;
-  } | null = null;
+  /**
+   * Get a fresh Clerk JWT token.
+   * Returns null on SSR or if Clerk is not ready.
+   */
+  async function getClerkToken(): Promise<string | null> {
+    if (!import.meta.client) return null;
 
-  if (import.meta.client) {
     try {
       const { getToken } = useAuth();
-      clerkGetTokenRef = getToken;
+      const tokenFn = getToken.value;
+      if (tokenFn) {
+        return await tokenFn();
+      }
     } catch {
-      // Clerk not initialized yet -- will retry in $api
+      // Clerk not initialized yet -- return null
     }
-  }
 
-  /** Try to acquire Clerk's getToken ref if we don't have it yet. */
-  function ensureGetToken(): void {
-    if (clerkGetTokenRef) return;
-    if (!import.meta.client) return;
-    try {
-      const { getToken } = useAuth();
-      clerkGetTokenRef = getToken;
-    } catch {
-      // Still not ready
-    }
+    return null;
   }
 
   /** Handle a 401 response from the API. */
@@ -70,22 +63,9 @@ export function useApi() {
     };
 
     // Attach Clerk JWT (includes orgId automatically)
-    if (import.meta.client) {
-      ensureGetToken();
-
-      if (clerkGetTokenRef) {
-        try {
-          const tokenFn = clerkGetTokenRef.value;
-          if (tokenFn) {
-            const token = await tokenFn();
-            if (token) {
-              headers["Authorization"] = `Bearer ${token}`;
-            }
-          }
-        } catch {
-          // Token retrieval failed
-        }
-      }
+    const token = await getClerkToken();
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
     }
 
     try {
