@@ -7,11 +7,17 @@
  * The middleware verifies the JWT, looks up the user by clerkId,
  * and sets the user context for downstream handlers.
  *
+ * For invited employees: when they first sign in after accepting the
+ * invitation, their clerkId is not yet in the DB. The middleware reads
+ * Clerk's publicMetadata.novaUserId to find and link the employee record.
+ *
  * After auth, sets `user`, `businessId`, and `db` on the Hono context.
  */
 
-import { verifyToken } from "@clerk/backend";
+import { verifyToken, createClerkClient } from "@clerk/backend";
 import { findUserByClerkId, findBusinessById } from "@nova/db";
+import { eq } from "drizzle-orm";
+import { users } from "@nova/db";
 import type { Context, Next } from "hono";
 import { getDb } from "../db";
 
@@ -44,7 +50,8 @@ async function verifyClerkJwt(token: string): Promise<string | null> {
  *
  * 1. Verify Clerk JWT
  * 2. Look up user by clerkId (owner or employee)
- * 3. Set the resolved user on the context
+ * 3. If not found, check Clerk publicMetadata for invited employee linking
+ * 4. Set the resolved user on the context
  */
 export async function authMiddleware(c: Context, next: Next) {
   const db = getDb();
@@ -89,7 +96,42 @@ export async function authMiddleware(c: Context, next: Next) {
   }
 
   // Look up the user (owner or employee) by their Clerk ID
-  const user = await findUserByClerkId(db, clerkUserId);
+  let user = await findUserByClerkId(db, clerkUserId);
+
+  // --- Employee linking: first login after accepting invitation ---
+  //
+  // When an employee accepts a Clerk invitation, they get a new clerkId
+  // that isn't in our DB yet. We check Clerk's publicMetadata for the
+  // novaUserId that was set when the invitation was created, and link it.
+  if (!user) {
+    try {
+      const clerk = createClerkClient({ secretKey: clerkSecretKey });
+      const clerkUser = await clerk.users.getUser(clerkUserId);
+      const meta = clerkUser.publicMetadata as {
+        novaUserId?: string;
+        businessId?: string;
+        role?: string;
+      };
+
+      if (meta.novaUserId) {
+        // Link the Clerk account to the existing Nova employee record
+        const [linked] = await db
+          .update(users)
+          .set({ clerkId: clerkUserId, updatedAt: new Date() })
+          .where(eq(users.id, meta.novaUserId))
+          .returning();
+
+        if (linked) {
+          console.info(
+            `[auth] Linked clerkId ${clerkUserId} to employee ${meta.novaUserId}`,
+          );
+          user = linked;
+        }
+      }
+    } catch (err) {
+      console.error("[auth] Employee linking failed:", err);
+    }
+  }
 
   if (!user) {
     return c.json(
