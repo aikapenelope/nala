@@ -256,11 +256,21 @@ onboarding.post("/", zValidator("json", onboardingSchema), async (c) => {
       // This handles businesses created before the Organizations migration.
       try {
         const clerk = createClerkClient({ secretKey: clerkSecretKey });
-        const org = await clerk.organizations.createOrganization({
-          name: existingBusiness.name,
-          slug: existingBusiness.slug ?? undefined,
-          createdBy: clerkUserId,
-        });
+
+        // Try with slug first, fall back without if Clerk rejects it
+        let org;
+        try {
+          org = await clerk.organizations.createOrganization({
+            name: existingBusiness.name,
+            slug: existingBusiness.slug ?? undefined,
+            createdBy: clerkUserId,
+          });
+        } catch {
+          org = await clerk.organizations.createOrganization({
+            name: existingBusiness.name,
+            createdBy: clerkUserId,
+          });
+        }
 
         await db
           .update(businesses)
@@ -287,9 +297,15 @@ onboarding.post("/", zValidator("json", onboardingSchema), async (c) => {
           migrated: true,
         });
       } catch (err) {
-        console.error("[onboarding] Migration to Clerk Org failed:", err);
+        const clerkErr = err as {
+          errors?: Array<{ message: string; code: string; longMessage?: string }>;
+        };
+        const detail = clerkErr.errors
+          ? clerkErr.errors.map((e) => e.longMessage ?? e.message).join(". ")
+          : String(err);
+        console.error("[onboarding] Migration to Clerk Org failed:", detail);
         return c.json(
-          { error: "Error al migrar el negocio. Intenta de nuevo." },
+          { error: `Error al migrar el negocio: ${detail}` },
           500,
         );
       }
@@ -313,20 +329,38 @@ onboarding.post("/", zValidator("json", onboardingSchema), async (c) => {
   if (clerkSecretKey) {
     try {
       const clerk = createClerkClient({ secretKey: clerkSecretKey });
-      const org = await clerk.organizations.createOrganization({
-        name: businessName,
-        slug: businessSlug,
-        createdBy: clerkUserId,
-      });
-      clerkOrgId = org.id;
+
+      // Try with slug first, fall back to without slug if it fails
+      // (Clerk may reject slugs that conflict with existing orgs)
+      try {
+        const org = await clerk.organizations.createOrganization({
+          name: businessName,
+          slug: businessSlug,
+          createdBy: clerkUserId,
+        });
+        clerkOrgId = org.id;
+      } catch {
+        // Retry without slug
+        const org = await clerk.organizations.createOrganization({
+          name: businessName,
+          createdBy: clerkUserId,
+        });
+        clerkOrgId = org.id;
+      }
 
       console.info(
         `[onboarding] Created Clerk Organization "${businessName}" (${clerkOrgId}) for user ${clerkUserId}`,
       );
     } catch (err) {
-      console.error("[onboarding] Failed to create Clerk Organization:", err);
+      const clerkErr = err as {
+        errors?: Array<{ message: string; code: string; longMessage?: string }>;
+      };
+      const detail = clerkErr.errors
+        ? clerkErr.errors.map((e) => e.longMessage ?? e.message).join(". ")
+        : String(err);
+      console.error("[onboarding] Failed to create Clerk Organization:", detail);
       return c.json(
-        { error: "Error al crear la organizacion. Intenta de nuevo." },
+        { error: `Error al crear la organizacion: ${detail}` },
         500,
       );
     }
