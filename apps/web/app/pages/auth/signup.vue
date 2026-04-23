@@ -2,14 +2,11 @@
 /**
  * Owner sign-up page using Clerk's SignUp component.
  *
- * This is the first step for new users. After Clerk creates the account,
- * the user is redirected to /auth/resolve which:
- * - Calls GET /api/me
- * - Gets USER_NOT_FOUND (no business yet)
- * - Redirects to /onboarding to configure the business
- *
- * Matches the Square pattern: account creation and business setup
- * are separate steps with clear purpose.
+ * After Clerk creates the account, the user is redirected to /auth/resolve.
+ * If Organizations are enabled with "Membership required", Clerk will
+ * show the choose-organization session task within the SignUp component.
+ * For new users without an org, /auth/resolve detects "no_org" and
+ * redirects to /onboarding to create the business + Clerk Organization.
  */
 
 definePageMeta({ layout: false });
@@ -24,8 +21,8 @@ definePageMeta({ layout: false });
       </div>
 
       <SignUp
-        :routing="'hash'"
-        :redirect-url="'/auth/resolve'"
+        :force-redirect-url="'/auth/resolve'"
+        sign-in-url="/auth/login"
         :appearance="{
           elements: {
             rootBox: 'mx-auto',

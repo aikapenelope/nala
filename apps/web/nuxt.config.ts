@@ -9,6 +9,10 @@ export default defineNuxtConfig({
   modules: ["@clerk/nuxt", "@vite-pwa/nuxt", "@nuxt/eslint"],
 
   clerk: {
+    // Tell Clerk where the dedicated sign-in and sign-up pages live.
+    // Used for internal links ("Already have an account?" etc.).
+    signInUrl: "/auth/login",
+    signUpUrl: "/auth/signup",
     // Always redirect to /auth/resolve after sign-in or sign-up.
     // This ensures the Nova user is resolved before accessing the app.
     signInForceRedirectUrl: "/auth/resolve",
