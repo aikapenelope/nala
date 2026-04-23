@@ -158,13 +158,18 @@ async function createBusiness() {
           await clerk.value.setActive({
             organization: result.business.clerkOrgId,
           });
+          // Wait for session token to refresh with orgId
+          await new Promise((r) => setTimeout(r, 1000));
         }
       } catch (orgErr) {
         console.warn("[onboarding] Failed to set active org:", orgErr);
       }
     }
 
-    // Set the Nova user from the onboarding response
+    // Resolve the Nova user so isAuthenticated becomes true
+    await resolveUser();
+
+    // Set the Nova user from the onboarding response (backup in case resolveUser had issues)
     setUser({
       id: result.user.id,
       name: result.user.name,
@@ -192,7 +197,7 @@ async function createBusiness() {
           if (clerk.value) {
             await clerk.value.setActive({ organization: clerkOrgId });
             // Wait for the session token to update with orgId
-            await new Promise((r) => setTimeout(r, 800));
+            await new Promise((r) => setTimeout(r, 1000));
             // Now resolve the Nova user so isAuthenticated becomes true
             await resolveUser();
           }

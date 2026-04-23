@@ -8,6 +8,15 @@ export default defineNuxtConfig({
 
   modules: ["@clerk/nuxt", "@vite-pwa/nuxt", "@nuxt/eslint"],
 
+  clerk: {
+    // Always redirect to /auth/resolve after sign-in or sign-up.
+    // This ensures the Nova user is resolved before accessing the app.
+    signInForceRedirectUrl: "/auth/resolve",
+    signUpForceRedirectUrl: "/auth/resolve",
+    // After sign-out, go to landing page.
+    afterSignOutUrl: "/landing",
+  },
+
   css: ["~/assets/css/main.css"],
 
   vite: {
