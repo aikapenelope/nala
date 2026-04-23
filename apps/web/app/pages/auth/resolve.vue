@@ -2,12 +2,13 @@
 /**
  * Post-Clerk-login resolver page.
  *
- * Single entry point after any Clerk sign-in/sign-up.
- * Ensures the user has an active Organization and a resolved NovaUser.
+ * Waits for Clerk to be fully loaded, then resolves the Nova user.
+ * With Clerk Organizations + "Membership required", Clerk handles
+ * the org selection automatically via session tasks. By the time
+ * the user reaches this page, they should have an active org.
  *
- * Strategy: retry the full flow up to MAX_ATTEMPTS times with delays.
- * This handles all timing issues (Clerk loading, org memberships loading,
- * session token refresh after setActive).
+ * If GET /api/me fails (no org, error), retries a few times then
+ * shows an error or redirects to onboarding.
  */
 
 definePageMeta({ layout: false });
@@ -18,89 +19,37 @@ const { resolveUser, isAuthenticated } = useNovaAuth();
 const error = ref("");
 const isResolving = ref(true);
 
-const MAX_ATTEMPTS = 5;
-const ATTEMPT_DELAY = 1500;
-const CLERK_LOAD_TIMEOUT = 10_000;
-const CLERK_LOAD_POLL = 200;
-
-async function waitForClerkLoaded(): Promise<boolean> {
-  try {
-    const { isLoaded } = useAuth();
-    if (isLoaded.value) return true;
-
-    const start = Date.now();
-    while (!isLoaded.value && Date.now() - start < CLERK_LOAD_TIMEOUT) {
-      await new Promise((r) => setTimeout(r, CLERK_LOAD_POLL));
-    }
-    return isLoaded.value;
-  } catch {
-    return false;
-  }
-}
-
-/**
- * Try to activate an org if the user has memberships but no active org.
- */
-async function activateOrgIfNeeded(): Promise<void> {
-  try {
-    const { orgId } = useAuth();
-    if (orgId.value) return; // Already active
-
-    const clerk = useClerk();
-    if (!clerk.value?.user) return;
-
-    const memberships = clerk.value.user.organizationMemberships;
-    if (!memberships || memberships.length === 0) return;
-
-    const first = memberships[0];
-    if (!first) return;
-
-    await clerk.value.setActive({ organization: first.organization.id });
-    // Give the session token time to refresh
-    await new Promise((r) => setTimeout(r, 1000));
-  } catch {
-    // Non-fatal -- the retry loop will handle it
-  }
-}
+const MAX_ATTEMPTS = 4;
+const RETRY_DELAY = 2000;
 
 async function resolve() {
   isResolving.value = true;
   error.value = "";
 
+  // Already resolved
   if (isAuthenticated.value) {
     router.replace("/");
     return;
   }
 
-  if (!import.meta.client) return;
+  // Wait for Clerk to be fully loaded
+  const { isLoaded, isSignedIn } = useAuth();
 
-  // Step 1: Wait for Clerk to load
-  const clerkReady = await waitForClerkLoaded();
-  if (!clerkReady) {
-    error.value =
-      "El servicio de autenticacion no pudo cargar. Recarga la pagina.";
-    isResolving.value = false;
-    return;
+  if (!isLoaded.value) {
+    // Poll until loaded (max 10s)
+    const start = Date.now();
+    while (!isLoaded.value && Date.now() - start < 10_000) {
+      await new Promise((r) => setTimeout(r, 200));
+    }
   }
 
-  // Step 2: Check if user is signed in at all
-  try {
-    const { isSignedIn } = useAuth();
-    if (!isSignedIn.value) {
-      router.replace("/landing");
-      return;
-    }
-  } catch {
+  if (!isLoaded.value || !isSignedIn.value) {
     router.replace("/landing");
     return;
   }
 
-  // Step 3: Try to activate org and resolve user, with retries
+  // Retry loop: resolve the Nova user from the backend
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-    // Try to activate an org if needed
-    await activateOrgIfNeeded();
-
-    // Try to resolve the Nova user
     const result = await resolveUser();
 
     if (result.status === "ok") {
@@ -108,30 +57,19 @@ async function resolve() {
       return;
     }
 
-    if (result.status === "no_org") {
-      // Check if user has ANY memberships (they might just not be loaded yet)
-      try {
-        const clerk = useClerk();
-        const memberships = clerk.value?.user?.organizationMemberships;
-        if (!memberships || memberships.length === 0) {
-          // Truly no org -- needs onboarding
-          router.replace("/onboarding");
-          return;
-        }
-        // Has memberships but org not active yet -- retry
-      } catch {
-        router.replace("/onboarding");
-        return;
-      }
+    if (result.status === "no_org" && attempt >= 1) {
+      // After at least one retry, if still no org, go to onboarding
+      router.replace("/onboarding");
+      return;
     }
 
     // Wait before retrying
     if (attempt < MAX_ATTEMPTS - 1) {
-      await new Promise((r) => setTimeout(r, ATTEMPT_DELAY));
+      await new Promise((r) => setTimeout(r, RETRY_DELAY));
     }
   }
 
-  // All attempts exhausted
+  // All attempts failed
   error.value =
     "No se pudo conectar con el servidor. Verifica tu conexion e intenta de nuevo.";
   isResolving.value = false;
