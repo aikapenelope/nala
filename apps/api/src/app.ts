@@ -196,7 +196,8 @@ app.route("/api", api);
 app.get("/", (c) => {
   return c.json({
     name: "Nova API",
-    version: "1.0.0",
+    version: "2.0.0",
     status: "running",
+    build: "clerk-invitations",
   });
 });
