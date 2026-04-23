@@ -2,15 +2,15 @@
 /**
  * Post-Clerk-login resolver page.
  *
- * After Clerk sign-in, this page:
- * 1. Waits for Clerk to finish loading (isLoaded)
- * 2. Checks if the user has an active Organization
- * 3. Calls GET /api/me to resolve the Nova user
- * 4. Redirects to dashboard or onboarding
+ * This is the single entry point after any Clerk sign-in.
+ * It ensures the user has an active Organization and a resolved
+ * NovaUser before allowing access to the app.
  *
- * With Clerk Organizations, the JWT already contains orgId.
- * The backend auto-creates the user record on first request.
- * No custom linking, no webhooks, no retry loops.
+ * Flow:
+ * 1. Wait for Clerk to load
+ * 2. If no active org in session, try to activate one from memberships
+ * 3. Call GET /api/me to resolve the Nova user
+ * 4. If ok -> dashboard. If no_org -> onboarding. If error -> show error.
  */
 
 definePageMeta({ layout: false });
@@ -21,13 +21,9 @@ const { resolveUser, isAuthenticated } = useNovaAuth();
 const error = ref("");
 const isResolving = ref(true);
 
-/** Maximum time to wait for Clerk to load (ms). */
 const CLERK_LOAD_TIMEOUT = 10_000;
 const CLERK_LOAD_POLL = 200;
 
-/**
- * Wait for Clerk to finish initializing.
- */
 async function waitForClerkLoaded(): Promise<boolean> {
   try {
     const { isLoaded } = useAuth();
@@ -43,17 +39,60 @@ async function waitForClerkLoaded(): Promise<boolean> {
   }
 }
 
+/**
+ * Ensure the user has an active Organization in their Clerk session.
+ * If they have memberships but no active org, activate the first one.
+ * Returns true if an org is active (either already was or just activated).
+ */
+async function ensureActiveOrg(): Promise<boolean> {
+  try {
+    const { orgId } = useAuth();
+
+    // Already has an active org
+    if (orgId.value) return true;
+
+    // No active org -- check memberships and activate one
+    const clerk = useClerk();
+    if (!clerk.value?.user) return false;
+
+    // Wait for user data to be fully loaded (memberships may not be
+    // available immediately after Clerk loads)
+    let attempts = 0;
+    while (attempts < 10) {
+      const memberships = clerk.value.user.organizationMemberships;
+      if (memberships && memberships.length > 0) {
+        const firstMembership = memberships[0];
+        if (firstMembership) {
+          await clerk.value.setActive({
+            organization: firstMembership.organization.id,
+          });
+          // Wait for session token to refresh with the new orgId
+          await new Promise((r) => setTimeout(r, 800));
+          return true;
+        }
+      }
+      // Memberships not loaded yet -- wait and retry
+      await new Promise((r) => setTimeout(r, 300));
+      attempts++;
+    }
+
+    return false;
+  } catch {
+    return false;
+  }
+}
+
 async function resolve() {
   isResolving.value = true;
   error.value = "";
 
-  // If already authenticated, go to dashboard
+  // Already resolved -- go to dashboard
   if (isAuthenticated.value) {
     router.replace("/");
     return;
   }
 
-  // Wait for Clerk to be ready
+  // Wait for Clerk
   if (import.meta.client) {
     const clerkReady = await waitForClerkLoaded();
     if (!clerkReady) {
@@ -62,10 +101,18 @@ async function resolve() {
       isResolving.value = false;
       return;
     }
+
+    // Ensure the user has an active org before calling the API
+    const hasOrg = await ensureActiveOrg();
+
+    if (!hasOrg) {
+      // No org memberships at all -- needs onboarding
+      router.replace("/onboarding");
+      return;
+    }
   }
 
-  // Resolve the Nova user via GET /api/me
-  // The backend reads orgId from the JWT and auto-creates the user if needed.
+  // Now the JWT should have orgId -- resolve the Nova user
   const result = await resolveUser();
 
   if (result.status === "ok") {
@@ -74,28 +121,12 @@ async function resolve() {
   }
 
   if (result.status === "no_org") {
-    // User is signed in but has no active Organization in the session.
-    // Before redirecting to onboarding, check if they already belong to
-    // an org (e.g., they completed onboarding before but the session
-    // doesn't have the org set as active). If so, activate it.
-    if (import.meta.client) {
-      const activated = await tryActivateExistingOrg();
-      if (activated) {
-        // Org is now active -- retry resolving the user
-        const retryResult = await resolveUser();
-        if (retryResult.status === "ok") {
-          router.replace("/");
-          return;
-        }
-      }
-    }
-
-    // No existing org found -- needs onboarding
+    // This shouldn't happen after ensureActiveOrg, but handle it
     router.replace("/onboarding");
     return;
   }
 
-  // Error -- show retry
+  // Error
   error.value =
     "No se pudo conectar con el servidor. Verifica tu conexion e intenta de nuevo.";
   isResolving.value = false;
@@ -104,44 +135,6 @@ async function resolve() {
 onMounted(() => {
   resolve();
 });
-
-/**
- * Try to activate an existing Organization membership.
- * Uses the Clerk client to check if the user belongs to any org,
- * and if so, calls setActive to make it the active org.
- * Returns true if an org was activated.
- */
-async function tryActivateExistingOrg(): Promise<boolean> {
-  try {
-    const clerk = useClerk();
-    if (!clerk.value) return false;
-
-    // Get the user's organization memberships
-    const memberships =
-      clerk.value.user?.organizationMemberships;
-
-    if (!memberships || memberships.length === 0) return false;
-
-    // Activate the first (and likely only) organization
-    const firstMembership = memberships[0];
-    if (!firstMembership) return false;
-    const firstOrg = firstMembership.organization;
-
-    await clerk.value.setActive({
-      organization: firstOrg.id,
-    });
-
-    // Wait for the session token to update with the new orgId
-    await new Promise((r) => setTimeout(r, 500));
-
-    console.info(
-      `[resolve] Activated existing org: ${firstOrg.name}`,
-    );
-    return true;
-  } catch {
-    return false;
-  }
-}
 </script>
 
 <template>
