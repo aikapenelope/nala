@@ -27,6 +27,7 @@ import {
   categories,
   accountingAccounts,
   findUserByClerkId,
+  findBusinessById,
 } from "@nova/db";
 import { getDb } from "../db";
 import { handleDbError } from "../utils/db-errors";
@@ -244,9 +245,57 @@ onboarding.post("/", zValidator("json", onboardingSchema), async (c) => {
     return c.json({ error: "Could not identify user from token" }, 401);
   }
 
-  // Check if user already has a business (prevent duplicates)
+  // Check if user already has a business
   const existingUser = await findUserByClerkId(db, clerkUserId);
   if (existingUser) {
+    // User already has a business. Check if it needs Clerk Org migration.
+    const existingBusiness = await findBusinessById(db, existingUser.businessId);
+
+    if (existingBusiness && !existingBusiness.clerkOrgId && clerkSecretKey) {
+      // --- Migration: link existing business to a new Clerk Organization ---
+      // This handles businesses created before the Organizations migration.
+      try {
+        const clerk = createClerkClient({ secretKey: clerkSecretKey });
+        const org = await clerk.organizations.createOrganization({
+          name: existingBusiness.name,
+          slug: existingBusiness.slug ?? undefined,
+          createdBy: clerkUserId,
+        });
+
+        await db
+          .update(businesses)
+          .set({ clerkOrgId: org.id, updatedAt: new Date() })
+          .where(eq(businesses.id, existingBusiness.id));
+
+        console.info(
+          `[onboarding] Migrated business "${existingBusiness.name}" to Clerk Org ${org.id}`,
+        );
+
+        return c.json({
+          business: {
+            id: existingBusiness.id,
+            name: existingBusiness.name,
+            type: existingBusiness.type,
+            clerkOrgId: org.id,
+          },
+          user: {
+            id: existingUser.id,
+            name: existingUser.name,
+            role: existingUser.role,
+            businessId: existingBusiness.id,
+          },
+          migrated: true,
+        });
+      } catch (err) {
+        console.error("[onboarding] Migration to Clerk Org failed:", err);
+        return c.json(
+          { error: "Error al migrar el negocio. Intenta de nuevo." },
+          500,
+        );
+      }
+    }
+
+    // Business already has a Clerk Org -- nothing to do
     return c.json(
       {
         error: "User already has a business",
