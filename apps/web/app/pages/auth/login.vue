@@ -2,18 +2,16 @@
 /**
  * Login page using Clerk's SignIn component.
  *
- * Used by owners to sign in. Employees use access links instead.
- * After sign-in, Clerk redirects to /auth/resolve which resolves
- * the Nova account and sets the user state.
+ * After sign-in, Clerk redirects to /auth/resolve (configured in nuxt.config.ts).
  */
 
 definePageMeta({ layout: false });
 
-// Clear session-expired banner when arriving at login page
-if (import.meta.client) {
+onMounted(() => {
+  // Clear session-expired banner when arriving at login page
   const sessionExpired = useState<boolean>("session-expired");
   sessionExpired.value = false;
-}
+});
 </script>
 
 <template>

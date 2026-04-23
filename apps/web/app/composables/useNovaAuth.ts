@@ -59,7 +59,7 @@ export function useNovaAuth() {
           businessId: string;
           businessName: string;
         };
-      }>("/api/me");
+      }>("/api/me", { silent: true });
 
       if (result.user) {
         setUser({
