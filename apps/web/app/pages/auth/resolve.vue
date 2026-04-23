@@ -74,7 +74,23 @@ async function resolve() {
   }
 
   if (result.status === "no_org") {
-    // User is signed in but has no Organization -- needs onboarding
+    // User is signed in but has no active Organization in the session.
+    // Before redirecting to onboarding, check if they already belong to
+    // an org (e.g., they completed onboarding before but the session
+    // doesn't have the org set as active). If so, activate it.
+    if (import.meta.client) {
+      const activated = await tryActivateExistingOrg();
+      if (activated) {
+        // Org is now active -- retry resolving the user
+        const retryResult = await resolveUser();
+        if (retryResult.status === "ok") {
+          router.replace("/");
+          return;
+        }
+      }
+    }
+
+    // No existing org found -- needs onboarding
     router.replace("/onboarding");
     return;
   }
@@ -88,6 +104,44 @@ async function resolve() {
 onMounted(() => {
   resolve();
 });
+
+/**
+ * Try to activate an existing Organization membership.
+ * Uses the Clerk client to check if the user belongs to any org,
+ * and if so, calls setActive to make it the active org.
+ * Returns true if an org was activated.
+ */
+async function tryActivateExistingOrg(): Promise<boolean> {
+  try {
+    const clerk = useClerk();
+    if (!clerk.value) return false;
+
+    // Get the user's organization memberships
+    const memberships =
+      clerk.value.user?.organizationMemberships;
+
+    if (!memberships || memberships.length === 0) return false;
+
+    // Activate the first (and likely only) organization
+    const firstMembership = memberships[0];
+    if (!firstMembership) return false;
+    const firstOrg = firstMembership.organization;
+
+    await clerk.value.setActive({
+      organization: firstOrg.id,
+    });
+
+    // Wait for the session token to update with the new orgId
+    await new Promise((r) => setTimeout(r, 500));
+
+    console.info(
+      `[resolve] Activated existing org: ${firstOrg.name}`,
+    );
+    return true;
+  } catch {
+    return false;
+  }
+}
 </script>
 
 <template>

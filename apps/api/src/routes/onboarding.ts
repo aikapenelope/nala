@@ -311,11 +311,13 @@ onboarding.post("/", zValidator("json", onboardingSchema), async (c) => {
       }
     }
 
-    // Business already has a Clerk Org -- nothing to do
+    // Business already has a Clerk Org -- return it so the frontend
+    // can call setActive() to activate it in the session.
     return c.json(
       {
         error: "User already has a business",
         businessId: existingUser.businessId,
+        clerkOrgId: existingBusiness?.clerkOrgId ?? null,
       },
       409,
     );

@@ -180,10 +180,26 @@ async function createBusiness() {
       statusCode?: number;
     };
 
-    // 409 means user already has a business WITH a Clerk Org (fully migrated).
-    // Just redirect to dashboard -- the org should already be active.
+    // 409 means user already has a business.
+    // Activate the Clerk Organization and redirect to dashboard.
     if (fetchError.statusCode === 409) {
-      router.replace("/auth/resolve");
+      const clerkOrgId = (fetchError.data as { clerkOrgId?: string })
+        ?.clerkOrgId;
+
+      if (clerkOrgId && import.meta.client) {
+        try {
+          const clerk = useClerk();
+          if (clerk.value) {
+            await clerk.value.setActive({ organization: clerkOrgId });
+            // Wait a moment for the session token to update with orgId
+            await new Promise((r) => setTimeout(r, 500));
+          }
+        } catch (orgErr) {
+          console.warn("[onboarding] Failed to set active org:", orgErr);
+        }
+      }
+
+      router.replace("/");
       return;
     }
 
