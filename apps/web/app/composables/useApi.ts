@@ -1,18 +1,12 @@
 /**
  * API client composable.
  *
- * Provides a typed `$api` function that wraps `$fetch` with:
- * - Automatic base URL from runtime config (NUXT_PUBLIC_API_BASE)
- * - Clerk JWT token in Authorization header (includes orgId)
- * - 401 interceptor: clears stale session and shows re-auth banner
+ * Simple, robust token acquisition:
+ * 1. During setup, capture useClerk() ref (always available with @clerk/nuxt)
+ * 2. On each $api call, get token from clerk.session.getToken()
+ * 3. Attach as Bearer token in Authorization header
  *
- * With Clerk Organizations, the JWT automatically includes the
- * active Organization's ID and role. No custom headers needed.
- *
- * Token strategy: capture the getToken Ref from useAuth() during
- * composable setup. The Ref is reactive -- its .value updates when
- * Clerk finishes loading. If Clerk isn't ready during initial setup,
- * we retry on each $api call (ensureGetToken).
+ * No Organizations complexity. Single admin user flow.
  */
 
 import type { NitroFetchOptions } from "nitropack";
@@ -21,39 +15,18 @@ export function useApi() {
   const config = useRuntimeConfig();
   const apiBase = config.public.apiBase as string;
 
-  /**
-   * Reactive flag shown by layouts/components when session expires.
-   */
   const sessionExpired = useState<boolean>("session-expired", () => false);
 
-  // Capture Clerk's getToken Ref during composable setup.
-  // getToken is Ref<(opts?) => Promise<string | null>> per Clerk Vue SDK.
-  // On SSR or if Clerk isn't ready, this will be null initially.
-  type GetTokenFn = (opts?: Record<string, unknown>) => Promise<string | null>;
-  type GetTokenRef = { value: GetTokenFn | undefined };
-  let clerkGetToken: GetTokenRef | null = null;
+  // Capture the Clerk instance during setup.
+  // useClerk() returns a Ref that updates when Clerk loads.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let clerkInstance: { value: any } | null = null;
 
   if (import.meta.client) {
     try {
-      const { getToken } = useAuth();
-      clerkGetToken = getToken as GetTokenRef;
+      clerkInstance = useClerk();
     } catch {
-      // Clerk not initialized yet -- will retry in ensureGetToken
-    }
-  }
-
-  /**
-   * Retry capturing getToken if the initial attempt failed.
-   * Called synchronously before each $api request.
-   */
-  function ensureGetToken(): void {
-    if (clerkGetToken) return;
-    if (!import.meta.client) return;
-    try {
-      const { getToken } = useAuth();
-      clerkGetToken = getToken as GetTokenRef;
-    } catch {
-      // Still not ready
+      // Clerk module not ready
     }
   }
 
@@ -78,22 +51,18 @@ export function useApi() {
       ...(opts?.headers as Record<string, string> | undefined),
     };
 
-    // Attach Clerk JWT (includes orgId automatically).
+    // Get token directly from the Clerk instance's active session.
     if (import.meta.client) {
-      ensureGetToken();
-
-      if (clerkGetToken) {
-        try {
-          const tokenFn = clerkGetToken.value;
-          if (tokenFn) {
-            const token = await tokenFn();
-            if (token) {
-              headers["Authorization"] = `Bearer ${token}`;
-            }
+      try {
+        const clerk = clerkInstance?.value;
+        if (clerk?.session) {
+          const token = await clerk.session.getToken();
+          if (token) {
+            headers["Authorization"] = `Bearer ${token}`;
           }
-        } catch {
-          // Token retrieval failed -- request goes without auth
         }
+      } catch {
+        // Token retrieval failed
       }
     }
 

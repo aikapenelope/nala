@@ -1,19 +1,15 @@
 /**
  * Global authentication middleware.
  *
- * Uses Clerk's recommended pattern for Nuxt page protection.
- * See: https://clerk.com/docs/guides/secure/protect-pages
- *
- * Flow:
+ * Simple flow:
  * 1. Public routes always pass through.
- * 2. If NovaUser is already resolved, allow access.
- * 3. If Clerk is still loading, allow access (avoid premature redirects).
- * 4. If Clerk is loaded and user is signed in but NovaUser not resolved,
- *    redirect to /auth/resolve.
- * 5. If Clerk is loaded and user is NOT signed in, redirect to /landing.
+ * 2. If Clerk hasn't loaded yet, allow (avoid premature redirects).
+ * 3. If signed in with Clerk, allow (resolve page handles the rest).
+ * 4. If not signed in, redirect to /landing.
+ *
+ * No Organizations complexity. Single admin user.
  */
 
-/** Matcher for public routes that don't require authentication. */
 const isPublicRoute = createRouteMatcher([
   "/landing",
   "/auth/login",
@@ -24,31 +20,28 @@ const isPublicRoute = createRouteMatcher([
 ]);
 
 export default defineNuxtRouteMiddleware((to) => {
-  // Public routes -- always allow
   if (isPublicRoute(to)) {
     return;
   }
 
-  // If Nova user is already resolved, allow access
-  const { isAuthenticated } = useNovaAuth();
-  if (isAuthenticated.value) {
+  // If Nova user is already resolved, allow
+  const novaUser = useState("nova-user");
+  if (novaUser.value) {
     return;
   }
 
-  // Check Clerk auth state
   const { isSignedIn, isLoaded } = useAuth();
 
-  // If Clerk hasn't loaded yet, don't redirect -- let the page render.
-  // The resolve page or component-level guards will handle it once loaded.
+  // Clerk still loading -- don't redirect yet
   if (!isLoaded.value) {
     return;
   }
 
-  // Clerk is loaded and user is signed in but NovaUser not resolved
+  // Signed in but NovaUser not resolved -- go to resolve
   if (isSignedIn.value) {
     return navigateTo("/auth/resolve");
   }
 
-  // Clerk is loaded and user is NOT signed in
+  // Not signed in
   return navigateTo("/landing");
 });

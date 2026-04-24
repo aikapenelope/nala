@@ -1,24 +1,22 @@
 /**
  * Onboarding routes.
  *
- * POST /onboarding - Create a new business + Clerk Organization after sign-up.
+ * POST /onboarding - Create a new business + owner after sign-up.
  *
- * Flow:
+ * Simple flow (no Clerk Organizations):
  * 1. Verify Clerk JWT to get the user's clerkId
- * 2. Create a Clerk Organization with the business name
- * 3. Add the user as org:admin of the Organization
- * 4. Create the business record in DB (with clerkOrgId)
- * 5. Create the owner user record in DB
- * 6. Pre-configure categories and accounting chart
+ * 2. Create the business record in DB
+ * 3. Create the owner user record in DB (linked to clerkId)
+ * 4. Pre-configure categories and accounting chart
  *
- * After onboarding, the user's JWT will include orgId and orgRole,
- * which the authMiddleware uses for all subsequent requests.
+ * After onboarding, the auth middleware finds the user by clerkId
+ * and resolves their business automatically.
  */
 
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import { verifyToken, createClerkClient } from "@clerk/backend";
+import { verifyToken } from "@clerk/backend";
 import { eq } from "drizzle-orm";
 import { businessTypeSchema } from "@nova/shared";
 import {
@@ -27,7 +25,6 @@ import {
   categories,
   accountingAccounts,
   findUserByClerkId,
-  findBusinessById,
 } from "@nova/db";
 import { getDb } from "../db";
 import { handleDbError } from "../utils/db-errors";
@@ -197,14 +194,13 @@ onboarding.get("/check-slug/:slug", async (c) => {
 });
 
 /**
- * POST /onboarding - Create business + Clerk Organization + owner.
+ * POST /onboarding - Create business + owner.
  *
  * Requires a valid Clerk session (the user just signed up).
  * Creates:
- * 1. Clerk Organization (the user becomes org:admin)
- * 2. Business record in DB (linked to Clerk Org via clerkOrgId)
- * 3. Owner user record in DB
- * 4. Pre-configured categories and accounting chart
+ * 1. Business record in DB
+ * 2. Owner user record in DB (linked to clerkId)
+ * 3. Pre-configured categories and accounting chart
  */
 onboarding.post("/", zValidator("json", onboardingSchema), async (c) => {
   const { businessType, businessName, businessSlug, ownerName } =
@@ -248,138 +244,26 @@ onboarding.post("/", zValidator("json", onboardingSchema), async (c) => {
   // Check if user already has a business
   const existingUser = await findUserByClerkId(db, clerkUserId);
   if (existingUser) {
-    // User already has a business. Check if it needs Clerk Org migration.
-    const existingBusiness = await findBusinessById(db, existingUser.businessId);
-
-    if (existingBusiness && !existingBusiness.clerkOrgId && clerkSecretKey) {
-      // --- Migration: link existing business to a new Clerk Organization ---
-      // This handles businesses created before the Organizations migration.
-      try {
-        const clerk = createClerkClient({ secretKey: clerkSecretKey });
-
-        // Try with slug first, fall back without if Clerk rejects it
-        let org;
-        try {
-          org = await clerk.organizations.createOrganization({
-            name: existingBusiness.name,
-            slug: existingBusiness.slug ?? undefined,
-            createdBy: clerkUserId,
-          });
-        } catch {
-          org = await clerk.organizations.createOrganization({
-            name: existingBusiness.name,
-            createdBy: clerkUserId,
-          });
-        }
-
-        await db
-          .update(businesses)
-          .set({ clerkOrgId: org.id, updatedAt: new Date() })
-          .where(eq(businesses.id, existingBusiness.id));
-
-        console.info(
-          `[onboarding] Migrated business "${existingBusiness.name}" to Clerk Org ${org.id}`,
-        );
-
-        return c.json({
-          business: {
-            id: existingBusiness.id,
-            name: existingBusiness.name,
-            type: existingBusiness.type,
-            clerkOrgId: org.id,
-          },
-          user: {
-            id: existingUser.id,
-            name: existingUser.name,
-            role: existingUser.role,
-            businessId: existingBusiness.id,
-          },
-          migrated: true,
-        });
-      } catch (err) {
-        const clerkErr = err as {
-          errors?: Array<{ message: string; code: string; longMessage?: string }>;
-        };
-        const detail = clerkErr.errors
-          ? clerkErr.errors.map((e) => e.longMessage ?? e.message).join(". ")
-          : String(err);
-        console.error("[onboarding] Migration to Clerk Org failed:", detail);
-        return c.json(
-          { error: `Error al migrar el negocio: ${detail}` },
-          500,
-        );
-      }
-    }
-
-    // Business already has a Clerk Org -- return it so the frontend
-    // can call setActive() to activate it in the session.
     return c.json(
       {
         error: "User already has a business",
         businessId: existingUser.businessId,
-        clerkOrgId: existingBusiness?.clerkOrgId ?? null,
       },
       409,
     );
-  }
-
-  // --- Create Clerk Organization ---
-  // The owner becomes org:admin automatically (createdBy).
-  // In dev mode without Clerk, skip org creation.
-  let clerkOrgId: string | null = null;
-
-  if (clerkSecretKey) {
-    try {
-      const clerk = createClerkClient({ secretKey: clerkSecretKey });
-
-      // Try with slug first, fall back to without slug if it fails
-      // (Clerk may reject slugs that conflict with existing orgs)
-      try {
-        const org = await clerk.organizations.createOrganization({
-          name: businessName,
-          slug: businessSlug,
-          createdBy: clerkUserId,
-        });
-        clerkOrgId = org.id;
-      } catch {
-        // Retry without slug
-        const org = await clerk.organizations.createOrganization({
-          name: businessName,
-          createdBy: clerkUserId,
-        });
-        clerkOrgId = org.id;
-      }
-
-      console.info(
-        `[onboarding] Created Clerk Organization "${businessName}" (${clerkOrgId}) for user ${clerkUserId}`,
-      );
-    } catch (err) {
-      const clerkErr = err as {
-        errors?: Array<{ message: string; code: string; longMessage?: string }>;
-      };
-      const detail = clerkErr.errors
-        ? clerkErr.errors.map((e) => e.longMessage ?? e.message).join(". ")
-        : String(err);
-      console.error("[onboarding] Failed to create Clerk Organization:", detail);
-      return c.json(
-        { error: `Error al crear la organizacion: ${detail}` },
-        500,
-      );
-    }
   }
 
   // --- Create DB records in a single transaction ---
   let result;
   try {
     result = await db.transaction(async (tx) => {
-      // 1. Create business with Clerk Org link
+      // 1. Create business
       const [business] = await tx
         .insert(businesses)
         .values({
           name: businessName,
           type: businessType,
           slug: businessSlug,
-          clerkOrgId,
         })
         .returning();
 
@@ -429,7 +313,6 @@ onboarding.post("/", zValidator("json", onboardingSchema), async (c) => {
         id: result.business.id,
         name: result.business.name,
         type: result.business.type,
-        clerkOrgId: result.business.clerkOrgId,
       },
       user: {
         id: result.owner.id,

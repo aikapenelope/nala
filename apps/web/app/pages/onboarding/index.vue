@@ -136,9 +136,8 @@ async function createBusiness() {
 
   try {
     const result = await $api<{
-      business: { id: string; name: string; type: string; clerkOrgId?: string };
+      business: { id: string; name: string; type: string };
       user: { id: string; name: string; role: string; businessId: string };
-      migrated?: boolean;
     }>("/onboarding", {
       method: "POST",
       body: {
@@ -149,30 +148,7 @@ async function createBusiness() {
       },
     });
 
-    // If a Clerk Organization was created (new or migrated), set it as active.
-    // This ensures the JWT includes orgId on subsequent requests.
-    if (result.business.clerkOrgId && import.meta.client) {
-      try {
-        const clerk = useClerk();
-        if (clerk.value) {
-          await clerk.value.setActive({
-            organization: result.business.clerkOrgId,
-          });
-          // Force a fresh token so the JWT includes the new orgId.
-          const { getToken } = useAuth();
-          if (getToken.value) {
-            await getToken.value({ skipCache: true });
-          }
-        }
-      } catch (orgErr) {
-        console.warn("[onboarding] Failed to set active org:", orgErr);
-      }
-    }
-
-    // Resolve the Nova user so isAuthenticated becomes true
-    await resolveUser();
-
-    // Set the Nova user from the onboarding response (backup in case resolveUser had issues)
+    // Set the Nova user directly from the onboarding response
     setUser({
       id: result.user.id,
       name: result.user.name,
@@ -188,30 +164,9 @@ async function createBusiness() {
       statusCode?: number;
     };
 
-    // 409 means user already has a business.
-    // Activate the Clerk Organization, resolve the user, then go to dashboard.
+    // 409 means user already has a business -- go to dashboard
     if (fetchError.statusCode === 409) {
-      const clerkOrgId = (fetchError.data as { clerkOrgId?: string })
-        ?.clerkOrgId;
-
-      if (clerkOrgId && import.meta.client) {
-        try {
-          const clerk = useClerk();
-          if (clerk.value) {
-            await clerk.value.setActive({ organization: clerkOrgId });
-            // Force a fresh token so the JWT includes the org
-            const { getToken } = useAuth();
-            if (getToken.value) {
-              await getToken.value({ skipCache: true });
-            }
-            // Now resolve the Nova user so isAuthenticated becomes true
-            await resolveUser();
-          }
-        } catch (orgErr) {
-          console.warn("[onboarding] Failed to set active org:", orgErr);
-        }
-      }
-
+      await resolveUser();
       router.replace("/");
       return;
     }
