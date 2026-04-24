@@ -2,8 +2,7 @@
 /**
  * Root app component.
  *
- * With Clerk Organizations, auth state comes from Clerk's JWT.
- * No localStorage restore needed.
+ * Auth state is managed by Clerk and resolved via /auth/resolve.
  */
 </script>
 

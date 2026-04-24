@@ -12,12 +12,9 @@ definePageMeta({ layout: false });
 const router = useRouter();
 
 onMounted(() => {
-  // Clear session-expired banner when arriving at login page
   const sessionExpired = useState<boolean>("session-expired");
   sessionExpired.value = false;
 
-  // If already signed in with Clerk, skip the login form and go to resolve.
-  // The <SignIn> component won't render for active sessions anyway.
   const { isSignedIn, isLoaded } = useAuth();
   if (isLoaded.value && isSignedIn.value) {
     router.replace("/auth/resolve");

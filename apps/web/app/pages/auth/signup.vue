@@ -3,7 +3,7 @@
  * Owner sign-up page using Clerk's SignUp component.
  *
  * After Clerk creates the account, the user is redirected to /auth/resolve.
- * For new users without a business, /auth/resolve detects "no_org" and
+ * For new users without a business, /auth/resolve detects "no user" and
  * redirects to /onboarding to create the business.
  */
 

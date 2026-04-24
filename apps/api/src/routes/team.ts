@@ -1,23 +1,20 @@
 /**
  * Team management routes.
  *
- * Uses Clerk Organizations for member management:
- * - GET  /employees       - List org members via Clerk API
- * - POST /employees       - Invite employee via Clerk org invitation
- * - PATCH /employees/:id  - Update employee name or active status in DB
- * - DELETE /employees/:id - Deactivate employee (soft delete in DB)
+ * Simple DB-based employee management (no Clerk Organizations):
+ * - GET  /employees       - List employees from DB
+ * - POST /employees       - Create employee in DB
+ * - PATCH /employees/:id  - Update employee name or active status
+ * - DELETE /employees/:id - Deactivate employee (soft delete)
  *
- * Clerk handles invitations, sign-up, and membership natively.
- * No custom linking, no webhooks, no temp passwords.
- * When an invited employee signs in, the authMiddleware auto-creates
- * their DB record on first request.
+ * GET /settings           - Get business settings
+ * PATCH /settings         - Update business settings
  */
 
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { eq, and } from "drizzle-orm";
-import { createClerkClient } from "@clerk/backend";
 import { users, businesses } from "@nova/db";
 import { handleDbError } from "../utils/db-errors";
 import { logActivity } from "../utils/audit";
@@ -35,22 +32,12 @@ function requireOwner(c: { get: (key: string) => unknown }) {
   return null;
 }
 
-/** Get a configured Clerk client. */
-function getClerkClient() {
-  return createClerkClient({
-    secretKey: process.env.CLERK_SECRET_KEY ?? "",
-  });
-}
-
 // ============================================================
 // List employees
 // ============================================================
 
 /**
- * GET /employees - List all members of the Clerk Organization.
- *
- * Combines Clerk membership data (email, invitation status) with
- * local DB data (name, active status) for a complete view.
+ * GET /employees - List all employees for this business from DB.
  */
 team.get("/employees", async (c) => {
   const ownerCheck = requireOwner(c);
@@ -59,230 +46,85 @@ team.get("/employees", async (c) => {
   const currentUser = c.get("user");
   const db = c.get("db");
 
-  // Get the Clerk org ID for this business
-  const [business] = await db
-    .select({ clerkOrgId: businesses.clerkOrgId })
-    .from(businesses)
-    .where(eq(businesses.id, currentUser.businessId))
-    .limit(1);
+  const dbEmployees = await db
+    .select({
+      id: users.id,
+      name: users.name,
+      role: users.role,
+      isActive: users.isActive,
+      createdAt: users.createdAt,
+    })
+    .from(users)
+    .where(eq(users.businessId, currentUser.businessId));
 
-  if (!business?.clerkOrgId) {
-    // Fallback: list from DB only (no Clerk org linked)
-    const dbEmployees = await db
-      .select({
-        id: users.id,
-        name: users.name,
-        role: users.role,
-        isActive: users.isActive,
-        createdAt: users.createdAt,
-      })
-      .from(users)
-      .where(eq(users.businessId, currentUser.businessId));
-
-    return c.json({
-      employees: dbEmployees.map((e) => ({
-        ...e,
-        hasClerkAccount: !!e.role,
-      })),
-    });
-  }
-
-  // List members from Clerk Organization
-  const clerk = getClerkClient();
-  try {
-    const memberships =
-      await clerk.organizations.getOrganizationMembershipList({
-        organizationId: business.clerkOrgId,
-        limit: 100,
-      });
-
-    // Also get pending invitations
-    const invitations =
-      await clerk.organizations.getOrganizationInvitationList({
-        organizationId: business.clerkOrgId,
-        limit: 100,
-      });
-
-    // Build employee list from memberships
-    const employees = memberships.data.map((m) => ({
-      id: m.publicUserData?.userId ?? m.id,
-      name:
-        [m.publicUserData?.firstName, m.publicUserData?.lastName]
-          .filter(Boolean)
-          .join(" ") || "Sin nombre",
-      role: m.role === "org:admin" ? "owner" : "employee",
-      isActive: true,
-      hasClerkAccount: true,
-      email: m.publicUserData?.identifier ?? null,
-      createdAt: m.createdAt ? new Date(m.createdAt).toISOString() : null,
-    }));
-
-    // Add pending invitations as "pending" employees
-    const pendingInvites = invitations.data
-      .filter((inv) => inv.status === "pending")
-      .map((inv) => ({
-        id: inv.id,
-        name: inv.emailAddress,
-        role: inv.role === "org:admin" ? "owner" : "employee",
-        isActive: false,
-        hasClerkAccount: false,
-        email: inv.emailAddress,
-        createdAt: inv.createdAt ? new Date(inv.createdAt).toISOString() : null,
-        isPending: true,
-      }));
-
-    return c.json({ employees: [...employees, ...pendingInvites] });
-  } catch (err) {
-    console.error("[team] Failed to list Clerk org members:", err);
-
-    // Fallback to DB
-    const dbEmployees = await db
-      .select({
-        id: users.id,
-        name: users.name,
-        role: users.role,
-        isActive: users.isActive,
-        createdAt: users.createdAt,
-      })
-      .from(users)
-      .where(eq(users.businessId, currentUser.businessId));
-
-    return c.json({
-      employees: dbEmployees.map((e) => ({
-        ...e,
-        hasClerkAccount: true,
-      })),
-    });
-  }
+  return c.json({
+    employees: dbEmployees.map((e) => ({
+      ...e,
+      hasClerkAccount: !!e.role,
+    })),
+  });
 });
 
 // ============================================================
-// Invite employee via Clerk Organization
+// Create employee
 // ============================================================
+
+const createEmployeeSchema = z.object({
+  name: z.string().min(1).max(100),
+  role: z.enum(["employee", "owner"]).default("employee"),
+});
 
 /**
- * POST /employees - Invite a new employee to the Clerk Organization.
- *
- * Accepts { name, email }. Sends a Clerk Organization invitation.
- * When the employee accepts, Clerk adds them to the org automatically.
- * On their first API request, authMiddleware auto-creates the DB record.
- *
- * No DB record is created here. No linking. No webhooks.
+ * POST /employees - Create a new employee in the DB.
  */
-team.post("/employees", async (c) => {
-  const ownerCheck = requireOwner(c);
-  if (ownerCheck) return c.json(ownerCheck, 403);
+team.post(
+  "/employees",
+  zValidator("json", createEmployeeSchema),
+  async (c) => {
+    const ownerCheck = requireOwner(c);
+    if (ownerCheck) return c.json(ownerCheck, 403);
 
-  // Manual validation for clear error messages
-  let body: { name?: string; email?: string };
-  try {
-    body = await c.req.json();
-  } catch {
-    return c.json({ error: "Body JSON invalido" }, 400);
-  }
+    const data = c.req.valid("json");
+    const currentUser = c.get("user");
+    const db = c.get("db");
 
-  const name = body.name?.trim();
-  const email = body.email?.trim();
+    try {
+      const [created] = await db
+        .insert(users)
+        .values({
+          businessId: currentUser.businessId,
+          name: data.name,
+          role: data.role,
+        })
+        .returning({
+          id: users.id,
+          name: users.name,
+          role: users.role,
+          isActive: users.isActive,
+          createdAt: users.createdAt,
+        });
 
-  if (!name || name.length === 0) {
-    return c.json({ error: "El nombre es obligatorio" }, 400);
-  }
-  if (!email || !email.includes("@")) {
-    return c.json({ error: "El email es obligatorio y debe ser valido" }, 400);
-  }
+      logActivity({
+        db,
+        businessId: currentUser.businessId,
+        userId: currentUser.id,
+        action: "employee_created",
+        detail: `${created.name}`,
+      });
 
-  const currentUser = c.get("user");
-  const db = c.get("db");
-  const clerk = getClerkClient();
-
-  // Get the Clerk org ID for this business
-  const [business] = await db
-    .select({ clerkOrgId: businesses.clerkOrgId, slug: businesses.slug })
-    .from(businesses)
-    .where(eq(businesses.id, currentUser.businessId))
-    .limit(1);
-
-  if (!business?.clerkOrgId) {
-    return c.json(
-      { error: "Este negocio no tiene una organizacion configurada." },
-      400,
-    );
-  }
-
-  try {
-    // Send Clerk Organization invitation.
-    // Clerk handles the email, sign-up flow, and org membership.
-    const tenantDomain = process.env.TENANT_DOMAIN ?? "novaincs.com";
-    const slug = business.slug ?? "nova";
-    const redirectUrl = `https://${slug}.${tenantDomain}/`;
-
-    await clerk.organizations.createOrganizationInvitation({
-      organizationId: business.clerkOrgId,
-      emailAddress: email,
-      role: "org:member",
-      inviterUserId: currentUser.clerkId,
-      redirectUrl,
-    });
-
-    logActivity({
-      db,
-      businessId: currentUser.businessId,
-      userId: currentUser.id,
-      action: "employee_invited",
-      detail: `${name} (${email})`,
-    });
-
-    return c.json(
-      {
-        message: `Invitacion enviada a ${email}. El empleado recibira un email para unirse al negocio.`,
-        email,
-        name,
-      },
-      201,
-    );
-  } catch (err) {
-    // Handle Clerk API errors
-    const clerkError = err as {
-      errors?: Array<{
-        message: string;
-        code: string;
-        longMessage?: string;
-        meta?: Record<string, unknown>;
-      }>;
-    };
-    if (clerkError.errors) {
-      console.error(
-        "[team] Clerk org invitation failed:",
-        JSON.stringify(clerkError.errors, null, 2),
-      );
-      const messages = clerkError.errors
-        .map(
-          (e) =>
-            e.longMessage ??
-            e.message ??
-            `${e.code}: ${JSON.stringify(e.meta)}`,
-        )
-        .join(". ");
-      return c.json(
-        {
-          error: messages || "Error enviando invitacion",
-          clerkErrors: clerkError.errors,
-        },
-        400,
-      );
+      return c.json({ employee: created }, 201);
+    } catch (err) {
+      const dbErr = handleDbError(err);
+      if (dbErr) return c.json({ error: dbErr.message }, dbErr.status);
+      throw err;
     }
-
-    const dbErr = handleDbError(err);
-    if (dbErr) return c.json({ error: dbErr.message }, dbErr.status);
-    throw err;
-  }
-});
+  },
+);
 
 // ============================================================
 // Update employee
 // ============================================================
 
-/** Schema for updating an employee. */
 const updateEmployeeSchema = z.object({
   name: z.string().min(1).max(100).optional(),
   isActive: z.boolean().optional(),
@@ -304,7 +146,6 @@ team.patch(
     const currentUser = c.get("user");
     const db = c.get("db");
 
-    // Verify the employee belongs to this business
     const [existing] = await db
       .select()
       .from(users)
