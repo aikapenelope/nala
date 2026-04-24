@@ -3,9 +3,6 @@
  * Login page using Clerk's SignIn component.
  *
  * After sign-in, Clerk redirects to /auth/resolve via forceRedirectUrl.
- * If Organizations are enabled with "Membership required", Clerk will
- * show the choose-organization session task before redirecting.
- *
  * If the user is already signed in, redirect to /auth/resolve directly
  * because Clerk's <SignIn> component won't render for active sessions.
  */

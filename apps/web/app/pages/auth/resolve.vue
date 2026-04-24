@@ -7,7 +7,7 @@
  * 2. If not signed in -> landing
  * 3. Call GET /api/me to resolve the Nova user
  * 4. If ok -> dashboard
- * 5. If 403 NO_ORGANIZATION or 404 -> onboarding
+ * 5. If 404 USER_NOT_FOUND -> onboarding
  * 6. If error -> show error with retry + sign-out buttons
  *
  * No Organizations complexity. Single admin user.

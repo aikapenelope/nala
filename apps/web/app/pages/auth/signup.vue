@@ -3,10 +3,8 @@
  * Owner sign-up page using Clerk's SignUp component.
  *
  * After Clerk creates the account, the user is redirected to /auth/resolve.
- * If Organizations are enabled with "Membership required", Clerk will
- * show the choose-organization session task within the SignUp component.
- * For new users without an org, /auth/resolve detects "no_org" and
- * redirects to /onboarding to create the business + Clerk Organization.
+ * For new users without a business, /auth/resolve detects "no_org" and
+ * redirects to /onboarding to create the business.
  */
 
 definePageMeta({ layout: false });
