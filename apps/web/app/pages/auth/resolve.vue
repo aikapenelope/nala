@@ -1,95 +1,62 @@
 <script setup lang="ts">
 /**
- * Post-Clerk-login resolver page.
+ * Post-login resolver page.
  *
- * Waits for Clerk to be fully loaded and signed in, then resolves
- * the Nova user via GET /api/me.
+ * Simple flow:
+ * 1. Wait for Clerk to load
+ * 2. If not signed in -> landing
+ * 3. Call GET /api/me to resolve the Nova user
+ * 4. If ok -> dashboard
+ * 5. If 403 NO_ORGANIZATION or 404 -> onboarding
+ * 6. If error -> show error with retry + sign-out buttons
  *
- * With Clerk Organizations + "Membership required", Clerk handles
- * the org selection automatically via session tasks within the
- * SignIn/SignUp components. By the time the user reaches this page,
- * they should have an active org in their JWT.
- *
- * Flow:
- * 1. Wait for Clerk isLoaded + isSignedIn (reactive watch, no polling)
- * 2. Call resolveUser() which hits GET /api/me
- * 3. If ok -> dashboard
- * 4. If no_org -> onboarding (user needs to create a business)
- * 5. If error -> retry up to MAX_ATTEMPTS, then show error with sign-out option
+ * No Organizations complexity. Single admin user.
  */
 
 definePageMeta({ layout: false });
 
 const router = useRouter();
 const { resolveUser, isAuthenticated, fullLogout } = useNovaAuth();
-const { isLoaded, isSignedIn } = useAuth();
 
 const error = ref("");
 const isResolving = ref(true);
 const isSigningOut = ref(false);
 
-const MAX_ATTEMPTS = 5;
-const RETRY_DELAY = 1500;
-
-/**
- * Wait for a reactive ref to become truthy, with a timeout.
- * Returns true if the condition was met, false if timed out.
- */
-function waitFor(
-  condition: () => boolean,
-  timeoutMs: number,
-): Promise<boolean> {
-  return new Promise((resolve) => {
-    if (condition()) {
-      resolve(true);
-      return;
-    }
-
-    const timeout = setTimeout(() => {
-      unwatch();
-      resolve(false);
-    }, timeoutMs);
-
-    const unwatch = watch(
-      condition,
-      (val) => {
-        if (val) {
-          clearTimeout(timeout);
-          unwatch();
-          resolve(true);
-        }
-      },
-      { immediate: true },
-    );
-  });
-}
+const MAX_ATTEMPTS = 3;
+const RETRY_DELAY = 2000;
 
 async function resolve() {
   isResolving.value = true;
   error.value = "";
 
-  // Already resolved -- go to dashboard
+  // Already resolved
   if (isAuthenticated.value) {
     router.replace("/");
     return;
   }
 
-  // Wait for Clerk to finish loading (max 15s)
-  const loaded = await waitFor(() => isLoaded.value === true, 15_000);
-  if (!loaded) {
-    error.value = "Clerk no pudo cargar. Verifica tu conexion.";
-    isResolving.value = false;
-    return;
+  // Wait for Clerk to load using the clerk instance directly
+  if (import.meta.client) {
+    const clerk = useClerk();
+    const start = Date.now();
+    while (!clerk.value?.loaded && Date.now() - start < 10_000) {
+      await new Promise((r) => setTimeout(r, 300));
+    }
+
+    if (!clerk.value?.loaded) {
+      error.value = "No se pudo cargar la autenticacion. Recarga la pagina.";
+      isResolving.value = false;
+      return;
+    }
+
+    // Not signed in
+    if (!clerk.value?.session) {
+      router.replace("/landing");
+      return;
+    }
   }
 
-  // If not signed in after Clerk loaded, go to landing
-  if (!isSignedIn.value) {
-    router.replace("/landing");
-    return;
-  }
-
-  // Retry loop: resolve the Nova user from the backend.
-  // The JWT should already contain orgId if the user has an active org.
+  // Retry loop: resolve the Nova user from the backend
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
     const result = await resolveUser();
 
@@ -99,28 +66,22 @@ async function resolve() {
     }
 
     if (result.status === "no_org") {
-      // User is signed in but has no org -> needs onboarding
+      // No business yet -> onboarding
       router.replace("/onboarding");
       return;
     }
 
-    // "error" status -- wait and retry (backend may be starting up)
+    // Error -- wait and retry
     if (attempt < MAX_ATTEMPTS - 1) {
       await new Promise((r) => setTimeout(r, RETRY_DELAY));
     }
   }
 
-  // All attempts failed
   error.value =
     "No se pudo conectar con el servidor. Verifica tu conexion e intenta de nuevo.";
   isResolving.value = false;
 }
 
-/**
- * Sign out of Clerk and redirect to landing.
- * This breaks the loop when the backend is unreachable:
- * resolve fails -> user clicks sign out -> Clerk session cleared -> landing.
- */
 async function signOut() {
   isSigningOut.value = true;
   try {

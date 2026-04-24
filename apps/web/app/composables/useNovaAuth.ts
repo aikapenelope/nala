@@ -1,13 +1,12 @@
 /**
  * Nova authentication composable.
  *
- * Uses Clerk Organizations for multi-tenancy:
- * - The user's orgId and orgRole come from Clerk's JWT
- * - No custom linking, no webhooks, no localStorage persistence
- * - The backend auto-creates user records on first API request
+ * Simple single-admin flow:
+ * - Clerk handles authentication (email/password, Google, etc.)
+ * - After login, GET /api/me resolves the Nova user from the DB
+ * - If user not found (404 USER_NOT_FOUND), redirect to onboarding
  *
- * This composable provides a thin wrapper over Clerk's useAuth()
- * and useOrganization() to expose Nova-specific state.
+ * No Organizations, no localStorage persistence, no webhooks.
  */
 
 import type { UserRole } from "@nova/shared";
@@ -23,9 +22,6 @@ export interface NovaUser {
 
 /**
  * Main auth composable for Nova.
- *
- * Reads auth state from Clerk (via useAuth/useOrganization) and
- * resolves the Nova user from the backend via GET /api/me.
  */
 export function useNovaAuth() {
   const novaUser = useState<NovaUser | null>("nova-user", () => null);
@@ -35,17 +31,18 @@ export function useNovaAuth() {
 
   const { $api } = useApi();
 
-  /**
-   * Set the current Nova user.
-   */
   function setUser(user: NovaUser) {
     novaUser.value = user;
   }
 
   /**
    * Resolve the Nova user from the backend after Clerk login.
-   * Calls GET /api/me which uses the orgId from the JWT to find
-   * the business and auto-create the user if needed.
+   * Calls GET /api/me which looks up the user by clerkId.
+   *
+   * Returns:
+   * - "ok" if user found and set
+   * - "no_org" if user not found (needs onboarding)
+   * - "error" if backend unreachable or other error
    */
   async function resolveUser(): Promise<{
     status: "ok" | "no_org" | "error";
@@ -70,7 +67,6 @@ export function useNovaAuth() {
           businessName: result.user.businessName,
         });
 
-        // Clear the session-expired banner if it was showing.
         const sessionExpired = useState<boolean>("session-expired");
         sessionExpired.value = false;
 
@@ -84,10 +80,12 @@ export function useNovaAuth() {
         data?: { code?: string };
       };
 
-      // 403 with NO_ORGANIZATION means user needs to select/create an org
+      // 404 USER_NOT_FOUND or 403 NO_ORGANIZATION -> needs onboarding
       if (
-        fetchError.statusCode === 403 &&
-        fetchError.data?.code === "NO_ORGANIZATION"
+        (fetchError.statusCode === 404 &&
+          fetchError.data?.code === "USER_NOT_FOUND") ||
+        (fetchError.statusCode === 403 &&
+          fetchError.data?.code === "NO_ORGANIZATION")
       ) {
         return { status: "no_org" };
       }
@@ -96,15 +94,12 @@ export function useNovaAuth() {
     }
   }
 
-  /**
-   * Clear the current user (logout).
-   */
   function clearUser() {
     novaUser.value = null;
   }
 
   /**
-   * Full logout: signs out of Clerk and clears everything.
+   * Full logout: signs out of Clerk and clears Nova state.
    */
   async function fullLogout() {
     novaUser.value = null;
