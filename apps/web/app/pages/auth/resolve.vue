@@ -2,15 +2,12 @@
 /**
  * Post-login resolver page.
  *
- * Simple flow:
  * 1. Wait for Clerk to load
  * 2. If not signed in -> landing
  * 3. Call GET /api/me to resolve the Nova user
  * 4. If ok -> dashboard
- * 5. If 403 NO_ORGANIZATION or 404 -> onboarding
+ * 5. If 404 USER_NOT_FOUND -> onboarding
  * 6. If error -> show error with retry + sign-out buttons
- *
- * No Organizations complexity. Single admin user.
  */
 
 definePageMeta({ layout: false });
@@ -29,13 +26,12 @@ async function resolve() {
   isResolving.value = true;
   error.value = "";
 
-  // Already resolved
   if (isAuthenticated.value) {
     router.replace("/");
     return;
   }
 
-  // Wait for Clerk to load using the clerk instance directly
+  // Wait for Clerk to load
   if (import.meta.client) {
     const clerk = useClerk();
     const start = Date.now();
@@ -49,14 +45,13 @@ async function resolve() {
       return;
     }
 
-    // Not signed in
     if (!clerk.value?.session) {
       router.replace("/landing");
       return;
     }
   }
 
-  // Retry loop: resolve the Nova user from the backend
+  // Retry loop
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
     const result = await resolveUser();
 
@@ -65,13 +60,11 @@ async function resolve() {
       return;
     }
 
-    if (result.status === "no_org") {
-      // No business yet -> onboarding
+    if (result.status === "needs_onboarding") {
       router.replace("/onboarding");
       return;
     }
 
-    // Error -- wait and retry
     if (attempt < MAX_ATTEMPTS - 1) {
       await new Promise((r) => setTimeout(r, RETRY_DELAY));
     }

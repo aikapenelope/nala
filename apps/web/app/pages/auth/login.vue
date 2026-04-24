@@ -3,9 +3,6 @@
  * Login page using Clerk's SignIn component.
  *
  * After sign-in, Clerk redirects to /auth/resolve via forceRedirectUrl.
- * If Organizations are enabled with "Membership required", Clerk will
- * show the choose-organization session task before redirecting.
- *
  * If the user is already signed in, redirect to /auth/resolve directly
  * because Clerk's <SignIn> component won't render for active sessions.
  */
@@ -15,12 +12,9 @@ definePageMeta({ layout: false });
 const router = useRouter();
 
 onMounted(() => {
-  // Clear session-expired banner when arriving at login page
   const sessionExpired = useState<boolean>("session-expired");
   sessionExpired.value = false;
 
-  // If already signed in with Clerk, skip the login form and go to resolve.
-  // The <SignIn> component won't render for active sessions anyway.
   const { isSignedIn, isLoaded } = useAuth();
   if (isLoaded.value && isSignedIn.value) {
     router.replace("/auth/resolve");

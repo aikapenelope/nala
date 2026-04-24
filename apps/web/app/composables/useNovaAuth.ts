@@ -1,12 +1,10 @@
 /**
  * Nova authentication composable.
  *
- * Simple single-admin flow:
+ * Simple flow:
  * - Clerk handles authentication (email/password, Google, etc.)
  * - After login, GET /api/me resolves the Nova user from the DB
  * - If user not found (404 USER_NOT_FOUND), redirect to onboarding
- *
- * No Organizations, no localStorage persistence, no webhooks.
  */
 
 import type { UserRole } from "@nova/shared";
@@ -20,9 +18,6 @@ export interface NovaUser {
   businessName: string;
 }
 
-/**
- * Main auth composable for Nova.
- */
 export function useNovaAuth() {
   const novaUser = useState<NovaUser | null>("nova-user", () => null);
   const isAuthenticated = computed(() => novaUser.value !== null);
@@ -36,16 +31,11 @@ export function useNovaAuth() {
   }
 
   /**
-   * Resolve the Nova user from the backend after Clerk login.
+   * Resolve the Nova user from the backend.
    * Calls GET /api/me which looks up the user by clerkId.
-   *
-   * Returns:
-   * - "ok" if user found and set
-   * - "no_org" if user not found (needs onboarding)
-   * - "error" if backend unreachable or other error
    */
   async function resolveUser(): Promise<{
-    status: "ok" | "no_org" | "error";
+    status: "ok" | "needs_onboarding" | "error";
   }> {
     try {
       const result = await $api<{
@@ -80,14 +70,12 @@ export function useNovaAuth() {
         data?: { code?: string };
       };
 
-      // 404 USER_NOT_FOUND or 403 NO_ORGANIZATION -> needs onboarding
+      // 404 USER_NOT_FOUND -> user signed up but hasn't created a business yet
       if (
-        (fetchError.statusCode === 404 &&
-          fetchError.data?.code === "USER_NOT_FOUND") ||
-        (fetchError.statusCode === 403 &&
-          fetchError.data?.code === "NO_ORGANIZATION")
+        fetchError.statusCode === 404 &&
+        fetchError.data?.code === "USER_NOT_FOUND"
       ) {
-        return { status: "no_org" };
+        return { status: "needs_onboarding" };
       }
 
       return { status: "error" };
@@ -98,16 +86,10 @@ export function useNovaAuth() {
     novaUser.value = null;
   }
 
-  /**
-   * Full logout: signs out of Clerk and clears Nova state.
-   */
   async function fullLogout() {
     novaUser.value = null;
     if (import.meta.client) {
       localStorage.removeItem("nova:sidebar-collapsed");
-    }
-
-    if (import.meta.client) {
       try {
         const clerk = useClerk();
         if (clerk.value) {
