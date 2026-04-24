@@ -15,17 +15,18 @@
  * 2. Call resolveUser() which hits GET /api/me
  * 3. If ok -> dashboard
  * 4. If no_org -> onboarding (user needs to create a business)
- * 5. If error -> retry up to MAX_ATTEMPTS, then show error
+ * 5. If error -> retry up to MAX_ATTEMPTS, then show error with sign-out option
  */
 
 definePageMeta({ layout: false });
 
 const router = useRouter();
-const { resolveUser, isAuthenticated } = useNovaAuth();
+const { resolveUser, isAuthenticated, fullLogout } = useNovaAuth();
 const { isLoaded, isSignedIn } = useAuth();
 
 const error = ref("");
 const isResolving = ref(true);
+const isSigningOut = ref(false);
 
 const MAX_ATTEMPTS = 5;
 const RETRY_DELAY = 1500;
@@ -115,6 +116,21 @@ async function resolve() {
   isResolving.value = false;
 }
 
+/**
+ * Sign out of Clerk and redirect to landing.
+ * This breaks the loop when the backend is unreachable:
+ * resolve fails -> user clicks sign out -> Clerk session cleared -> landing.
+ */
+async function signOut() {
+  isSigningOut.value = true;
+  try {
+    await fullLogout();
+  } finally {
+    isSigningOut.value = false;
+    router.replace("/landing");
+  }
+}
+
 onMounted(() => {
   resolve();
 });
@@ -147,12 +163,13 @@ onMounted(() => {
       >
         Reintentar
       </button>
-      <NuxtLink
-        to="/landing"
-        class="mt-3 block text-xs font-bold text-gray-400 transition-spring hover:text-gray-600"
+      <button
+        class="mt-3 block w-full text-xs font-bold text-gray-400 transition-spring hover:text-gray-600"
+        :disabled="isSigningOut"
+        @click="signOut"
       >
-        Volver al inicio
-      </NuxtLink>
+        {{ isSigningOut ? "Cerrando sesion..." : "Cerrar sesion" }}
+      </button>
     </div>
   </div>
 </template>
