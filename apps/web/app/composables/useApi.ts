@@ -8,6 +8,11 @@
  *
  * With Clerk Organizations, the JWT automatically includes the
  * active Organization's ID and role. No custom headers needed.
+ *
+ * Token strategy: capture the getToken Ref from useAuth() during
+ * composable setup. The Ref is reactive -- its .value updates when
+ * Clerk finishes loading. If Clerk isn't ready during initial setup,
+ * we retry on each $api call (ensureGetToken).
  */
 
 import type { NitroFetchOptions } from "nitropack";
@@ -21,24 +26,35 @@ export function useApi() {
    */
   const sessionExpired = useState<boolean>("session-expired", () => false);
 
-  /**
-   * Get a fresh Clerk JWT token.
-   * Returns null on SSR or if Clerk is not ready.
-   */
-  async function getClerkToken(): Promise<string | null> {
-    if (!import.meta.client) return null;
+  // Capture Clerk's getToken Ref during composable setup.
+  // getToken is Ref<(opts?) => Promise<string | null>> per Clerk Vue SDK.
+  // On SSR or if Clerk isn't ready, this will be null initially.
+  type GetTokenFn = (opts?: Record<string, unknown>) => Promise<string | null>;
+  type GetTokenRef = { value: GetTokenFn | undefined };
+  let clerkGetToken: GetTokenRef | null = null;
 
+  if (import.meta.client) {
     try {
       const { getToken } = useAuth();
-      const tokenFn = getToken.value;
-      if (tokenFn) {
-        return await tokenFn();
-      }
+      clerkGetToken = getToken as GetTokenRef;
     } catch {
-      // Clerk not initialized yet -- return null
+      // Clerk not initialized yet -- will retry in ensureGetToken
     }
+  }
 
-    return null;
+  /**
+   * Retry capturing getToken if the initial attempt failed.
+   * Called synchronously before each $api request.
+   */
+  function ensureGetToken(): void {
+    if (clerkGetToken) return;
+    if (!import.meta.client) return;
+    try {
+      const { getToken } = useAuth();
+      clerkGetToken = getToken as GetTokenRef;
+    } catch {
+      // Still not ready
+    }
   }
 
   /** Handle a 401 response from the API. */
@@ -62,10 +78,23 @@ export function useApi() {
       ...(opts?.headers as Record<string, string> | undefined),
     };
 
-    // Attach Clerk JWT (includes orgId automatically)
-    const token = await getClerkToken();
-    if (token) {
-      headers["Authorization"] = `Bearer ${token}`;
+    // Attach Clerk JWT (includes orgId automatically).
+    if (import.meta.client) {
+      ensureGetToken();
+
+      if (clerkGetToken) {
+        try {
+          const tokenFn = clerkGetToken.value;
+          if (tokenFn) {
+            const token = await tokenFn();
+            if (token) {
+              headers["Authorization"] = `Bearer ${token}`;
+            }
+          }
+        } catch {
+          // Token retrieval failed -- request goes without auth
+        }
+      }
     }
 
     try {
