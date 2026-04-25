@@ -38,10 +38,12 @@ import {
   accountingEntries,
   accountingAccounts,
   customers,
+  users,
   stockMovements,
 } from "@nova/db";
 import { getCurrentRate, setCurrentRate } from "../services/exchange-rate";
 import { fetchBcvRates } from "../services/bcv-rates";
+import { generateReceiptPdf } from "../services/pdf-generator";
 import { handleDbError } from "../utils/db-errors";
 import { validateUuidParam } from "../middleware/validate-uuid";
 import type { AppEnv } from "../types";
@@ -252,6 +254,93 @@ salesRoutes.get("/sales/:id", validateUuidParam, async (c) => {
     .where(eq(salePayments.saleId, id));
 
   return c.json({ sale, items, payments });
+});
+
+/**
+ * GET /sales/:id/receipt - Download a PDF receipt for a sale.
+ */
+salesRoutes.get("/sales/:id/receipt", validateUuidParam, async (c) => {
+  const id = c.req.param("id");
+  const db = c.get("db");
+  const businessId = c.get("businessId");
+  const user = c.get("user");
+
+  const [sale] = await db
+    .select()
+    .from(sales)
+    .where(and(eq(sales.id, id), eq(sales.businessId, businessId)))
+    .limit(1);
+
+  if (!sale) {
+    return c.json({ error: "Sale not found" }, 404);
+  }
+
+  // Get items with product names
+  const items = await db
+    .select({
+      name: products.name,
+      quantity: saleItems.quantity,
+      unitPrice: saleItems.unitPrice,
+      lineTotal: saleItems.lineTotal,
+    })
+    .from(saleItems)
+    .innerJoin(products, eq(saleItems.productId, products.id))
+    .where(eq(saleItems.saleId, id));
+
+  const payments = await db
+    .select()
+    .from(salePayments)
+    .where(eq(salePayments.saleId, id));
+
+  // Get customer name if present
+  let customerName: string | null = null;
+  if (sale.customerId) {
+    const [customer] = await db
+      .select({ name: customers.name })
+      .from(customers)
+      .where(eq(customers.id, sale.customerId))
+      .limit(1);
+    customerName = customer?.name ?? null;
+  }
+
+  // Get seller name
+  const [seller] = await db
+    .select({ name: users.name })
+    .from(users)
+    .where(eq(users.id, sale.userId))
+    .limit(1);
+
+  const pdfBuffer = await generateReceiptPdf({
+    saleId: sale.id,
+    businessName: user.businessName,
+    sellerName: seller?.name ?? "Vendedor",
+    customerName,
+    createdAt: sale.createdAt.toISOString(),
+    items: items.map((i) => ({
+      name: i.name,
+      quantity: i.quantity,
+      unitPrice: Number(i.unitPrice),
+      lineTotal: Number(i.lineTotal),
+    })),
+    payments: payments.map((p) => ({
+      method: p.method,
+      amountUsd: Number(p.amountUsd),
+      amountBs: p.amountBs ? Number(p.amountBs) : null,
+      reference: p.reference,
+    })),
+    totalUsd: Number(sale.totalUsd),
+    totalBs: sale.totalBs ? Number(sale.totalBs) : null,
+    exchangeRate: sale.exchangeRate ? Number(sale.exchangeRate) : null,
+    discountPercent: Number(sale.discountPercent ?? 0),
+    discountAmount: Number(sale.discountAmount ?? 0),
+    notes: sale.notes,
+    status: sale.status,
+  });
+
+  const shortId = sale.id.slice(0, 8);
+  c.header("Content-Type", "application/pdf");
+  c.header("Content-Disposition", `attachment; filename="recibo-${shortId}.pdf"`);
+  return c.body(pdfBuffer);
 });
 
 /**

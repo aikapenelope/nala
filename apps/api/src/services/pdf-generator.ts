@@ -493,3 +493,71 @@ export async function generateFinancialPdf(
 
   return generatePdfBuffer(docDef);
 }
+
+// ============================================================
+// Individual Sale Receipt PDF
+// ============================================================
+
+export interface ReceiptItem { name: string; quantity: number; unitPrice: number; lineTotal: number }
+export interface ReceiptPayment { method: string; amountUsd: number; amountBs: number | null; reference: string | null }
+
+export interface ReceiptData {
+  saleId: string;
+  businessName: string;
+  sellerName: string;
+  customerName: string | null;
+  createdAt: string;
+  items: ReceiptItem[];
+  payments: ReceiptPayment[];
+  totalUsd: number;
+  totalBs: number | null;
+  exchangeRate: number | null;
+  discountPercent: number;
+  discountAmount: number;
+  notes: string | null;
+  status: string;
+}
+
+const PAYMENT_LABELS: Record<string, string> = {
+  efectivo: "Efectivo", pago_movil: "Pago Movil", binance: "Binance",
+  zinli: "Zinli", transferencia: "Transferencia", zelle: "Zelle", fiado: "Fiado",
+};
+
+export async function generateReceiptPdf(data: ReceiptData): Promise<ArrayBuffer> {
+  const date = new Date(data.createdAt).toLocaleString("es-VE", { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+  const shortId = data.saleId.slice(0, 8).toUpperCase();
+  const divider: Content = { text: "\u2500".repeat(50), fontSize: 8, color: "#CCCCCC", alignment: "center" as const, margin: [0, 4, 0, 8] as [number, number, number, number] };
+
+  const docDef: PdfDocDefinition = {
+    content: [
+      { text: data.businessName, fontSize: 16, bold: true, alignment: "center" as const, margin: [0, 0, 0, 4] as [number, number, number, number] },
+      { text: `Recibo #${shortId}`, fontSize: 10, alignment: "center" as const, color: "#666666", margin: [0, 0, 0, 2] as [number, number, number, number] },
+      { text: date, fontSize: 9, alignment: "center" as const, color: "#999999", margin: [0, 0, 0, 2] as [number, number, number, number] },
+      { text: `Atendido por: ${data.sellerName}`, fontSize: 9, alignment: "center" as const, color: "#999999", margin: [0, 0, 0, 4] as [number, number, number, number] },
+      ...(data.customerName ? [{ text: `Cliente: ${data.customerName}`, fontSize: 9, alignment: "center" as const, color: "#999999", margin: [0, 0, 0, 4] as [number, number, number, number] } as Content] : []),
+      divider,
+      {
+        table: {
+          headerRows: 1, widths: ["*", "auto", "auto", "auto"],
+          body: [
+            [{ text: "Producto", bold: true, fontSize: 9 }, { text: "Cant.", bold: true, fontSize: 9, alignment: "right" as const }, { text: "P.Unit", bold: true, fontSize: 9, alignment: "right" as const }, { text: "Total", bold: true, fontSize: 9, alignment: "right" as const }],
+            ...data.items.map((i) => [{ text: i.name, fontSize: 9 }, { text: String(i.quantity), fontSize: 9, alignment: "right" as const }, { text: usd(i.unitPrice), fontSize: 9, alignment: "right" as const }, { text: usd(i.lineTotal), fontSize: 9, alignment: "right" as const }]),
+          ],
+        },
+        layout: "lightHorizontalLines", margin: [0, 0, 0, 8] as [number, number, number, number],
+      },
+      ...(data.discountPercent > 0 || data.discountAmount > 0 ? [{ columns: [{ text: `Descuento${data.discountPercent > 0 ? ` (${data.discountPercent}%)` : ""}`, fontSize: 9, color: "#666666" }, { text: `-${usd(data.discountAmount)}`, fontSize: 9, alignment: "right" as const, color: "#dc2626" }], margin: [0, 0, 0, 4] as [number, number, number, number] } as Content] : []),
+      { columns: [{ text: "TOTAL", fontSize: 12, bold: true }, { text: usd(data.totalUsd), fontSize: 12, bold: true, alignment: "right" as const }], margin: [0, 4, 0, 2] as [number, number, number, number] },
+      ...(data.totalBs && data.exchangeRate ? [{ columns: [{ text: `Bs. (tasa ${data.exchangeRate.toFixed(2)})`, fontSize: 9, color: "#666666" }, { text: `Bs.${data.totalBs.toFixed(2)}`, fontSize: 9, alignment: "right" as const, color: "#666666" }], margin: [0, 0, 0, 8] as [number, number, number, number] } as Content] : []),
+      divider,
+      { text: "Pagos", fontSize: 10, bold: true, margin: [0, 0, 0, 4] as [number, number, number, number] },
+      ...data.payments.map((p) => ({ columns: [{ text: [{ text: PAYMENT_LABELS[p.method] ?? p.method, fontSize: 9 }, ...(p.reference ? [{ text: ` (ref: ${p.reference})`, fontSize: 8, color: "#999999" }] : [])] }, { text: usd(p.amountUsd), fontSize: 9, alignment: "right" as const }], margin: [0, 0, 0, 2] as [number, number, number, number] }) as Content),
+      ...(data.notes ? [{ text: `Nota: ${data.notes}`, fontSize: 8, color: "#666666", italics: true, margin: [0, 8, 0, 0] as [number, number, number, number] } as Content] : []),
+      ...(data.status === "voided" ? [{ text: "ANULADA", fontSize: 14, bold: true, color: "#dc2626", alignment: "center" as const, margin: [0, 12, 0, 0] as [number, number, number, number] } as Content] : []),
+      { text: "Gracias por su compra", fontSize: 9, alignment: "center" as const, color: "#999999", margin: [0, 16, 0, 0] as [number, number, number, number] },
+    ],
+    defaultStyle: { font: "Roboto" },
+  };
+
+  return generatePdfBuffer(docDef);
+}
