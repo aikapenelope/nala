@@ -2,15 +2,14 @@
 /**
  * Team management page (owner only).
  *
- * Uses Clerk Organizations for member management:
- * - View active members and pending invitations
- * - Invite new employees via Clerk org invitation
- * - Edit employee name (local DB)
+ * - View employees
+ * - Create new employees
+ * - Edit employee name
  * - Deactivate/reactivate employees
  *
  * Connected to:
- * - GET /api/employees (lists Clerk org members + pending invitations)
- * - POST /api/employees (sends Clerk org invitation)
+ * - GET /api/employees
+ * - POST /api/employees
  * - PATCH /api/employees/:id
  * - DELETE /api/employees/:id
  */
@@ -45,7 +44,7 @@ const employees = ref<Employee[]>([]);
 const isLoading = ref(true);
 const loadError = ref("");
 
-/** Fetch employees from Clerk Organization. */
+/** Fetch employees from the API. */
 async function fetchEmployees() {
   isLoading.value = true;
   loadError.value = "";
