@@ -54,7 +54,7 @@ export const createSaleSchema = z.object({
   notes: z.string().max(500).optional(),
 });
 
-/** Schema for voiding a sale (requires owner PIN). */
+/** Schema for voiding a sale (requires owner authorization). */
 export const voidSaleSchema = z.object({
   reason: z.string().min(1).max(500),
 });

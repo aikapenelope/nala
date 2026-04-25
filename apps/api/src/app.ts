@@ -10,8 +10,8 @@
  *
  * Routes:
  * - /health - health check (no auth required)
- * - /onboarding - business creation (Clerk JWT required, creates Clerk Org)
- * - /api/* - protected API routes (auth + tenant required, uses Clerk Org JWT)
+ * - /onboarding - business creation (Clerk JWT required)
+ * - /api/* - protected API routes (auth + tenant required, uses Clerk JWT)
  */
 
 import { Hono } from "hono";
@@ -212,6 +212,6 @@ app.get("/", (c) => {
     name: "Nova API",
     version: "2.0.0",
     status: "running",
-    build: "clerk-organizations",
+    build: "clerk-simple",
   });
 });
