@@ -32,13 +32,6 @@ const data = ref({
   },
 });
 
-/** Max value for trend chart scaling. */
-const trendMax = computed(() => {
-  const revenues = data.value.trend.dailyRevenue.map((d) => d.revenue);
-  const expenses = data.value.trend.dailyExpenses.map((d) => d.amount);
-  return Math.max(...revenues, ...expenses, 1);
-});
-
 async function loadReport() {
   isLoading.value = true;
   loadError.value = "";
@@ -196,29 +189,12 @@ onMounted(loadReport);
         <h2 class="mb-4 text-sm font-semibold text-gray-700">
           Ultimos 14 dias
         </h2>
-        <div class="flex items-end gap-1" style="height: 100px">
-          <div
-            v-for="d in data.trend.dailyRevenue"
-            :key="d.date"
-            class="flex flex-1 flex-col items-center gap-0.5"
-          >
-            <div
-              class="w-full rounded-t bg-green-400/80"
-              :style="{
-                height: `${(d.revenue / trendMax) * 100}%`,
-                minHeight: '2px',
-              }"
-            />
-            <span class="text-[8px] text-gray-400">
-              {{ d.date.slice(8) }}
-            </span>
-          </div>
-        </div>
-        <div class="mt-2 flex items-center gap-4 text-[10px] text-gray-400">
-          <span class="flex items-center gap-1">
-            <span class="h-2 w-2 rounded-full bg-green-400" /> Ingresos
-          </span>
-        </div>
+        <SharedBarChart
+          :labels="data.trend.dailyRevenue.map((d) => d.date.slice(8))"
+          :data="data.trend.dailyRevenue.map((d) => d.revenue)"
+          color="#4ade80"
+          :height="120"
+        />
       </div>
 
       <!-- AI narrative -->

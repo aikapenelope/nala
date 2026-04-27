@@ -16,9 +16,6 @@ const data = ref({
   bestDay: null as string | null,
   topProduct: null as string | null,
 });
-const weeklyMax = computed(() =>
-  Math.max(...data.value.dailyBreakdown.map((d) => d.amount), 1),
-);
 
 async function fetchReport() {
   isLoading.value = true;
@@ -77,25 +74,11 @@ watch(period, fetchReport);
         <h3 class="mb-4 text-sm font-semibold text-gray-700">
           Desglose diario
         </h3>
-        <div class="flex items-end gap-2" style="height: 120px">
-          <div
-            v-for="d in data.dailyBreakdown"
-            :key="d.day"
-            class="flex flex-1 flex-col items-center gap-1"
-          >
-            <span class="text-[10px] text-gray-500"
-              >${{ d.amount.toFixed(0) }}</span
-            >
-            <div
-              class="w-full rounded-t bg-nova-primary/80"
-              :style="{
-                height: `${(d.amount / weeklyMax) * 100}%`,
-                minHeight: '4px',
-              }"
-            />
-            <span class="text-[10px] text-gray-400">{{ d.day }}</span>
-          </div>
-        </div>
+        <SharedBarChart
+          :labels="data.dailyBreakdown.map((d) => d.day)"
+          :data="data.dailyBreakdown.map((d) => d.amount)"
+          :height="140"
+        />
       </div>
       <div
         v-if="data.bestDay || data.topProduct"

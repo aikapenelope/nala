@@ -53,9 +53,6 @@ const salesByMethod = ref<Record<string, number>>({});
 
 /** Weekly chart data. */
 const weeklyDays = ref<Array<{ day: string; amount: number }>>([]);
-const weeklyMax = computed(() =>
-  Math.max(...weeklyDays.value.map((d) => d.amount), 1),
-);
 
 /** Financial margin. */
 const grossMargin = ref(0);
@@ -519,23 +516,11 @@ function openRateEditor() {
           </p>
           <BarChart3 :size="14" class="text-gray-400" />
         </div>
-        <div class="flex items-end gap-1.5" style="height: 56px">
-          <div
-            v-for="(d, i) in weeklyDays"
-            :key="i"
-            class="flex flex-1 flex-col items-center gap-1"
-          >
-            <div
-              class="w-full rounded-t-md bg-gradient-to-t from-[#7c3aed] to-[#a78bfa] transition-all duration-500"
-              :style="{
-                height: `${Math.max((d.amount / weeklyMax) * 100, 4)}%`,
-              }"
-            />
-            <span class="text-[9px] font-bold text-gray-400">{{
-              d.day.slice(0, 2)
-            }}</span>
-          </div>
-        </div>
+        <SharedBarChart
+          :labels="weeklyDays.map((d) => d.day.slice(0, 2))"
+          :data="weeklyDays.map((d) => d.amount)"
+          :height="80"
+        />
       </NuxtLink>
 
       <!-- PAYMENT MIX -->

@@ -2,13 +2,14 @@
 /**
  * POS sales screen.
  *
- * Design: Grid of products (most sold first) + active ticket on the right.
+ * Design: Category tabs + product grid + active ticket.
  * Mobile: product grid fills screen, ticket slides up from bottom.
  *
- * Flow: tap product -> adds to ticket -> tap "Cobrar $XX" -> checkout.
- * 3-4 taps to complete a sale.
+ * Flow: select category -> tap product -> adds to ticket -> "Cobrar $XX" -> checkout.
  *
- * Connected to: GET /api/products (loads real product grid)
+ * Connected to:
+ * - GET /api/categories (category tabs)
+ * - GET /api/products?categoryId=&limit=100 (product grid)
  */
 
 import { calculateLineTotal, calculateSaleTotal } from "@nova/shared";
@@ -39,22 +40,33 @@ interface GridProduct {
   price: string;
   stock: number;
   barcode: string | null;
+  imageUrl: string | null;
+  categoryId: string | null;
+}
+
+interface Category {
+  id: string;
+  name: string;
 }
 
 const gridProducts = ref<GridProduct[]>([]);
+const categories = ref<Category[]>([]);
+const selectedCategory = ref<string | null>(null);
 
 /** Track recently added product for animation. */
 const recentlyAdded = ref<string | null>(null);
 
-/** Load products from API on mount. */
+/** Load categories and products on mount. */
 onMounted(async () => {
   try {
-    const result = await $api<{
-      products: GridProduct[];
-    }>("/api/products?limit=100");
-    gridProducts.value = result.products;
+    const [catResult, prodResult] = await Promise.all([
+      $api<{ categories: Category[] }>("/api/categories"),
+      $api<{ products: GridProduct[] }>("/api/products?limit=200"),
+    ]);
+    categories.value = catResult.categories;
+    gridProducts.value = prodResult.products;
   } catch {
-    // Products will show empty grid with error implicit
+    // Will show empty grid
   } finally {
     isLoadingProducts.value = false;
   }
@@ -68,7 +80,6 @@ function addToTicket(product: GridProduct) {
     (item) => item.productId === product.id,
   );
   if (existing) {
-    // Don't exceed available stock
     if (existing.quantity >= product.stock) return;
     existing.quantity++;
   } else {
@@ -87,15 +98,13 @@ function addToTicket(product: GridProduct) {
   recentlyAdded.value = product.id;
   setTimeout(() => {
     recentlyAdded.value = null;
-  }, 400);
+  }, 500);
 }
 
-/** Remove item from ticket. */
 function removeFromTicket(itemId: string) {
   ticketItems.value = ticketItems.value.filter((item) => item.id !== itemId);
 }
 
-/** Update item quantity. */
 function updateQuantity(itemId: string, delta: number) {
   const item = ticketItems.value.find((i) => i.id === itemId);
   if (!item) return;
@@ -104,7 +113,6 @@ function updateQuantity(itemId: string, delta: number) {
   item.quantity = newQty;
 }
 
-/** Calculate line total for display. */
 function lineTotal(item: TicketItem): number {
   return calculateLineTotal(
     item.quantity,
@@ -113,7 +121,6 @@ function lineTotal(item: TicketItem): number {
   );
 }
 
-/** Total of the entire ticket. */
 const ticketTotal = computed(() => {
   return calculateSaleTotal(
     ticketItems.value.map((item) => ({
@@ -124,21 +131,31 @@ const ticketTotal = computed(() => {
   );
 });
 
-/** Filtered products based on search (name or barcode). */
+/** Filtered products based on search and category. */
 const filteredProducts = computed(() => {
-  if (!searchQuery.value) return gridProducts.value;
-  const q = searchQuery.value.toLowerCase().trim();
-  return gridProducts.value.filter(
-    (p) =>
-      p.name.toLowerCase().includes(q) ||
-      (p.barcode && p.barcode.toLowerCase() === q),
-  );
+  let result = gridProducts.value;
+
+  // Filter by category
+  if (selectedCategory.value) {
+    result = result.filter((p) => p.categoryId === selectedCategory.value);
+  }
+
+  // Filter by search
+  if (searchQuery.value) {
+    const q = searchQuery.value.toLowerCase().trim();
+    result = result.filter(
+      (p) =>
+        p.name.toLowerCase().includes(q) ||
+        (p.barcode && p.barcode.toLowerCase() === q),
+    );
+  }
+
+  return result;
 });
 
 /**
  * Auto-add scanned product to ticket.
  * Triggered by Enter key -- barcode guns send digits + Enter automatically.
- * If exactly one product matches the search, add it and clear the field.
  */
 function autoAddScannedProduct() {
   const match = filteredProducts.value[0];
@@ -148,11 +165,6 @@ function autoAddScannedProduct() {
   }
 }
 
-/**
- * Navigate to checkout, passing ticket data via sessionStorage.
- * sessionStorage is used instead of query params because ticket data
- * can be large and contains structured objects.
- */
 function goToCheckout() {
   if (ticketItems.value.length === 0) return;
 
@@ -174,7 +186,9 @@ function goToCheckout() {
     <div class="flex-1">
       <!-- Search bar -->
       <div class="mb-3 flex gap-2">
-        <div class="glass relative flex flex-1 items-center rounded-2xl px-4 py-2.5">
+        <div
+          class="glass relative flex flex-1 items-center rounded-2xl px-4 py-2.5"
+        >
           <Search :size="16" class="mr-2 flex-shrink-0 text-gray-400" />
           <input
             v-model="searchQuery"
@@ -190,9 +204,42 @@ function goToCheckout() {
         />
       </div>
 
+      <!-- Category tabs -->
+      <div
+        v-if="categories.length > 0"
+        class="mb-3 flex gap-2 overflow-x-auto pb-1 scrollbar-hide"
+      >
+        <button
+          class="flex-shrink-0 rounded-xl px-3.5 py-1.5 text-xs font-bold transition-spring"
+          :class="
+            selectedCategory === null
+              ? 'bg-nova-primary text-white shadow-sm'
+              : 'glass text-gray-600 hover:bg-white/80'
+          "
+          @click="selectedCategory = null"
+        >
+          Todos
+        </button>
+        <button
+          v-for="cat in categories"
+          :key="cat.id"
+          class="flex-shrink-0 rounded-xl px-3.5 py-1.5 text-xs font-bold transition-spring"
+          :class="
+            selectedCategory === cat.id
+              ? 'bg-nova-primary text-white shadow-sm'
+              : 'glass text-gray-600 hover:bg-white/80'
+          "
+          @click="selectedCategory = cat.id"
+        >
+          {{ cat.name }}
+        </button>
+      </div>
+
       <!-- Loading -->
       <div v-if="isLoadingProducts" class="py-12 text-center text-gray-400">
-        <div class="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2 border-gray-200 border-t-nova-primary" />
+        <div
+          class="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2 border-gray-200 border-t-nova-primary"
+        />
         Cargando productos...
       </div>
 
@@ -218,13 +265,21 @@ function goToCheckout() {
           class="card-premium flex flex-col items-center p-3.5 transition-spring active:scale-95"
           :class="{
             'opacity-40': product.stock <= 0,
-            'scale-95': recentlyAdded === product.id,
+            'animate-pulse ring-2 ring-nova-accent/50':
+              recentlyAdded === product.id,
           }"
           :disabled="product.stock <= 0"
           @click="addToTicket(product)"
         >
-          <!-- Product initial avatar -->
+          <!-- Product image or initial avatar -->
+          <img
+            v-if="product.imageUrl"
+            :src="product.imageUrl"
+            :alt="product.name"
+            class="mb-2 h-10 w-10 rounded-xl object-cover"
+          />
           <div
+            v-else
             class="mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-[#EFECFF] to-[#D0CCF9] text-sm font-extrabold text-nova-accent"
           >
             {{ product.name.charAt(0) }}
@@ -257,9 +312,13 @@ function goToCheckout() {
           : 'fixed bottom-16 left-0 right-0 z-40 mx-2 max-h-[50vh] flex flex-col rounded-t-3xl'
       "
     >
-      <div class="flex items-center justify-between border-b border-white/50 px-4 py-3">
+      <div
+        class="flex items-center justify-between border-b border-white/50 px-4 py-3"
+      >
         <div class="flex items-center gap-2">
-          <div class="flex h-7 w-7 items-center justify-center rounded-lg bg-nova-primary/10">
+          <div
+            class="flex h-7 w-7 items-center justify-center rounded-lg bg-nova-primary/10"
+          >
             <ShoppingCart :size="14" class="text-nova-primary" />
           </div>
           <h2 class="text-sm font-bold text-gray-800">
@@ -276,7 +335,9 @@ function goToCheckout() {
           class="flex items-center justify-between rounded-2xl px-2 py-2.5 transition-spring hover:bg-white/60"
         >
           <div class="min-w-0 flex-1">
-            <p class="truncate text-[13px] font-semibold text-gray-800">{{ item.name }}</p>
+            <p class="truncate text-[13px] font-semibold text-gray-800">
+              {{ item.name }}
+            </p>
             <div class="mt-1 flex items-center gap-1.5">
               <button
                 class="flex h-6 w-6 items-center justify-center rounded-lg bg-gray-100/80 text-gray-500 transition-spring hover:bg-gray-200"
@@ -284,7 +345,10 @@ function goToCheckout() {
               >
                 <Minus :size="12" />
               </button>
-              <span class="min-w-[20px] text-center text-xs font-bold text-gray-700">{{ item.quantity }}</span>
+              <span
+                class="min-w-[20px] text-center text-xs font-bold text-gray-700"
+                >{{ item.quantity }}</span
+              >
               <button
                 class="flex h-6 w-6 items-center justify-center rounded-lg bg-gray-100/80 text-gray-500 transition-spring hover:bg-gray-200"
                 @click="updateQuantity(item.id, 1)"

@@ -36,11 +36,6 @@ onMounted(async () => {
   }
 });
 
-/** Max revenue for bar chart scaling. */
-const maxRevenue = computed(() =>
-  Math.max(...months.value.map((m) => m.revenue), 1),
-);
-
 /** Format month label (e.g., "2026-04" -> "Abr 2026"). */
 function formatMonth(month: string): string {
   const [year, m] = month.split("-");
@@ -98,32 +93,12 @@ function formatMonth(month: string): string {
     <template v-else>
       <!-- Bar chart -->
       <div class="mb-6 rounded-xl bg-white p-6 shadow-sm">
-        <div class="space-y-3">
-          <div
-            v-for="month in months"
-            :key="month.month"
-            class="flex items-center gap-3"
-          >
-            <span class="w-20 text-right text-xs text-gray-500">
-              {{ formatMonth(month.month) }}
-            </span>
-            <div class="flex-1">
-              <div
-                class="h-6 rounded-r bg-nova-primary transition-all"
-                :style="{
-                  width: `${(month.revenue / maxRevenue) * 100}%`,
-                  minWidth: month.revenue > 0 ? '4px' : '0',
-                }"
-              />
-            </div>
-            <span class="w-24 text-right text-sm font-medium text-gray-900">
-              ${{ month.revenue.toFixed(0) }}
-            </span>
-            <span class="w-12 text-right text-xs text-gray-400">
-              {{ month.count }} v.
-            </span>
-          </div>
-        </div>
+        <SharedBarChart
+          :labels="months.map((m) => formatMonth(m.month))"
+          :data="months.map((m) => m.revenue)"
+          color="#1e40af"
+          :height="180"
+        />
       </div>
 
       <!-- Summary -->
