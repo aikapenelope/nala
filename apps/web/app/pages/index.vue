@@ -286,6 +286,12 @@ function openRateEditor() {
 
 <template>
   <div>
+    <SharedContextualTip
+      tip-id="dashboard"
+      title="Tu panel de control"
+      description="Aqui ves las ventas del dia, tendencias semanales, alertas de inventario y acciones rapidas. Toca cualquier tarjeta para ver mas detalles."
+    />
+
     <!-- Skeleton -->
     <div v-if="isLoading" class="animate-pulse space-y-3">
       <div class="h-7 w-52 rounded-xl bg-white/50" />

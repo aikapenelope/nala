@@ -184,6 +184,12 @@ function goToCheckout() {
   <div class="flex h-full gap-4" :class="{ 'flex-col': !isDesktop }">
     <!-- Product grid (left side on desktop, full width on mobile) -->
     <div class="flex-1">
+      <SharedContextualTip
+        tip-id="pos"
+        title="Punto de venta"
+        description="Selecciona una categoria, toca un producto para agregarlo al ticket, y presiona Cobrar cuando estes listo. Puedes escanear codigos de barras con la camara."
+      />
+
       <!-- Search bar -->
       <div class="mb-3 flex gap-2">
         <div

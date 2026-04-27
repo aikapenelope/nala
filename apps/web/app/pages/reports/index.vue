@@ -96,6 +96,12 @@ const reportsList: ReportItem[] = [
 
 <template>
   <div>
+    <SharedContextualTip
+      tip-id="reports"
+      title="Reportes inteligentes"
+      description="9 reportes pre-construidos con datos en tiempo real. Cada uno incluye graficos, tablas y narrativa generada por IA. Puedes exportar a PDF o Excel."
+    />
+
     <h1 class="mb-6 text-2xl font-extrabold tracking-tight text-gradient">Reportes</h1>
 
     <div class="grid gap-3 sm:grid-cols-2">
