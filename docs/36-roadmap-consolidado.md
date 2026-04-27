@@ -1,52 +1,70 @@
 # Nova: Roadmap Consolidado - Abril 2026
 
-> Fuente unica de verdad para prioridades. Actualizado post-sesion 7.
+> Fuente unica de verdad para prioridades. Actualizado post-sesion 8.
 > Incorpora: auditoria produccion (doc 34), analisis ERPNext (doc 32),
-> comparacion Fina (doc 35), y backlog de sesiones anteriores.
+> comparacion Fina (doc 35), backlog de sesiones anteriores, y sesion 8
+> (auth cleanup, Fase 1-3 completadas).
 
 ---
 
-## Fase 1: Production-Ready (bloqueantes)
+## Completado en Sesion 8 (PR #189)
 
-**Objetivo:** Poder dar acceso a usuarios reales sin riesgo.
-**Estimado:** 1 dia (2-3 horas).
+### Auth: Limpieza total
+- [x] Reparar login Clerk (props deprecados, token acquisition, redirect loops)
+- [x] Simplificar a flujo single-admin (sin Organizations, sin PIN)
+- [x] Limpiar codigo muerto: Organizations, PIN, createClerkClient
+- [x] Reescribir team.ts a DB-only (sin Clerk Organizations API)
+- [x] Documentar estado actual (AUTH-CURRENT-STATE.md)
+- [x] Boton "Cerrar sesion" en /auth/resolve cuando backend falla
 
+### Fase 1: Production-Ready
+- [x] `npm audit fix` -- drizzle-orm upgrade a 0.45.2 (SQL injection fix)
+- [x] Verificar build Docker con cambios de auth (API: 505KB bundle OK)
+- [x] Body size limit (1MB) y request timeout (30s) -- ya estaban implementados
 - [ ] Generar PWA icons (192x192, 512x512) y agregarlos a public/
-- [ ] `npm audit fix` (clerk critical + drizzle high)
-- [ ] Agregar body size limit (1MB) y request timeout (30s) en Hono
-- [ ] Verificar build Docker con los cambios
+
+### Fase 2 (parcial)
+- [x] Recibo PDF individual -- GET /api/sales/:id/receipt (pdfmake)
+- [x] drizzle-orm upgrade a >=0.45.2
+
+### Fase 3: Competir con Fina
+- [x] Charts reales en reportes (vue-chartjs / Chart.js) -- dashboard, weekly, cash-flow, monthly-trend
+- [x] POS con categorias como tabs horizontales
+- [x] POS con imagenes de producto (muestra imageUrl si existe)
+- [x] Animacion mejorada al agregar producto al ticket (pulse + ring)
+- [x] Tutoriales in-app (ContextualTip en 5 paginas: dashboard, POS, inventario, clientes, reportes)
+- [x] Busqueda global (Cmd+K modal con productos, clientes, paginas)
 
 ---
 
-## Fase 2: Lanzamiento Solido
+## Pendiente: Fase 2 (resto)
 
-**Objetivo:** Monitoreo, backups, y UX minima para primeros usuarios.
-**Estimado:** 1 dia (3-4 horas).
+**Objetivo:** Monitoreo, backups, y UX para primeros usuarios.
+**Estimado:** 3-4 horas.
 
 - [ ] Sentry setup (API + frontend, free tier)
 - [ ] og:image + meta tags para compartir en WhatsApp
 - [ ] Backup cron PostgreSQL -> MinIO (pg_dump diario)
 - [ ] Configurar Uptime Kuma para API y Web health checks
-- [ ] Recibo PDF individual (pdfmake ya instalado)
-- [ ] drizzle-orm upgrade a >=0.45.2
+- [ ] PWA icons (192x192, 512x512)
 
 ---
 
-## Fase 3: Competir con Fina
+## Pendiente: Fase 3.5 - Product Image Upload
 
-**Objetivo:** Cerrar los gaps vs Fina que importan.
-**Estimado:** 2-3 dias.
+**Objetivo:** Completar el flujo de imagenes de producto (el POS ya las muestra).
+**Estimado:** 3-4 horas.
 
-- [ ] Charts reales en reportes (Chart.js o vue-chartjs)
-- [ ] POS con categorias como tabs horizontales
-- [ ] POS con imagenes de producto (upload a MinIO)
-- [ ] Animacion al agregar producto al ticket
-- [ ] Tutoriales in-app (tooltips en primer uso) o videos cortos
-- [ ] Busqueda global (cmd+k modal)
+- [ ] Configurar cliente MinIO en el API (S3-compatible)
+- [ ] Endpoint POST /api/products/:id/image -- upload imagen, guarda en MinIO, actualiza imageUrl en DB
+- [ ] Endpoint DELETE /api/products/:id/image -- elimina imagen de MinIO, limpia imageUrl
+- [ ] UI de upload en formulario de producto (/inventory/new y /inventory/:id/edit)
+- [ ] Preview de imagen en el formulario antes de guardar
+- [ ] Validacion: max 2MB, solo JPEG/PNG/WebP
 
 ---
 
-## Fase 4: Diferenciadores
+## Pendiente: Fase 4 - Diferenciadores
 
 **Objetivo:** Features que Fina no puede copiar facilmente.
 **Estimado:** 2-3 dias.
@@ -59,7 +77,23 @@
 
 ---
 
-## Fase 5: Patrones ERPNext (PR #146, pendiente merge)
+## Pendiente: Fase 5 - Multi-usuario (Clerk Organizations)
+
+**Objetivo:** Empleados con cuentas propias via Clerk Organizations.
+**Estimado:** 2-3 dias.
+**Prerequisito:** Leer AUTH-CURRENT-STATE.md seccion 7.
+
+- [ ] Clerk Dashboard: habilitar Organizations con "Membership optional"
+- [ ] Onboarding: crear Clerk Organization al crear negocio
+- [ ] setActive({ organization }) + getToken({ skipCache: true }) post-onboarding
+- [ ] Auth middleware dual: si hay orgId -> buscar por clerkOrgId, si no -> buscar por clerkId
+- [ ] Team: invitar empleados via Clerk Organization invitations
+- [ ] Team: listar miembros desde Clerk API + DB fallback
+- [ ] Frontend: OrganizationSwitcher en header (si aplica)
+
+---
+
+## Fase 5b: Patrones ERPNext (PR #146, pendiente merge)
 
 **Objetivo:** Robustez operacional inspirada en ERPNext.
 **Estado:** Implementado, pendiente merge.
@@ -91,7 +125,7 @@
 
 ---
 
-## Completado
+## Completado (historico)
 
 | Sesion | PRs | Contenido |
 |--------|-----|-----------|
@@ -99,6 +133,7 @@
 | 5 | #125-#134 | Auditoria: race condition fix, seguridad (rate limit, UUID, PIN lockout), indices, paginacion, frontend 14 features, graceful shutdown |
 | 6 | #135-#143 | Visual: dashboard redesign, glassmorphism, 15 gaps API-UI cerrados, open/close toggle, quick actions, back buttons |
 | 7 | #144-#147 | Design system premium en todas las paginas, analisis ERPNext, adopcion de patrones, documentacion completa |
+| 8 | #189 | Auth cleanup (Clerk simple), Fase 1 (audit fix, Docker), Fase 2 parcial (receipt PDF), Fase 3 completa (charts, POS tabs, cmd+k, tips, animaciones) |
 
 ---
 
@@ -106,11 +141,12 @@
 
 | Metrica | Valor |
 |---------|-------|
-| LOC | ~26,200 |
+| LOC | ~27,500 |
 | Tablas | 30 |
-| Endpoints | 87 |
+| Endpoints | 88 (+1: receipt PDF) |
 | Paginas | 43 |
+| Componentes nuevos | 4 (BarChart, DonutChart, CommandPalette, ContextualTip activo) |
 | Tests | 10 archivos (~132 cases) |
-| Migraciones | 9 |
-| PRs | #79-#147 (69 PRs) |
-| Sesiones | 7 |
+| Migraciones | 12 |
+| PRs | #79-#189 |
+| Sesiones | 8 |
