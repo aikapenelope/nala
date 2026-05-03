@@ -130,6 +130,12 @@ function margin(cost: string, price: string): string {
 
 <template>
   <div>
+    <SharedContextualTip
+      tip-id="inventory"
+      title="Tu inventario"
+      description="Aqui ves todos tus productos con semaforo de stock (verde, amarillo, rojo). Usa los filtros para buscar por nombre, categoria o estado. Toca un producto para editarlo."
+    />
+
     <!-- Header -->
     <div class="mb-4 flex items-center justify-between">
       <h1 class="text-2xl font-extrabold tracking-tight text-gradient">Inventario</h1>

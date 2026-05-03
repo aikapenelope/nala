@@ -24,6 +24,9 @@ function reAuthenticate() {
   <div
     class="min-h-screen bg-gradient-to-br from-[#f8f7ff] via-[#f0eef9] to-[#e8e4f3]"
   >
+    <!-- Global search (Cmd+K) -->
+    <SharedCommandPalette />
+
     <!-- Session expired banner -->
     <div
       v-if="sessionExpired"

@@ -124,6 +124,12 @@ async function submitEdit() {
 
 <template>
   <div>
+    <SharedContextualTip
+      tip-id="clients"
+      title="Tus clientes"
+      description="Nova crea perfiles automaticos de tus clientes a partir de sus compras. Puedes ver historial, saldo pendiente (fiado), y segmentos (VIP, en riesgo). Toca un cliente para ver su detalle."
+    />
+
     <div class="mb-4 flex items-center justify-between">
       <h1 class="text-2xl font-extrabold tracking-tight text-gradient">Clientes</h1>
       <NuxtLink
