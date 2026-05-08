@@ -1,12 +1,11 @@
 # Nova: Estado Actual del Sistema de Autenticacion
 
-> Fecha: Abril 2026
-> Estado: Limpio, funcional, sin Organizations ni PIN.
-> Base para construir encima.
+> Fecha: Mayo 2026
+> Estado: Single-user model. Un owner por negocio. Sin employees, PIN, ni Organizations.
 
 ---
 
-## 1. Flujo Actual (Simple, Funcional)
+## 1. Flujo Actual (Single-User)
 
 ```
 Usuario nuevo:
@@ -40,55 +39,50 @@ Usuario ya logueado (sesion activa):
 | Archivo | Funcion |
 |---------|---------|
 | `nuxt.config.ts` | Clerk module config: signInUrl, signUpUrl, forceRedirectUrl, afterSignOutUrl |
-| `app/middleware/auth.global.ts` | Proteccion global de rutas. Rutas publicas pasan. Si Clerk no ha cargado, no redirige. Si logueado pero sin NovaUser, va a /auth/resolve. Si no logueado, va a /landing |
-| `app/middleware/admin-only.ts` | Middleware por pagina para rutas solo-owner (settings, reports, accounting) |
-| `app/composables/useApi.ts` | Cliente HTTP. Obtiene token via `useClerk().value.session.getToken()`. Adjunta como Bearer header. Maneja 401 con banner de sesion expirada |
-| `app/composables/useNovaAuth.ts` | Estado del usuario Nova. `resolveUser()` llama GET /api/me. Maneja USER_NOT_FOUND -> needs_onboarding |
-| `app/pages/auth/login.vue` | Clerk `<SignIn>` component. Si ya logueado, redirige a /auth/resolve |
+| `app/middleware/auth.global.ts` | Proteccion global de rutas. Si logueado pero sin NovaUser, va a /auth/resolve. Si no logueado, va a /landing |
+| `app/composables/useApi.ts` | Cliente HTTP. Obtiene token via Clerk session. Adjunta como Bearer header |
+| `app/composables/useNovaAuth.ts` | Estado del usuario Nova. `resolveUser()` llama GET /api/me. `isAdmin` siempre true |
+| `app/pages/auth/login.vue` | Clerk `<SignIn>` component |
 | `app/pages/auth/signup.vue` | Clerk `<SignUp>` component |
-| `app/pages/auth/resolve.vue` | Espera Clerk, llama resolveUser(), redirige segun resultado. Tiene boton "Cerrar sesion" si falla |
+| `app/pages/auth/resolve.vue` | Espera Clerk, llama resolveUser(), redirige segun resultado |
 | `app/pages/onboarding/index.vue` | 3 pasos: tipo negocio -> nombre/slug/owner -> listo. POST /onboarding |
-| `app/plugins/nova-auth.client.ts` | No-op. Hook point para futuras necesidades |
-| `app/layouts/default.vue` | Muestra banner "Sesion expirada" si sessionExpired es true |
 
 ### Backend (apps/api)
 
 | Archivo | Funcion |
 |---------|---------|
-| `src/middleware/auth.ts` | Verifica Clerk JWT con `verifyToken()`. Busca user por `clerkId` en DB. Si no existe, 404 USER_NOT_FOUND. Si existe, setea user + businessId en contexto Hono |
+| `src/middleware/auth.ts` | Verifica Clerk JWT con `verifyToken()`. Busca user por `clerkId` en DB. Setea user + businessId en contexto Hono. Role siempre "owner" |
 | `src/middleware/tenant.ts` | Setea `app.current_business_id` en PostgreSQL para RLS |
 | `src/routes/onboarding.ts` | POST /onboarding: verifica JWT, crea business + user + categorias + cuentas contables en transaccion |
-| `src/routes/team.ts` | CRUD de empleados (100% DB, sin Clerk Organizations) |
+| `src/routes/team.ts` | Solo GET/PATCH /settings (configuracion del negocio) |
 | `src/app.ts` | Monta rutas publicas (health, catalog, onboarding) y protegidas (/api/*) |
 
 ### DB (packages/db)
 
 | Archivo | Funcion |
 |---------|---------|
-| `src/schema.ts` | Tablas businesses (con clerkOrgId legacy) y users (con pinHash legacy) |
-| `src/queries.ts` | `findUserByClerkId()` y `findBusinessById()` -- las unicas queries de auth activas |
+| `src/schema.ts` | Tablas businesses y users (sin PIN, sin clerkOrgId) |
+| `src/queries.ts` | `findUserByClerkId()` y `findBusinessById()` |
 
 ---
 
-## 3. Lo Que Se Elimino (y por que)
+## 3. Lo Que Se Elimino
 
-### Sistema de PIN (eliminado del codigo activo)
-- **Que era**: Empleados usaban PIN de 4 digitos para identificarse en dispositivo compartido
-- **Archivos eliminados**: `POST /auth/pin`, `GET /auth/employees`, `POST /api/verify-owner-pin`, `/auth/pin.vue`, `OwnerPinModal.vue`
-- **Por que se elimino**: El sistema de PIN dependia de localStorage para businessId, tenia endpoints publicos vulnerables, y no funcionaba sin que el dueno configurara el dispositivo primero
-- **Columnas DB que quedan** (requieren migracion para eliminar):
-  - `users.pin_hash` -- hash bcrypt del PIN
-  - `users.pin_failed_attempts` -- contador de intentos fallidos
-  - `users.pin_locked_until` -- timestamp de lockout
-- **Seed data**: `packages/db/src/seed.ts` aun tiene PIN hashes para tests
+### Sistema de PIN (eliminado)
+- Empleados usaban PIN de 4 digitos para identificarse
+- Columnas eliminadas: `pin_hash`, `pin_failed_attempts`, `pin_locked_until`
+- Endpoints eliminados: POST /auth/pin, GET /auth/employees
 
-### Clerk Organizations (eliminado del codigo activo)
-- **Que era**: Cada business se vinculaba a una Clerk Organization. El JWT incluia orgId. Empleados se invitaban via Clerk org invitations
-- **Archivos eliminados**: Toda la logica de `createClerkClient`, `organizations.createOrganization`, `setActive({ organization })`, `findBusinessByClerkOrgId`, `findUserInBusiness`
-- **Por que se elimino**: Con "Membership required", la sesion quedaba en estado "pending" (tratada como signed-out). `getToken` no devolvia token. Todas las llamadas API fallaban con 401. Chicken-and-egg: para crear org necesitas token, para tener token necesitas org
-- **Columnas DB que quedan** (requieren migracion para eliminar):
-  - `businesses.clerk_org_id` -- ID de la Clerk Organization
-  - `idx_businesses_clerk_org_id` -- indice unico
+### Clerk Organizations (eliminado)
+- Cada business se vinculaba a una Clerk Organization
+- Columna eliminada: `businesses.clerk_org_id`
+- Logica eliminada: createClerkClient, organizations API
+
+### Multi-usuario / Employees (eliminado)
+- CRUD de empleados: GET/POST/PATCH/DELETE /employees
+- Middleware admin-only (restriccion por rol)
+- Roles owner/employee en frontend
+- Pagina /settings/team
 
 ---
 
@@ -104,7 +98,7 @@ Backend (auth.ts):
   -> verifyToken(token, { secretKey }) -> payload.sub (clerkId)
   -> findUserByClerkId(db, clerkId) -> user
   -> findBusinessById(db, user.businessId) -> business
-  -> c.set("user", activeUser)
+  -> c.set("user", { ...user, role: "owner" })
   -> c.set("businessId", business.id)
 ```
 
@@ -124,8 +118,8 @@ Backend (auth.ts):
 | Metodo | Ruta | Funcion |
 |--------|------|---------|
 | GET | /api/me | Resolver usuario actual |
-| GET/POST/PATCH/DELETE | /api/employees/* | CRUD empleados |
-| GET/POST | /api/products/* | Inventario |
+| GET/PATCH | /api/settings | Configuracion del negocio |
+| GET/POST/PATCH/DELETE | /api/products/* | Inventario |
 | GET/POST | /api/sales/* | Ventas |
 | GET | /api/reports/* | Reportes |
 | ... | /api/* | Todas las demas rutas |
@@ -152,18 +146,23 @@ PORT=3001
 
 ---
 
-## 7. Para Construir Encima
+## 7. Modelo de Datos
 
-### Si quieres agregar Organizations:
-1. Clerk Dashboard: "Membership optional" (NO "required")
-2. Onboarding crea la Organization via backend (`createClerkClient`)
-3. Despues de crear, `setActive({ organization })` + `getToken({ skipCache: true })`
-4. Auth middleware: si hay orgId en JWT, buscar business por clerkOrgId. Si no, buscar user por clerkId (fallback)
-5. Ver investigacion completa en el PR #189
+```sql
+businesses
+  id          UUID PK
+  name        TEXT
+  type        TEXT
+  slug        TEXT UNIQUE
+  is_active   BOOLEAN
 
-### Si quieres agregar sistema de PIN:
-1. Seguir el plan de AUTH-REFACTOR-PLAN.md (PIN local, no server-side)
-2. GET /api/team-roster (protegido) descarga empleados con PIN hashes
-3. PIN se verifica localmente contra roster cacheado
-4. Todas las requests van con JWT del dueno + header X-Acting-As
-5. Backend valida que el employee pertenece al mismo business
+users
+  id          UUID PK
+  business_id UUID FK -> businesses.id
+  clerk_id    TEXT UNIQUE
+  name        TEXT
+  role        TEXT (always "owner")
+  is_active   BOOLEAN
+```
+
+Un business tiene exactamente 1 user (el owner). El user tiene `clerk_id` que lo vincula con Clerk.

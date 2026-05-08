@@ -189,29 +189,9 @@ describe.skipIf(!hasDb)("E2E: Settings and team", () => {
     expect(data.settings.accountantEmail).toBe("contador@test.com");
   });
 
-  it("GET /employees lists team members", async () => {
+  it("GET /employees returns 404 (endpoint removed in single-user model)", async () => {
     const res = await app.request("/api/employees");
-    expect(res.status).toBe(200);
-    const data = (await res.json()) as {
-      employees: Array<{ name: string; role: string }>;
-    };
-    // At least the owner should be listed
-    expect(data.employees.length).toBeGreaterThanOrEqual(1);
-    expect(data.employees.some((e) => e.role === "owner")).toBe(true);
-  });
-
-  it("POST /employees creates a new employee", async () => {
-    const res = await app.request("/api/employees", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: "Carlos Vendedor" }),
-    });
-    expect(res.status).toBe(201);
-    const data = (await res.json()) as {
-      employee: { name: string; role: string };
-    };
-    expect(data.employee.name).toBe("Carlos Vendedor");
-    expect(data.employee.role).toBe("employee");
+    expect(res.status).toBe(404);
   });
 
   it("GET /exchange-rate returns rate or 503 if not set", async () => {
