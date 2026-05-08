@@ -2,8 +2,8 @@
  * Core types shared across the Nova monorepo.
  */
 
-/** User roles in the system. Owner has full access, employee is restricted. */
-export type UserRole = "owner" | "employee";
+/** User role. Single-user model: always "owner". */
+export type UserRole = "owner";
 
 /** Business types supported by Nova for pre-configuration. */
 export type BusinessType =

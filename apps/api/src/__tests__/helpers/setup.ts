@@ -27,9 +27,7 @@ import {
 } from "@nova/db";
 import { sql } from "drizzle-orm";
 
-/** Pre-computed bcrypt hash for test PIN "0000" (cost 10). Legacy, kept for backward compat. */
-const PIN_HASH_0000 =
-  "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy";
+
 
 let _testDb: Database | null = null;
 
@@ -87,7 +85,6 @@ export async function createTestBusiness(
         clerkId: `test-clerk-${suffix}`,
         name: "Test Owner",
         role: "owner",
-        pinHash: PIN_HASH_0000,
       })
       .returning();
 
@@ -178,23 +175,23 @@ export async function setTestExchangeRate(
   return rate;
 }
 
-/** Create a second user (employee) for a business. */
+/** Create a second user for a business (for testing multi-user scenarios). */
 export async function createTestEmployee(
   db: Database,
   businessId: string,
   overrides?: { name?: string },
 ) {
   const suffix = Math.random().toString(36).slice(2, 8);
-  const [employee] = await db
+  const [user] = await db
     .insert(users)
     .values({
       businessId,
-      name: overrides?.name ?? `Employee ${suffix}`,
-      role: "employee",
-      clerkId: `test-clerk-emp-${suffix}`,
+      name: overrides?.name ?? `User ${suffix}`,
+      role: "owner",
+      clerkId: `test-clerk-user-${suffix}`,
     })
     .returning();
-  return employee;
+  return user;
 }
 
 /**

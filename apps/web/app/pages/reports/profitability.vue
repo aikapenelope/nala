@@ -3,7 +3,7 @@
  * Product profitability report.
  * Connected to: GET /api/reports/profitability
  */
-definePageMeta({ middleware: ["admin-only"] });
+
 const { $api } = useApi();
 const isLoading = ref(true);
 const narrative = ref("");

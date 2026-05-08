@@ -8,7 +8,7 @@
  * - POST /api/day-close (record the close)
  */
 
-definePageMeta({ middleware: ["admin-only"] });
+
 
 const router = useRouter();
 const { $api } = useApi();

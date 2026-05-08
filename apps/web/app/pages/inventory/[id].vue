@@ -10,7 +10,7 @@
  * - GET /api/categories (load category options)
  */
 
-definePageMeta({ middleware: ["admin-only"] });
+
 
 const route = useRoute();
 const router = useRouter();

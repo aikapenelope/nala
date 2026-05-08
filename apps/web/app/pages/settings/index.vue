@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * Settings hub page (owner only).
+ * Settings hub page.
  *
  * All sections link to functional pages.
  * Logout is handled by the Clerk UserButton in the header.
@@ -8,15 +8,12 @@
 
 import {
   Store,
-  Users,
   ArrowLeftRight,
   Tag,
   Landmark,
   Bell,
 } from "lucide-vue-next";
 import type { Component } from "vue";
-
-definePageMeta({ middleware: ["admin-only"] });
 
 const { user } = useNovaAuth();
 
@@ -29,13 +26,6 @@ interface SettingsSection {
 }
 
 const sections: SettingsSection[] = [
-  {
-    icon: Users,
-    label: "Equipo",
-    description: "Empleados e invitaciones",
-    to: "/settings/team",
-    gradient: "from-[#EFECFF] to-[#D0CCF9]",
-  },
   {
     icon: Store,
     label: "Negocio",
@@ -80,7 +70,7 @@ const sections: SettingsSection[] = [
       Configuracion
     </h1>
     <p class="mb-6 text-sm font-medium text-gray-500">
-      {{ user?.name ?? "Admin" }} · Administrador
+      {{ user?.name ?? "Admin" }}
     </p>
 
     <div class="space-y-2.5">

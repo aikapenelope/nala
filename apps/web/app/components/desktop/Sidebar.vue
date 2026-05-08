@@ -28,38 +28,23 @@ interface NavItem {
   to: string;
   icon: Component;
   label: string;
-  adminOnly: boolean;
 }
 
 const navItems: NavItem[] = [
-  { to: "/", icon: Home, label: "Inicio", adminOnly: false },
-  { to: "/sales", icon: ShoppingCart, label: "Vender", adminOnly: false },
-  { to: "/inventory", icon: Package, label: "Inventario", adminOnly: false },
-  { to: "/clients", icon: Users, label: "Clientes", adminOnly: false },
-  { to: "/accounts", icon: Wallet, label: "Cuentas", adminOnly: true },
-  { to: "/suppliers", icon: Truck, label: "Proveedores", adminOnly: true },
-  {
-    to: "/sales/quotations",
-    icon: ClipboardList,
-    label: "Cotizaciones",
-    adminOnly: true,
-  },
-  { to: "/accounting", icon: Receipt, label: "Gastos", adminOnly: true },
-  { to: "/reports", icon: BarChart3, label: "Reportes", adminOnly: true },
-  {
-    to: "/accounting/ocr",
-    icon: FileText,
-    label: "OCR Factura",
-    adminOnly: true,
-  },
-  { to: "/settings", icon: Settings, label: "Config.", adminOnly: true },
+  { to: "/", icon: Home, label: "Inicio" },
+  { to: "/sales", icon: ShoppingCart, label: "Vender" },
+  { to: "/inventory", icon: Package, label: "Inventario" },
+  { to: "/clients", icon: Users, label: "Clientes" },
+  { to: "/accounts", icon: Wallet, label: "Cuentas" },
+  { to: "/suppliers", icon: Truck, label: "Proveedores" },
+  { to: "/sales/quotations", icon: ClipboardList, label: "Cotizaciones" },
+  { to: "/accounting", icon: Receipt, label: "Gastos" },
+  { to: "/reports", icon: BarChart3, label: "Reportes" },
+  { to: "/accounting/ocr", icon: FileText, label: "OCR Factura" },
+  { to: "/settings", icon: Settings, label: "Config." },
 ];
 
-const { isAdmin, user } = useNovaAuth();
-
-const visibleItems = computed(() =>
-  navItems.filter((item) => !item.adminOnly || isAdmin.value),
-);
+const { user } = useNovaAuth();
 
 /** Sidebar collapsed state, persisted in localStorage. */
 const isCollapsed = ref(false);
@@ -104,7 +89,7 @@ function toggleCollapsed() {
     <!-- Navigation -->
     <nav class="flex-1 space-y-0.5">
       <NuxtLink
-        v-for="item in visibleItems"
+        v-for="item in navItems"
         :key="item.to"
         :to="item.to"
         :title="isCollapsed ? item.label : undefined"
@@ -141,23 +126,18 @@ function toggleCollapsed() {
 
     <!-- User section -->
     <div class="border-t border-white/50 px-1.5 pt-3">
-      <!-- User info -->
       <div
         class="flex items-center rounded-2xl px-1.5 py-2 text-xs text-gray-500"
         :class="isCollapsed ? 'justify-center' : 'gap-3'"
       >
         <span
-          class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-xl text-xs font-bold text-white"
-          :class="isAdmin ? 'dark-pill' : 'bg-gray-400'"
+          class="dark-pill flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-xl text-xs font-bold text-white"
         >
           {{ user?.name?.charAt(0) ?? "?" }}
         </span>
         <div v-if="!isCollapsed" class="min-w-0 flex-1">
           <p class="truncate font-semibold text-gray-700">
             {{ user?.name ?? "Sin usuario" }}
-          </p>
-          <p class="text-[10px] text-gray-400">
-            {{ isAdmin ? "Administrador" : "Empleado" }}
           </p>
         </div>
       </div>
