@@ -50,8 +50,8 @@ const chartOptions = {
   plugins: {
     tooltip: {
       callbacks: {
-        label: (ctx: { parsed: { y: number } }) =>
-          `$${ctx.parsed.y.toFixed(2)}`,
+        label: (ctx: { parsed: { y: number | null } }) =>
+          `$${(ctx.parsed.y ?? 0).toFixed(2)}`,
       },
     },
   },
