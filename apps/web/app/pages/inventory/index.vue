@@ -12,7 +12,7 @@ import type { StockSemaphore } from "@nova/shared";
 import { Search, Upload, Plus } from "lucide-vue-next";
 
 const { isDesktop } = useDevice();
-const { isAdmin } = useNovaAuth();
+
 const { $api } = useApi();
 
 const searchQuery = ref("");
@@ -139,7 +139,7 @@ function margin(cost: string, price: string): string {
     <!-- Header -->
     <div class="mb-4 flex items-center justify-between">
       <h1 class="text-2xl font-extrabold tracking-tight text-gradient">Inventario</h1>
-      <div v-if="isAdmin" class="flex gap-2">
+      <div class="flex gap-2">
         <NuxtLink
           to="/inventory/import"
           class="glass flex items-center gap-1.5 rounded-2xl px-4 py-2 text-sm font-bold text-gray-700 transition-spring hover:shadow-[0_4px_12px_-2px_rgba(0,0,0,0.08)]"
@@ -208,7 +208,7 @@ function margin(cost: string, price: string): string {
     >
       <p class="text-sm font-medium text-gray-400">No hay productos{{ searchQuery ? " que coincidan" : "" }}</p>
       <NuxtLink
-        v-if="isAdmin && !searchQuery"
+        v-if="!searchQuery"
         to="/inventory/new"
         class="mt-3 inline-block text-sm font-bold text-nova-primary hover:underline"
       >
@@ -235,7 +235,6 @@ function margin(cost: string, price: string): string {
                 Duracion
               </th>
               <th
-                v-if="isAdmin"
                 class="px-4 py-3.5 text-right text-[11px] font-bold tracking-wider text-gray-400 uppercase"
               >
                 Costo
@@ -244,7 +243,6 @@ function margin(cost: string, price: string): string {
                 Precio
               </th>
               <th
-                v-if="isAdmin"
                 class="px-4 py-3.5 text-right text-[11px] font-bold tracking-wider text-gray-400 uppercase"
               >
                 Margen
@@ -286,13 +284,13 @@ function margin(cost: string, price: string): string {
                 </template>
                 <template v-else>-</template>
               </td>
-              <td v-if="isAdmin" class="px-4 py-3.5 text-right text-gray-500">
+              <td class="px-4 py-3.5 text-right text-gray-500">
                 ${{ Number(product.cost).toFixed(2) }}
               </td>
               <td class="px-4 py-3.5 text-right font-semibold text-gray-800">
                 ${{ Number(product.price).toFixed(2) }}
               </td>
-              <td v-if="isAdmin" class="px-4 py-3.5 text-right">
+              <td class="px-4 py-3.5 text-right">
                 <span
                   class="rounded-lg px-1.5 py-0.5 text-xs font-bold"
                   :class="Number(margin(product.cost, product.price)) >= 30 ? 'bg-green-50 text-green-700' : Number(margin(product.cost, product.price)) >= 15 ? 'bg-yellow-50 text-yellow-700' : 'bg-red-50 text-red-600'"
@@ -341,7 +339,6 @@ function margin(cost: string, price: string): string {
               ${{ Number(product.price).toFixed(2) }}
             </p>
             <span
-              v-if="isAdmin"
               class="text-[10px] font-bold"
               :class="Number(margin(product.cost, product.price)) >= 30 ? 'text-green-600' : Number(margin(product.cost, product.price)) >= 15 ? 'text-yellow-600' : 'text-red-600'"
             >

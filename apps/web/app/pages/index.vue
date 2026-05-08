@@ -34,7 +34,7 @@ import {
   ClipboardList,
 } from "lucide-vue-next";
 
-const { isAdmin, user } = useNovaAuth();
+const { user } = useNovaAuth();
 const { $api } = useApi();
 
 const isLoading = ref(true);
@@ -330,7 +330,6 @@ function openRateEditor() {
           </p>
         </div>
         <button
-          v-if="isAdmin"
           class="rounded-2xl px-4 py-2 text-xs font-bold transition-spring"
           :class="
             exchangeRate
@@ -344,12 +343,6 @@ function openRateEditor() {
           >
           <template v-else>Configurar tasa</template>
         </button>
-        <span
-          v-else-if="exchangeRate"
-          class="glass rounded-2xl px-4 py-2 text-xs font-bold text-gray-500"
-        >
-          Bs.{{ exchangeRate.toFixed(2) }}
-        </span>
       </div>
 
       <!-- HERO: Sales + Profit -->
@@ -715,7 +708,7 @@ function openRateEditor() {
       </NuxtLink>
 
       <!-- QUICK ACTIONS -->
-      <div v-if="isAdmin" class="mt-3 grid grid-cols-4 gap-2">
+      <div class="mt-3 grid grid-cols-4 gap-2">
         <NuxtLink
           to="/inventory/new"
           class="card-premium flex flex-col items-center gap-1.5 p-3 transition-spring hover:shadow-[0_8px_20px_-5px_rgba(0,0,0,0.06)]"
