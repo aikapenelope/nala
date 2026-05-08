@@ -2,7 +2,7 @@
 /**
  * App header bar with business open/close toggle.
  *
- * Shows: business name, open/close toggle (Apple style), role badge, Clerk user.
+ * Shows: business name, open/close toggle (Apple style), Clerk user.
  * The toggle checks GET /cash-opening/latest to determine if the business
  * is open today. Tapping it when closed opens a quick cash declaration.
  */
@@ -12,7 +12,6 @@ defineProps<{
   exchangeRate?: number;
 }>();
 
-const { user, isAdmin } = useNovaAuth();
 const { $api } = useApi();
 const {
   isOpen,
@@ -64,9 +63,7 @@ async function submitOpen() {
 }
 
 onMounted(() => {
-  if (isAdmin.value) {
-    checkOpenStatus();
-  }
+  checkOpenStatus();
 });
 </script>
 
@@ -75,24 +72,18 @@ onMounted(() => {
     <header
       class="glass-strong mx-2 mb-3 mt-2 flex h-14 items-center justify-between rounded-2xl px-4 shadow-[0_4px_15px_-3px_rgba(0,0,0,0.04)]"
     >
-      <!-- Left: Business name + role -->
+      <!-- Left: Business name -->
       <div class="flex items-center gap-2">
         <span class="text-sm font-extrabold tracking-tight text-gray-900">
           {{ businessName ?? "Nova" }}
-        </span>
-        <span
-          v-if="user && !isAdmin"
-          class="rounded-xl bg-gray-100 px-2 py-0.5 text-[10px] font-bold text-gray-600"
-        >
-          {{ user.name }}
         </span>
       </div>
 
       <!-- Right: Open/Close toggle + Clerk -->
       <div class="flex items-center gap-3">
-        <!-- Open/Close toggle (admin only) -->
+        <!-- Open/Close toggle -->
         <button
-          v-if="isAdmin && !isCheckingStatus"
+          v-if="!isCheckingStatus"
           class="flex items-center gap-2 rounded-full py-1 pl-3 pr-1 text-[11px] font-bold transition-spring"
           :class="
             isOpen

@@ -4,10 +4,10 @@
  * POST   /sales                    - Create a new sale
  * GET    /sales                    - List sales (with filters, pagination)
  * GET    /sales/:id                - Get sale detail with items and payments
- * POST   /sales/:id/void           - Void a sale (owner only)
+ * POST   /sales/:id/void           - Void a sale
  *
  * GET    /exchange-rate             - Get current BCV exchange rate
- * POST   /exchange-rate             - Set exchange rate (owner only)
+ * POST   /exchange-rate             - Set exchange rate
  * GET    /exchange-rate/bcv         - Fetch official BCV rate
  *
  * POST   /quotations               - Create a quotation
@@ -86,12 +86,6 @@ salesRoutes.post(
   zValidator("json", setRateSchema),
   async (c) => {
     const user = c.get("user");
-
-    // Only owners can set the exchange rate
-    if (user.role !== "owner") {
-      return c.json({ error: "Solo el dueno puede cambiar la tasa" }, 403);
-    }
-
     const { rateBcv, rateEur } = c.req.valid("json");
 
     try {

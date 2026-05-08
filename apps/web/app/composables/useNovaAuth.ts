@@ -1,19 +1,17 @@
 /**
  * Nova authentication composable.
  *
- * Simple flow:
+ * Single-user model:
  * - Clerk handles authentication (email/password, Google, etc.)
  * - After login, GET /api/me resolves the Nova user from the DB
  * - If user not found (404 USER_NOT_FOUND), redirect to onboarding
+ * - Only one user (owner) per business. No employees.
  */
-
-import type { UserRole } from "@nova/shared";
 
 /** Nova user as seen by the frontend. */
 export interface NovaUser {
   id: string;
   name: string;
-  role: UserRole;
   businessId: string;
   businessName: string;
 }
@@ -21,8 +19,12 @@ export interface NovaUser {
 export function useNovaAuth() {
   const novaUser = useState<NovaUser | null>("nova-user", () => null);
   const isAuthenticated = computed(() => novaUser.value !== null);
-  const isAdmin = computed(() => novaUser.value?.role === "owner");
-  const isEmployee = computed(() => novaUser.value?.role === "employee");
+
+  /**
+   * Always true in single-user model. Kept for backward compatibility
+   * with UI components that conditionally show admin-only elements.
+   */
+  const isAdmin = computed(() => novaUser.value !== null);
 
   const { $api } = useApi();
 
@@ -52,7 +54,6 @@ export function useNovaAuth() {
         setUser({
           id: result.user.id,
           name: result.user.name,
-          role: result.user.role as UserRole,
           businessId: result.user.businessId,
           businessName: result.user.businessName,
         });
@@ -105,7 +106,6 @@ export function useNovaAuth() {
     user: readonly(novaUser),
     isAuthenticated,
     isAdmin,
-    isEmployee,
     setUser,
     resolveUser,
     clearUser,

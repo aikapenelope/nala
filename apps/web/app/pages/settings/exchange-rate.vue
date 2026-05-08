@@ -10,7 +10,7 @@
 
 import { ArrowLeft, RefreshCw } from "lucide-vue-next";
 
-definePageMeta({ middleware: ["admin-only"] });
+
 
 const { $api } = useApi();
 

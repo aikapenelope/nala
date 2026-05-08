@@ -3,7 +3,7 @@
  * Financial summary (P&L) report.
  * Connected to: GET /api/reports/financial?period=month
  */
-definePageMeta({ middleware: ["admin-only"] });
+
 const { $api } = useApi();
 const isLoading = ref(true);
 const narrative = ref("");

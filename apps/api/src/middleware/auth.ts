@@ -3,7 +3,7 @@
  *
  * Verifies Clerk JWT tokens and resolves the authenticated user.
  *
- * Simple single-admin flow (no Organizations required):
+ * Single-user model: one owner per business, no employees.
  * 1. Verify the Clerk JWT
  * 2. Look up the user by clerkId in the DB
  * 3. Find their business
@@ -27,7 +27,8 @@ export interface AuthUser {
   businessId: string;
   businessName: string;
   name: string;
-  role: "owner" | "employee";
+  /** Always "owner" in single-user model. Kept for API contract compatibility. */
+  role: "owner";
   clerkId: string;
 }
 
@@ -138,7 +139,7 @@ export async function authMiddleware(c: Context, next: Next) {
     businessId: business.id,
     businessName: business.name,
     name: user.name,
-    role: user.role as "owner" | "employee",
+    role: "owner",
     clerkId: clerkUserId,
   };
 

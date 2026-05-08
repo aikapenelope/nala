@@ -704,14 +704,6 @@ inventory.post(
     const db = c.get("db");
     const businessId = c.get("businessId");
 
-    // Only owners can adjust stock
-    if (user.role !== "owner") {
-      return c.json(
-        { error: "Solo el dueno puede ajustar inventario" },
-        403,
-      );
-    }
-
     const [product] = await db
       .select({ id: products.id, stock: products.stock, cost: products.cost })
       .from(products)

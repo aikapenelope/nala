@@ -3,7 +3,7 @@
  * Weekly/monthly summary report.
  * Connected to: GET /api/reports/weekly?period=week
  */
-definePageMeta({ middleware: ["admin-only"] });
+
 const { $api } = useApi();
 const isLoading = ref(true);
 const narrative = ref("");

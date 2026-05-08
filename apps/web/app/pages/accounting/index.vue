@@ -8,7 +8,7 @@
  * - GET /api/accounting/entries
  */
 
-definePageMeta({ middleware: ["admin-only"] });
+
 
 const { $api } = useApi();
 

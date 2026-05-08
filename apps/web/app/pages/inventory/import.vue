@@ -13,7 +13,7 @@
 
 import * as XLSX from "xlsx";
 
-definePageMeta({ middleware: ["admin-only"] });
+
 
 const { isDesktop } = useDevice();
 const { $api } = useApi();

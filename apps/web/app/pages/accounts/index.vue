@@ -15,7 +15,7 @@ import { calculateAgingColor } from "@nova/shared";
 import type { AgingColor } from "@nova/shared";
 import { MessageCircle, Plus } from "lucide-vue-next";
 
-definePageMeta({ middleware: ["admin-only"] });
+
 
 const { $api } = useApi();
 
