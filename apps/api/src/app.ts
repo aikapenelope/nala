@@ -177,7 +177,7 @@ api.get("/me", (c) => {
   return c.json({ user });
 });
 
-// Team management (employees, access links)
+// Business settings
 api.route("/", team);
 
 // Inventory routes (products, categories, variants)
