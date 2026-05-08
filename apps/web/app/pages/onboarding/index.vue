@@ -152,7 +152,6 @@ async function createBusiness() {
     setUser({
       id: result.user.id,
       name: result.user.name,
-      role: result.user.role as "owner" | "employee",
       businessId: result.user.businessId,
       businessName: result.business.name,
     });

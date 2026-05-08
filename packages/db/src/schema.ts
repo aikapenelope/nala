@@ -46,9 +46,6 @@ export const businesses = pgTable(
     /** Accountant email for report delivery. */
     accountantEmail: text("accountant_email"),
 
-    /** Clerk Organization ID. Links this business to a Clerk Organization. */
-    clerkOrgId: text("clerk_org_id"),
-
     isActive: boolean("is_active").notNull().default(true),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
@@ -57,14 +54,11 @@ export const businesses = pgTable(
       .notNull()
       .defaultNow(),
   },
-  (table) => [
-    uniqueIndex("idx_businesses_slug").on(table.slug),
-    uniqueIndex("idx_businesses_clerk_org_id").on(table.clerkOrgId),
-  ],
+  (table) => [uniqueIndex("idx_businesses_slug").on(table.slug)],
 );
 
 /**
- * Users table - owners (Clerk auth) and employees (PIN auth).
+ * Users table - single owner per business (Clerk auth).
  */
 export const users = pgTable(
   "users",
@@ -77,13 +71,10 @@ export const users = pgTable(
       .references(() => businesses.id),
     clerkId: text("clerk_id"),
     name: text("name").notNull(),
-    role: text("role").notNull().default("employee"),
-    pinHash: text("pin_hash"),
+    role: text("role").notNull().default("owner"),
     phone: text("phone"),
     whatsappEnabled: boolean("whatsapp_enabled").notNull().default(false),
     isActive: boolean("is_active").notNull().default(true),
-    pinFailedAttempts: integer("pin_failed_attempts").notNull().default(0),
-    pinLockedUntil: timestamp("pin_locked_until", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

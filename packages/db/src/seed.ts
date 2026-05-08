@@ -1,22 +1,13 @@
 /**
  * Seed script for local development.
  *
- * Creates a sample business with an owner and employee.
- * Uses real bcrypt hashes so PIN auth works immediately.
+ * Creates a sample business with a single owner user.
  *
  * Run with: npx tsx src/seed.ts
  */
 
 import { createDb } from "./client";
 import { businesses, users, categories, accountingAccounts } from "./schema";
-
-// bcryptjs is a dependency of @nova/api, not @nova/db.
-// For the seed script, we use a pre-computed hash to avoid the dependency.
-// These hashes were generated with bcrypt.hash(pin, 10).
-const PIN_HASHES: Record<string, string> = {
-  "0000": "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy",
-  "1234": "$2a$10$YQ8HhvBRz5OaTIGYTYMT4.2rxSFBMP.kDJOiZE6OU/.VjEbMmx9V.",
-};
 
 async function seed() {
   const db = createDb();
@@ -38,7 +29,7 @@ async function seed() {
 
   console.log(`Created business: ${business.name} (${business.id})`);
 
-  // Create owner (PIN: 0000)
+  // Create owner
   const [owner] = await db
     .insert(users)
     .values({
@@ -46,26 +37,12 @@ async function seed() {
       clerkId: "clerk_dev_owner_001",
       name: "Pedro Rodriguez",
       role: "owner",
-      pinHash: PIN_HASHES["0000"],
       phone: "+58412-555-0001",
       whatsappEnabled: true,
     })
     .returning();
 
-  console.log(`Created owner: ${owner.name} (PIN: 0000)`);
-
-  // Create employee (PIN: 1234)
-  const [employee] = await db
-    .insert(users)
-    .values({
-      businessId: business.id,
-      name: "Maria Garcia",
-      role: "employee",
-      pinHash: PIN_HASHES["1234"],
-    })
-    .returning();
-
-  console.log(`Created employee: ${employee.name} (PIN: 1234)`);
+  console.log(`Created owner: ${owner.name}`);
 
   // Create default categories for bodega
   const categoryNames = [
@@ -111,9 +88,7 @@ async function seed() {
 
   console.log(`Created ${accounts.length} accounting accounts`);
 
-  console.log("\nSeed complete. You can now log in with:");
-  console.log("  Owner PIN: 0000");
-  console.log("  Employee PIN: 1234");
+  console.log("\nSeed complete.");
 
   process.exit(0);
 }
