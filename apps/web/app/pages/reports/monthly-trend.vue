@@ -6,7 +6,7 @@
  * - GET /api/reports/monthly-trend
  */
 
-definePageMeta({ middleware: ["admin-only"] });
+
 
 const { $api } = useApi();
 

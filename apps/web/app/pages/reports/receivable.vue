@@ -3,7 +3,7 @@
  * Accounts receivable aging report.
  * Connected to: GET /api/reports/receivable
  */
-definePageMeta({ middleware: ["admin-only"] });
+
 const { $api } = useApi();
 const isLoading = ref(true);
 const narrative = ref("");

@@ -17,7 +17,7 @@ import {
 } from "lucide-vue-next";
 import type { Component } from "vue";
 
-definePageMeta({ middleware: ["admin-only"] });
+
 
 interface ReportItem {
   to: string;

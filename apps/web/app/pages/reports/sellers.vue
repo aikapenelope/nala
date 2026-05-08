@@ -5,7 +5,7 @@
  * Connected to:
  * - GET /api/reports/sellers?period=week (period report)
  */
-definePageMeta({ middleware: ["admin-only"] });
+
 const { $api } = useApi();
 const isLoading = ref(true);
 const narrative = ref("");

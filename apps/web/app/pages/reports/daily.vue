@@ -4,7 +4,7 @@
  * Connected to: GET /api/reports/daily
  */
 
-definePageMeta({ middleware: ["admin-only"] });
+
 
 const { $api } = useApi();
 const isLoading = ref(true);

@@ -12,7 +12,7 @@
  * Connected to: GET /api/reports/cash-flow
  */
 
-definePageMeta({ middleware: ["admin-only"] });
+
 
 const { $api } = useApi();
 const isLoading = ref(true);

@@ -11,7 +11,7 @@
 
 import { ArrowLeft } from "lucide-vue-next";
 
-definePageMeta({ middleware: ["admin-only"] });
+
 
 const { $api } = useApi();
 

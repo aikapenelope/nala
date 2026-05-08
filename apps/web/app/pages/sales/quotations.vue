@@ -10,7 +10,7 @@
 
 import { Plus, X } from "lucide-vue-next";
 
-definePageMeta({ middleware: ["admin-only"] });
+
 
 const router = useRouter();
 const { $api } = useApi();
