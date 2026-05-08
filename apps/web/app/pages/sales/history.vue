@@ -10,7 +10,6 @@
 import { Plus, Calendar } from "lucide-vue-next";
 
 const { isDesktop } = useDevice();
-const { isAdmin } = useNovaAuth();
 const { $api } = useApi();
 
 const dateFilter = ref("");
@@ -240,7 +239,7 @@ async function confirmReason() {
               >
                 Estado
               </th>
-              <th v-if="isAdmin" class="px-4 py-3.5" />
+              <th class="px-4 py-3.5" />
             </tr>
           </thead>
           <tbody class="divide-y divide-white/30">
@@ -297,7 +296,7 @@ async function confirmReason() {
                   {{ sale.status === "voided" ? "Anulada" : "Completada" }}
                 </span>
               </td>
-              <td v-if="isAdmin" class="px-4 py-3.5">
+              <td class="px-4 py-3.5">
                 <button
                   v-if="sale.status === 'completed'"
                   class="rounded-xl bg-red-50 px-2.5 py-1 text-[11px] font-bold text-red-600 transition-spring hover:bg-red-100"
@@ -356,7 +355,7 @@ async function confirmReason() {
                 {{ sale.status === "voided" ? "Anulada" : "Completada" }}
               </span>
               <button
-                v-if="isAdmin && sale.status === 'completed'"
+                v-if="sale.status === 'completed'"
                 class="rounded-lg bg-red-50 px-2 py-0.5 text-[10px] font-bold text-red-500 transition-spring hover:bg-red-100"
                 @click="requestVoid(sale.id)"
               >
