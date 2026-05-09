@@ -99,6 +99,33 @@ export async function publicRateLimit(c: Context, next: Next) {
 }
 
 /**
+ * Strict rate limiting for file upload endpoints.
+ * 3 requests per minute per IP.
+ */
+export async function uploadRateLimit(c: Context, next: Next) {
+  const ip =
+    c.req.header("x-forwarded-for")?.split(",")[0]?.trim() ??
+    c.req.header("x-real-ip") ??
+    "unknown";
+
+  const config: RateLimitConfig = { max: 3, windowSeconds: 60 };
+  const key = `rl:upload:${ip}`;
+  const { allowed, remaining } = await checkRedis(key, config);
+
+  c.header("X-RateLimit-Limit", String(config.max));
+  c.header("X-RateLimit-Remaining", String(remaining));
+
+  if (!allowed) {
+    return c.json(
+      { error: "Demasiados uploads. Intenta en un minuto." },
+      429,
+    );
+  }
+
+  await next();
+}
+
+/**
  * Rate limiting middleware for authenticated API endpoints.
  * Limits by user ID. Applies stricter limits to write operations.
  */
