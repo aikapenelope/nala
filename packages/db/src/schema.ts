@@ -993,3 +993,122 @@ export const notificationPreferences = pgTable("notification_preferences", {
     .notNull()
     .defaultNow(),
 });
+
+// ============================================================
+// Phase 8 tables: Storefront (online orders)
+// ============================================================
+
+/**
+ * Orders - online orders placed by customers via the storefront PWA.
+ * Status lifecycle: pending -> confirmed -> delivered | cancelled.
+ * Stock is decremented only when the vendor confirms the order.
+ */
+export const orders = pgTable(
+  "orders",
+  {
+    id: uuid("id")
+      .default(sql`gen_random_uuid()`)
+      .primaryKey(),
+    businessId: uuid("business_id")
+      .notNull()
+      .references(() => businesses.id),
+
+    /** Customer name (no account required). */
+    customerName: text("customer_name").notNull(),
+    /** Customer phone for WhatsApp contact. */
+    customerPhone: text("customer_phone").notNull(),
+    /** Optional notes from the customer. */
+    customerNotes: text("customer_notes"),
+
+    /** Order items as JSON snapshot: [{ productId, name, price, quantity, lineTotal }]. */
+    items: jsonb("items").notNull().default([]),
+
+    /** Subtotal before delivery fee (USD). */
+    subtotal: numeric("subtotal", { precision: 12, scale: 2 }).notNull(),
+    /** Delivery fee (USD). */
+    deliveryFee: numeric("delivery_fee", { precision: 12, scale: 2 })
+      .notNull()
+      .default("0"),
+    /** Total including delivery (USD). */
+    total: numeric("total", { precision: 12, scale: 2 }).notNull(),
+
+    /** Payment method chosen by customer. */
+    paymentMethod: text("payment_method").notNull(),
+    /** URL of payment proof image in MinIO. */
+    paymentProofUrl: text("payment_proof_url"),
+    /** Manual payment reference (transfer number, etc.). */
+    paymentReference: text("payment_reference"),
+
+    /** Order status: pending, confirmed, delivered, cancelled. */
+    status: text("status").notNull().default("pending"),
+
+    /** BCV exchange rate at time of order. */
+    exchangeRate: numeric("exchange_rate", { precision: 12, scale: 4 }),
+    /** Total in Bs at the exchange rate. */
+    totalBs: numeric("total_bs", { precision: 12, scale: 2 }),
+    /** Channel: always 'storefront' for online orders. */
+    channel: text("channel").notNull().default("storefront"),
+
+    confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
+    deliveredAt: timestamp("delivered_at", { withTimezone: true }),
+    cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
+    cancelReason: text("cancel_reason"),
+
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("idx_orders_business").on(table.businessId),
+    index("idx_orders_business_status").on(table.businessId, table.status),
+    index("idx_orders_created").on(table.createdAt),
+  ],
+);
+
+/**
+ * Store settings - per-business storefront configuration.
+ * Controls payment methods, delivery options, and store activation.
+ */
+export const storeSettings = pgTable("store_settings", {
+  id: uuid("id")
+    .default(sql`gen_random_uuid()`)
+    .primaryKey(),
+  businessId: uuid("business_id")
+    .notNull()
+    .references(() => businesses.id),
+
+  /** Whether the online store is active and accepting orders. */
+  storeEnabled: boolean("store_enabled").notNull().default(false),
+
+  /**
+   * Payment methods accepted by this store (JSON array).
+   * Example: [{ method: "pago_movil", label: "Pago Movil", details: { bank: "Banesco", phone: "0412...", ci: "V-12345" } }]
+   */
+  paymentMethods: jsonb("payment_methods").notNull().default([]),
+
+  /** Whether delivery is available. */
+  deliveryEnabled: boolean("delivery_enabled").notNull().default(false),
+  /** Delivery fee in USD. */
+  deliveryFee: numeric("delivery_fee", { precision: 12, scale: 2 })
+    .notNull()
+    .default("0"),
+  /** Description of delivery zones/areas. */
+  deliveryZones: text("delivery_zones"),
+
+  /** Welcome message shown at the top of the store. */
+  welcomeMessage: text("welcome_message"),
+  /** Minimum order amount in USD (0 = no minimum). */
+  minOrderAmount: numeric("min_order_amount", { precision: 12, scale: 2 })
+    .notNull()
+    .default("0"),
+
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
