@@ -136,7 +136,7 @@ async function createBusiness() {
 
   try {
     const result = await $api<{
-      business: { id: string; name: string; type: string };
+      business: { id: string; name: string; type: string; slug: string | null };
       user: { id: string; name: string; role: string; businessId: string };
     }>("/onboarding", {
       method: "POST",
@@ -154,6 +154,7 @@ async function createBusiness() {
       name: result.user.name,
       businessId: result.user.businessId,
       businessName: result.business.name,
+      businessSlug: result.business.slug ?? null,
     });
 
     step.value = 3;
