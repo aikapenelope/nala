@@ -36,6 +36,9 @@ const deliveryRequested = ref(false);
 const isSubmitting = ref(false);
 const submitError = ref<string | null>(null);
 
+// Idempotency key: generated once per checkout session, reused on retries
+const idempotencyKey = ref(import.meta.client ? crypto.randomUUID() : "");
+
 /** Delivery fee. */
 const deliveryFee = computed(() => {
   if (!deliveryRequested.value || !storeInfo.value?.deliveryEnabled) return 0;
@@ -83,6 +86,7 @@ async function submitOrder() {
         paymentMethod: selectedPaymentMethod.value,
         paymentReference: paymentReference.value.trim() || undefined,
         deliveryRequested: deliveryRequested.value,
+        idempotencyKey: idempotencyKey.value || undefined,
       },
     });
 

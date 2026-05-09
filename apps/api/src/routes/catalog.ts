@@ -17,9 +17,16 @@ import { eq, and, desc, inArray } from "drizzle-orm";
 import { businesses, products, categories, storeSettings, orders } from "@nova/db";
 import { calculateStockSemaphore } from "@nova/shared";
 import { tryGetDb } from "../db";
+import { getRedis } from "../redis";
 import { uploadPaymentProof, isStorageConfigured } from "../services/storage";
+import { logActivity } from "../utils/audit";
+import { uploadRateLimit } from "../middleware/rate-limit";
 
 export const catalog = new Hono();
+
+/** Cache TTLs in seconds. */
+const CATALOG_CACHE_TTL = 60; // 1 minute
+const STORE_INFO_CACHE_TTL = 300; // 5 minutes
 
 /**
  * GET /catalog/:slug - Public product catalog for a business.
@@ -35,6 +42,16 @@ catalog.get("/:slug", async (c) => {
 
   if (!db) {
     return c.json({ error: "Service unavailable" }, 503);
+  }
+
+  // Try Redis cache first
+  const redis = getRedis();
+  const cacheKey = `catalog:${slug}`;
+  if (redis) {
+    const cached = await redis.get(cacheKey);
+    if (cached) {
+      return c.json(JSON.parse(cached));
+    }
   }
 
   // Look up business by slug
@@ -119,7 +136,7 @@ catalog.get("/:slug", async (c) => {
     };
   });
 
-  return c.json({
+  const responseData = {
     business: {
       name: business.name,
       type: business.type,
@@ -130,7 +147,14 @@ catalog.get("/:slug", async (c) => {
     },
     categories: categoryRows,
     products: catalogProducts,
-  });
+  };
+
+  // Cache the response
+  if (redis) {
+    redis.set(cacheKey, JSON.stringify(responseData), "EX", CATALOG_CACHE_TTL);
+  }
+
+  return c.json(responseData);
 });
 
 // ============================================================
@@ -149,6 +173,16 @@ catalog.get("/:slug/store-info", async (c) => {
 
   if (!db) {
     return c.json({ error: "Service unavailable" }, 503);
+  }
+
+  // Try Redis cache first
+  const redis = getRedis();
+  const cacheKey = `store-info:${slug}`;
+  if (redis) {
+    const cached = await redis.get(cacheKey);
+    if (cached) {
+      return c.json(JSON.parse(cached));
+    }
   }
 
   // Look up business by slug
@@ -173,7 +207,7 @@ catalog.get("/:slug/store-info", async (c) => {
     return c.json({ error: "Store not available", code: "STORE_DISABLED" }, 404);
   }
 
-  return c.json({
+  const responseData = {
     storeEnabled: settings.storeEnabled,
     paymentMethods: settings.paymentMethods,
     deliveryEnabled: settings.deliveryEnabled,
@@ -181,7 +215,14 @@ catalog.get("/:slug/store-info", async (c) => {
     deliveryZones: settings.deliveryZones,
     welcomeMessage: settings.welcomeMessage,
     minOrderAmount: Number(settings.minOrderAmount),
-  });
+  };
+
+  // Cache the response
+  if (redis) {
+    redis.set(cacheKey, JSON.stringify(responseData), "EX", STORE_INFO_CACHE_TTL);
+  }
+
+  return c.json(responseData);
 });
 
 // ============================================================
@@ -205,6 +246,7 @@ const createOrderSchema = z.object({
   paymentMethod: z.string().min(1).max(50),
   paymentReference: z.string().max(100).optional(),
   deliveryRequested: z.boolean().default(false),
+  idempotencyKey: z.string().max(64).optional(),
 });
 
 /**
@@ -252,39 +294,21 @@ catalog.post(
 
     const data = c.req.valid("json");
 
-    // Validate stock availability for all items
-    const productIds = data.items.map((item) => item.productId);
-    const productRows = await db
-      .select({ id: products.id, stock: products.stock, price: products.price })
-      .from(products)
-      .where(
-        and(
-          eq(products.businessId, business.id),
-          eq(products.isActive, true),
-          inArray(products.id, productIds),
-        ),
-      );
-
-    const productMap = new Map(productRows.map((p) => [p.id, p]));
-
-    // Check each item has sufficient stock
-    const stockErrors: string[] = [];
-    for (const item of data.items) {
-      const product = productMap.get(item.productId);
-      if (!product) {
-        stockErrors.push(`Producto no encontrado: ${item.name}`);
-      } else if (product.stock < item.quantity) {
-        stockErrors.push(
-          `Stock insuficiente para ${item.name} (disponible: ${product.stock})`,
+    // Idempotency check: if key provided, check if order already exists
+    const redis = getRedis();
+    if (data.idempotencyKey && redis) {
+      const idempotencyRedisKey = `order-idem:${business.id}:${data.idempotencyKey}`;
+      const existingOrderId = await redis.get(idempotencyRedisKey);
+      if (existingOrderId) {
+        // Return the existing order (duplicate request)
+        return c.json(
+          { orderId: existingOrderId, waLink: null, message: "Pedido ya registrado" },
+          201,
         );
       }
     }
 
-    if (stockErrors.length > 0) {
-      return c.json({ error: "Stock insuficiente", details: stockErrors }, 409);
-    }
-
-    // Calculate totals
+    // Calculate totals upfront (doesn't need DB)
     const subtotal = data.items.reduce((sum, item) => sum + item.lineTotal, 0);
     const deliveryFee =
       data.deliveryRequested && settings.deliveryEnabled
@@ -300,22 +324,98 @@ catalog.post(
       );
     }
 
-    // Create the order
-    const [order] = await db
-      .insert(orders)
-      .values({
-        businessId: business.id,
-        customerName: data.customerName,
-        customerPhone: data.customerPhone,
-        customerNotes: data.customerNotes,
-        items: data.items,
-        subtotal: String(subtotal),
-        deliveryFee: String(deliveryFee),
-        total: String(total),
-        paymentMethod: data.paymentMethod,
-        paymentReference: data.paymentReference,
-      })
-      .returning({ id: orders.id, createdAt: orders.createdAt });
+    // Atomic stock validation + order creation inside a transaction.
+    // SELECT ... FOR UPDATE locks the product rows to prevent race conditions.
+    const productIds = data.items.map((item) => item.productId);
+
+    let orderId: string;
+    try {
+      const result = await db.transaction(async (tx) => {
+        // Lock product rows for the duration of this transaction
+        const productRows = await tx
+          .select({ id: products.id, stock: products.stock, price: products.price })
+          .from(products)
+          .where(
+            and(
+              eq(products.businessId, business.id),
+              eq(products.isActive, true),
+              inArray(products.id, productIds),
+            ),
+          )
+          .for("update");
+
+        const productMap = new Map(productRows.map((p) => [p.id, p]));
+
+        // Check each item has sufficient stock
+        const stockErrors: string[] = [];
+        for (const item of data.items) {
+          const product = productMap.get(item.productId);
+          if (!product) {
+            stockErrors.push(`Producto no encontrado: ${item.name}`);
+          } else if (product.stock < item.quantity) {
+            stockErrors.push(
+              `Stock insuficiente para ${item.name} (disponible: ${product.stock})`,
+            );
+          }
+        }
+
+        if (stockErrors.length > 0) {
+          throw new Error(JSON.stringify({ stockErrors }));
+        }
+
+        // Create the order (stock is NOT decremented here, only on confirm)
+        const [order] = await tx
+          .insert(orders)
+          .values({
+            businessId: business.id,
+            customerName: data.customerName,
+            customerPhone: data.customerPhone,
+            customerNotes: data.customerNotes,
+            items: data.items,
+            subtotal: String(subtotal),
+            deliveryFee: String(deliveryFee),
+            total: String(total),
+            paymentMethod: data.paymentMethod,
+            paymentReference: data.paymentReference,
+          })
+          .returning({ id: orders.id });
+
+        return order.id;
+      });
+
+      orderId = result;
+    } catch (err) {
+      // Handle stock validation errors thrown from inside the transaction
+      if (err instanceof Error && err.message.startsWith("{")) {
+        try {
+          const parsed = JSON.parse(err.message) as { stockErrors?: string[] };
+          if (parsed.stockErrors) {
+            return c.json(
+              { error: "Stock insuficiente", details: parsed.stockErrors },
+              409,
+            );
+          }
+        } catch {
+          // Not a stock error, rethrow
+        }
+      }
+      throw err;
+    }
+
+    // Store idempotency key (expires in 10 minutes)
+    if (data.idempotencyKey && redis) {
+      const idempotencyRedisKey = `order-idem:${business.id}:${data.idempotencyKey}`;
+      redis.set(idempotencyRedisKey, orderId, "EX", 600);
+    }
+
+    // Log order creation (fire-and-forget, no userId for public endpoint)
+    logActivity({
+      db,
+      businessId: business.id,
+      userId: business.id, // Use businessId as actor for public orders
+      action: "order_created",
+      detail: `Pedido online ${orderId.slice(0, 8)} - ${data.customerName} - $${total.toFixed(2)}`,
+    });
 
     // Build WhatsApp link with order summary
     const itemsSummary = data.items
@@ -345,7 +445,7 @@ catalog.post(
 
     return c.json(
       {
-        orderId: order.id,
+        orderId,
         waLink,
         message: "Pedido creado exitosamente",
       },
@@ -365,9 +465,9 @@ catalog.post(
  * Max 5MB, only JPEG/PNG/WebP.
  * Stores in MinIO and updates the order's payment_proof_url.
  */
-catalog.post("/:slug/orders/:id/proof", async (c) => {
-  const slug = c.req.param("slug");
-  const orderId = c.req.param("id");
+catalog.post("/:slug/orders/:id/proof", uploadRateLimit, async (c) => {
+  const slug = c.req.param("slug") as string;
+  const orderId = c.req.param("id") as string;
   const db = tryGetDb();
 
   if (!db) {
