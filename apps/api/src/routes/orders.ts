@@ -25,6 +25,7 @@ import {
   customers,
 } from "@nova/db";
 import { logActivity } from "../utils/audit";
+import { cancelStaleOrdersForBusiness } from "../utils/auto-cancel";
 import { validateUuidParam } from "../middleware/validate-uuid";
 import { getProofUrl, isStorageConfigured } from "../services/storage";
 import type { AppEnv } from "../types";
@@ -531,5 +532,35 @@ ordersRoutes.patch(
     });
   },
 );
+
+// ============================================================
+// Auto-cancel stale orders
+// ============================================================
+
+/**
+ * POST /orders/auto-cancel - Cancel pending orders older than 24h.
+ *
+ * Can be called manually or by a cron job (e.g., Coolify scheduled task).
+ * Only cancels orders for the authenticated user's business.
+ */
+ordersRoutes.post("/orders/auto-cancel", async (c) => {
+  const db = c.get("db");
+  const businessId = c.get("businessId");
+
+  const cancelledCount = await cancelStaleOrdersForBusiness(db, businessId);
+
+  if (cancelledCount > 0) {
+    const user = c.get("user");
+    logActivity({
+      db,
+      businessId,
+      userId: user.id,
+      action: "orders_auto_cancelled",
+      detail: `${cancelledCount} pedido(s) cancelado(s) por inactividad (>24h)`,
+    });
+  }
+
+  return c.json({ cancelled: cancelledCount });
+});
 
 export { ordersRoutes };
