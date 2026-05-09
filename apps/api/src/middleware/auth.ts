@@ -26,7 +26,6 @@ export interface AuthUser {
   id: string;
   businessId: string;
   businessName: string;
-  businessSlug: string | null;
   name: string;
   /** Always "owner" in single-user model. Kept for API response compatibility. */
   role: "owner";
@@ -68,7 +67,6 @@ export async function authMiddleware(c: Context, next: Next) {
       id: "dev-user-001",
       businessId: "dev-business-001",
       businessName: "Dev Business",
-      businessSlug: "dev-business",
       name: "Dev User",
       role: "owner",
       clerkId: "dev-clerk-001",
@@ -140,7 +138,6 @@ export async function authMiddleware(c: Context, next: Next) {
     id: user.id,
     businessId: business.id,
     businessName: business.name,
-    businessSlug: business.slug ?? null,
     name: user.name,
     role: "owner",
     clerkId: clerkUserId,

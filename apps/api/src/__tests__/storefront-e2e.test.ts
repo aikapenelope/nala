@@ -29,15 +29,21 @@ import {
   type TestBusiness,
 } from "./helpers/setup";
 import { cancelStaleOrdersForBusiness } from "../utils/auto-cancel";
+import type { Database } from "@nova/db";
 
-describe("Storefront Order Flow (E2E)", () => {
-  const db = getTestDb();
+/**
+ * These tests require a real PostgreSQL database with migrations applied.
+ * They run in CI (where DATABASE_URL is set) and are skipped locally without DB.
+ */
+describe.skipIf(!process.env.DATABASE_URL)("Storefront Order Flow (E2E)", () => {
+  let db: Database;
   let testBiz: TestBusiness;
   let productA: { id: string; stock: number };
   let productB: { id: string; stock: number };
   let createdOrderId: string;
 
   beforeAll(async () => {
+    db = getTestDb();
     // Create test business
     testBiz = await createTestBusiness(db, {
       slug: "test-storefront-e2e",
@@ -72,6 +78,7 @@ describe("Storefront Order Flow (E2E)", () => {
   });
 
   afterAll(async () => {
+    if (!db) return;
     // Clean up orders and store settings
     await db.delete(orders).where(eq(orders.businessId, testBiz.business.id));
     await db.delete(storeSettings).where(eq(storeSettings.businessId, testBiz.business.id));

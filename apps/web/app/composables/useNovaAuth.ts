@@ -14,7 +14,6 @@ export interface NovaUser {
   name: string;
   businessId: string;
   businessName: string;
-  businessSlug: string | null;
 }
 
 export function useNovaAuth() {
@@ -48,7 +47,6 @@ export function useNovaAuth() {
           role: string;
           businessId: string;
           businessName: string;
-          businessSlug: string | null;
         };
       }>("/api/me", { silent: true });
 
@@ -58,7 +56,6 @@ export function useNovaAuth() {
           name: result.user.name,
           businessId: result.user.businessId,
           businessName: result.user.businessName,
-          businessSlug: result.user.businessSlug,
         });
 
         const sessionExpired = useState<boolean>("session-expired");
