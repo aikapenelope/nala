@@ -60,6 +60,10 @@ const order = ref<OrderDetail | null>(null);
 const isLoading = ref(true);
 const loadError = ref("");
 
+// Proof image state
+const proofImageUrl = ref<string | null>(null);
+const showProofModal = ref(false);
+
 // Action state
 const isActioning = ref(false);
 const actionError = ref("");
@@ -73,10 +77,27 @@ async function fetchOrder() {
   try {
     const result = await $api<{ order: OrderDetail }>(`/api/orders/${orderId}`);
     order.value = result.order;
+
+    // Fetch proof URL if available
+    if (result.order.paymentProofUrl) {
+      fetchProofUrl();
+    }
   } catch {
     loadError.value = "Error cargando pedido";
   } finally {
     isLoading.value = false;
+  }
+}
+
+/** Fetch presigned URL for the payment proof image. */
+async function fetchProofUrl() {
+  try {
+    const result = await $api<{ url: string }>(
+      `/api/orders/${orderId}/proof-url`,
+    );
+    proofImageUrl.value = result.url;
+  } catch {
+    // Silently fail - proof display is non-critical
   }
 }
 
@@ -290,6 +311,56 @@ onMounted(fetchOrder);
         </p>
       </div>
 
+      <!-- Payment proof image -->
+      <div
+        v-if="order.paymentProofUrl"
+        class="mb-4 rounded-xl bg-white p-4 shadow-sm"
+      >
+        <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
+          Comprobante de pago
+        </p>
+        <div v-if="proofImageUrl" class="relative">
+          <img
+            :src="proofImageUrl"
+            alt="Comprobante de pago"
+            class="w-full cursor-pointer rounded-xl object-cover"
+            style="max-height: 240px"
+            @click="showProofModal = true"
+          >
+          <span class="mt-1 block text-[10px] text-gray-400">
+            Toca para ampliar
+          </span>
+        </div>
+        <div v-else class="flex items-center gap-2 py-2 text-xs text-gray-500">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <rect width="18" height="18" x="3" y="3" rx="2" ry="2" />
+            <circle cx="9" cy="9" r="2" />
+            <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
+          </svg>
+          Cargando imagen...
+        </div>
+      </div>
+
+      <!-- No proof indicator -->
+      <div
+        v-else-if="order.status === 'pending'"
+        class="mb-4 rounded-xl border border-dashed border-amber-200 bg-amber-50/50 p-3"
+      >
+        <p class="text-xs font-medium text-amber-700">
+          El cliente no ha subido comprobante de pago.
+        </p>
+      </div>
+
       <!-- Timeline -->
       <div class="mb-4 rounded-xl bg-white p-4 shadow-sm">
         <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
@@ -411,6 +482,42 @@ onMounted(fetchOrder);
               {{ isActioning ? "Cancelando..." : "Confirmar cancelacion" }}
             </button>
           </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- Proof image fullscreen modal -->
+    <Teleport to="body">
+      <div
+        v-if="showProofModal && proofImageUrl"
+        class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
+        @click.self="showProofModal = false"
+      >
+        <div class="relative max-h-[90vh] max-w-lg">
+          <img
+            :src="proofImageUrl"
+            alt="Comprobante de pago"
+            class="max-h-[85vh] rounded-xl object-contain"
+          >
+          <button
+            class="absolute -top-3 -right-3 flex h-8 w-8 items-center justify-center rounded-full bg-white text-gray-900 shadow-lg"
+            @click="showProofModal = false"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M18 6 6 18" />
+              <path d="m6 6 12 12" />
+            </svg>
+          </button>
         </div>
       </div>
     </Teleport>

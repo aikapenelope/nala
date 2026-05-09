@@ -26,6 +26,7 @@ import {
 } from "@nova/db";
 import { logActivity } from "../utils/audit";
 import { validateUuidParam } from "../middleware/validate-uuid";
+import { getProofUrl, isStorageConfigured } from "../services/storage";
 import type { AppEnv } from "../types";
 
 const ordersRoutes = new Hono<AppEnv>();
@@ -113,6 +114,38 @@ ordersRoutes.get("/orders/:id", validateUuidParam, async (c) => {
       totalBs: order.totalBs ? Number(order.totalBs) : null,
     },
   });
+});
+
+// ============================================================
+// Proof URL (presigned)
+// ============================================================
+
+/** GET /orders/:id/proof-url - Get presigned URL for payment proof image. */
+ordersRoutes.get("/orders/:id/proof-url", validateUuidParam, async (c) => {
+  const db = c.get("db");
+  const businessId = c.get("businessId");
+  const id = c.req.param("id");
+
+  if (!isStorageConfigured) {
+    return c.json({ error: "Storage not configured" }, 503);
+  }
+
+  const [order] = await db
+    .select({ paymentProofUrl: orders.paymentProofUrl })
+    .from(orders)
+    .where(and(eq(orders.id, id), eq(orders.businessId, businessId)))
+    .limit(1);
+
+  if (!order) {
+    return c.json({ error: "Pedido no encontrado" }, 404);
+  }
+
+  if (!order.paymentProofUrl) {
+    return c.json({ error: "No hay comprobante de pago" }, 404);
+  }
+
+  const url = await getProofUrl(order.paymentProofUrl);
+  return c.json({ url });
 });
 
 // ============================================================

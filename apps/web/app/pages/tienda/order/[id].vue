@@ -1,18 +1,28 @@
 <script setup lang="ts">
 /**
- * Order confirmation page.
+ * Order confirmation page with payment proof upload.
  *
  * Shown after a successful checkout. Displays the order ID,
- * a success message, and a link to contact the seller via WhatsApp.
+ * a success message, upload for payment proof, and WhatsApp link.
  */
 
 definePageMeta({ layout: "storefront" });
 
 const route = useRoute();
+const config = useRuntimeConfig();
+const apiBase = config.public.apiBase as string;
+const { tenantSlug } = useTenant();
 const orderId = route.params.id as string;
 const { business } = useStorefront();
 
 useStorefrontSeo({ title: "Pedido enviado" });
+
+// Upload state
+const proofFile = ref<File | null>(null);
+const proofPreview = ref<string | null>(null);
+const isUploading = ref(false);
+const uploadSuccess = ref(false);
+const uploadError = ref<string | null>(null);
 
 /** Build WhatsApp link for follow-up. */
 const whatsappLink = computed(() => {
@@ -26,6 +36,71 @@ const whatsappLink = computed(() => {
 
 /** Short order ID for display. */
 const shortId = computed(() => orderId.slice(0, 8).toUpperCase());
+
+/** Handle file selection. */
+function handleFileSelect(event: Event) {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+  if (!file) return;
+
+  // Validate type
+  if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+    uploadError.value = "Solo se permiten imagenes JPEG, PNG o WebP.";
+    return;
+  }
+
+  // Validate size
+  if (file.size > 5 * 1024 * 1024) {
+    uploadError.value = "La imagen no puede superar 5MB.";
+    return;
+  }
+
+  proofFile.value = file;
+  uploadError.value = null;
+
+  // Create preview
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    proofPreview.value = e.target?.result as string;
+  };
+  reader.readAsDataURL(file);
+}
+
+/** Upload the proof image. */
+async function uploadProof() {
+  if (!proofFile.value || isUploading.value) return;
+
+  isUploading.value = true;
+  uploadError.value = null;
+
+  try {
+    const formData = new FormData();
+    formData.append("proof", proofFile.value);
+
+    await $fetch(
+      `${apiBase}/catalog/${tenantSlug.value}/orders/${orderId}/proof`,
+      {
+        method: "POST",
+        body: formData,
+      },
+    );
+
+    uploadSuccess.value = true;
+  } catch (err) {
+    const fetchError = err as { data?: { error?: string } };
+    uploadError.value =
+      fetchError.data?.error ?? "Error al subir comprobante. Intenta de nuevo.";
+  } finally {
+    isUploading.value = false;
+  }
+}
+
+/** Remove selected file. */
+function removeFile() {
+  proofFile.value = null;
+  proofPreview.value = null;
+  uploadError.value = null;
+}
 </script>
 
 <template>
@@ -66,6 +141,124 @@ const shortId = computed(() => orderId.slice(0, 8).toUpperCase());
       </p>
     </div>
 
+    <!-- Payment proof upload -->
+    <div class="mx-auto mt-5 max-w-xs text-left">
+      <div class="rounded-2xl border border-gray-100 bg-white p-4">
+        <p class="mb-3 text-sm font-semibold text-gray-800">
+          Comprobante de pago (opcional)
+        </p>
+        <p class="mb-3 text-xs text-gray-500">
+          Sube una captura de tu transferencia o pago para agilizar la confirmacion.
+        </p>
+
+        <!-- Upload success -->
+        <div
+          v-if="uploadSuccess"
+          class="flex items-center gap-2 rounded-xl bg-green-50 p-3"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            class="text-green-500"
+          >
+            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+            <path d="m9 11 3 3L22 4" />
+          </svg>
+          <span class="text-xs font-medium text-green-700">
+            Comprobante enviado correctamente
+          </span>
+        </div>
+
+        <!-- File input + preview -->
+        <template v-else>
+          <!-- Preview -->
+          <div v-if="proofPreview" class="mb-3">
+            <div class="relative">
+              <img
+                :src="proofPreview"
+                alt="Preview"
+                class="w-full rounded-xl object-cover"
+                style="max-height: 200px"
+              >
+              <button
+                class="absolute top-2 right-2 flex h-6 w-6 items-center justify-center rounded-full bg-black/50 text-white"
+                @click="removeFile"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="12"
+                  height="12"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M18 6 6 18" />
+                  <path d="m6 6 12 12" />
+                </svg>
+              </button>
+            </div>
+            <button
+              class="mt-2 w-full rounded-xl bg-gray-900 py-2.5 text-xs font-bold text-white disabled:opacity-50"
+              :disabled="isUploading"
+              @click="uploadProof"
+            >
+              {{ isUploading ? "Subiendo..." : "Enviar comprobante" }}
+            </button>
+          </div>
+
+          <!-- File picker -->
+          <label
+            v-else
+            class="flex cursor-pointer flex-col items-center gap-2 rounded-xl border-2 border-dashed border-gray-200 p-4 transition-colors hover:border-gray-400 hover:bg-gray-50"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              class="text-gray-400"
+            >
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="17 8 12 3 7 8" />
+              <line x1="12" x2="12" y1="3" y2="15" />
+            </svg>
+            <span class="text-xs font-medium text-gray-500">
+              Toca para seleccionar imagen
+            </span>
+            <span class="text-[10px] text-gray-400">
+              JPEG, PNG o WebP. Max 5MB.
+            </span>
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              class="hidden"
+              @change="handleFileSelect"
+            >
+          </label>
+
+          <!-- Error -->
+          <p v-if="uploadError" class="mt-2 text-xs font-medium text-red-600">
+            {{ uploadError }}
+          </p>
+        </template>
+      </div>
+    </div>
+
     <!-- Instructions -->
     <div class="mx-auto mt-5 max-w-xs space-y-3 text-left">
       <div class="flex gap-3 rounded-xl bg-blue-50 p-3">
@@ -77,7 +270,7 @@ const shortId = computed(() => orderId.slice(0, 8).toUpperCase());
       <div class="flex gap-3 rounded-xl bg-blue-50 p-3">
         <span class="flex-shrink-0 text-lg">2</span>
         <p class="text-sm text-gray-700">
-          Contacta al vendedor por WhatsApp para confirmar tu pedido.
+          Sube el comprobante arriba (opcional) o envialo por WhatsApp.
         </p>
       </div>
       <div class="flex gap-3 rounded-xl bg-blue-50 p-3">
