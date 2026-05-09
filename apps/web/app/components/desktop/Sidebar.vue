@@ -21,6 +21,7 @@ import {
   Receipt,
   PanelLeftClose,
   PanelLeftOpen,
+  ShoppingBag,
 } from "lucide-vue-next";
 import type { Component } from "vue";
 
@@ -28,11 +29,13 @@ interface NavItem {
   to: string;
   icon: Component;
   label: string;
+  badge?: boolean;
 }
 
 const navItems: NavItem[] = [
   { to: "/", icon: Home, label: "Inicio" },
   { to: "/sales", icon: ShoppingCart, label: "Vender" },
+  { to: "/orders", icon: ShoppingBag, label: "Pedidos", badge: true },
   { to: "/inventory", icon: Package, label: "Inventario" },
   { to: "/clients", icon: Users, label: "Clientes" },
   { to: "/accounts", icon: Wallet, label: "Cuentas" },
@@ -45,6 +48,7 @@ const navItems: NavItem[] = [
 ];
 
 const { user } = useNovaAuth();
+const { pendingCount } = useOrdersBadge();
 
 /** Sidebar collapsed state, persisted in localStorage. */
 const isCollapsed = ref(false);
@@ -101,6 +105,15 @@ function toggleCollapsed() {
       >
         <component :is="item.icon" :size="18" class="flex-shrink-0" />
         <span v-if="!isCollapsed">{{ item.label }}</span>
+
+        <!-- Pending orders badge -->
+        <span
+          v-if="item.badge && pendingCount > 0"
+          class="ml-auto flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white"
+          :class="isCollapsed ? 'absolute -top-1 -right-1' : ''"
+        >
+          {{ pendingCount }}
+        </span>
 
         <!-- Tooltip on collapsed hover -->
         <span

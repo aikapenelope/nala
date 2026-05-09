@@ -12,6 +12,7 @@ import {
   Tag,
   Landmark,
   Bell,
+  ShoppingBag,
 } from "lucide-vue-next";
 import type { Component } from "vue";
 
@@ -26,6 +27,13 @@ interface SettingsSection {
 }
 
 const sections: SettingsSection[] = [
+  {
+    icon: ShoppingBag,
+    label: "Tienda online",
+    description: "Activar tienda, metodos de pago, delivery",
+    to: "/settings/store",
+    gradient: "from-[#F0FDF4] to-[#D1FAE5]",
+  },
   {
     icon: Store,
     label: "Negocio",

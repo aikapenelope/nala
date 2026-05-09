@@ -15,7 +15,15 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { eq, and, desc, sql } from "drizzle-orm";
-import { orders, storeSettings, products } from "@nova/db";
+import {
+  orders,
+  storeSettings,
+  products,
+  sales,
+  saleItems,
+  salePayments,
+  customers,
+} from "@nova/db";
 import { logActivity } from "../utils/audit";
 import { validateUuidParam } from "../middleware/validate-uuid";
 import type { AppEnv } from "../types";
@@ -111,7 +119,7 @@ ordersRoutes.get("/orders/:id", validateUuidParam, async (c) => {
 // Confirm order (descounts stock)
 // ============================================================
 
-/** PATCH /orders/:id/confirm - Confirm payment and decrement stock. */
+/** PATCH /orders/:id/confirm - Confirm payment and decrement stock. Creates a sale record. */
 ordersRoutes.patch("/orders/:id/confirm", validateUuidParam, async (c) => {
   const db = c.get("db");
   const businessId = c.get("businessId");
@@ -135,15 +143,18 @@ ordersRoutes.patch("/orders/:id/confirm", validateUuidParam, async (c) => {
     );
   }
 
-  // Decrement stock for each item in a transaction
-  const items = order.items as Array<{
+  // Decrement stock for each item in a transaction + create sale
+  const orderItems = order.items as Array<{
     productId: string;
     quantity: number;
     name: string;
+    price: number;
+    lineTotal: number;
   }>;
 
   await db.transaction(async (tx) => {
-    for (const item of items) {
+    // 1. Decrement stock
+    for (const item of orderItems) {
       const result = await tx
         .update(products)
         .set({ stock: sql`stock - ${item.quantity}` })
@@ -161,7 +172,7 @@ ordersRoutes.patch("/orders/:id/confirm", validateUuidParam, async (c) => {
       }
     }
 
-    // Update order status
+    // 2. Update order status
     await tx
       .update(orders)
       .set({
@@ -170,6 +181,69 @@ ordersRoutes.patch("/orders/:id/confirm", validateUuidParam, async (c) => {
         updatedAt: new Date(),
       })
       .where(eq(orders.id, id));
+
+    // 3. Find or create customer by phone
+    let customerId: string | null = null;
+    if (order.customerPhone) {
+      const [existing] = await tx
+        .select({ id: customers.id })
+        .from(customers)
+        .where(
+          and(
+            eq(customers.businessId, businessId),
+            eq(customers.phone, order.customerPhone),
+          ),
+        )
+        .limit(1);
+
+      if (existing) {
+        customerId = existing.id;
+      } else {
+        const [newCustomer] = await tx
+          .insert(customers)
+          .values({
+            businessId,
+            name: order.customerName,
+            phone: order.customerPhone,
+          })
+          .returning({ id: customers.id });
+        customerId = newCustomer.id;
+      }
+    }
+
+    // 4. Create sale record (channel: storefront)
+    const [sale] = await tx
+      .insert(sales)
+      .values({
+        businessId,
+        userId: user.id,
+        customerId,
+        totalUsd: order.total,
+        channel: "storefront",
+        notes: `Pedido online #${id.slice(0, 8)}`,
+      })
+      .returning({ id: sales.id });
+
+    // 5. Create sale items
+    for (const item of orderItems) {
+      await tx.insert(saleItems).values({
+        saleId: sale.id,
+        businessId,
+        productId: item.productId,
+        quantity: item.quantity,
+        unitPrice: String(item.price),
+        lineTotal: String(item.lineTotal),
+      });
+    }
+
+    // 6. Create sale payment
+    await tx.insert(salePayments).values({
+      saleId: sale.id,
+      businessId,
+      method: order.paymentMethod,
+      amountUsd: order.total,
+      reference: order.paymentReference,
+    });
   });
 
   logActivity({
@@ -177,7 +251,7 @@ ordersRoutes.patch("/orders/:id/confirm", validateUuidParam, async (c) => {
     businessId,
     userId: user.id,
     action: "order_confirmed",
-    detail: `Pedido ${id.slice(0, 8)} - $${Number(order.total).toFixed(2)}`,
+    detail: `Pedido ${id.slice(0, 8)} - $${Number(order.total).toFixed(2)} → Venta creada`,
   });
 
   return c.json({ success: true, status: "confirmed" });
