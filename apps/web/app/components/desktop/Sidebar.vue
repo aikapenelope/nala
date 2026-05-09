@@ -22,6 +22,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   ShoppingBag,
+  Globe,
 } from "lucide-vue-next";
 import type { Component } from "vue";
 
@@ -36,6 +37,7 @@ const navItems: NavItem[] = [
   { to: "/", icon: Home, label: "Inicio" },
   { to: "/sales", icon: ShoppingCart, label: "Vender" },
   { to: "/orders", icon: ShoppingBag, label: "Pedidos", badge: true },
+  { to: "/store", icon: Globe, label: "Tienda Online" },
   { to: "/inventory", icon: Package, label: "Inventario" },
   { to: "/clients", icon: Users, label: "Clientes" },
   { to: "/accounts", icon: Wallet, label: "Cuentas" },
