@@ -17,6 +17,7 @@ import { eq, and, desc, inArray } from "drizzle-orm";
 import { businesses, products, categories, storeSettings, orders } from "@nova/db";
 import { calculateStockSemaphore } from "@nova/shared";
 import { tryGetDb } from "../db";
+import { uploadPaymentProof, isStorageConfigured } from "../services/storage";
 
 export const catalog = new Hono();
 
@@ -352,3 +353,114 @@ catalog.post(
     );
   },
 );
+
+// ============================================================
+// Upload payment proof (public, rate-limited)
+// ============================================================
+
+/**
+ * POST /catalog/:slug/orders/:id/proof - Upload payment proof image.
+ *
+ * Accepts multipart/form-data with a single file field "proof".
+ * Max 5MB, only JPEG/PNG/WebP.
+ * Stores in MinIO and updates the order's payment_proof_url.
+ */
+catalog.post("/:slug/orders/:id/proof", async (c) => {
+  const slug = c.req.param("slug");
+  const orderId = c.req.param("id");
+  const db = tryGetDb();
+
+  if (!db) {
+    return c.json({ error: "Service unavailable" }, 503);
+  }
+
+  if (!isStorageConfigured) {
+    return c.json({ error: "File storage not configured" }, 503);
+  }
+
+  // Validate UUID format for orderId
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!uuidRegex.test(orderId)) {
+    return c.json({ error: "Invalid order ID" }, 400);
+  }
+
+  // Look up business by slug
+  const [business] = await db
+    .select({ id: businesses.id })
+    .from(businesses)
+    .where(and(eq(businesses.slug, slug), eq(businesses.isActive, true)))
+    .limit(1);
+
+  if (!business) {
+    return c.json({ error: "Business not found" }, 404);
+  }
+
+  // Verify order exists and belongs to this business
+  const [order] = await db
+    .select({ id: orders.id, status: orders.status })
+    .from(orders)
+    .where(and(eq(orders.id, orderId), eq(orders.businessId, business.id)))
+    .limit(1);
+
+  if (!order) {
+    return c.json({ error: "Order not found" }, 404);
+  }
+
+  // Only allow proof upload for pending orders
+  if (order.status !== "pending") {
+    return c.json(
+      { error: "Solo se puede subir comprobante para pedidos pendientes" },
+      400,
+    );
+  }
+
+  // Parse multipart form data
+  const formData = await c.req.formData();
+  const file = formData.get("proof");
+
+  if (!file || !(file instanceof File)) {
+    return c.json({ error: "No se recibio archivo. Campo: proof" }, 400);
+  }
+
+  // Validate content type
+  const contentType = file.type;
+  if (!["image/jpeg", "image/png", "image/webp"].includes(contentType)) {
+    return c.json(
+      { error: "Tipo de archivo no permitido. Solo JPEG, PNG o WebP." },
+      400,
+    );
+  }
+
+  // Validate size (5MB max)
+  if (file.size > 5 * 1024 * 1024) {
+    return c.json({ error: "Archivo demasiado grande. Maximo 5MB." }, 400);
+  }
+
+  // Read file into buffer
+  const arrayBuffer = await file.arrayBuffer();
+  const buffer = Buffer.from(arrayBuffer);
+
+  try {
+    // Upload to MinIO
+    const { key } = await uploadPaymentProof(
+      business.id,
+      orderId,
+      buffer,
+      contentType,
+    );
+
+    // Update order with proof key
+    await db
+      .update(orders)
+      .set({
+        paymentProofUrl: key,
+        updatedAt: new Date(),
+      })
+      .where(eq(orders.id, orderId));
+
+    return c.json({ success: true, key }, 201);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Upload failed";
+    return c.json({ error: message }, 500);
+  }
+});
