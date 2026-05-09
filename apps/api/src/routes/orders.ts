@@ -570,4 +570,59 @@ ordersRoutes.post("/orders/auto-cancel", async (c) => {
   return c.json({ cancelled: cancelledCount });
 });
 
+// ============================================================
+// Store stats (dashboard widget)
+// ============================================================
+
+/**
+ * GET /store-stats - Basic storefront statistics.
+ *
+ * Returns orders this week, storefront revenue this week,
+ * and current pending order count. Used by the /store dashboard page.
+ */
+ordersRoutes.get("/store-stats", async (c) => {
+  const db = c.get("db");
+  const businessId = c.get("businessId");
+
+  // Start of current week (Monday 00:00)
+  const now = new Date();
+  const dayOfWeek = now.getDay();
+  const mondayOffset = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+  const weekStart = new Date(now);
+  weekStart.setDate(now.getDate() - mondayOffset);
+  weekStart.setHours(0, 0, 0, 0);
+
+  const [weekResult] = await db
+    .select({
+      orderCount: sql<number>`count(*)::int`,
+      revenue: sql<number>`coalesce(sum(${orders.total}::numeric), 0)::float`,
+    })
+    .from(orders)
+    .where(
+      and(
+        eq(orders.businessId, businessId),
+        sql`${orders.createdAt} >= ${weekStart.toISOString()}`,
+        sql`${orders.status} != 'cancelled'`,
+      ),
+    );
+
+  const [pendingResult] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(orders)
+    .where(
+      and(
+        eq(orders.businessId, businessId),
+        eq(orders.status, "pending"),
+      ),
+    );
+
+  return c.json({
+    stats: {
+      ordersThisWeek: weekResult.orderCount,
+      revenueThisWeek: weekResult.revenue,
+      pendingOrders: pendingResult.count,
+    },
+  });
+});
+
 export { ordersRoutes };

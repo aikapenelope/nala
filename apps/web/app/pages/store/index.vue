@@ -25,6 +25,9 @@ import {
   Globe,
   Share2,
   Eye,
+  ShoppingCart,
+  DollarSign,
+  Clock,
 } from "lucide-vue-next";
 
 const { $api } = useApi();
@@ -190,6 +193,29 @@ async function shareNative() {
   }
 }
 
+// --- Store stats ---
+
+const storeStats = ref<{
+  ordersThisWeek: number;
+  revenueThisWeek: number;
+  pendingOrders: number;
+} | null>(null);
+
+async function fetchStoreStats() {
+  try {
+    const result = await $api<{
+      stats: {
+        ordersThisWeek: number;
+        revenueThisWeek: number;
+        pendingOrders: number;
+      };
+    }>("/api/store-stats");
+    storeStats.value = result.stats;
+  } catch {
+    // Non-critical — stats just won't show
+  }
+}
+
 function startAddPayment(method: string) {
   const t = paymentTemplates[method];
   if (!t) return;
@@ -210,7 +236,10 @@ function removePayment(idx: number) {
   paymentMethods.value.splice(idx, 1);
 }
 
-onMounted(fetchSettings);
+onMounted(() => {
+  fetchSettings();
+  fetchStoreStats();
+});
 </script>
 
 <template>
@@ -301,6 +330,37 @@ onMounted(fetchSettings);
             <Eye :size="16" class="text-gray-500" />
             Ver como se ve tu tienda
           </a>
+        </div>
+
+        <!-- Store stats -->
+        <div v-if="storeStats && storeEnabled" class="grid grid-cols-3 gap-2.5">
+          <NuxtLink
+            to="/orders"
+            class="card-premium flex flex-col items-center gap-1 p-3.5 text-center transition-spring hover:shadow-[0_8px_20px_-5px_rgba(0,0,0,0.06)]"
+          >
+            <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50">
+              <ShoppingCart :size="14" class="text-blue-600" />
+            </div>
+            <p class="text-lg font-extrabold text-gray-900">{{ storeStats.ordersThisWeek }}</p>
+            <p class="text-[10px] font-semibold text-gray-500">Pedidos semana</p>
+          </NuxtLink>
+          <div class="card-premium flex flex-col items-center gap-1 p-3.5 text-center">
+            <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-green-50">
+              <DollarSign :size="14" class="text-green-600" />
+            </div>
+            <p class="text-lg font-extrabold text-gray-900">${{ storeStats.revenueThisWeek.toFixed(0) }}</p>
+            <p class="text-[10px] font-semibold text-gray-500">Ingresos semana</p>
+          </div>
+          <NuxtLink
+            to="/orders"
+            class="card-premium flex flex-col items-center gap-1 p-3.5 text-center transition-spring hover:shadow-[0_8px_20px_-5px_rgba(0,0,0,0.06)]"
+          >
+            <div class="flex h-8 w-8 items-center justify-center rounded-lg" :class="storeStats.pendingOrders > 0 ? 'bg-amber-50' : 'bg-gray-50'">
+              <Clock :size="14" :class="storeStats.pendingOrders > 0 ? 'text-amber-600' : 'text-gray-400'" />
+            </div>
+            <p class="text-lg font-extrabold text-gray-900">{{ storeStats.pendingOrders }}</p>
+            <p class="text-[10px] font-semibold text-gray-500">Pendientes</p>
+          </NuxtLink>
         </div>
 
         <!-- Share store -->

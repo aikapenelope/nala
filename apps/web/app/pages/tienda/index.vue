@@ -12,7 +12,7 @@ definePageMeta({ layout: "storefront" });
 
 const { business, products, categories, storeInfo, exchangeRate, isLoading, error, fetchCatalog } =
   useStorefront();
-const { addItem, itemCount } = useCart();
+const { addItem, itemCount, subtotal } = useCart();
 
 useStorefrontSeo({ title: "Catalogo" });
 
@@ -40,7 +40,7 @@ const filteredProducts = computed(() => {
   return result;
 });
 
-/** Show brief "added" feedback on a product card. */
+/** Show brief "added" feedback on a product card + haptic vibration. */
 function handleAddToCart(product: (typeof products.value)[number]) {
   addItem({
     id: product.id,
@@ -49,6 +49,12 @@ function handleAddToCart(product: (typeof products.value)[number]) {
     imageUrl: product.imageUrl,
   });
   addedProductId.value = product.id;
+
+  // Haptic feedback on mobile (short vibration)
+  if (import.meta.client && navigator.vibrate) {
+    navigator.vibrate(50);
+  }
+
   setTimeout(() => {
     addedProductId.value = null;
   }, 1200);
@@ -63,15 +69,23 @@ onMounted(() => {
 
 <template>
   <div>
-    <!-- Loading state -->
+    <!-- Loading state (shimmer skeleton) -->
     <div v-if="isLoading" class="space-y-4 py-8">
-      <div class="mx-auto h-6 w-48 animate-pulse rounded-lg bg-gray-200" />
+      <div class="mx-auto h-6 w-48 rounded-lg bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 bg-[length:200%_100%] animate-[shimmer_1.5s_infinite]" />
+      <div class="h-10 rounded-xl bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 bg-[length:200%_100%] animate-[shimmer_1.5s_infinite]" />
       <div class="grid grid-cols-2 gap-3">
         <div
           v-for="n in 4"
           :key="n"
-          class="h-52 animate-pulse rounded-2xl bg-gray-200"
-        />
+          class="overflow-hidden rounded-2xl"
+        >
+          <div class="aspect-square bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 bg-[length:200%_100%] animate-[shimmer_1.5s_infinite]" />
+          <div class="space-y-2 p-3">
+            <div class="h-3 w-16 rounded bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 bg-[length:200%_100%] animate-[shimmer_1.5s_infinite]" />
+            <div class="h-4 w-24 rounded bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 bg-[length:200%_100%] animate-[shimmer_1.5s_infinite]" />
+            <div class="h-5 w-14 rounded bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 bg-[length:200%_100%] animate-[shimmer_1.5s_infinite]" />
+          </div>
+        </div>
       </div>
     </div>
 
@@ -316,24 +330,29 @@ onMounted(() => {
       <NuxtLink
         v-if="itemCount > 0"
         to="/tienda/cart"
-        class="fixed bottom-6 left-1/2 z-50 flex -translate-x-1/2 items-center gap-2 rounded-full bg-gray-900 px-6 py-3.5 text-sm font-bold text-white shadow-xl transition-transform hover:scale-105"
+        class="fixed bottom-6 left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 rounded-full bg-gray-900 px-6 py-3.5 text-sm font-bold text-white shadow-[0_8px_30px_rgba(0,0,0,0.3)] transition-transform hover:scale-105"
       >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="18"
-          height="18"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-        >
-          <circle cx="8" cy="21" r="1" />
-          <circle cx="19" cy="21" r="1" />
-          <path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12" />
-        </svg>
-        Ver carrito ({{ itemCount }})
+        <div class="flex items-center gap-2">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <circle cx="8" cy="21" r="1" />
+            <circle cx="19" cy="21" r="1" />
+            <path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12" />
+          </svg>
+          <span>Ver carrito ({{ itemCount }})</span>
+        </div>
+        <span class="border-l border-white/20 pl-3 text-white/80">
+          ${{ subtotal.toFixed(2) }}
+        </span>
       </NuxtLink>
     </Teleport>
   </div>
