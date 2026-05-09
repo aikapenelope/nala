@@ -2,10 +2,11 @@
  * Global authentication middleware.
  *
  * Simple flow:
- * 1. Public routes always pass through.
- * 2. If Clerk hasn't loaded yet, allow (avoid premature redirects).
- * 3. If signed in with Clerk, allow (resolve page handles the rest).
- * 4. If not signed in, redirect to /landing.
+ * 1. Storefront (tenant subdomain) routes bypass auth entirely.
+ * 2. Public routes always pass through.
+ * 3. If Clerk hasn't loaded yet, allow (avoid premature redirects).
+ * 4. If signed in with Clerk, allow (resolve page handles the rest).
+ * 5. If not signed in, redirect to /landing.
  *
  * No Organizations complexity. Single admin user.
  */
@@ -17,9 +18,16 @@ const isPublicRoute = createRouteMatcher([
   "/auth/resolve",
   "/onboarding(.*)",
   "/catalogo(.*)",
+  "/tienda(.*)",
 ]);
 
 export default defineNuxtRouteMiddleware((to) => {
+  // Storefront: tenant subdomain detected, no auth required
+  const { hasTenant } = useTenant();
+  if (hasTenant.value) {
+    return;
+  }
+
   if (isPublicRoute(to)) {
     return;
   }
