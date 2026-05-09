@@ -49,6 +49,11 @@ jobs:
       - name: Lint
         run: npx turbo lint
 
+      - name: Migrate database
+        run: cd packages/db && npx drizzle-kit push
+        env:
+          DATABASE_URL: postgresql://nova:test@localhost:5432/nova_test
+
       - name: Test
         run: npx turbo test
         env:
