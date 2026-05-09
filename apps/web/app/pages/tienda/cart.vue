@@ -10,7 +10,7 @@ definePageMeta({ layout: "storefront" });
 
 const { items, removeItem, updateQuantity, itemCount, subtotal, clear } =
   useCart();
-const { storeInfo } = useStorefront();
+const { storeInfo, exchangeRate } = useStorefront();
 
 useStorefrontSeo({ title: "Carrito" });
 
@@ -178,9 +178,17 @@ const meetsMinimum = computed(() => {
               </div>
 
               <!-- Line total -->
-              <p class="text-sm font-bold text-gray-900">
-                ${{ (item.price * item.quantity).toFixed(2) }}
-              </p>
+              <div class="text-right">
+                <p class="text-sm font-bold text-gray-900">
+                  ${{ (item.price * item.quantity).toFixed(2) }}
+                </p>
+                <p
+                  v-if="exchangeRate"
+                  class="text-[11px] font-medium text-gray-400"
+                >
+                  Bs. {{ (item.price * item.quantity * exchangeRate).toFixed(2) }}
+                </p>
+              </div>
             </div>
           </div>
         </div>
@@ -198,7 +206,12 @@ const meetsMinimum = computed(() => {
       <div class="mt-6 space-y-2 rounded-2xl border border-gray-100 bg-white p-4">
         <div class="flex justify-between text-sm text-gray-600">
           <span>Subtotal ({{ itemCount }} items)</span>
-          <span class="font-semibold">${{ subtotal.toFixed(2) }}</span>
+          <div class="text-right">
+            <span class="font-semibold">${{ subtotal.toFixed(2) }}</span>
+            <p v-if="exchangeRate" class="text-[11px] text-gray-400">
+              Bs. {{ (subtotal * exchangeRate).toFixed(2) }}
+            </p>
+          </div>
         </div>
         <div
           v-if="storeInfo?.deliveryEnabled"
@@ -212,7 +225,12 @@ const meetsMinimum = computed(() => {
         <div class="border-t border-gray-100 pt-2">
           <div class="flex justify-between text-base font-bold text-gray-900">
             <span>Total</span>
-            <span>${{ total.toFixed(2) }}</span>
+            <div class="text-right">
+              <span>${{ total.toFixed(2) }}</span>
+              <p v-if="exchangeRate" class="text-xs font-medium text-gray-400">
+                Bs. {{ (total * exchangeRate).toFixed(2) }}
+              </p>
+            </div>
           </div>
         </div>
       </div>

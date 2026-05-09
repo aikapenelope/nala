@@ -5,9 +5,17 @@
  * No sidebar, no header, no auth required.
  * Used by /tienda/* pages when accessed via tenant subdomain.
  * Clean, minimal design focused on the shopping experience.
+ *
+ * Reads business name from useStorefront() and cart count from useCart()
+ * directly — no slots needed from child pages.
  */
 
 const { tenantSlug } = useTenant();
+const { business } = useStorefront();
+const { itemCount } = useCart();
+
+/** Display name: business name when loaded, generic fallback otherwise. */
+const storeName = computed(() => business.value?.name ?? "Tienda");
 </script>
 
 <template>
@@ -16,7 +24,7 @@ const { tenantSlug } = useTenant();
     <header class="sticky top-0 z-40 border-b border-gray-100 bg-white/90 backdrop-blur-md">
       <div class="mx-auto flex h-14 max-w-3xl items-center justify-between px-4">
         <NuxtLink to="/tienda" class="text-lg font-bold text-gray-900">
-          <slot name="store-name">Tienda</slot>
+          {{ storeName }}
         </NuxtLink>
         <NuxtLink
           to="/tienda/cart"
@@ -39,8 +47,13 @@ const { tenantSlug } = useTenant();
             <circle cx="19" cy="21" r="1" />
             <path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12" />
           </svg>
-          <!-- Cart badge (provided by useCart) -->
-          <slot name="cart-badge" />
+          <!-- Cart item count badge -->
+          <span
+            v-if="itemCount > 0"
+            class="absolute -right-1 -top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-gray-900 px-1 text-[10px] font-bold leading-none text-white"
+          >
+            {{ itemCount > 99 ? "99+" : itemCount }}
+          </span>
         </NuxtLink>
       </div>
     </header>

@@ -15,7 +15,7 @@ const config = useRuntimeConfig();
 const apiBase = config.public.apiBase as string;
 const { tenantSlug } = useTenant();
 const { items, subtotal, itemCount, clear } = useCart();
-const { storeInfo, business } = useStorefront();
+const { storeInfo, business, exchangeRate } = useStorefront();
 
 useStorefrontSeo({ title: "Checkout" });
 
@@ -154,15 +154,28 @@ async function submitOrder() {
             {{ item.name }}
             <span class="text-gray-400">x{{ item.quantity }}</span>
           </span>
-          <span class="font-semibold text-gray-900">
-            ${{ (item.price * item.quantity).toFixed(2) }}
-          </span>
+          <div class="text-right">
+            <span class="font-semibold text-gray-900">
+              ${{ (item.price * item.quantity).toFixed(2) }}
+            </span>
+            <p
+              v-if="exchangeRate"
+              class="text-[11px] text-gray-400"
+            >
+              Bs. {{ (item.price * item.quantity * exchangeRate).toFixed(2) }}
+            </p>
+          </div>
         </div>
       </div>
       <div class="mt-3 border-t border-gray-100 pt-2">
         <div class="flex justify-between text-sm">
           <span class="text-gray-600">Subtotal</span>
-          <span class="font-semibold">${{ subtotal.toFixed(2) }}</span>
+          <div class="text-right">
+            <span class="font-semibold">${{ subtotal.toFixed(2) }}</span>
+            <p v-if="exchangeRate" class="text-[11px] text-gray-400">
+              Bs. {{ (subtotal * exchangeRate).toFixed(2) }}
+            </p>
+          </div>
         </div>
         <div
           v-if="deliveryRequested && deliveryFee > 0"
@@ -173,7 +186,12 @@ async function submitOrder() {
         </div>
         <div class="mt-1 flex justify-between text-base font-bold text-gray-900">
           <span>Total</span>
-          <span>${{ total.toFixed(2) }}</span>
+          <div class="text-right">
+            <span>${{ total.toFixed(2) }}</span>
+            <p v-if="exchangeRate" class="text-xs font-medium text-gray-400">
+              Bs. {{ (total * exchangeRate).toFixed(2) }}
+            </p>
+          </div>
         </div>
       </div>
     </div>
