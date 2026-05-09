@@ -154,6 +154,7 @@ async function createBusiness() {
       name: result.user.name,
       businessId: result.user.businessId,
       businessName: result.business.name,
+      businessSlug: null,
     });
 
     step.value = 3;
