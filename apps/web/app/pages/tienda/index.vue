@@ -50,11 +50,6 @@ onMounted(() => {
 
 <template>
   <div>
-    <!-- Store name in layout header slot -->
-    <Teleport to="header">
-      <span v-if="business">{{ business.name }}</span>
-    </Teleport>
-
     <!-- Loading state -->
     <div v-if="isLoading" class="space-y-4 py-8">
       <div class="mx-auto h-6 w-48 animate-pulse rounded-lg bg-gray-200" />

@@ -48,6 +48,13 @@ ordersRoutes.get("/orders", zValidator("query", listOrdersQuery), async (c) => {
   const businessId = c.get("businessId");
   const { status, limit, offset } = c.req.valid("query");
 
+  // Piggyback auto-cancel: clean up stale pending orders (>24h) on every
+  // list request. Fire-and-forget so it doesn't slow down the response.
+  // The dashboard polls this endpoint every 30s, which is frequent enough.
+  cancelStaleOrdersForBusiness(db, businessId).catch(() => {
+    // Silently ignore — auto-cancel is best-effort, not critical path.
+  });
+
   const conditions = [eq(orders.businessId, businessId)];
   if (status) {
     conditions.push(eq(orders.status, status));
