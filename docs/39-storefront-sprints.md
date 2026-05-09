@@ -6,89 +6,101 @@
 
 ---
 
-## Sprint 1: Fundacion (Schema + API backend)
+## Sprint 1: Fundacion (Schema + API backend) ✅ COMPLETADO (PR #206)
 
 **Objetivo:** Tablas en DB + endpoints funcionales. Sin UI.
-**Estimado:** 1 dia.
-**Riesgo:** Bajo. Solo agrega, no modifica nada existente.
+**Completado:** Mayo 2026.
 
-### Tareas
+### Entregado
 
-1. **Migracion 0014:** Crear tablas `orders` y `store_settings` con indices y RLS
-2. **Drizzle schema:** Agregar `orders` y `storeSettings` al schema.ts
-3. **API publica:** `GET /catalog/:slug/store-info` (metodos de pago del vendedor)
-4. **API publica:** `POST /catalog/:slug/orders` (crear pedido, validar stock, rate limit)
-5. **API protegida:** `GET /api/orders` (listar pedidos con filtros status/fecha)
-6. **API protegida:** `GET /api/orders/:id` (detalle de pedido)
-7. **API protegida:** `PATCH /api/orders/:id/confirm` (confirmar + descontar stock)
-8. **API protegida:** `PATCH /api/orders/:id/deliver` (marcar entregado)
-9. **API protegida:** `PATCH /api/orders/:id/cancel` (cancelar con motivo)
-10. **API protegida:** `GET /api/store-settings` + `PATCH /api/store-settings`
-11. **Seed:** Crear store_settings de ejemplo para el negocio de prueba
-12. **Typecheck + lint**
-
-### Criterio de completado
-- `POST /catalog/bodega-don-pedro/orders` crea un pedido en DB
-- `GET /api/orders` devuelve pedidos del tenant
-- `PATCH /api/orders/:id/confirm` descuenta stock correctamente
-- Typecheck y lint pasan
+- Migracion 0014: tablas `orders` y `store_settings` con indices y RLS
+- Drizzle schema actualizado
+- API publica: `GET /catalog/:slug/store-info`, `POST /catalog/:slug/orders`
+- API protegida: orders CRUD (list, detail, confirm, deliver, cancel) + store-settings
+- Stock validation atomica en confirm
+- WhatsApp link auto-generado en POST orders
 
 ---
 
-## Sprint 2: Tienda PWA del cliente (frontend publico)
+## Sprint 2: Tienda PWA del cliente (frontend publico) ✅ COMPLETADO (PR #207)
 
 **Objetivo:** El cliente puede ver catalogo, armar carrito, y hacer checkout.
-**Estimado:** 2-3 dias.
-**Riesgo:** Medio. Nuevo routing por subdominio, layout nuevo.
+**Completado:** Mayo 2026.
 
-### Tareas
+### Entregado
 
-1. **Layout `storefront`:** Layout standalone para la tienda (sin sidebar/header de Nova)
-2. **Middleware update:** `auth.global.ts` detecta tenantSlug y bypasea auth
-3. **Redirect por subdominio:** Si hay tenantSlug, redirigir `/` a `/tienda`
-4. **Composable `useCart`:** Carrito en localStorage (add, remove, clear, total)
-5. **Composable `useStorefront`:** Fetch catalog + store-info, estado del tenant
-6. **Pagina `/tienda/index.vue`:** Catalogo con boton "Agregar al carrito" por producto
-7. **Pagina `/tienda/cart.vue`:** Resumen del carrito, editar cantidades, boton "Pagar"
-8. **Pagina `/tienda/checkout.vue`:** Formulario (nombre, telefono), datos de pago del vendedor, boton "Confirmar pedido"
-9. **Logica de checkout:** POST al API, generar wa.me link con resumen, redirigir a WhatsApp
-10. **Pagina `/tienda/order/[id].vue`:** Confirmacion post-pedido ("Pedido enviado, contacta al vendedor")
-11. **Manifest dinamico:** `server/routes/manifest.json.get.ts` genera manifest por tenant
-12. **SEO:** Meta tags, og:image, titulo dinamico por tienda
-13. **Typecheck + lint + verificar en browser**
-
-### Criterio de completado
-- `bodega.novaincs.com` (o localhost con subdominio simulado) muestra la tienda
-- Se puede agregar productos al carrito
-- Checkout muestra datos de pago y envia pedido
-- WhatsApp se abre con resumen pre-armado
-- La pagina es installable como PWA
+- Layout `storefront` standalone (sin sidebar/header de Nova)
+- Middleware: auth bypass para subdominios + redirect `/` → `/tienda`
+- Composable `useCart` (localStorage: add, remove, clear, total)
+- Composable `useStorefront` (fetch catalog + store-info)
+- Composable `useStorefrontSeo` (meta tags dinamicos por tenant)
+- Paginas: `/tienda/index`, `/tienda/cart`, `/tienda/checkout`, `/tienda/order/[id]`
+- Manifest PWA dinamico por tenant (`server/routes/manifest.json.get.ts`)
+- SEO: Open Graph, Twitter cards, canonical URL por subdominio
+- routeRules SSR para `/tienda/**`
 
 ---
 
 ## Sprint 3: Dashboard del vendedor (gestion de pedidos)
 
 **Objetivo:** El vendedor ve, confirma, y gestiona pedidos desde Nova.
-**Estimado:** 1-2 dias.
-**Riesgo:** Bajo. Solo paginas nuevas en el dashboard existente.
+**Estimado:** 2 dias.
+**Riesgo:** Medio. Modifica sidebar/dashboard existentes + agrega logica backend (sales integration).
 
 ### Tareas
 
-1. **Pagina `/orders/index.vue`:** Lista de pedidos con tabs (pendientes, confirmados, entregados, cancelados)
-2. **Pagina `/orders/[id].vue`:** Detalle del pedido (items, cliente, metodo de pago, capture si existe)
-3. **Acciones en detalle:** Botones confirmar/entregar/cancelar con confirmacion
-4. **Pagina `/settings/store.vue`:** Formulario para configurar metodos de pago (Pago Movil, Binance, Zinli)
-5. **Settings store:** Toggle activar/desactivar tienda, delivery fee, mensaje de bienvenida
-6. **Sidebar:** Agregar "Pedidos" al nav con badge de pendientes
-7. **Dashboard alert:** Mostrar alerta cuando hay pedidos pendientes sin confirmar
-8. **Integracion con ventas:** Al confirmar pedido, crear registro en `sales` (canal: storefront)
-9. **Typecheck + lint**
+1. **Pagina `/settings/store.vue`:** Formulario completo para configurar la tienda online
+   - Toggle activar/desactivar tienda
+   - Metodos de pago: agregar/editar/eliminar (Pago Movil, Binance, Zinli, efectivo)
+   - Delivery: toggle + fee + zonas
+   - Mensaje de bienvenida y monto minimo
+   - Preview del link de la tienda (`{slug}.novaincs.com`)
+2. **Settings hub:** Agregar seccion "Tienda online" en `/settings/index.vue`
+3. **Pagina `/orders/index.vue`:** Lista de pedidos con tabs por estado
+   - Tabs: Pendientes | Confirmados | Entregados | Cancelados
+   - Cada fila: nombre cliente, total, metodo pago, fecha, estado
+   - Badge con conteo de pendientes en tab activo
+   - Polling cada 30s para nuevos pedidos (sin WebSockets)
+4. **Pagina `/orders/[id].vue`:** Detalle completo del pedido
+   - Info del cliente (nombre, telefono, notas)
+   - Items con cantidades y precios
+   - Metodo de pago seleccionado + referencia
+   - Timeline de estados (creado → confirmado → entregado)
+   - Botones de accion: Confirmar / Entregar / Cancelar (con modal de confirmacion)
+5. **Sidebar + BottomTabs:** Agregar "Pedidos" al nav con badge de pendientes
+6. **Dashboard alert:** Composable `useOrdersBadge` que expone `pendingCount`
+   - Polling al cargar dashboard (no en tiempo real)
+   - Badge numerico en sidebar y bottom tabs
+7. **API: Integracion orders → sales:** Al confirmar pedido, crear registro en `sales`
+   - Modificar `PATCH /orders/:id/confirm` en el API
+   - Crear sale con `channel: "storefront"`, items, payment
+   - Buscar o crear customer por telefono
+   - Registrar en activity log
+8. **Typecheck + lint**
 
 ### Criterio de completado
-- `/orders` muestra pedidos creados desde la tienda
-- Confirmar pedido descuenta stock y crea venta
-- `/settings/store` permite configurar datos de Pago Movil/Binance
+- `/orders` muestra pedidos creados desde la tienda con tabs funcionales
+- Confirmar pedido descuenta stock Y crea venta en `sales` (canal: storefront)
+- La venta aparece en reportes y contabilidad automaticamente
+- `/settings/store` permite configurar datos de Pago Movil/Binance/Zinli
 - Badge en sidebar muestra conteo de pedidos pendientes
+- Cancelar pedido pide motivo y actualiza estado
+
+### Notas de implementacion
+
+**Orden de ejecucion recomendado:**
+1. Settings store (para que el vendedor pueda activar su tienda)
+2. Orders list + detail (UI de gestion)
+3. Sidebar/badge (navegacion)
+4. API integration orders → sales (backend, mas riesgo)
+
+**Riesgo principal:** La integracion con `sales` modifica el endpoint `PATCH /orders/:id/confirm`.
+Debe crear un registro en `sales` + `sale_items` + `sale_payments` dentro de la misma transaccion
+que descuenta stock. Si falla la creacion de la venta, el pedido no se confirma (atomicidad).
+
+**Polling vs WebSockets:** Se usa polling simple (fetch cada 30s en la pagina de orders)
+porque no hay infraestructura de WebSockets. Suficiente para el volumen actual.
+En el futuro se puede migrar a Server-Sent Events o WebSockets.
 
 ---
 
@@ -145,12 +157,12 @@
 ## Orden de ejecucion
 
 ```
-Sprint 1 ──► Sprint 2 ──► Sprint 3 ──► Sprint 4 ──► Sprint 5
- (DB+API)    (Tienda)    (Dashboard)   (Upload)    (Pulido)
-  1 dia       2-3 dias    1-2 dias      1 dia       1 dia
+Sprint 1 ✅ ──► Sprint 2 ✅ ──► Sprint 3 ──► Sprint 4 ──► Sprint 5
+ (DB+API)       (Tienda)       (Dashboard)   (Upload)    (Pulido)
+  DONE           DONE           2 dias        1 dia       1 dia
 ```
 
-**Total: 6-8 dias de trabajo.**
+**Restante: 4 dias de trabajo.**
 
 Cada sprint es un PR independiente que se puede mergear y deployar sin romper nada. El sistema existente (POS, inventario, reportes) sigue funcionando identico durante toda la implementacion.
 
@@ -158,20 +170,22 @@ Cada sprint es un PR independiente que se puede mergear y deployar sin romper na
 
 ## Notas tecnicas importantes
 
-### Routing por subdominio (como funciona sin romper nada)
+### Routing por subdominio (implementado en Sprint 2)
 
-El `auth.global.ts` actual protege todas las rutas excepto las publicas. Para la tienda:
+El `auth.global.ts` detecta el tenant via `useTenant()` y bypasea auth:
 
 ```typescript
-// En auth.global.ts, agregar al inicio:
-const tenantSlug = useState("tenant-slug");
-if (tenantSlug.value) {
-  // Estamos en un subdominio de tienda, no requiere auth
-  return;
+// En auth.global.ts:
+const { hasTenant } = useTenant();
+if (hasTenant.value) {
+  return; // Storefront, no requiere auth
 }
 ```
 
-Las paginas de `/tienda/*` usan un layout diferente (`storefront`) que no tiene sidebar, header de Nova, ni nada del dashboard. Es una experiencia completamente separada visualmente.
+El middleware `storefront-redirect.global.ts` redirige `/` → `/tienda` en subdominios
+y bloquea acceso a rutas del dashboard desde subdominios de tenant.
+
+Las paginas de `/tienda/*` usan el layout `storefront` que no tiene sidebar, header de Nova, ni nada del dashboard. Es una experiencia completamente separada visualmente.
 
 ### Stock: cuando se descuenta
 
