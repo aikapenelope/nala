@@ -10,7 +10,7 @@
 
 definePageMeta({ layout: "storefront" });
 
-const { business, products, categories, isLoading, error, fetchCatalog } =
+const { business, products, categories, storeInfo, exchangeRate, isLoading, error, fetchCatalog } =
   useStorefront();
 const { addItem, itemCount } = useCart();
 
@@ -80,6 +80,50 @@ onMounted(() => {
 
     <!-- Catalog content -->
     <template v-else>
+      <!-- Store disabled -->
+      <div
+        v-if="business && !storeInfo"
+        class="py-16 text-center"
+      >
+        <div class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gray-100">
+          <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="text-gray-400">
+            <path d="m2 7 4.41-4.41A2 2 0 0 1 7.83 2h8.34a2 2 0 0 1 1.42.59L22 7" />
+            <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
+            <path d="M15 22v-4a2 2 0 0 0-2-2h-2a2 2 0 0 0-2 2v4" />
+            <path d="M2 7h20" />
+          </svg>
+        </div>
+        <p class="text-base font-medium text-gray-600">
+          Esta tienda no esta disponible
+        </p>
+        <p class="mt-1 text-sm text-gray-400">
+          El vendedor aun no ha activado su tienda online.
+        </p>
+      </div>
+
+      <!-- No products -->
+      <div
+        v-else-if="products.length === 0"
+        class="py-16 text-center"
+      >
+        <div class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gray-100">
+          <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="text-gray-400">
+            <path d="m7.5 4.27 9 5.15" />
+            <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" />
+            <path d="m3.3 7 8.7 5 8.7-5" />
+            <path d="M12 22V12" />
+          </svg>
+        </div>
+        <p class="text-base font-medium text-gray-600">
+          No hay productos disponibles
+        </p>
+        <p class="mt-1 text-sm text-gray-400">
+          El vendedor aun no ha agregado productos a su tienda.
+        </p>
+      </div>
+
+      <!-- Normal catalog -->
+      <template v-else>
       <!-- Welcome message -->
       <div v-if="business" class="mb-5">
         <h1 class="text-xl font-bold text-gray-900">{{ business.name }}</h1>
@@ -194,6 +238,12 @@ onMounted(() => {
             <p class="mt-1 text-base font-bold text-gray-900">
               ${{ product.price.toFixed(2) }}
             </p>
+            <p
+              v-if="exchangeRate"
+              class="text-xs font-medium text-gray-400"
+            >
+              Bs. {{ (product.price * exchangeRate).toFixed(2) }}
+            </p>
 
             <!-- Add to cart button -->
             <button
@@ -216,6 +266,7 @@ onMounted(() => {
           </div>
         </div>
       </div>
+      </template>
     </template>
 
     <!-- Floating cart button (when items in cart) -->

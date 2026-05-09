@@ -66,6 +66,7 @@ export function useStorefront() {
     () => [],
   );
   const storeInfo = useState<StoreInfo | null>("storefront-info", () => null);
+  const exchangeRate = useState<number | null>("storefront-rate", () => null);
   const isLoading = ref(false);
   const error = ref<string | null>(null);
 
@@ -85,6 +86,7 @@ export function useStorefront() {
           business: StorefrontBusiness;
           categories: StorefrontCategory[];
           products: StorefrontProduct[];
+          exchangeRate: number | null;
         }>(`${apiBase}/catalog/${tenantSlug.value}`),
         $fetch<StoreInfo>(`${apiBase}/catalog/${tenantSlug.value}/store-info`).catch(
           () => null,
@@ -94,6 +96,7 @@ export function useStorefront() {
       business.value = catalogData.business;
       products.value = catalogData.products;
       categories.value = catalogData.categories;
+      exchangeRate.value = catalogData.exchangeRate;
       storeInfo.value = storeData;
     } catch {
       error.value = "No se pudo cargar la tienda. Verifica el enlace.";
@@ -112,6 +115,7 @@ export function useStorefront() {
     products: readonly(products),
     categories: readonly(categories),
     storeInfo: readonly(storeInfo),
+    exchangeRate: readonly(exchangeRate),
     isLoading: readonly(isLoading),
     error: readonly(error),
     fetchCatalog,
