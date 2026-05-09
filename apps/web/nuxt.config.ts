@@ -30,28 +30,9 @@ export default defineNuxtConfig({
 
   pwa: {
     registerType: "autoUpdate",
-    manifest: {
-      name: "Nova - Backoffice Operativo",
-      short_name: "Nova",
-      description:
-        "Backoffice operativo para comerciantes y PyMEs. Ventas, inventario, clientes, reportes.",
-      theme_color: "#1e40af",
-      background_color: "#ffffff",
-      display: "standalone",
-      orientation: "any",
-      icons: [
-        {
-          src: "/icon-192x192.png",
-          sizes: "192x192",
-          type: "image/png",
-        },
-        {
-          src: "/icon-512x512.png",
-          sizes: "512x512",
-          type: "image/png",
-        },
-      ],
-    },
+    // Manifest is served dynamically via server/routes/manifest.json.get.ts
+    // to support per-tenant PWA branding on subdomains.
+    manifest: false,
     workbox: {
       navigateFallback: "/",
       globPatterns: ["**/*.{js,css,html,png,svg,ico}"],
@@ -59,6 +40,11 @@ export default defineNuxtConfig({
     devOptions: {
       enabled: false,
     },
+  },
+
+  routeRules: {
+    // Storefront pages: always SSR for SEO and social sharing
+    "/tienda/**": { ssr: true },
   },
 
   runtimeConfig: {
@@ -79,6 +65,7 @@ export default defineNuxtConfig({
     pageTransition: { name: "page", mode: "out-in" },
     head: {
       title: "Nova",
+      link: [{ rel: "manifest", href: "/manifest.json" }],
       meta: [
         { charset: "utf-8" },
         { name: "viewport", content: "width=device-width, initial-scale=1" },
