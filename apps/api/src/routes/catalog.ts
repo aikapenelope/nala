@@ -19,6 +19,7 @@ import { calculateStockSemaphore } from "@nova/shared";
 import { tryGetDb } from "../db";
 import { getRedis } from "../redis";
 import { uploadPaymentProof, isStorageConfigured } from "../services/storage";
+import { getCurrentRate } from "../services/exchange-rate";
 import { logActivity } from "../utils/audit";
 import { uploadRateLimit } from "../middleware/rate-limit";
 
@@ -136,6 +137,15 @@ catalog.get("/:slug", async (c) => {
     };
   });
 
+  // Fetch exchange rate for Bs display (non-blocking, optional)
+  let exchangeRate: number | null = null;
+  try {
+    const rate = await getCurrentRate(business.id);
+    exchangeRate = rate.rateBcv;
+  } catch {
+    // Rate not configured -- that's fine, just don't show Bs prices
+  }
+
   const responseData = {
     business: {
       name: business.name,
@@ -147,6 +157,7 @@ catalog.get("/:slug", async (c) => {
     },
     categories: categoryRows,
     products: catalogProducts,
+    exchangeRate,
   };
 
   // Cache the response

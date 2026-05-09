@@ -249,7 +249,21 @@ async function submitOrder() {
         <p class="mb-2 text-sm font-semibold text-gray-700">
           Metodo de pago *
         </p>
-        <div class="space-y-2">
+
+        <!-- No payment methods configured -->
+        <div
+          v-if="!storeInfo?.paymentMethods?.length"
+          class="rounded-xl border border-dashed border-amber-200 bg-amber-50/50 p-4 text-center"
+        >
+          <p class="text-sm font-medium text-amber-700">
+            El vendedor no ha configurado metodos de pago.
+          </p>
+          <p class="mt-1 text-xs text-amber-600">
+            Contactalo por WhatsApp para coordinar el pago.
+          </p>
+        </div>
+
+        <div v-else class="space-y-2">
           <label
             v-for="pm in storeInfo?.paymentMethods ?? []"
             :key="pm.method"
