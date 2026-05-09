@@ -8,9 +8,10 @@
  * Connected to: GET /api/orders?status=...
  */
 
-import { Clock, CheckCircle, Truck, XCircle, RefreshCw } from "lucide-vue-next";
+import { Clock, CheckCircle, Truck, XCircle, RefreshCw, Volume2, VolumeX } from "lucide-vue-next";
 
 const { $api } = useApi();
+const { muted, toggleMute, playNotification } = useOrderSound();
 
 interface OrderRow {
   id: string;
@@ -39,6 +40,9 @@ const pendingCount = ref(0);
 const isLoading = ref(true);
 const loadError = ref("");
 
+/** Track previous pending count to detect new orders. */
+const prevPendingCount = ref(-1);
+
 /** Fetch orders for the active tab. */
 async function fetchOrders() {
   loadError.value = "";
@@ -49,6 +53,16 @@ async function fetchOrders() {
     }>(`/api/orders?status=${activeTab.value}&limit=50`);
 
     orders.value = result.orders;
+
+    // Play notification sound when pending count increases
+    // (skip the first fetch — prevPendingCount starts at -1)
+    if (
+      prevPendingCount.value >= 0 &&
+      result.pendingCount > prevPendingCount.value
+    ) {
+      playNotification();
+    }
+    prevPendingCount.value = result.pendingCount;
     pendingCount.value = result.pendingCount;
   } catch {
     loadError.value = "Error cargando pedidos";
@@ -122,13 +136,24 @@ watch(activeTab, () => {
           Pedidos de tu tienda online
         </p>
       </div>
-      <button
-        class="flex items-center gap-1.5 rounded-xl bg-white/70 px-3 py-2 text-xs font-medium text-gray-600 shadow-sm hover:bg-white"
-        @click="fetchOrders"
-      >
-        <RefreshCw :size="13" />
-        Actualizar
-      </button>
+      <div class="flex items-center gap-2">
+        <button
+          class="flex items-center gap-1 rounded-xl bg-white/70 px-2.5 py-2 text-xs font-medium shadow-sm hover:bg-white"
+          :class="muted ? 'text-gray-400' : 'text-gray-600'"
+          :title="muted ? 'Activar sonido' : 'Silenciar notificaciones'"
+          @click="toggleMute"
+        >
+          <VolumeX v-if="muted" :size="13" />
+          <Volume2 v-else :size="13" />
+        </button>
+        <button
+          class="flex items-center gap-1.5 rounded-xl bg-white/70 px-3 py-2 text-xs font-medium text-gray-600 shadow-sm hover:bg-white"
+          @click="fetchOrders"
+        >
+          <RefreshCw :size="13" />
+          Actualizar
+        </button>
+      </div>
     </div>
 
     <!-- Tabs -->
