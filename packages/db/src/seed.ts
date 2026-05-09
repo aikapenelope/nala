@@ -7,7 +7,13 @@
  */
 
 import { createDb } from "./client";
-import { businesses, users, categories, accountingAccounts } from "./schema";
+import {
+  businesses,
+  users,
+  categories,
+  accountingAccounts,
+  storeSettings,
+} from "./schema";
 
 async function seed() {
   const db = createDb();
@@ -87,6 +93,35 @@ async function seed() {
   );
 
   console.log(`Created ${accounts.length} accounting accounts`);
+
+  // Create store settings with example payment methods
+  await db.insert(storeSettings).values({
+    businessId: business.id,
+    storeEnabled: true,
+    paymentMethods: [
+      {
+        method: "pago_movil",
+        label: "Pago Movil",
+        details: {
+          bank: "Banesco",
+          phone: "0412-555-0001",
+          ci: "V-12345678",
+        },
+      },
+      {
+        method: "binance",
+        label: "Binance Pay",
+        details: { payId: "pedro_bodega" },
+      },
+    ],
+    deliveryEnabled: true,
+    deliveryFee: "2.00",
+    deliveryZones: "Los Teques y alrededores",
+    welcomeMessage: "Bienvenido a Bodega Don Pedro. Haz tu pedido online!",
+    minOrderAmount: "5.00",
+  });
+
+  console.log("Created store settings");
 
   console.log("\nSeed complete.");
 

@@ -31,6 +31,7 @@ import { accounting } from "./routes/accounting";
 import { team } from "./routes/team";
 import { suppliersRoutes } from "./routes/suppliers";
 import { configRoutes } from "./routes/config";
+import { ordersRoutes } from "./routes/orders";
 import { authMiddleware } from "./middleware/auth";
 import { tenantMiddleware } from "./middleware/tenant";
 import { publicRateLimit, apiRateLimit } from "./middleware/rate-limit";
@@ -200,6 +201,9 @@ api.route("/", suppliersRoutes);
 
 // Business configuration (surcharges, bank accounts, notifications)
 api.route("/", configRoutes);
+
+// Online orders and store settings
+api.route("/", ordersRoutes);
 
 app.route("/api", api);
 
