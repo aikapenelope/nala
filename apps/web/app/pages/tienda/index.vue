@@ -17,14 +17,27 @@ const { addItem, itemCount } = useCart();
 useStorefrontSeo({ title: "Catalogo" });
 
 const selectedCategory = ref<string | null>(null);
+const searchQuery = ref("");
 const addedProductId = ref<string | null>(null);
 
-/** Filtered products by selected category. */
+/** Filtered products by category and search query. */
 const filteredProducts = computed(() => {
-  if (!selectedCategory.value) return products.value;
-  return products.value.filter(
-    (p) => p.categoryName === selectedCategory.value,
-  );
+  let result = products.value;
+
+  if (selectedCategory.value) {
+    result = result.filter(
+      (p) => p.categoryName === selectedCategory.value,
+    );
+  }
+
+  const query = searchQuery.value.trim().toLowerCase();
+  if (query.length >= 2) {
+    result = result.filter((p) =>
+      p.name.toLowerCase().includes(query),
+    );
+  }
+
+  return result;
 });
 
 /** Show brief "added" feedback on a product card. */
@@ -120,11 +133,36 @@ onMounted(() => {
       <!-- Normal catalog -->
       <template v-else>
       <!-- Welcome message -->
-      <div v-if="business" class="mb-5">
+      <div v-if="business" class="mb-4">
         <h1 class="text-xl font-bold text-gray-900">{{ business.name }}</h1>
         <p v-if="business.address" class="mt-0.5 text-sm text-gray-500">
           {{ business.address }}
         </p>
+      </div>
+
+      <!-- Search input -->
+      <div class="relative mb-4">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+        >
+          <circle cx="11" cy="11" r="8" />
+          <path d="m21 21-4.3-4.3" />
+        </svg>
+        <input
+          v-model="searchQuery"
+          type="text"
+          placeholder="Buscar productos..."
+          class="w-full rounded-xl border border-gray-200 bg-white py-2.5 pl-9 pr-4 text-sm text-gray-900 outline-none transition-colors placeholder:text-gray-400 focus:border-gray-400 focus:ring-2 focus:ring-gray-100"
+        >
       </div>
 
       <!-- Category filter pills -->
@@ -160,12 +198,21 @@ onMounted(() => {
         </div>
       </div>
 
-      <!-- Empty state -->
+      <!-- Empty state (filtered) -->
       <div
         v-if="filteredProducts.length === 0"
         class="py-16 text-center text-gray-400"
       >
-        <p class="text-base">No hay productos disponibles.</p>
+        <p class="text-base">
+          {{ searchQuery.trim().length >= 2 ? "Sin resultados para tu busqueda." : "No hay productos disponibles." }}
+        </p>
+        <button
+          v-if="searchQuery.trim().length >= 2"
+          class="mt-3 text-sm font-medium text-gray-500 underline"
+          @click="searchQuery = ''"
+        >
+          Limpiar busqueda
+        </button>
       </div>
 
       <!-- Products grid -->
