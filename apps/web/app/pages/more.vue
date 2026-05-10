@@ -2,19 +2,23 @@
 /**
  * "More" page for mobile navigation.
  *
- * Provides access to sections not in the bottom tabs.
- * Logout is handled by the Clerk UserButton in the header.
+ * Organized in two sections:
+ * - Main: core features not in bottom tabs (Tienda, Clientes, Historial, Config)
+ * - Herramientas: advanced features (Cuentas, Cierre, Reportes, etc.)
  */
 
 import {
+  Globe,
+  Users,
   History,
+  Settings,
   Wallet,
   CalendarCheck,
   BarChart3,
   FileText,
-  Settings,
   Truck,
   ClipboardList,
+  Receipt,
   DollarSign,
 } from "lucide-vue-next";
 import type { Component } from "vue";
@@ -28,13 +32,36 @@ interface MenuItem {
   description: string;
 }
 
-const menuItems: MenuItem[] = [
+/** Core items - what most users need. */
+const mainItems: MenuItem[] = [
+  {
+    to: "/store",
+    icon: Globe,
+    label: "Tienda Online",
+    description: "Tu tienda publica PWA",
+  },
+  {
+    to: "/clients",
+    icon: Users,
+    label: "Clientes",
+    description: "Directorio y fiado",
+  },
   {
     to: "/sales/history",
     icon: History,
     label: "Historial de ventas",
-    description: "Ver todas las ventas realizadas",
+    description: "Todas las ventas realizadas",
   },
+  {
+    to: "/settings",
+    icon: Settings,
+    label: "Configuracion",
+    description: "Negocio y preferencias",
+  },
+];
+
+/** Advanced tools - for power users. */
+const toolItems: MenuItem[] = [
   {
     to: "/accounts",
     icon: Wallet,
@@ -54,12 +81,6 @@ const menuItems: MenuItem[] = [
     description: "Declarar efectivo al inicio",
   },
   {
-    to: "/sales/quotations",
-    icon: ClipboardList,
-    label: "Cotizaciones",
-    description: "Crear y convertir a venta",
-  },
-  {
     to: "/reports",
     icon: BarChart3,
     label: "Reportes",
@@ -67,21 +88,27 @@ const menuItems: MenuItem[] = [
   },
   {
     to: "/accounting",
+    icon: Receipt,
+    label: "Gastos",
+    description: "Registro de gastos y compras",
+  },
+  {
+    to: "/accounting/ocr",
     icon: FileText,
-    label: "Contabilidad",
-    description: "Asientos y exportacion contable",
+    label: "OCR Factura",
+    description: "Escanear factura con camara",
   },
   {
     to: "/suppliers",
     icon: Truck,
     label: "Proveedores",
-    description: "Directorio y estado de cuenta",
+    description: "Directorio de proveedores",
   },
   {
-    to: "/settings",
-    icon: Settings,
-    label: "Configuracion",
-    description: "Negocio y preferencias",
+    to: "/sales/quotations",
+    icon: ClipboardList,
+    label: "Cotizaciones",
+    description: "Crear y convertir a venta",
   },
 ];
 </script>
@@ -106,10 +133,10 @@ const menuItems: MenuItem[] = [
       </div>
     </div>
 
-    <!-- Menu items -->
+    <!-- Main items -->
     <div class="space-y-2">
       <NuxtLink
-        v-for="item in menuItems"
+        v-for="item in mainItems"
         :key="item.to"
         :to="item.to"
         class="flex items-center gap-4 rounded-xl bg-white p-4 shadow-sm transition-all hover:shadow-md"
@@ -122,6 +149,29 @@ const menuItems: MenuItem[] = [
         <div class="flex-1">
           <p class="text-sm font-semibold text-gray-900">{{ item.label }}</p>
           <p class="text-xs text-gray-500">{{ item.description }}</p>
+        </div>
+      </NuxtLink>
+    </div>
+
+    <!-- Tools section -->
+    <p class="mb-2 mt-6 px-1 text-[11px] font-bold uppercase tracking-wider text-gray-400">
+      Herramientas
+    </p>
+    <div class="space-y-2">
+      <NuxtLink
+        v-for="item in toolItems"
+        :key="item.to"
+        :to="item.to"
+        class="flex items-center gap-4 rounded-xl bg-white/70 p-3.5 shadow-sm transition-all hover:shadow-md"
+      >
+        <div
+          class="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-gray-50"
+        >
+          <component :is="item.icon" :size="18" class="text-gray-400" />
+        </div>
+        <div class="flex-1">
+          <p class="text-sm font-medium text-gray-700">{{ item.label }}</p>
+          <p class="text-[11px] text-gray-400">{{ item.description }}</p>
         </div>
       </NuxtLink>
     </div>
