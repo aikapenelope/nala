@@ -54,7 +54,7 @@ const meetsMinimum = computed(() => {
       Seguir comprando
     </NuxtLink>
 
-    <h1 class="mb-5 text-xl font-bold text-gray-900">Tu carrito</h1>
+    <h1 class="mb-5 text-xl font-bold text-gray-900 dark:text-white">Tu carrito</h1>
 
     <!-- Empty cart -->
     <div v-if="itemCount === 0" class="py-16 text-center">
@@ -94,7 +94,7 @@ const meetsMinimum = computed(() => {
         <div
           v-for="item in items"
           :key="item.productId"
-          class="flex gap-3 rounded-2xl border border-gray-100 bg-white p-3 shadow-sm"
+          class="flex gap-3 rounded-2xl border border-gray-100 bg-white p-3 shadow-sm dark:border-gray-800 dark:bg-gray-900"
         >
           <!-- Product image -->
           <div
@@ -132,7 +132,7 @@ const meetsMinimum = computed(() => {
           <!-- Item details -->
           <div class="flex min-w-0 flex-1 flex-col justify-between">
             <div class="flex items-start justify-between gap-2">
-              <p class="text-sm font-semibold leading-tight text-gray-900">
+              <p class="text-sm font-semibold leading-tight text-gray-900 dark:text-white">
                 {{ item.name }}
               </p>
               <button
@@ -203,7 +203,7 @@ const meetsMinimum = computed(() => {
       </button>
 
       <!-- Summary -->
-      <div class="mt-6 space-y-2 rounded-2xl border border-gray-100 bg-white p-4">
+      <div class="mt-6 space-y-2 rounded-2xl border border-gray-100 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
         <div class="flex justify-between text-sm text-gray-600">
           <span>Subtotal ({{ itemCount }} items)</span>
           <div class="text-right">
@@ -223,7 +223,7 @@ const meetsMinimum = computed(() => {
           </span>
         </div>
         <div class="border-t border-gray-100 pt-2">
-          <div class="flex justify-between text-base font-bold text-gray-900">
+          <div class="flex justify-between text-base font-bold text-gray-900 dark:text-white">
             <span>Total</span>
             <div class="text-right">
               <span>${{ total.toFixed(2) }}</span>
@@ -249,8 +249,8 @@ const meetsMinimum = computed(() => {
         class="mt-4 block w-full rounded-xl py-3.5 text-center text-sm font-bold transition-colors"
         :class="
           meetsMinimum
-            ? 'bg-gray-900 text-white hover:bg-gray-800'
-            : 'pointer-events-none bg-gray-200 text-gray-400'
+            ? 'bg-gray-900 text-white hover:bg-gray-800 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-200'
+            : 'pointer-events-none bg-gray-200 text-gray-400 dark:bg-gray-800 dark:text-gray-600'
         "
       >
         Continuar al pago

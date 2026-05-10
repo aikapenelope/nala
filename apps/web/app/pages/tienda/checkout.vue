@@ -137,10 +137,10 @@ async function submitOrder() {
       Volver al carrito
     </NuxtLink>
 
-    <h1 class="mb-5 text-xl font-bold text-gray-900">Confirmar pedido</h1>
+    <h1 class="mb-5 text-xl font-bold text-gray-900 dark:text-white">Confirmar pedido</h1>
 
     <!-- Order summary -->
-    <div class="mb-5 rounded-2xl border border-gray-100 bg-white p-4">
+    <div class="mb-5 rounded-2xl border border-gray-100 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
       <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
         Resumen
       </p>
@@ -184,7 +184,7 @@ async function submitOrder() {
           <span class="text-gray-600">Delivery</span>
           <span class="font-semibold">${{ deliveryFee.toFixed(2) }}</span>
         </div>
-        <div class="mt-1 flex justify-between text-base font-bold text-gray-900">
+        <div class="mt-1 flex justify-between text-base font-bold text-gray-900 dark:text-white">
           <span>Total</span>
           <div class="text-right">
             <span>${{ total.toFixed(2) }}</span>
@@ -206,7 +206,7 @@ async function submitOrder() {
           v-model="customerName"
           type="text"
           placeholder="Nombre completo"
-          class="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-900 outline-none transition-colors focus:border-gray-400 focus:ring-2 focus:ring-gray-100"
+          class="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-900 outline-none transition-colors focus:border-gray-400 focus:ring-2 focus:ring-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:focus:border-gray-600 dark:focus:ring-gray-700"
         >
       </div>
 
@@ -218,7 +218,7 @@ async function submitOrder() {
           v-model="customerPhone"
           type="tel"
           placeholder="0412-1234567"
-          class="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-900 outline-none transition-colors focus:border-gray-400 focus:ring-2 focus:ring-gray-100"
+          class="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-900 outline-none transition-colors focus:border-gray-400 focus:ring-2 focus:ring-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:focus:border-gray-600 dark:focus:ring-gray-700"
         >
       </div>
 
@@ -230,7 +230,7 @@ async function submitOrder() {
           v-model="customerNotes"
           rows="2"
           placeholder="Instrucciones especiales, direccion, etc."
-          class="w-full resize-none rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-900 outline-none transition-colors focus:border-gray-400 focus:ring-2 focus:ring-gray-100"
+          class="w-full resize-none rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-900 outline-none transition-colors focus:border-gray-400 focus:ring-2 focus:ring-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:focus:border-gray-600 dark:focus:ring-gray-700"
         />
       </div>
 
@@ -325,7 +325,7 @@ async function submitOrder() {
           v-model="paymentReference"
           type="text"
           placeholder="Nro. de transferencia o referencia"
-          class="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-900 outline-none transition-colors focus:border-gray-400 focus:ring-2 focus:ring-gray-100"
+          class="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-900 outline-none transition-colors focus:border-gray-400 focus:ring-2 focus:ring-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:focus:border-gray-600 dark:focus:ring-gray-700"
         >
       </div>
 
@@ -339,8 +339,8 @@ async function submitOrder() {
         class="w-full rounded-xl py-3.5 text-sm font-bold transition-colors"
         :class="
           isFormValid && !isSubmitting
-            ? 'bg-gray-900 text-white hover:bg-gray-800'
-            : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+            ? 'bg-gray-900 text-white hover:bg-gray-800 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-200'
+            : 'bg-gray-200 text-gray-400 cursor-not-allowed dark:bg-gray-800 dark:text-gray-600'
         "
         :disabled="!isFormValid || isSubmitting"
         @click="submitOrder"
