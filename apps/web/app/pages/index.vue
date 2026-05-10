@@ -32,10 +32,18 @@ import {
   UserPlus,
   Upload,
   ClipboardList,
+  CheckCircle,
+  Circle,
 } from "lucide-vue-next";
 
 const { user } = useNovaAuth();
 const { $api } = useApi();
+const {
+  steps: onboardingSteps,
+  allComplete: onboardingComplete,
+  completedCount: onboardingCompletedCount,
+  refresh: refreshOnboarding,
+} = useOnboardingChecklist();
 
 const isLoading = ref(true);
 const loadError = ref("");
@@ -249,6 +257,7 @@ onMounted(() => {
     });
   }
   loadDashboard();
+  refreshOnboarding();
 });
 
 async function saveRate() {
@@ -343,6 +352,54 @@ function openRateEditor() {
           >
           <template v-else>Configurar tasa</template>
         </button>
+      </div>
+
+      <!-- ONBOARDING CHECKLIST (hidden when all complete) -->
+      <div
+        v-if="!onboardingComplete"
+        class="mb-3 rounded-[20px] border border-green-200/60 bg-gradient-to-br from-[#F0FDF4] to-[#DCFCE7] p-4"
+      >
+        <div class="mb-3 flex items-center justify-between">
+          <p class="text-sm font-bold text-gray-800">
+            Configura tu tienda online
+          </p>
+          <span class="text-xs font-bold text-green-600">
+            {{ onboardingCompletedCount }}/{{ onboardingSteps.length }}
+          </span>
+        </div>
+        <!-- Progress bar -->
+        <div class="mb-3 h-1.5 overflow-hidden rounded-full bg-green-200/50">
+          <div
+            class="h-full rounded-full bg-green-500 transition-all duration-500"
+            :style="{ width: `${(onboardingCompletedCount / onboardingSteps.length) * 100}%` }"
+          />
+        </div>
+        <div class="space-y-1.5">
+          <NuxtLink
+            v-for="step in onboardingSteps"
+            :key="step.id"
+            :to="step.complete ? undefined : step.to"
+            class="flex items-center gap-2.5 rounded-xl px-2 py-1.5 text-sm transition-colors"
+            :class="step.complete ? 'text-gray-400' : 'text-gray-700 hover:bg-white/60'"
+          >
+            <CheckCircle
+              v-if="step.complete"
+              :size="16"
+              class="flex-shrink-0 text-green-500"
+            />
+            <Circle
+              v-else
+              :size="16"
+              class="flex-shrink-0 text-gray-300"
+            />
+            <span
+              class="text-[13px] font-medium"
+              :class="step.complete ? 'line-through' : ''"
+            >
+              {{ step.label }}
+            </span>
+          </NuxtLink>
+        </div>
       </div>
 
       <!-- HERO: Sales + Profit -->

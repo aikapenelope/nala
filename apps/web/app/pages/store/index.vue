@@ -24,6 +24,7 @@ import {
   Smartphone,
   Globe,
   Share2,
+  Eye,
 } from "lucide-vue-next";
 
 const { $api } = useApi();
@@ -288,6 +289,18 @@ onMounted(fetchSettings);
           <div v-else class="mt-3 rounded-xl border border-dashed border-amber-200 bg-amber-50/50 px-3 py-2.5">
             <p class="text-xs text-amber-700">Tu negocio no tiene slug. Configuralo en Config. &gt; Negocio.</p>
           </div>
+
+          <!-- Preview store button -->
+          <a
+            v-if="storeUrl && storeEnabled"
+            :href="storeUrl"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-gray-200 bg-gray-50 py-2.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100"
+          >
+            <Eye :size="16" class="text-gray-500" />
+            Ver como se ve tu tienda
+          </a>
         </div>
 
         <!-- Share store -->
