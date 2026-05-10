@@ -126,24 +126,24 @@ function removeFile() {
       </svg>
     </div>
 
-    <h1 class="text-2xl font-bold text-gray-900">Pedido enviado</h1>
+    <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Pedido enviado</h1>
     <p class="mt-2 text-sm text-gray-500">
       Tu pedido ha sido registrado exitosamente.
     </p>
 
     <!-- Order ID -->
-    <div class="mx-auto mt-5 max-w-xs rounded-2xl border border-gray-100 bg-white p-4">
+    <div class="mx-auto mt-5 max-w-xs rounded-2xl border border-gray-100 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
       <p class="text-xs font-semibold uppercase tracking-wide text-gray-400">
         Numero de pedido
       </p>
-      <p class="mt-1 font-mono text-lg font-bold text-gray-900">
+      <p class="mt-1 font-mono text-lg font-bold text-gray-900 dark:text-white">
         #{{ shortId }}
       </p>
     </div>
 
     <!-- Payment proof upload -->
     <div class="mx-auto mt-5 max-w-xs text-left">
-      <div class="rounded-2xl border border-gray-100 bg-white p-4">
+      <div class="rounded-2xl border border-gray-100 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
         <p class="mb-3 text-sm font-semibold text-gray-800">
           Comprobante de pago (opcional)
         </p>

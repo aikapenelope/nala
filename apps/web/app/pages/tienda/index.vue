@@ -148,8 +148,8 @@ onMounted(() => {
       <template v-else>
       <!-- Welcome message -->
       <div v-if="business" class="mb-4">
-        <h1 class="text-xl font-bold text-gray-900">{{ business.name }}</h1>
-        <p v-if="business.address" class="mt-0.5 text-sm text-gray-500">
+        <h1 class="text-xl font-bold text-gray-900 dark:text-white">{{ business.name }}</h1>
+        <p v-if="business.address" class="mt-0.5 text-sm text-gray-500 dark:text-gray-400">
           {{ business.address }}
         </p>
       </div>
@@ -175,7 +175,7 @@ onMounted(() => {
           v-model="searchQuery"
           type="text"
           placeholder="Buscar productos..."
-          class="w-full rounded-xl border border-gray-200 bg-white py-2.5 pl-9 pr-4 text-sm text-gray-900 outline-none transition-colors placeholder:text-gray-400 focus:border-gray-400 focus:ring-2 focus:ring-gray-100"
+          class="w-full rounded-xl border border-gray-200 bg-white py-2.5 pl-9 pr-4 text-sm text-gray-900 outline-none transition-colors placeholder:text-gray-400 focus:border-gray-400 focus:ring-2 focus:ring-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:placeholder:text-gray-500 dark:focus:border-gray-600 dark:focus:ring-gray-700"
         >
       </div>
 
@@ -234,7 +234,7 @@ onMounted(() => {
         <div
           v-for="product in filteredProducts"
           :key="product.id"
-          class="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm"
+          class="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900"
         >
           <!-- Product image -->
           <div class="relative aspect-square bg-gray-50">
@@ -288,10 +288,10 @@ onMounted(() => {
             >
               {{ product.categoryName }}
             </p>
-            <h3 class="mt-0.5 text-sm font-semibold leading-tight text-gray-900">
+            <h3 class="mt-0.5 text-sm font-semibold leading-tight text-gray-900 dark:text-white">
               {{ product.name }}
             </h3>
-            <p class="mt-1 text-base font-bold text-gray-900">
+            <p class="mt-1 text-base font-bold text-gray-900 dark:text-white">
               ${{ product.price.toFixed(2) }}
             </p>
             <p
@@ -308,7 +308,7 @@ onMounted(() => {
               :class="
                 addedProductId === product.id
                   ? 'bg-green-500 text-white'
-                  : 'bg-gray-900 text-white hover:bg-gray-800'
+                  : 'bg-gray-900 text-white hover:bg-gray-800 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-200'
               "
               :disabled="addedProductId === product.id"
               @click="handleAddToCart(product)"
@@ -330,7 +330,7 @@ onMounted(() => {
       <NuxtLink
         v-if="itemCount > 0"
         to="/tienda/cart"
-        class="fixed bottom-6 left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 rounded-full bg-gray-900 px-6 py-3.5 text-sm font-bold text-white shadow-[0_8px_30px_rgba(0,0,0,0.3)] transition-transform hover:scale-105"
+        class="fixed bottom-6 left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 rounded-full bg-gray-900 px-6 py-3.5 text-sm font-bold text-white shadow-[0_8px_30px_rgba(0,0,0,0.3)] transition-transform hover:scale-105 dark:bg-white dark:text-gray-900 dark:shadow-[0_8px_30px_rgba(255,255,255,0.15)]"
       >
         <div class="flex items-center gap-2">
           <svg

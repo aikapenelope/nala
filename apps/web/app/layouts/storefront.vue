@@ -8,6 +8,8 @@
  *
  * Reads business name from useStorefront() and cart count from useCart()
  * directly — no slots needed from child pages.
+ *
+ * Supports dark mode via prefers-color-scheme: dark.
  */
 
 const { tenantSlug } = useTenant();
@@ -28,16 +30,16 @@ async function handleInstall() {
 </script>
 
 <template>
-  <div class="min-h-screen bg-gray-50">
+  <div class="min-h-screen bg-gray-50 dark:bg-gray-950">
     <!-- Minimal header with store branding -->
-    <header class="sticky top-0 z-40 border-b border-gray-100 bg-white/90 backdrop-blur-md">
+    <header class="sticky top-0 z-40 border-b border-gray-100 bg-white/90 backdrop-blur-md dark:border-gray-800 dark:bg-gray-900/90">
       <div class="mx-auto flex h-14 max-w-3xl items-center justify-between px-4">
-        <NuxtLink to="/tienda" class="text-lg font-bold text-gray-900">
+        <NuxtLink to="/tienda" class="text-lg font-bold text-gray-900 dark:text-white">
           {{ storeName }}
         </NuxtLink>
         <NuxtLink
           to="/tienda/cart"
-          class="relative flex h-9 w-9 items-center justify-center rounded-full bg-gray-100 transition-colors hover:bg-gray-200"
+          class="relative flex h-9 w-9 items-center justify-center rounded-full bg-gray-100 transition-colors hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700"
           aria-label="Ver carrito"
         >
           <svg
@@ -50,7 +52,7 @@ async function handleInstall() {
             stroke-width="2"
             stroke-linecap="round"
             stroke-linejoin="round"
-            class="text-gray-700"
+            class="text-gray-700 dark:text-gray-300"
           >
             <circle cx="8" cy="21" r="1" />
             <circle cx="19" cy="21" r="1" />
@@ -59,7 +61,7 @@ async function handleInstall() {
           <!-- Cart item count badge -->
           <span
             v-if="itemCount > 0"
-            class="absolute -right-1 -top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-gray-900 px-1 text-[10px] font-bold leading-none text-white"
+            class="absolute -right-1 -top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-gray-900 px-1 text-[10px] font-bold leading-none text-white dark:bg-white dark:text-gray-900"
           >
             {{ itemCount > 99 ? "99+" : itemCount }}
           </span>
@@ -75,18 +77,19 @@ async function handleInstall() {
     <!-- PWA install banner -->
     <div
       v-if="showBanner"
-      class="border-t border-gray-100 bg-white"
+      class="border-t border-gray-100 bg-white dark:border-gray-800 dark:bg-gray-900"
     >
       <div class="mx-auto flex max-w-3xl items-center gap-3 px-4 py-3">
         <!-- Phone icon -->
-        <div class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-gray-900">
+        <div class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-gray-900 dark:bg-white">
           <svg
             xmlns="http://www.w3.org/2000/svg"
             width="20"
             height="20"
             viewBox="0 0 24 24"
             fill="none"
-            stroke="white"
+            class="stroke-white dark:stroke-gray-900"
+            stroke="currentColor"
             stroke-width="2"
             stroke-linecap="round"
             stroke-linejoin="round"
@@ -97,17 +100,17 @@ async function handleInstall() {
         </div>
 
         <div class="min-w-0 flex-1">
-          <p class="text-sm font-semibold text-gray-900">
+          <p class="text-sm font-semibold text-gray-900 dark:text-white">
             Instala esta tienda
           </p>
-          <p v-if="isIos" class="text-xs text-gray-500">
+          <p v-if="isIos" class="text-xs text-gray-500 dark:text-gray-400">
             Toca
             <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline align-text-bottom">
               <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" /><polyline points="16 6 12 2 8 6" /><line x1="12" x2="12" y1="2" y2="15" />
             </svg>
             y luego "Agregar a inicio"
           </p>
-          <p v-else class="text-xs text-gray-500">
+          <p v-else class="text-xs text-gray-500 dark:text-gray-400">
             Accede rapido desde tu celular
           </p>
         </div>
@@ -115,7 +118,7 @@ async function handleInstall() {
         <!-- Install / dismiss buttons -->
         <button
           v-if="canInstall"
-          class="flex-shrink-0 rounded-lg bg-gray-900 px-4 py-2 text-xs font-bold text-white"
+          class="flex-shrink-0 rounded-lg bg-gray-900 px-4 py-2 text-xs font-bold text-white dark:bg-white dark:text-gray-900"
           @click="handleInstall"
         >
           Instalar
@@ -133,8 +136,8 @@ async function handleInstall() {
     </div>
 
     <!-- Footer -->
-    <footer class="border-t border-gray-100 bg-white py-6">
-      <div class="mx-auto max-w-3xl px-4 text-center text-xs text-gray-400">
+    <footer class="border-t border-gray-100 bg-white py-6 dark:border-gray-800 dark:bg-gray-900">
+      <div class="mx-auto max-w-3xl px-4 text-center text-xs text-gray-400 dark:text-gray-500">
         <p>Tienda en linea · Precios en USD</p>
         <p v-if="tenantSlug" class="mt-1">
           Powered by
@@ -142,7 +145,7 @@ async function handleInstall() {
             href="https://novaincs.com"
             target="_blank"
             rel="noopener noreferrer"
-            class="font-medium text-gray-500 hover:text-gray-700"
+            class="font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
           >
             Nova
           </a>

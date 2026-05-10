@@ -47,7 +47,8 @@ export function useStorefrontSeo(options: StorefrontSeoOptions = {}) {
       ],
       meta: [
         { name: "description", content: pageDescription.value },
-        { name: "theme-color", content: "#111827" },
+        { name: "theme-color", content: "#111827", media: "(prefers-color-scheme: dark)" },
+        { name: "theme-color", content: "#ffffff", media: "(prefers-color-scheme: light)" },
         { name: "mobile-web-app-capable", content: "yes" },
         { name: "apple-mobile-web-app-capable", content: "yes" },
         {
