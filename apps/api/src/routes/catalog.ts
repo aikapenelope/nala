@@ -13,7 +13,7 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import { eq, and, desc, inArray } from "drizzle-orm";
+import { eq, and, desc, inArray, sql } from "drizzle-orm";
 import { businesses, products, categories, storeSettings, orders } from "@nova/db";
 import { calculateStockSemaphore } from "@nova/shared";
 import { tryGetDb } from "../db";
@@ -39,15 +39,17 @@ const STORE_INFO_CACHE_TTL = 300; // 5 minutes
  */
 catalog.get("/:slug", async (c) => {
   const slug = c.req.param("slug");
+  const limit = Math.min(Math.max(Number(c.req.query("limit")) || 100, 1), 500);
+  const offset = Math.max(Number(c.req.query("offset")) || 0, 0);
   const db = tryGetDb();
 
   if (!db) {
     return c.json({ error: "Service unavailable" }, 503);
   }
 
-  // Try Redis cache first
+  // Try Redis cache first (keyed by slug + pagination)
   const redis = getRedis();
-  const cacheKey = `catalog:${slug}`;
+  const cacheKey = `catalog:${slug}:${limit}:${offset}`;
   if (redis) {
     const cached = await redis.get(cacheKey);
     if (cached) {
@@ -74,7 +76,7 @@ catalog.get("/:slug", async (c) => {
     return c.json({ error: "Business not found" }, 404);
   }
 
-  // Fetch active products with stock > 0
+  // Fetch active products (paginated)
   const productRows = await db
     .select({
       id: products.id,
@@ -95,7 +97,21 @@ catalog.get("/:slug", async (c) => {
         eq(products.isActive, true),
       ),
     )
-    .orderBy(desc(products.updatedAt));
+    .orderBy(desc(products.updatedAt))
+    .limit(limit)
+    .offset(offset);
+
+  // Count total products for pagination metadata
+  const [countResult] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(products)
+    .where(
+      and(
+        eq(products.businessId, business.id),
+        eq(products.isActive, true),
+      ),
+    );
+  const totalProducts = countResult?.count ?? 0;
 
   // Fetch categories for this business
   const categoryRows = await db
@@ -158,6 +174,12 @@ catalog.get("/:slug", async (c) => {
     categories: categoryRows,
     products: catalogProducts,
     exchangeRate,
+    pagination: {
+      total: totalProducts,
+      limit,
+      offset,
+      hasMore: offset + productRows.length < totalProducts,
+    },
   };
 
   // Cache the response
@@ -319,27 +341,19 @@ catalog.post(
       }
     }
 
-    // Calculate totals upfront (doesn't need DB)
-    const subtotal = data.items.reduce((sum, item) => sum + item.lineTotal, 0);
     const deliveryFee =
       data.deliveryRequested && settings.deliveryEnabled
         ? Number(settings.deliveryFee)
         : 0;
-    const total = subtotal + deliveryFee;
 
-    // Enforce minimum order amount
-    if (Number(settings.minOrderAmount) > 0 && total < Number(settings.minOrderAmount)) {
-      return c.json(
-        { error: `Monto minimo de pedido: $${Number(settings.minOrderAmount).toFixed(2)}` },
-        400,
-      );
-    }
-
-    // Atomic stock validation + order creation inside a transaction.
+    // Atomic stock + price validation + order creation inside a transaction.
     // SELECT ... FOR UPDATE locks the product rows to prevent race conditions.
+    // Totals are recalculated server-side using DB prices to prevent manipulation.
     const productIds = data.items.map((item) => item.productId);
 
     let orderId: string;
+    let serverTotal: number;
+    let serverItems: Array<{ productId: string; name: string; price: number; quantity: number; lineTotal: number }>;
     try {
       const result = await db.transaction(async (tx) => {
         // Lock product rows for the duration of this transaction
@@ -357,22 +371,63 @@ catalog.post(
 
         const productMap = new Map(productRows.map((p) => [p.id, p]));
 
-        // Check each item has sufficient stock
+        // Check each item has sufficient stock and valid price
         const stockErrors: string[] = [];
+        const priceErrors: string[] = [];
         for (const item of data.items) {
           const product = productMap.get(item.productId);
           if (!product) {
             stockErrors.push(`Producto no encontrado: ${item.name}`);
-          } else if (product.stock < item.quantity) {
-            stockErrors.push(
-              `Stock insuficiente para ${item.name} (disponible: ${product.stock})`,
-            );
+          } else {
+            if (product.stock < item.quantity) {
+              stockErrors.push(
+                `Stock insuficiente para ${item.name} (disponible: ${product.stock})`,
+              );
+            }
+            // Validate price: client-sent price must match DB price (1 cent tolerance)
+            const dbPrice = Number(product.price);
+            if (Math.abs(item.price - dbPrice) > 0.01) {
+              priceErrors.push(
+                `Precio incorrecto para ${item.name}: enviado $${item.price.toFixed(2)}, actual $${dbPrice.toFixed(2)}`,
+              );
+            }
           }
+        }
+
+        if (priceErrors.length > 0) {
+          throw new Error(JSON.stringify({ priceErrors }));
         }
 
         if (stockErrors.length > 0) {
           throw new Error(JSON.stringify({ stockErrors }));
         }
+
+        // Recalculate totals server-side using DB prices (prevents client manipulation)
+        const subtotal = data.items.reduce((sum, item) => {
+          const dbPrice = Number(productMap.get(item.productId)?.price ?? item.price);
+          return sum + dbPrice * item.quantity;
+        }, 0);
+        const total = subtotal + deliveryFee;
+
+        // Enforce minimum order amount
+        const minOrder = Number(settings.minOrderAmount);
+        if (minOrder > 0 && total < minOrder) {
+          throw new Error(JSON.stringify({
+            minOrderError: `Monto minimo de pedido: $${minOrder.toFixed(2)}`,
+          }));
+        }
+
+        // Build server-validated items snapshot with DB prices
+        const validatedItems = data.items.map((item) => {
+          const dbPrice = Number(productMap.get(item.productId)?.price ?? item.price);
+          return {
+            productId: item.productId,
+            name: item.name,
+            price: dbPrice,
+            quantity: item.quantity,
+            lineTotal: dbPrice * item.quantity,
+          };
+        });
 
         // Create the order (stock is NOT decremented here, only on confirm)
         const [order] = await tx
@@ -382,7 +437,7 @@ catalog.post(
             customerName: data.customerName,
             customerPhone: data.customerPhone,
             customerNotes: data.customerNotes,
-            items: data.items,
+            items: validatedItems,
             subtotal: String(subtotal),
             deliveryFee: String(deliveryFee),
             total: String(total),
@@ -391,23 +446,38 @@ catalog.post(
           })
           .returning({ id: orders.id });
 
-        return order.id;
+        return { id: order.id, total, validatedItems };
       });
 
-      orderId = result;
+      orderId = result.id;
+      serverTotal = result.total;
+      serverItems = result.validatedItems;
     } catch (err) {
-      // Handle stock validation errors thrown from inside the transaction
+      // Handle validation errors thrown from inside the transaction
       if (err instanceof Error && err.message.startsWith("{")) {
         try {
-          const parsed = JSON.parse(err.message) as { stockErrors?: string[] };
+          const parsed = JSON.parse(err.message) as {
+            stockErrors?: string[];
+            priceErrors?: string[];
+            minOrderError?: string;
+          };
+          if (parsed.priceErrors) {
+            return c.json(
+              { error: "Precio incorrecto", details: parsed.priceErrors },
+              409,
+            );
+          }
           if (parsed.stockErrors) {
             return c.json(
               { error: "Stock insuficiente", details: parsed.stockErrors },
               409,
             );
           }
+          if (parsed.minOrderError) {
+            return c.json({ error: parsed.minOrderError }, 400);
+          }
         } catch {
-          // Not a stock error, rethrow
+          // Not a validation error, rethrow
         }
       }
       throw err;
@@ -425,11 +495,11 @@ catalog.post(
       businessId: business.id,
       userId: business.id, // Use businessId as actor for public orders
       action: "order_created",
-      detail: `Pedido online ${orderId.slice(0, 8)} - ${data.customerName} - $${total.toFixed(2)}`,
+      detail: `Pedido online ${orderId.slice(0, 8)} - ${data.customerName} - $${serverTotal.toFixed(2)}`,
     });
 
-    // Build WhatsApp link with order summary
-    const itemsSummary = data.items
+    // Build WhatsApp link with order summary (using server-validated items)
+    const itemsSummary = serverItems
       .map((item) => `• ${item.name} x${item.quantity} - $${item.lineTotal.toFixed(2)}`)
       .join("\n");
 
@@ -440,7 +510,7 @@ catalog.post(
       itemsSummary,
       "",
       deliveryFee > 0 ? `Delivery: $${deliveryFee.toFixed(2)}` : "",
-      `Total: $${total.toFixed(2)}`,
+      `Total: $${serverTotal.toFixed(2)}`,
       "",
       `Metodo de pago: ${data.paymentMethod}`,
       data.paymentReference ? `Referencia: ${data.paymentReference}` : "",
