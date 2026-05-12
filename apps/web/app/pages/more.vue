@@ -16,8 +16,6 @@ import {
   CalendarCheck,
   BarChart3,
   FileText,
-  Truck,
-  ClipboardList,
   Receipt,
   DollarSign,
 } from "lucide-vue-next";
@@ -97,18 +95,6 @@ const toolItems: MenuItem[] = [
     icon: FileText,
     label: "OCR Factura",
     description: "Escanear factura con camara",
-  },
-  {
-    to: "/suppliers",
-    icon: Truck,
-    label: "Proveedores",
-    description: "Directorio de proveedores",
-  },
-  {
-    to: "/sales/quotations",
-    icon: ClipboardList,
-    label: "Cotizaciones",
-    description: "Crear y convertir a venta",
   },
 ];
 </script>

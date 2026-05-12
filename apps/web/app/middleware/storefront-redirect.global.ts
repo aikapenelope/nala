@@ -22,8 +22,7 @@ export default defineNuxtRouteMiddleware((to) => {
   }
 
   // Block access to dashboard routes when on a tenant subdomain
-  const storefrontPaths = ["/tienda", "/catalogo"];
-  const isStorefrontRoute = storefrontPaths.some((p) => to.path.startsWith(p));
+  const isStorefrontRoute = to.path.startsWith("/tienda");
 
   if (!isStorefrontRoute && to.path !== "/") {
     return navigateTo("/tienda", { redirectCode: 302 });
