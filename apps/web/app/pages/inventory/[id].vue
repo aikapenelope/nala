@@ -2,6 +2,9 @@
 /**
  * Product creation/edit form.
  *
+ * Simplified: 3 essential fields visible (name, price, stock).
+ * Everything else in a collapsible "Mas detalles" section.
+ *
  * Connected to:
  * - GET /api/products/:id (load existing product for editing)
  * - POST /api/products (create new product)
@@ -10,7 +13,7 @@
  * - GET /api/categories (load category options)
  */
 
-
+import { ChevronDown } from "lucide-vue-next";
 
 const route = useRoute();
 const router = useRouter();
@@ -44,6 +47,27 @@ const form = reactive({
 
 /** Categories from API. */
 const categories = ref<Array<{ id: string; name: string }>>([]);
+
+/** Whether the "Mas detalles" section is expanded. */
+const detailsExpanded = ref(false);
+
+/** Auto-expand details when editing a product with advanced fields filled. */
+function autoExpandIfNeeded() {
+  if (
+    form.description ||
+    form.sku ||
+    form.barcode ||
+    form.cost > 0 ||
+    form.brand ||
+    form.location ||
+    form.expiresAt ||
+    form.wholesalePrice > 0 ||
+    form.hasVariants ||
+    form.isService
+  ) {
+    detailsExpanded.value = true;
+  }
+}
 
 /** Computed margin percentage. */
 const marginPercent = computed(() => {
@@ -193,6 +217,8 @@ onMounted(async () => {
           );
         }
       }
+
+      autoExpandIfNeeded();
     } catch {
       error.value = "Error cargando producto";
     } finally {
@@ -291,350 +317,315 @@ async function submitForm() {
       Cargando producto...
     </div>
 
-    <form v-else class="space-y-6" @submit.prevent="submitForm">
-      <!-- Basic info -->
+    <form v-else class="space-y-4" @submit.prevent="submitForm">
+      <!-- ============================================================ -->
+      <!-- Essential fields: Name, Price, Stock (always visible) -->
+      <!-- ============================================================ -->
       <div class="rounded-xl bg-white p-5 shadow-sm">
-        <h2 class="mb-4 text-sm font-semibold text-gray-700">
-          Informacion basica
-        </h2>
-
         <div class="space-y-4">
           <div>
-            <label class="mb-1 block text-sm text-gray-600">Nombre *</label>
+            <label class="mb-1 block text-sm font-medium text-gray-700">Nombre del producto *</label>
             <input
               v-model="form.name"
               type="text"
               placeholder="Ej: Harina PAN 1kg"
-              class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-nova-primary focus:outline-none"
+              class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-nova-primary focus:outline-none"
               required
             >
           </div>
 
-          <div>
-            <label class="mb-1 block text-sm text-gray-600">Descripcion</label>
-            <textarea
-              v-model="form.description"
-              rows="2"
-              placeholder="Descripcion opcional"
-              class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-nova-primary focus:outline-none"
-            />
-          </div>
-
-          <div>
-            <label class="mb-1 block text-sm text-gray-600">Categoria</label>
-            <select
-              v-model="form.categoryId"
-              class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-nova-primary focus:outline-none"
-            >
-              <option value="">Sin categoria</option>
-              <option v-for="cat in categories" :key="cat.id" :value="cat.id">
-                {{ cat.name }}
-              </option>
-            </select>
-          </div>
-
           <div class="grid grid-cols-2 gap-4">
             <div>
-              <label class="mb-1 block text-sm text-gray-600">SKU</label>
+              <label class="mb-1 block text-sm font-medium text-gray-700">Precio de venta (USD) *</label>
               <input
-                v-model="form.sku"
-                type="text"
-                placeholder="HP-001"
-                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-nova-primary focus:outline-none"
-              >
-            </div>
-            <div>
-              <label class="mb-1 block text-sm text-gray-600">
-                Codigo de barras
-              </label>
-              <input
-                v-model="form.barcode"
-                type="text"
-                placeholder="7591234567890"
-                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-nova-primary focus:outline-none"
-              >
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Product type and details -->
-      <div class="rounded-xl bg-white p-5 shadow-sm">
-        <h2 class="mb-4 text-sm font-semibold text-gray-700">
-          Tipo y detalles
-        </h2>
-
-        <div class="space-y-4">
-          <!-- Service toggle -->
-          <div class="flex items-center justify-between">
-            <div>
-              <p class="text-sm font-medium text-gray-700">
-                Producto tipo servicio
-              </p>
-              <p class="text-xs text-gray-500">
-                No maneja inventario (peluqueria, taller, etc.)
-              </p>
-            </div>
-            <label class="relative inline-flex cursor-pointer items-center">
-              <input
-                v-model="form.isService"
-                type="checkbox"
-                class="peer sr-only"
-              >
-              <div
-                class="h-6 w-11 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:bg-white after:transition-all peer-checked:bg-nova-primary peer-checked:after:translate-x-full"
-              />
-            </label>
-          </div>
-
-          <!-- Brand and location -->
-          <div class="grid grid-cols-2 gap-4">
-            <div>
-              <label class="mb-1 block text-sm text-gray-600">Marca</label>
-              <input
-                v-model="form.brand"
-                type="text"
-                placeholder="Ej: Samsung"
-                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-nova-primary focus:outline-none"
-              >
-            </div>
-            <div>
-              <label class="mb-1 block text-sm text-gray-600">
-                Ubicacion fisica
-              </label>
-              <input
-                v-model="form.location"
-                type="text"
-                placeholder="Ej: Estante A3"
-                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-nova-primary focus:outline-none"
-              >
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Pricing -->
-      <div class="rounded-xl bg-white p-5 shadow-sm">
-        <h2 class="mb-4 text-sm font-semibold text-gray-700">Precios (USD)</h2>
-
-        <div class="grid grid-cols-3 gap-4">
-          <div>
-            <label class="mb-1 block text-sm text-gray-600">Costo</label>
-            <input
-              v-model.number="form.cost"
-              type="number"
-              step="0.01"
-              min="0"
-              class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-nova-primary focus:outline-none"
-            >
-          </div>
-          <div>
-            <label class="mb-1 block text-sm text-gray-600">
-              Precio de venta *
-            </label>
-            <input
-              v-model.number="form.price"
-              type="number"
-              step="0.01"
-              min="0"
-              class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-nova-primary focus:outline-none"
-              required
-            >
-          </div>
-          <div>
-            <label class="mb-1 block text-sm text-gray-600">Margen</label>
-            <div
-              class="flex h-[38px] items-center rounded-lg bg-gray-50 px-3 text-sm text-gray-700"
-            >
-              {{ marginPercent }}%
-            </div>
-          </div>
-        </div>
-
-        <!-- Wholesale pricing -->
-        <div class="mt-4 border-t border-gray-100 pt-4">
-          <p class="mb-3 text-xs font-medium text-gray-500">
-            Precio al mayor (opcional)
-          </p>
-          <div class="grid grid-cols-2 gap-4">
-            <div>
-              <label class="mb-1 block text-sm text-gray-600">
-                Precio al mayor
-              </label>
-              <input
-                v-model.number="form.wholesalePrice"
+                v-model.number="form.price"
                 type="number"
                 step="0.01"
                 min="0"
                 placeholder="0.00"
-                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-nova-primary focus:outline-none"
+                class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-nova-primary focus:outline-none"
+                required
               >
             </div>
-            <div>
-              <label class="mb-1 block text-sm text-gray-600">
-                Cantidad minima
-              </label>
+            <div v-if="!form.isService">
+              <label class="mb-1 block text-sm font-medium text-gray-700">Stock actual</label>
+              <input
+                v-model.number="form.stock"
+                type="number"
+                min="0"
+                placeholder="0"
+                class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-nova-primary focus:outline-none"
+              >
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============================================================ -->
+      <!-- Expandable: "Mas detalles" -->
+      <!-- ============================================================ -->
+      <div class="rounded-xl bg-white shadow-sm">
+        <button
+          type="button"
+          class="flex w-full items-center justify-between px-5 py-4 text-left"
+          @click="detailsExpanded = !detailsExpanded"
+        >
+          <span class="text-sm font-semibold text-gray-600">Mas detalles</span>
+          <ChevronDown
+            :size="16"
+            class="text-gray-400 transition-transform"
+            :class="detailsExpanded ? 'rotate-180' : ''"
+          />
+        </button>
+
+        <div v-if="detailsExpanded" class="space-y-5 border-t border-gray-100 px-5 pb-5 pt-4">
+          <!-- Pricing details -->
+          <div>
+            <p class="mb-3 text-xs font-bold uppercase tracking-wider text-gray-400">Precios</p>
+            <div class="grid grid-cols-3 gap-4">
+              <div>
+                <label class="mb-1 block text-sm text-gray-600">Costo</label>
+                <input
+                  v-model.number="form.cost"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-nova-primary focus:outline-none"
+                >
+              </div>
+              <div>
+                <label class="mb-1 block text-sm text-gray-600">Precio al mayor</label>
+                <input
+                  v-model.number="form.wholesalePrice"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="0.00"
+                  class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-nova-primary focus:outline-none"
+                >
+              </div>
+              <div>
+                <label class="mb-1 block text-sm text-gray-600">Margen</label>
+                <div class="flex h-[38px] items-center rounded-lg bg-gray-50 px-3 text-sm text-gray-700">
+                  {{ marginPercent }}%
+                </div>
+              </div>
+            </div>
+            <div class="mt-3">
+              <label class="mb-1 block text-sm text-gray-600">Cantidad minima al mayor</label>
               <input
                 v-model.number="form.wholesaleMinQty"
                 type="number"
                 min="1"
-                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-nova-primary focus:outline-none"
+                class="w-32 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-nova-primary focus:outline-none"
               >
             </div>
           </div>
-        </div>
-      </div>
 
-      <!-- Stock (hidden for services) -->
-      <div v-if="!form.isService" class="rounded-xl bg-white p-5 shadow-sm">
-        <h2 class="mb-4 text-sm font-semibold text-gray-700">Inventario</h2>
-
-        <div class="grid grid-cols-3 gap-4">
+          <!-- Identification -->
           <div>
-            <label class="mb-1 block text-sm text-gray-600">Stock actual</label>
-            <input
-              v-model.number="form.stock"
-              type="number"
-              min="0"
-              class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-nova-primary focus:outline-none"
-            >
-          </div>
-          <div>
-            <label class="mb-1 block text-sm text-gray-600">
-              Minimo (amarillo)
-            </label>
-            <input
-              v-model.number="form.stockMin"
-              type="number"
-              min="0"
-              class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-nova-primary focus:outline-none"
-            >
-          </div>
-          <div>
-            <label class="mb-1 block text-sm text-gray-600">
-              Critico (rojo)
-            </label>
-            <input
-              v-model.number="form.stockCritical"
-              type="number"
-              min="0"
-              class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-nova-primary focus:outline-none"
-            >
-          </div>
-        </div>
-      </div>
-
-      <!-- Variants toggle -->
-      <div class="rounded-xl bg-white p-5 shadow-sm">
-        <div class="flex items-center justify-between">
-          <div>
-            <h2 class="text-sm font-semibold text-gray-700">Variantes</h2>
-            <p class="text-xs text-gray-500">
-              Talla, color, referencia, modelo
-            </p>
-          </div>
-          <label class="relative inline-flex cursor-pointer items-center">
-            <input
-              v-model="form.hasVariants"
-              type="checkbox"
-              class="peer sr-only"
-            >
-            <div
-              class="h-6 w-11 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:bg-white after:transition-all peer-checked:bg-nova-primary peer-checked:after:translate-x-full"
-            />
-          </label>
-        </div>
-
-        <!-- Variant management -->
-        <div v-if="form.hasVariants" class="mt-4 space-y-4">
-          <div>
-            <label class="mb-1 block text-xs text-gray-500">
-              Atributos de variante
-            </label>
-            <div class="flex flex-wrap gap-2">
-              <span
-                v-for="key in variantAttributeKeys"
-                :key="key"
-                class="flex items-center gap-1 rounded-full bg-blue-50 px-3 py-1 text-xs text-blue-700"
-              >
-                {{ key }}
-                <button
-                  type="button"
-                  class="text-blue-400 hover:text-blue-600"
-                  @click="removeAttributeKey(key)"
-                >
-                  x
-                </button>
-              </span>
-              <div class="flex gap-1">
+            <p class="mb-3 text-xs font-bold uppercase tracking-wider text-gray-400">Identificacion</p>
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="mb-1 block text-sm text-gray-600">SKU</label>
                 <input
-                  v-model="newAttributeKey"
+                  v-model="form.sku"
                   type="text"
-                  placeholder="Ej: Talla"
-                  class="w-24 rounded-lg border border-gray-300 px-2 py-1 text-xs"
-                  @keyup.enter="addAttributeKey"
+                  placeholder="HP-001"
+                  class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-nova-primary focus:outline-none"
                 >
-                <button
-                  type="button"
-                  class="rounded-lg bg-gray-100 px-2 py-1 text-xs"
-                  @click="addAttributeKey"
+              </div>
+              <div>
+                <label class="mb-1 block text-sm text-gray-600">Codigo de barras</label>
+                <input
+                  v-model="form.barcode"
+                  type="text"
+                  placeholder="7591234567890"
+                  class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-nova-primary focus:outline-none"
                 >
-                  +
-                </button>
               </div>
             </div>
           </div>
 
-          <div v-if="variants.length > 0" class="space-y-2">
-            <div
-              v-for="variant in variants"
-              :key="variant.id"
-              class="flex items-center gap-2 rounded-lg border border-gray-200 p-3"
-            >
+          <!-- Classification -->
+          <div>
+            <p class="mb-3 text-xs font-bold uppercase tracking-wider text-gray-400">Clasificacion</p>
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="mb-1 block text-sm text-gray-600">Categoria</label>
+                <select
+                  v-model="form.categoryId"
+                  class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-nova-primary focus:outline-none"
+                >
+                  <option value="">Sin categoria</option>
+                  <option v-for="cat in categories" :key="cat.id" :value="cat.id">
+                    {{ cat.name }}
+                  </option>
+                </select>
+              </div>
+              <div>
+                <label class="mb-1 block text-sm text-gray-600">Marca</label>
+                <input
+                  v-model="form.brand"
+                  type="text"
+                  placeholder="Ej: Samsung"
+                  class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-nova-primary focus:outline-none"
+                >
+              </div>
+            </div>
+          </div>
+
+          <!-- Stock thresholds -->
+          <div v-if="!form.isService">
+            <p class="mb-3 text-xs font-bold uppercase tracking-wider text-gray-400">Alertas de stock</p>
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="mb-1 block text-sm text-gray-600">Minimo (amarillo)</label>
+                <input
+                  v-model.number="form.stockMin"
+                  type="number"
+                  min="0"
+                  class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-nova-primary focus:outline-none"
+                >
+              </div>
+              <div>
+                <label class="mb-1 block text-sm text-gray-600">Critico (rojo)</label>
+                <input
+                  v-model.number="form.stockCritical"
+                  type="number"
+                  min="0"
+                  class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-nova-primary focus:outline-none"
+                >
+              </div>
+            </div>
+          </div>
+
+          <!-- Extra fields -->
+          <div>
+            <p class="mb-3 text-xs font-bold uppercase tracking-wider text-gray-400">Otros</p>
+            <div class="space-y-4">
+              <div class="grid grid-cols-2 gap-4">
+                <div>
+                  <label class="mb-1 block text-sm text-gray-600">Ubicacion fisica</label>
+                  <input
+                    v-model="form.location"
+                    type="text"
+                    placeholder="Ej: Estante A3"
+                    class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-nova-primary focus:outline-none"
+                  >
+                </div>
+                <div>
+                  <label class="mb-1 block text-sm text-gray-600">Fecha vencimiento</label>
+                  <input
+                    v-model="form.expiresAt"
+                    type="date"
+                    class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-nova-primary focus:outline-none"
+                  >
+                </div>
+              </div>
+              <div>
+                <label class="mb-1 block text-sm text-gray-600">Descripcion</label>
+                <textarea
+                  v-model="form.description"
+                  rows="2"
+                  placeholder="Descripcion opcional"
+                  class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-nova-primary focus:outline-none"
+                />
+              </div>
+
+              <!-- Toggles -->
+              <div class="flex items-center justify-between rounded-lg bg-gray-50 px-4 py-3">
+                <div>
+                  <p class="text-sm font-medium text-gray-700">Es servicio (sin stock)</p>
+                  <p class="text-xs text-gray-500">Peluqueria, taller, etc.</p>
+                </div>
+                <label class="relative inline-flex cursor-pointer items-center">
+                  <input v-model="form.isService" type="checkbox" class="peer sr-only">
+                  <div class="h-6 w-11 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:bg-white after:transition-all peer-checked:bg-nova-primary peer-checked:after:translate-x-full" />
+                </label>
+              </div>
+
+              <div class="flex items-center justify-between rounded-lg bg-gray-50 px-4 py-3">
+                <div>
+                  <p class="text-sm font-medium text-gray-700">Tiene variantes</p>
+                  <p class="text-xs text-gray-500">Talla, color, modelo</p>
+                </div>
+                <label class="relative inline-flex cursor-pointer items-center">
+                  <input v-model="form.hasVariants" type="checkbox" class="peer sr-only">
+                  <div class="h-6 w-11 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:bg-white after:transition-all peer-checked:bg-nova-primary peer-checked:after:translate-x-full" />
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <!-- Variant management (inside expanded section) -->
+          <div v-if="form.hasVariants" class="space-y-4">
+            <p class="text-xs font-bold uppercase tracking-wider text-gray-400">Variantes</p>
+            <div>
+              <label class="mb-1 block text-xs text-gray-500">Atributos de variante</label>
+              <div class="flex flex-wrap gap-2">
+                <span
+                  v-for="key in variantAttributeKeys"
+                  :key="key"
+                  class="flex items-center gap-1 rounded-full bg-blue-50 px-3 py-1 text-xs text-blue-700"
+                >
+                  {{ key }}
+                  <button type="button" class="text-blue-400 hover:text-blue-600" @click="removeAttributeKey(key)">x</button>
+                </span>
+                <div class="flex gap-1">
+                  <input
+                    v-model="newAttributeKey"
+                    type="text"
+                    placeholder="Ej: Talla"
+                    class="w-24 rounded-lg border border-gray-300 px-2 py-1 text-xs"
+                    @keyup.enter="addAttributeKey"
+                  >
+                  <button type="button" class="rounded-lg bg-gray-100 px-2 py-1 text-xs" @click="addAttributeKey">+</button>
+                </div>
+              </div>
+            </div>
+
+            <div v-if="variants.length > 0" class="space-y-2">
               <div
-                v-for="key in variantAttributeKeys"
-                :key="key"
-                class="flex-1"
+                v-for="variant in variants"
+                :key="variant.id"
+                class="flex items-center gap-2 rounded-lg border border-gray-200 p-3"
               >
+                <div v-for="key in variantAttributeKeys" :key="key" class="flex-1">
+                  <input
+                    v-model="variant.attributes[key]"
+                    type="text"
+                    :placeholder="key"
+                    class="w-full rounded border border-gray-200 px-2 py-1 text-xs"
+                  >
+                </div>
                 <input
-                  v-model="variant.attributes[key]"
-                  type="text"
-                  :placeholder="key"
-                  class="w-full rounded border border-gray-200 px-2 py-1 text-xs"
+                  v-model.number="variant.stock"
+                  type="number"
+                  min="0"
+                  placeholder="Stock"
+                  class="w-16 rounded border border-gray-200 px-2 py-1 text-xs"
                 >
+                <input
+                  v-model.number="variant.price"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="Precio"
+                  class="w-20 rounded border border-gray-200 px-2 py-1 text-xs"
+                >
+                <button type="button" class="text-xs text-red-400 hover:text-red-600" @click="removeVariant(variant.id)">x</button>
               </div>
-              <input
-                v-model.number="variant.stock"
-                type="number"
-                min="0"
-                placeholder="Stock"
-                class="w-16 rounded border border-gray-200 px-2 py-1 text-xs"
-              >
-              <input
-                v-model.number="variant.price"
-                type="number"
-                step="0.01"
-                min="0"
-                placeholder="Precio"
-                class="w-20 rounded border border-gray-200 px-2 py-1 text-xs"
-              >
-              <button
-                type="button"
-                class="text-xs text-red-400 hover:text-red-600"
-                @click="removeVariant(variant.id)"
-              >
-                x
-              </button>
             </div>
-          </div>
 
-          <button
-            type="button"
-            class="rounded-lg border border-dashed border-gray-300 px-4 py-2 text-sm text-gray-500 hover:border-nova-primary hover:text-nova-primary"
-            @click="addVariant"
-          >
-            + Agregar variante
-          </button>
+            <button
+              type="button"
+              class="rounded-lg border border-dashed border-gray-300 px-4 py-2 text-sm text-gray-500 hover:border-nova-primary hover:text-nova-primary"
+              @click="addVariant"
+            >
+              + Agregar variante
+            </button>
+          </div>
         </div>
       </div>
 
