@@ -19,8 +19,6 @@ import {
   BarChart3,
   FileText,
   Settings,
-  Truck,
-  ClipboardList,
   Receipt,
   PanelLeftClose,
   PanelLeftOpen,
@@ -59,8 +57,6 @@ const toolItems: NavItem[] = [
   { to: "/reports", icon: BarChart3, label: "Reportes" },
   { to: "/accounting", icon: Receipt, label: "Gastos" },
   { to: "/accounting/ocr", icon: FileText, label: "OCR Factura" },
-  { to: "/suppliers", icon: Truck, label: "Proveedores" },
-  { to: "/sales/quotations", icon: ClipboardList, label: "Cotizaciones" },
 ];
 
 const { user } = useNovaAuth();

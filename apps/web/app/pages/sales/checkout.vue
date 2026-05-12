@@ -16,17 +16,23 @@
  * - GET /api/exchange-rate
  * - GET /api/surcharge-types
  * - POST /api/sales
- * - useOfflineQueue (IndexedDB fallback)
  */
 
 import { usdToBs } from "@nova/shared";
 import type { PaymentMethod, SaleChannel } from "@nova/shared";
-import { Check, Wifi, WifiOff, X, MessageCircle, ShoppingCart } from "lucide-vue-next";
+import { Check, WifiOff, X, MessageCircle, ShoppingCart } from "lucide-vue-next";
 
 const router = useRouter();
 const { $api } = useApi();
-const { user } = useNovaAuth();
-const { isOnline, queueSale, init: initOfflineQueue } = useOfflineQueue();
+
+/** Simple online status check (no IndexedDB dependency). */
+const isOnline = ref(true);
+
+function updateOnlineStatus() {
+  if (import.meta.client) {
+    isOnline.value = navigator.onLine;
+  }
+}
 
 /** Exchange rate from API. */
 const exchangeRate = ref(0);
@@ -50,9 +56,6 @@ const selectedCustomerId = ref<string | null>(null);
 const isSubmitting = ref(false);
 const saleComplete = ref(false);
 const saleError = ref("");
-
-/** Whether the sale was queued offline (not sent to server yet). */
-const queuedOffline = ref(false);
 
 /** Sale channel (defaults to POS). */
 const selectedChannel = ref<SaleChannel>("pos");
@@ -114,8 +117,10 @@ function removeSurcharge(index: number) {
 onMounted(async () => {
   if (!import.meta.client) return;
 
-  // Initialize offline queue listeners
-  await initOfflineQueue();
+  // Track online status
+  updateOnlineStatus();
+  window.addEventListener("online", () => { isOnline.value = true; });
+  window.addEventListener("offline", () => { isOnline.value = false; });
 
   // Read ticket from sessionStorage
   const storedItems = sessionStorage.getItem("nova:checkout:items");
@@ -208,34 +213,10 @@ async function confirmSale() {
   isSubmitting.value = true;
   saleError.value = "";
 
-  // Offline path: queue in IndexedDB for later sync
+  // Block sale when offline -- require connectivity
   if (!isOnline.value) {
-    try {
-      await queueSale({
-        items: items.value.map((item) => ({
-          productId: item.productId,
-          quantity: item.quantity,
-          price: item.unitPrice,
-          discount: item.discountPercent,
-        })),
-        total: totalUsd.value,
-        paymentMethod: selectedMethod.value,
-        customerId: selectedCustomerId.value ?? undefined,
-        userId: user.value?.id ?? "",
-        createdAt: new Date().toISOString(),
-      });
-
-      sessionStorage.removeItem("nova:checkout:items");
-      sessionStorage.removeItem("nova:checkout:total");
-
-      queuedOffline.value = true;
-      saleComplete.value = true;
-    } catch {
-      saleError.value =
-        "Error guardando la venta localmente. Intenta de nuevo.";
-    } finally {
-      isSubmitting.value = false;
-    }
+    saleError.value = "Sin conexion a internet. Verifica tu conexion e intenta de nuevo.";
+    isSubmitting.value = false;
     return;
   }
 
@@ -302,17 +283,12 @@ function newSale() {
     <!-- Sale complete screen -->
     <div v-if="saleComplete" class="py-8 text-center">
       <div
-        class="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-[28px]"
-        :class="queuedOffline ? 'bg-gradient-to-br from-[#FEF3C7] to-[#FDE68A]' : 'bg-gradient-to-br from-[#D1FAE5] to-[#6EE7B7]'"
+        class="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-[28px] bg-gradient-to-br from-[#D1FAE5] to-[#6EE7B7]"
       >
-        <component
-          :is="queuedOffline ? WifiOff : Check"
-          :size="32"
-          :class="queuedOffline ? 'text-yellow-700' : 'text-green-700'"
-        />
+        <Check :size="32" class="text-green-700" />
       </div>
       <h1 class="text-2xl font-extrabold tracking-tight text-gradient">
-        {{ queuedOffline ? "Venta guardada" : "Venta registrada" }}
+        Venta registrada
       </h1>
       <p class="mt-2 text-lg font-bold text-gray-600">
         ${{ totalUsd.toFixed(2) }}
@@ -320,13 +296,6 @@ function newSale() {
           (Bs.{{ totalBs.toFixed(2) }})
         </span>
       </p>
-      <div
-        v-if="queuedOffline"
-        class="mx-auto mt-4 max-w-xs rounded-2xl bg-yellow-50 px-4 py-3 text-[13px] font-medium text-yellow-700"
-      >
-        Sin conexion. La venta se sincronizara automaticamente cuando vuelva el
-        internet.
-      </div>
 
       <div class="mt-8 space-y-3">
         <button
@@ -497,9 +466,9 @@ function newSale() {
         v-if="!isOnline"
         class="mb-4 glass flex items-center gap-2.5 rounded-2xl px-4 py-3"
       >
-        <Wifi :size="14" class="text-yellow-500" />
+        <WifiOff :size="14" class="text-yellow-500" />
         <span class="text-[13px] font-semibold text-yellow-700">
-          Sin conexion. La venta se guardara localmente.
+          Sin conexion. Necesitas internet para registrar la venta.
         </span>
       </div>
 
