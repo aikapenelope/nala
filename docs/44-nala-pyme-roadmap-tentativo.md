@@ -66,17 +66,6 @@ No es un ERP fiscal (no compite con Saint/Profit/Hybrid). No es una app para sol
 | **Funciona offline** | Existe pero sobreingenieriado | Simplificar: solo cache de productos para POS. Eliminar cola de ventas |
 | **Onboarding en 5 minutos** | Existe pero tiene demasiados pasos | Reducir a: nombre negocio + primer producto + listo |
 
-### Restaurantes (vertical clave)
-
-| Feature Treinta | Estado en Nala | Accion |
-|----------------|---------------|--------|
-| **Mesas** (asignar pedido a mesa) | No existe | Agregar en Fase 5 |
-| **Comandas** (enviar pedido a cocina) | No existe | Agregar en Fase 5 |
-| **Propinas** | No existe como concepto separado | Agregar como campo en checkout |
-| **Division de cuentas** | No existe | Agregar en Fase 5 |
-| **Recetas** (plato = ingredientes) | No existe | Agregar en Fase 5 |
-| **Modificadores** (sin cebolla, extra queso) | No existe | Agregar en Fase 5 |
-
 ### Gestion (lo que Treinta tiene y Nala ya tiene mejor)
 
 | Feature | Treinta | Nala | Ventaja Nala |
@@ -123,28 +112,23 @@ No es un ERP fiscal (no compite con Saint/Profit/Hybrid). No es una app para sol
 - Sube comprobante de pago desde el mismo link
 - El vendedor recibe notificacion cuando el cliente paga
 
-### 6. Recetas/composicion (restaurantes)
-- Crear receta: "Hamburguesa = 1 pan + 1 carne + 2 tomate + 1 lechuga"
-- Al vender hamburguesa, se descuentan los ingredientes automaticamente
-- Calcular costo real del plato basado en ingredientes
-
-### 7. Multi-usuario con roles
+### 6. Multi-usuario con roles
 - Owner: todo
 - Manager: todo menos config de negocio y anulaciones
 - Cashier: vender, ver inventario, ver pedidos
 - Invitacion por link o codigo
 
-### 8. Dashboard inteligente con sugerencias
+### 7. Dashboard inteligente con sugerencias
 - "Tienes 3 productos con stock critico" -> tap -> ir a inventario
 - "5 clientes te deben mas de $50" -> tap -> enviar cobro por WhatsApp
 - "Vendiste 30% menos que la semana pasada" -> tap -> ver detalle
 - Reglas simples con datos reales, no AI autonoma
 
-### 9. Notas de entrega / Comprobante de venta
+### 8. Notas de entrega / Comprobante de venta
 - Documento basico post-venta (no factura fiscal)
 - Compartible por WhatsApp como imagen o PDF
 
-### 10. Import inteligente (Google Sheets + foto de lista)
+### 9. Import inteligente (Google Sheets + foto de lista)
 - Import desde Google Sheets
 - Import desde foto de lista de precios (OCR + parsing)
 - El vendedor toma foto de la lista del proveedor -> se crean/actualizan productos
@@ -206,28 +190,69 @@ No es un ERP fiscal (no compite con Saint/Profit/Hybrid). No es una app para sol
 
 ---
 
+## Referentes de EEUU
+
+| Producto | Modelo | Lo que Nala toma |
+|----------|--------|-----------------|
+| **Square** (gratis + % transaccion) | Empezo como "acepta pagos con celular", crecio a POS + inventario + tienda + clientes | Filosofia: empieza simple, crece con el vendedor. Venta ultra-rapida |
+| **Shopify POS** ($5-89/mes) | Online y fisico son lo mismo: un inventario, un cliente, un dashboard | Omnichannel: storefront + POS unificados. Nala ya hace esto |
+| **Loyverse** (gratis, add-ons $5-25/mes) | POS gratis en celular, 1M+ negocios en 170 paises | Core gratis, cobra por features avanzados. Multi-dispositivo |
+
+**Lo que todos tienen en comun:** venta en 2-3 toques, inventario auto-actualizado, clientes auto-creados, dashboard con 3 numeros (hoy/semana/mes), multi-dispositivo.
+
+**Lo que ninguno tiene (oportunidad Nala):** WhatsApp API real, bimoneda BCV, OCR facturas, input por voz, link de pago compartible.
+
+---
+
 ## Diferenciadores vs competencia
 
-| Feature | Treinta | Fina | Saint | Nala (propuesto) |
-|---------|---------|------|-------|-----------------|
-| Venta en 2 toques | Si | No | No | **Si** |
-| Producto en 3 campos | Si | No | No | **Si** |
-| POS movil | Si | Si | No | **Si** |
-| Inventario con semaforo | Basico | Basico | Si | **Completo** |
-| Fiado + cobro WhatsApp | Link | Link | No | **API real** |
-| Tienda online PWA | Basico | No | No | **Completa** |
-| WhatsApp API real | No | No | No | **Si** |
-| OCR facturas | No | No | No | **Si** |
-| Input por voz | No | No | No | **Si** |
-| Link de pago compartible | No | No | No | **Si** |
-| Import por foto | No | No | No | **Si** |
-| Recetas (restaurantes) | Si | No | No | **Si** |
-| Mesas + comandas | Si | No | No | **Si** |
-| Multi-usuario | Si | Si | Si | **Si** |
-| Tasa BCV auto | N/A | Si | Si | **Si** |
-| IGTF | N/A | No | Si | **Si** |
-| Sugerencias inteligentes | No | No | No | **Si** |
-| Dark mode storefront | No | No | No | **Si** |
+| Feature | Square | Loyverse | Treinta | Fina | Nala (propuesto) |
+|---------|--------|----------|---------|------|-----------------|
+| Venta en 2 toques | Si | Si | Si | No | **Si** |
+| Producto en 3 campos | Si | Si | Si | No | **Si** |
+| POS movil | Si | Si | Si | Si | **Si** |
+| Inventario con semaforo | Basico | Basico | Basico | Basico | **Completo** |
+| Fiado + cobro WhatsApp | No | No | Link | Link | **API real** |
+| Tienda online PWA | Si (Shopify) | No | Basico | No | **Completa** |
+| WhatsApp API real | No | No | No | No | **Si** |
+| OCR facturas | No | No | No | No | **Si** |
+| Input por voz | No | No | No | No | **Si** |
+| Link de pago compartible | Si (Square) | No | No | No | **Si** |
+| Import por foto | No | No | No | No | **Si** |
+| Multi-usuario | Si | Add-on | Si | Si | **Si** |
+| Bimoneda (USD/Bs) | No | No | No | Si | **Si** |
+| Tasa BCV auto | No | No | No | Si | **Si** |
+| IGTF | No | No | No | No | **Si** |
+| Sugerencias inteligentes | No | No | No | No | **Si** |
+| Dark mode storefront | Si | No | No | No | **Si** |
+
+---
+
+## Que queda por detras (invisible pero funcionando)
+
+| Sistema | Que hace | Por que mantenerlo |
+|---------|---------|-------------------|
+| Asientos contables | Se generan en cada venta automaticamente | Datos disponibles si se necesita exportar contabilidad |
+| Historial de precios | Se registra al cambiar precio de producto | Audit trail |
+| Stock movements | Se registra en cada venta, ajuste, compra | Trazabilidad de inventario |
+| Activity log | Se registra cada accion del usuario | Seguridad y auditoria |
+| Customer segments (tabla) | Existe sin UI | Podria usarse para WhatsApp broadcasts en el futuro |
+| Quotations (tabla + endpoint) | Existe sin navegacion | La ruta sigue accesible por URL directa |
+| Suppliers (tabla + endpoint) | Existe sin navegacion | Se usa internamente en OCR para matching |
+| Accounting entries (tabla + endpoint) | Existe sin navegacion | Se generan automaticamente, consultables por API |
+
+## Que se elimina completamente
+
+| Componente | Razon |
+|-----------|-------|
+| `useOfflineQueue.ts` | Cola de ventas offline. Complejidad alta, uso 0% |
+| `useProductCache.ts` sync agresivo (1000 items) | Reemplazar por cache simple |
+| `useOfflineDb.ts` tabla `pendingSales` | Parte del offline queue |
+| `/catalogo/[slug].vue` | Duplica el storefront `/tienda` |
+| `/settings/bank-accounts.vue` | Nadie registra cuentas bancarias |
+| `/settings/notifications.vue` | No hay notificaciones reales |
+| `/settings/surcharges.vue` | Delivery fee ya esta en store_settings |
+| 9 paginas de reportes individuales | Se consolidan en `/reports/index.vue` con tabs |
 
 ---
 
@@ -350,14 +375,7 @@ Ajustar sidebar y mobile "Mas" para reflejar los cambios:
 - Import por foto de lista de precios
 - Barcode scanner mejorado
 
-### Fase 5 -- Restaurantes (3 semanas)
-- Mesas + comandas
-- Recetas (composicion de productos)
-- Modificadores de platos
-- Propinas
-- Division de cuentas
-
-### Fase 6 -- Personalizacion storefront (2 semanas)
+### Fase 5 -- Personalizacion storefront (2 semanas)
 - Color de marca + logo
 - Dominio custom
 
