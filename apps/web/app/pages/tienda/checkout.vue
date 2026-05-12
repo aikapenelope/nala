@@ -45,8 +45,26 @@ const deliveryFee = computed(() => {
   return storeInfo.value.deliveryFee;
 });
 
-/** Total. */
-const total = computed(() => subtotal.value + deliveryFee.value);
+/**
+ * IGTF (Impuesto a las Grandes Transacciones Financieras) - 3%.
+ * Applies to payments in foreign currency (USD cash, Zelle, Binance, Zinli).
+ * Informational only -- shown to the buyer so they know the real amount.
+ */
+const IGTF_RATE = 0.03;
+const divisaMethods = new Set(["zelle", "binance", "zinli", "efectivo_usd", "efectivo"]);
+
+const isIgtfApplicable = computed(() => {
+  return divisaMethods.has(selectedPaymentMethod.value);
+});
+
+const igtfAmount = computed(() => {
+  if (!isIgtfApplicable.value) return 0;
+  const base = subtotal.value + deliveryFee.value;
+  return Math.round(base * IGTF_RATE * 100) / 100;
+});
+
+/** Total including delivery and IGTF when applicable. */
+const total = computed(() => subtotal.value + deliveryFee.value + igtfAmount.value);
 
 /** Form validation. */
 const isFormValid = computed(() => {
@@ -184,6 +202,13 @@ async function submitOrder() {
           <span class="text-gray-600">Delivery</span>
           <span class="font-semibold">${{ deliveryFee.toFixed(2) }}</span>
         </div>
+        <div
+          v-if="isIgtfApplicable && igtfAmount > 0"
+          class="flex justify-between text-sm"
+        >
+          <span class="text-gray-600">IGTF (3%)</span>
+          <span class="font-semibold">${{ igtfAmount.toFixed(2) }}</span>
+        </div>
         <div class="mt-1 flex justify-between text-base font-bold text-gray-900 dark:text-white">
           <span>Total</span>
           <div class="text-right">
@@ -314,6 +339,19 @@ async function submitOrder() {
             </div>
           </label>
         </div>
+      </div>
+
+      <!-- IGTF notice -->
+      <div
+        v-if="isIgtfApplicable"
+        class="rounded-xl border border-amber-200 bg-amber-50/50 px-4 py-3"
+      >
+        <p class="text-xs font-semibold text-amber-700">
+          Este metodo de pago incluye IGTF (3%): +${{ igtfAmount.toFixed(2) }}
+        </p>
+        <p class="mt-0.5 text-[11px] text-amber-600">
+          Impuesto a las Grandes Transacciones Financieras sobre pagos en divisas.
+        </p>
       </div>
 
       <!-- Payment reference -->
