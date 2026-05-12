@@ -1,137 +1,81 @@
-# Nala: Roadmap Tentativo -- Sistema PyME Moderno para Venezuela
+# Nala: Roadmap de Producto
 
-> Mayo 2026. Analisis tentativo. Pendiente de revision y aprobacion.
-> Referencia: Treinta (Colombia, $46M Series A, 7M+ usuarios), Fina (Venezuela).
+> Mayo 2026. Filosofia Treinta: la venta genera el dato.
+> Referencia: Treinta (Colombia, $46M, 7M+ usuarios), Square (EEUU), Loyverse (global).
 
 ---
 
-## Filosofia de producto
+## Filosofia
 
 **La venta genera el dato. No al reves.**
 
-El vendedor nunca deberia sentir que esta "llenando un sistema". Deberia sentir que esta vendiendo, y el sistema se llena solo. Cada accion del vendedor (vender, recibir mercancia, cobrar) alimenta automaticamente inventario, clientes, estadisticas, y contabilidad.
+El vendedor nunca "llena un sistema". Vende, y el sistema se organiza solo. Cada venta actualiza inventario, crea clientes, calcula estadisticas, y genera contabilidad automaticamente.
 
-| Enfoque tradicional (Fina, Saint) | Enfoque Nala (inspirado en Treinta) |
+| Enfoque tradicional (Fina, Saint) | Enfoque Nala |
 |---|---|
-| "Registra tus productos con todos los datos" | "Pon nombre, precio y foto. Vende. El resto se calcula" |
+| "Registra tus productos con todos los datos" | "Nombre, precio, foto. Vende" |
 | "Configura tu plan de cuentas" | "Vende. La contabilidad se genera sola" |
 | "Registra a tus clientes" | "Vende. El cliente se crea cuando compra" |
 | "Llena el formulario de gastos" | "Toma foto de la factura. Listo" |
-| "Revisa tus 10 reportes" | "Abre la app. El dashboard te dice que hacer" |
+| "Revisa tus 10 reportes" | "El dashboard te dice que hacer" |
 
-### Principios de diseno
+### Principios
 
-1. **2 toques para vender**: tap producto, tap cobrar. Nada mas
-2. **3 campos para crear producto**: nombre, precio, foto. Todo lo demas es opcional y expandible
-3. **0 configuracion para empezar**: onboarding = crear negocio + agregar primer producto. 2 minutos
-4. **La camara es un input**: escanear barcode, tomar foto de factura, tomar foto de lista de precios
-5. **La voz es un input**: "agregar 10 harina pan a 1.50" funciona
-6. **WhatsApp es el canal**: notificaciones, cobros, pedidos, comprobantes -- todo por WhatsApp
-7. **El dashboard sugiere acciones**: no muestra datos pasivos. Dice "haz esto" con un boton
-
----
-
-## Posicionamiento
-
-**Nala es un sistema de gestion para PyMEs venezolanas con tienda online y WhatsApp integrado.**
-
-No es un ERP fiscal (no compite con Saint/Profit/Hybrid). No es una app para solopreneurs (eso es novaincs). Es el sistema que usa un negocio de 2-15 personas que quiere organizarse, vender online, y comunicarse con sus clientes por WhatsApp de forma profesional.
-
-### Diferencia con novaincs
-
-| | novaincs | Nala |
-|---|---------|------|
-| **Target** | Solopreneur, vendedor Instagram, <200 items | PyME, 2-15 personas, 200-2000 items |
-| **Foco** | Catalogo visual + AI images + WhatsApp conversacional | Gestion operativa + storefront + WhatsApp transaccional |
-| **Complejidad** | Minima (como Instagram) | Media (como Treinta pero moderno) |
-| **Storefront** | PWA basica con AI images | PWA completa con checkout, pedidos, dark mode |
-| **AI** | Agentes autonomos (venta, contenido, finanzas) | OCR facturas, voz-to-data, sugerencias inteligentes |
-| **Precio** | $0-15/mes | $15-30/mes |
+1. **2 toques para vender**: tap producto, tap cobrar
+2. **3 campos para crear producto**: nombre, precio, foto. El resto es expandible
+3. **0 configuracion para empezar**: nombre del negocio + primer producto = listo
+4. **La camara es un input**: barcode, foto de factura, foto de lista de precios
+5. **WhatsApp es el canal**: cobros de fiado, pedidos, comprobantes
+6. **El dashboard sugiere acciones**: "3 productos criticos" -> tap -> ir a inventario
+7. **Los datos se generan solos**: contabilidad, historial de precios, movimientos de stock
 
 ---
 
-## Features de Treinta que Nala debe adoptar
+## Que cambiar en Nala
 
-### Core (la venta como centro)
+### Simplificar (inspirado en Treinta/Square/Loyverse)
 
-| Feature Treinta | Estado en Nala | Accion |
-|----------------|---------------|--------|
-| **Venta en 2 toques** (tap producto, tap cobrar) | POS existe pero tiene pasos intermedios | Simplificar: eliminar pantalla de checkout separada para ventas rapidas |
-| **Producto en 3 campos** (nombre, precio, foto) | Formulario de 15+ campos | Redisenar: 3 campos visibles + "Mas detalles" expandible |
-| **Cliente se crea al comprar** | Hay que crear cliente manualmente antes | Crear automaticamente al registrar venta con nombre/telefono |
-| **Fiado en 1 toque** | Existe pero requiere seleccionar cliente primero | Simplificar: "Fiar a [nombre]" directo desde el ticket |
-| **Recordatorio de fiado por WhatsApp** | Solo link wa.me manual | Boton "Cobrar" que abre WhatsApp con mensaje pre-armado (Fase 1) y luego automatico (Fase 2 con API) |
-| **Estadisticas simples** (hoy, semana, mes) | 10 paginas de reportes | Consolidar en 1 dashboard con 3 periodos |
-| **Catalogo compartible** | Storefront PWA completo (mejor que Treinta) | Ya resuelto. Mantener |
-| **Funciona offline** | Existe pero sobreingenieriado | Simplificar: solo cache de productos para POS. Eliminar cola de ventas |
-| **Onboarding en 5 minutos** | Existe pero tiene demasiados pasos | Reducir a: nombre negocio + primer producto + listo |
+| Que | Hoy | Debe ser |
+|-----|-----|---------|
+| Vender | POS con pasos intermedios | 2 toques: tap producto, tap cobrar |
+| Crear producto | 15+ campos visibles | 3 campos: nombre, precio, foto. "Mas detalles" expandible |
+| Crear cliente | Manual, antes de vender | Automatico: se crea cuando compra o hace pedido |
+| Fiar | Requiere seleccionar cliente primero | "Fiar a [nombre]" directo desde el ticket |
+| Cobrar fiado | Link wa.me manual | Boton "Cobrar" -> WhatsApp con mensaje pre-armado |
+| Reportes | 10 paginas separadas | 1 pagina con 3 tabs: Hoy, Semana, Mes |
+| Settings | 7 sub-paginas | 1 pagina con secciones colapsables |
+| Onboarding | Multiples pasos | Nombre negocio + primer producto = listo |
+| Import productos | Solo Excel, solo desktop | Excel + foto de lista de precios. Mobile y desktop |
 
-### Gestion (lo que Treinta tiene y Nala ya tiene mejor)
+### Lo que Nala ya tiene mejor que todos
 
-| Feature | Treinta | Nala | Ventaja Nala |
-|---------|---------|------|-------------|
-| Inventario con semaforo | Basico | Completo (verde/amarillo/rojo + prediccion) | Nala gana |
-| Variantes (talla, color) | Si | Si | Empate |
-| Cierre de caja | Basico | Completo (apertura + cierre + comparacion) | Nala gana |
-| Cuentas por cobrar | Si | Si (con pagos parciales + aging) | Nala gana |
-| OCR facturas | No | Si (GPT-4o-mini) | Nala gana |
-| Tienda online | Catalogo basico | PWA completa con checkout | Nala gana |
-| Pedidos online | No | Flujo completo (pending->confirmed->delivered) | Nala gana |
+| Feature | Treinta | Square | Loyverse | Nala |
+|---------|---------|--------|----------|------|
+| Tienda online PWA | Catalogo basico | Requiere Shopify | No | Completa con checkout |
+| Pedidos online | No | Via Shopify | No | Flujo completo |
+| OCR facturas | No | No | No | Si (GPT-4o-mini) |
+| Inventario semaforo | Basico | Basico | Basico | Completo + prediccion |
+| Cierre de caja | Basico | Si | No | Completo (apertura + cierre) |
+| Cuentas por cobrar | Si | No | No | Con pagos parciales + aging |
+| Bimoneda USD/Bs | No | No | No | Si, con tasa BCV |
 
 ---
 
-## Features nuevos y modernos para Venezuela 2026
+## Features por agregar
 
-### 1. Ingesta de datos por voz (Groq Whisper)
-- El vendedor dice "agregar 10 harina pan a 1.50" y el producto se crea/actualiza
-- Usa Groq Whisper para transcripcion ultra-rapida
-- Parsing con GPT-4o-mini para extraer: accion, producto, cantidad, precio
-- **Por que es novedoso**: Ningun sistema en Venezuela tiene input por voz
-
-### 2. WhatsApp transaccional real (Cloud API)
-- Notificacion automatica al vendedor cuando llega pedido
-- Confirmacion automatica al cliente cuando se confirma pedido
-- Recordatorio de fiado automatico ("Hola Maria, tienes $15 pendientes")
-- Resumen diario al vendedor ("Hoy vendiste $450, 23 ventas")
-- **Costo**: ~$0.008/msg utility en LATAM. 20 pedidos/dia = ~$5/mes
-
-### 3. Tasa BCV auto-fetch + IGTF automatico
-- Jalar tasa BCV automaticamente cada dia
-- Calcular IGTF (3%) automaticamente en ventas en divisas
-- Mostrar precio en Bs y USD en todo el sistema
-
-### 4. Scan-to-add (camara como input principal)
-- Escanear barcode para agregar producto al ticket POS
-- Escanear barcode para buscar producto en inventario
-- Escanear factura del proveedor con OCR
-- Feedback haptico y sonido al escanear
-
-### 5. Link de pago compartible
-- Generar link unico por venta/pedido: `nala.app/pay/abc123`
-- El cliente abre, ve el monto, los datos de Pago Movil/Binance/Zelle
-- Sube comprobante de pago desde el mismo link
-- El vendedor recibe notificacion cuando el cliente paga
-
-### 6. Multi-usuario con roles
-- Owner: todo
-- Manager: todo menos config de negocio y anulaciones
-- Cashier: vender, ver inventario, ver pedidos
-- Invitacion por link o codigo
-
-### 7. Dashboard inteligente con sugerencias
-- "Tienes 3 productos con stock critico" -> tap -> ir a inventario
-- "5 clientes te deben mas de $50" -> tap -> enviar cobro por WhatsApp
-- "Vendiste 30% menos que la semana pasada" -> tap -> ver detalle
-- Reglas simples con datos reales, no AI autonoma
-
-### 8. Notas de entrega / Comprobante de venta
-- Documento basico post-venta (no factura fiscal)
-- Compartible por WhatsApp como imagen o PDF
-
-### 9. Import inteligente (Google Sheets + foto de lista)
-- Import desde Google Sheets
-- Import desde foto de lista de precios (OCR + parsing)
-- El vendedor toma foto de la lista del proveedor -> se crean/actualizan productos
+| # | Feature | Descripcion | Fase |
+|---|---------|-------------|------|
+| 1 | **Cobro fiado por WhatsApp** | Boton "Cobrar" en cada deuda -> abre wa.me con mensaje pre-armado | 1 |
+| 2 | **Tasa BCV auto + IGTF** | Fetch automatico cada 6h. IGTF 3% en ventas en divisas | 1 |
+| 3 | **Validacion precios server-side** | Comparar precio enviado vs precio real en DB al crear pedido | 1 |
+| 4 | **Paginacion catalogo** | LIMIT 100 + scroll infinito en storefront | 1 |
+| 5 | **Import Excel mejorado** | Deteccion de duplicados por SKU. Funciona en mobile | 2 |
+| 6 | **Import por foto** | Tomar foto de lista de precios del proveedor -> OCR -> crear productos | 2 |
+| 7 | **Comprobante por WhatsApp** | Post-venta: compartir recibo como imagen por WhatsApp | 2 |
+| 8 | **Multi-usuario** | Roles: owner, manager, cashier. Invitacion por link | 3 |
+| 9 | **Dashboard con sugerencias** | "3 productos criticos" -> tap -> inventario. Reglas simples, no AI | 3 |
+| 10 | **Link de pago compartible** | `nala.app/pay/abc123` con datos de pago + upload comprobante | 4 |
+| 11 | **Personalizacion storefront** | Color de marca + logo + dominio custom | 5 |
 
 ---
 
@@ -166,45 +110,20 @@ No es un ERP fiscal (no compite con Saint/Profit/Hybrid). No es una app para sol
 
 ## Buyer Persona
 
-### Principal: Roberto -- Dueno de PyME (60% del target)
+### Roberto -- Comerciante (el cliente principal)
 
-- **Edad:** 30-50 anos
-- **Negocio:** Mini-market, ferreteria pequena, restaurante, distribuidora, tienda de repuestos
-- **Productos:** 200-1000 items
-- **Empleados:** 2-10 personas
-- **Facturacion:** $2,000-$15,000 USD/mes
-- **Dispositivo:** Android gama media + computadora en el mostrador
-- **Hoy usa:** Fina, Excel, cuaderno, o Saint viejo sin actualizar
-- **Dolor:** "Necesito organizarme pero los sistemas son complicados o caros"
-
-### Secundario: Ana -- Administradora (30% del target)
-
-- **Rol:** Lleva las cuentas de 1-3 negocios
-- **Necesita:** Reportes claros, control de gastos, cierre de caja
-- **Dolor:** "Paso horas consolidando datos de diferentes fuentes"
-
-### Terciario: Carlos -- Comerciante pequeno (10% del target)
-
-- Bodega, panaderia, <200 items
-- Usa Nala en modo simple (POS + inventario + storefront)
+- **Negocio:** Bodega, mini-market, tienda de ropa, licoreria, tienda de celulares, distribuidora
+- **Productos:** 50-500 items
+- **Personas:** 1-5 (el dueno + ayudantes)
+- **Facturacion:** $500-$10,000 USD/mes
+- **Dispositivo:** Android gama media. Algunos tienen computadora en el mostrador
+- **Hoy usa:** Cuaderno, Excel, Fina, o nada
+- **Dolor:** "No se cuanto vendi", "Se me olvido que me deben", "Quiero que me pidan por internet"
+- **No necesita:** Contabilidad formal, facturacion fiscal, reportes complejos
 
 ---
 
-## Referentes de EEUU
-
-| Producto | Modelo | Lo que Nala toma |
-|----------|--------|-----------------|
-| **Square** (gratis + % transaccion) | Empezo como "acepta pagos con celular", crecio a POS + inventario + tienda + clientes | Filosofia: empieza simple, crece con el vendedor. Venta ultra-rapida |
-| **Shopify POS** ($5-89/mes) | Online y fisico son lo mismo: un inventario, un cliente, un dashboard | Omnichannel: storefront + POS unificados. Nala ya hace esto |
-| **Loyverse** (gratis, add-ons $5-25/mes) | POS gratis en celular, 1M+ negocios en 170 paises | Core gratis, cobra por features avanzados. Multi-dispositivo |
-
-**Lo que todos tienen en comun:** venta en 2-3 toques, inventario auto-actualizado, clientes auto-creados, dashboard con 3 numeros (hoy/semana/mes), multi-dispositivo.
-
-**Lo que ninguno tiene (oportunidad Nala):** WhatsApp API real, bimoneda BCV, OCR facturas, input por voz, link de pago compartible.
-
----
-
-## Diferenciadores vs competencia
+## Competencia
 
 | Feature | Square | Loyverse | Treinta | Fina | Nala (propuesto) |
 |---------|--------|----------|---------|------|-----------------|
@@ -361,23 +280,18 @@ Ajustar sidebar y mobile "Mas" para reflejar los cambios:
 
 ---
 
-### Fase 2 -- WhatsApp real + Link de pago (3 semanas)
-- WhatsApp Cloud API integration
-- Templates: pedido nuevo, confirmacion, recordatorio fiado, resumen diario
-- Link de pago compartible con upload de comprobante
+### Fase 2 -- Import + Comprobantes (2 semanas)
+- Import Excel mejorado: deteccion duplicados por SKU, funciona en mobile
+- Import por foto de lista de precios (OCR -> crear productos)
+- Comprobante de venta compartible por WhatsApp (imagen)
 
-### Fase 3 -- Multi-usuario + Roles (2 semanas)
-- Owner, Manager, Cashier
-- Invitacion por link
+### Fase 3 -- Multi-usuario + Dashboard inteligente (3 semanas)
+- Roles: owner, manager, cashier. Invitacion por link
+- Dashboard con sugerencias accionables (stock critico, fiados pendientes, tendencia)
 
-### Fase 4 -- Input moderno (3 semanas)
-- Voz-to-data (Groq Whisper + GPT-4o-mini parsing)
-- Import por foto de lista de precios
-- Barcode scanner mejorado
-
-### Fase 5 -- Personalizacion storefront (2 semanas)
-- Color de marca + logo
-- Dominio custom
+### Fase 4 -- Link de pago + Personalizacion (2 semanas)
+- Link de pago compartible: `nala.app/pay/abc123`
+- Color de marca + logo en storefront
 
 ---
 
