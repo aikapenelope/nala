@@ -593,8 +593,18 @@ catalog.get("/:slug/products/:productId/image", async (c) => {
     return c.json({ error: "Image not found in storage" }, 404);
   }
 
+  // ETag-based caching for proper revalidation after image re-uploads.
+  if (result.etag) {
+    const ifNoneMatch = c.req.header("If-None-Match");
+    if (ifNoneMatch && ifNoneMatch === result.etag) {
+      return c.body(null, 304);
+    }
+    c.header("ETag", result.etag);
+  }
+
+  // Storefront images can cache longer (public catalog, less frequent changes)
   c.header("Content-Type", result.contentType);
-  c.header("Cache-Control", "public, max-age=86400, immutable");
+  c.header("Cache-Control", "public, max-age=3600, must-revalidate");
 
   return c.body(result.body);
 });

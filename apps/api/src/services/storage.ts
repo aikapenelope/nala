@@ -215,11 +215,11 @@ export async function getProofUrl(key: string): Promise<string> {
  * Used by the proxy endpoint to serve images without exposing MinIO.
  *
  * @param keyOrUrl - Storage key or legacy presigned URL
- * @returns Object with body stream and content type, or null if not found
+ * @returns Object with body stream, content type, and ETag, or null if not found
  */
 export async function getProductImageStream(
   keyOrUrl: string,
-): Promise<{ body: ReadableStream; contentType: string } | null> {
+): Promise<{ body: ReadableStream; contentType: string; etag: string | null } | null> {
   if (!isStorageConfigured || !keyOrUrl) {
     return null;
   }
@@ -251,20 +251,25 @@ export async function getProductImageStream(
 
     if (!response.Body) return null;
 
-    // Determine content type from key extension
-    const ext = key.split(".").pop()?.toLowerCase();
-    const contentType =
-      ext === "jpg" || ext === "jpeg"
-        ? "image/jpeg"
-        : ext === "png"
-          ? "image/png"
-          : ext === "webp"
-            ? "image/webp"
-            : "application/octet-stream";
+    // Use the content type from S3 metadata (set during upload).
+    // Fall back to extension-based detection if metadata is missing.
+    let contentType = response.ContentType;
+    if (!contentType || contentType === "application/octet-stream") {
+      const ext = key.split(".").pop()?.toLowerCase();
+      contentType =
+        ext === "jpg" || ext === "jpeg"
+          ? "image/jpeg"
+          : ext === "png"
+            ? "image/png"
+            : ext === "webp"
+              ? "image/webp"
+              : "application/octet-stream";
+    }
 
     return {
       body: response.Body.transformToWebStream() as ReadableStream,
       contentType,
+      etag: response.ETag ?? null,
     };
   } catch {
     return null;

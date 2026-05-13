@@ -44,7 +44,6 @@ import { validateUuidParam } from "../middleware/validate-uuid";
 import {
   uploadProductImage,
   isStorageConfigured,
-  getProductImageUrl,
   getProductImageStream,
 } from "../services/storage";
 import type { AppEnv } from "../types";
@@ -829,9 +828,18 @@ inventory.get("/products/:id/image", validateUuidParam, async (c) => {
     return c.json({ error: "Image not found in storage" }, 404);
   }
 
-  // Cache for 1 day (images don't change often)
+  // ETag-based caching: browser revalidates when image changes (re-upload).
+  // If the client sends If-None-Match matching the ETag, return 304.
+  if (result.etag) {
+    const ifNoneMatch = c.req.header("If-None-Match");
+    if (ifNoneMatch && ifNoneMatch === result.etag) {
+      return c.body(null, 304);
+    }
+    c.header("ETag", result.etag);
+  }
+
   c.header("Content-Type", result.contentType);
-  c.header("Cache-Control", "public, max-age=86400, immutable");
+  c.header("Cache-Control", "public, max-age=3600, must-revalidate");
 
   return c.body(result.body);
 });
