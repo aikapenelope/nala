@@ -23,21 +23,16 @@ import {
   AlertTriangle,
   DollarSign,
   Package,
-  CreditCard,
-  Trophy,
+  ShoppingBag,
   Star,
   Wallet,
   RefreshCw,
   BarChart3,
-  UserPlus,
-  Upload,
-  ClipboardList,
-  CheckCircle,
-  Circle,
 } from "lucide-vue-next";
 
 const { user } = useNovaAuth();
 const { $api } = useApi();
+const { pendingCount: pendingOrdersCount } = useOrdersBadge();
 const {
   steps: onboardingSteps,
   allComplete: onboardingComplete,
@@ -103,44 +98,12 @@ const dueToday = ref<DueReceivable[]>([]);
 
 /** Sync status. */
 const syncStatus = ref<"online" | "offline" | "syncing">("online");
-const pendingSyncCount = ref(0);
 
 const greeting = computed(() => {
   const hour = new Date().getHours();
   if (hour < 12) return "Buenos dias";
   if (hour < 18) return "Buenas tardes";
   return "Buenas noches";
-});
-
-/** Payment method config with colors. */
-const methodConfig: Record<
-  string,
-  { label: string; from: string; to: string }
-> = {
-  efectivo: { label: "Efectivo", from: "#4ade80", to: "#16a34a" },
-  pago_movil: { label: "Movil", from: "#60a5fa", to: "#2563eb" },
-  binance: { label: "Binance", from: "#fbbf24", to: "#d97706" },
-  zinli: { label: "Zinli", from: "#a78bfa", to: "#7c3aed" },
-  transferencia: { label: "Transf.", from: "#38bdf8", to: "#0284c7" },
-  zelle: { label: "Zelle", from: "#818cf8", to: "#4f46e5" },
-  fiado: { label: "Fiado", from: "#fb923c", to: "#ea580c" },
-};
-
-const topMethods = computed(() => {
-  const entries = Object.entries(salesByMethod.value);
-  if (entries.length === 0) return [];
-  const total = entries.reduce((sum, [, v]) => sum + v, 0);
-  if (total === 0) return [];
-  return entries
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 4)
-    .map(([method, amount]) => ({
-      label: methodConfig[method]?.label ?? method,
-      from: methodConfig[method]?.from ?? "#9ca3af",
-      to: methodConfig[method]?.to ?? "#6b7280",
-      percent: Math.round((amount / total) * 100),
-      amount: Math.round(amount * 100) / 100,
-    }));
 });
 
 /** Load all dashboard data in parallel. */
@@ -360,12 +323,6 @@ function openRateEditor() {
       />
     </div>
 
-    <SharedContextualTip
-      tip-id="dashboard"
-      title="Tu panel de control"
-      description="Aqui ves las ventas del dia, tendencias semanales, alertas de inventario y acciones rapidas. Toca cualquier tarjeta para ver mas detalles."
-    />
-
     <!-- Skeleton -->
     <div v-if="isLoading" class="animate-pulse space-y-3">
       <div class="h-7 w-52 rounded-xl bg-white/50" />
@@ -375,8 +332,7 @@ function openRateEditor() {
         <div class="h-24 rounded-[24px] bg-white/40" />
         <div class="h-24 rounded-[24px] bg-white/40" />
       </div>
-      <div class="h-28 rounded-[24px] bg-white/40" />
-      <div class="h-20 rounded-[24px] bg-white/40" />
+      <div class="h-14 rounded-[20px] bg-white/40" />
     </div>
 
     <!-- Error -->
@@ -391,118 +347,78 @@ function openRateEditor() {
     </div>
 
     <template v-else>
-      <!-- HEADER -->
-      <div class="mb-4 flex items-center justify-between">
+      <!-- ============================================================ -->
+      <!-- SCREEN 1: Header + Hero + Cards + CTA (no scroll needed) -->
+      <!-- ============================================================ -->
+
+      <!-- HEADER with rate visible -->
+      <div class="mb-3 flex items-center justify-between">
         <div>
           <h1 class="text-2xl font-extrabold tracking-tight text-gradient">
             {{ greeting }}
           </h1>
           <p class="mt-0.5 text-sm font-medium text-gray-500">
-            {{ user?.businessName ?? "Nova" }}
-            <span class="text-gray-300"> · </span>
-            {{ user?.name ?? "" }}
+            {{ user?.businessName ?? "Nala" }}
+            <button
+              class="ml-1 rounded-lg px-1.5 py-0.5 text-xs font-bold transition-spring"
+              :class="exchangeRate ? 'bg-green-50 text-green-700' : 'bg-yellow-100 text-yellow-700'"
+              @click="openRateEditor"
+            >
+              {{ exchangeRate ? `Bs.${exchangeRate.toFixed(2)}` : "Tasa?" }}
+            </button>
           </p>
         </div>
         <button
-          class="rounded-2xl px-4 py-2 text-xs font-bold transition-spring"
-          :class="
-            exchangeRate
-              ? 'glass text-gray-700'
-              : 'bg-yellow-100 text-yellow-700'
-          "
-          @click="openRateEditor"
+          class="text-gray-300 transition-spring hover:text-gray-500"
+          @click="loadDashboard"
         >
-          <template v-if="exchangeRate"
-            >Bs.{{ exchangeRate.toFixed(2) }}</template
-          >
-          <template v-else>Configurar tasa</template>
+          <RefreshCw :size="16" />
         </button>
       </div>
 
-      <!-- ONBOARDING CHECKLIST (hidden when all complete) -->
+      <!-- ONBOARDING (compact, only if incomplete) -->
       <div
         v-if="!onboardingComplete"
-        class="mb-3 rounded-[20px] border border-green-200/60 bg-gradient-to-br from-[#F0FDF4] to-[#DCFCE7] p-4"
+        class="mb-3 rounded-[16px] border border-green-200/60 bg-gradient-to-r from-[#F0FDF4] to-[#DCFCE7] px-4 py-3"
       >
-        <div class="mb-3 flex items-center justify-between">
-          <p class="text-sm font-bold text-gray-800">
-            Configura tu tienda online
+        <div class="flex items-center justify-between">
+          <p class="text-xs font-bold text-gray-700">
+            Configura tu tienda
           </p>
-          <span class="text-xs font-bold text-green-600">
+          <span class="text-[10px] font-bold text-green-600">
             {{ onboardingCompletedCount }}/{{ onboardingSteps.length }}
           </span>
         </div>
-        <!-- Progress bar -->
-        <div class="mb-3 h-1.5 overflow-hidden rounded-full bg-green-200/50">
-          <div
-            class="h-full rounded-full bg-green-500 transition-all duration-500"
-            :style="{ width: `${(onboardingCompletedCount / onboardingSteps.length) * 100}%` }"
-          />
-        </div>
-        <div class="space-y-1.5">
+        <div class="mt-2 flex gap-1.5">
           <NuxtLink
             v-for="step in onboardingSteps"
             :key="step.id"
             :to="step.complete ? undefined : step.to"
-            class="flex items-center gap-2.5 rounded-xl px-2 py-1.5 text-sm transition-colors"
-            :class="step.complete ? 'text-gray-400' : 'text-gray-700 hover:bg-white/60'"
-          >
-            <CheckCircle
-              v-if="step.complete"
-              :size="16"
-              class="flex-shrink-0 text-green-500"
-            />
-            <Circle
-              v-else
-              :size="16"
-              class="flex-shrink-0 text-gray-300"
-            />
-            <span
-              class="text-[13px] font-medium"
-              :class="step.complete ? 'line-through' : ''"
-            >
-              {{ step.label }}
-            </span>
-          </NuxtLink>
+            class="flex h-1.5 flex-1 rounded-full transition-all"
+            :class="step.complete ? 'bg-green-500' : 'bg-green-200/50'"
+          />
         </div>
       </div>
 
-      <!-- HERO: Sales + Profit -->
+      <!-- HERO: Sales today -->
       <NuxtLink
         to="/sales/history"
-        class="card-lift relative block overflow-hidden rounded-[28px] bg-gradient-to-br from-[#EFECFF] via-[#E2DEFF] to-[#D0CCF9] p-5 shadow-[0_15px_35px_-10px_rgba(208,204,249,0.5)] border border-white/80"
+        class="card-lift relative block overflow-hidden rounded-[24px] bg-gradient-to-br from-[#EFECFF] via-[#E2DEFF] to-[#D0CCF9] p-4 shadow-[0_12px_30px_-10px_rgba(208,204,249,0.5)] border border-white/80"
       >
-        <div
-          class="absolute -top-10 -right-10 h-36 w-36 rounded-full bg-white/50 blur-3xl"
-        />
-        <div
-          class="absolute bottom-0 left-0 h-20 w-20 rounded-full bg-[#a78bfa]/20 blur-2xl"
-        />
+        <div class="absolute -top-8 -right-8 h-28 w-28 rounded-full bg-white/50 blur-3xl" />
         <div class="relative z-10 flex items-start justify-between">
           <div>
-            <p class="text-[13px] font-bold text-gray-600/80">Vendido hoy</p>
-            <p
-              class="mt-0.5 text-4xl font-extrabold tracking-tighter text-gradient"
-            >
+            <p class="text-[12px] font-bold text-gray-600/80">Vendido hoy</p>
+            <p class="mt-0.5 text-3xl font-extrabold tracking-tighter text-gradient">
               ${{ todaySales.toFixed(2) }}
             </p>
-            <div
-              class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] font-semibold text-gray-600/70"
-            >
-              <span
-                >{{ todayCount }} venta{{ todayCount !== 1 ? "s" : "" }}</span
-              >
-              <span v-if="todayCount > 0"
-                >${{ todayAvgTicket.toFixed(2) }} prom</span
-              >
+            <div class="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-semibold text-gray-600/70">
+              <span>{{ todayCount }} venta{{ todayCount !== 1 ? "s" : "" }}</span>
+              <span v-if="todayCount > 0">${{ todayAvgTicket.toFixed(2) }} prom</span>
               <span
                 v-if="todayProfit !== 0"
-                class="rounded-lg px-1.5 py-0.5 text-[11px] font-bold"
-                :class="
-                  todayProfit >= 0
-                    ? 'bg-green-600/15 text-green-700'
-                    : 'bg-red-500/15 text-red-700'
-                "
+                class="rounded-lg px-1.5 py-0.5 text-[10px] font-bold"
+                :class="todayProfit >= 0 ? 'bg-green-600/15 text-green-700' : 'bg-red-500/15 text-red-700'"
               >
                 {{ todayProfit >= 0 ? "+" : "" }}${{ todayProfit.toFixed(2) }}
               </span>
@@ -510,346 +426,163 @@ function openRateEditor() {
           </div>
           <span
             v-if="trendPercent > 0"
-            class="flex items-center gap-1 rounded-2xl px-3 py-1.5 text-xs font-bold shadow-sm"
-            :class="
-              trendPositive
-                ? 'bg-white/60 text-green-700'
-                : 'bg-white/60 text-red-700'
-            "
+            class="flex items-center gap-1 rounded-2xl px-2.5 py-1 text-xs font-bold shadow-sm"
+            :class="trendPositive ? 'bg-white/60 text-green-700' : 'bg-white/60 text-red-700'"
           >
-            <component
-              :is="trendPositive ? TrendingUp : TrendingDown"
-              :size="14"
-            />
+            <component :is="trendPositive ? TrendingUp : TrendingDown" :size="14" />
             {{ trendPercent }}%
           </span>
         </div>
       </NuxtLink>
 
-      <!-- 3 CARDS -->
-      <div class="mt-3 grid grid-cols-3 gap-2.5 overflow-hidden">
+      <!-- 3 CARDS: Fiado + Stock + Pedidos -->
+      <div class="mt-2.5 grid grid-cols-3 gap-2">
         <NuxtLink
           to="/accounts"
-          class="card-lift relative overflow-hidden rounded-[20px] border border-white/80 p-3"
-          :class="
-            receivableTotal > 0
-              ? 'bg-gradient-to-br from-[#FFF7ED] to-[#FED7AA]'
-              : 'bg-gradient-to-br from-[#F0FDF4] to-[#BBF7D0]'
-          "
+          class="card-lift relative overflow-hidden rounded-[18px] border border-white/80 p-2.5"
+          :class="receivableTotal > 0 ? 'bg-gradient-to-br from-[#FFF7ED] to-[#FED7AA]' : 'bg-gradient-to-br from-[#F0FDF4] to-[#BBF7D0]'"
         >
-          <div
-            class="absolute -top-3 -right-3 h-10 w-10 rounded-full bg-white/40 blur-lg"
-          />
           <div class="relative z-10">
-            <div
-              class="mb-1.5 flex h-8 w-8 items-center justify-center rounded-lg"
-              :class="receivableTotal > 0 ? 'dark-pill' : 'bg-green-600/20'"
-            >
-              <Wallet
-                :size="14"
-                :class="
-                  receivableTotal > 0 ? 'text-orange-300' : 'text-green-600'
-                "
-              />
-            </div>
-            <p class="text-lg font-extrabold tracking-tight text-gray-900">
-              ${{ receivableTotal.toFixed(0) }}
-            </p>
-            <p class="text-[10px] font-semibold text-gray-600/70">Te deben</p>
+            <Wallet :size="14" :class="receivableTotal > 0 ? 'text-orange-500' : 'text-green-600'" />
+            <p class="mt-1 text-lg font-extrabold tracking-tight text-gray-900">${{ receivableTotal.toFixed(0) }}</p>
+            <p class="text-[10px] font-semibold text-gray-600/70">Fiado</p>
           </div>
         </NuxtLink>
 
         <NuxtLink
           to="/inventory?status=red"
-          class="card-lift relative overflow-hidden rounded-[20px] border border-white/80 p-3"
-          :class="
-            lowStockCount > 0
-              ? 'bg-gradient-to-br from-[#FEF2F2] to-[#FECACA]'
-              : 'bg-gradient-to-br from-[#F0FDF4] to-[#BBF7D0]'
-          "
+          class="card-lift relative overflow-hidden rounded-[18px] border border-white/80 p-2.5"
+          :class="lowStockCount > 0 ? 'bg-gradient-to-br from-[#FEF2F2] to-[#FECACA]' : 'bg-gradient-to-br from-[#F0FDF4] to-[#BBF7D0]'"
         >
-          <div
-            class="absolute -top-3 -right-3 h-10 w-10 rounded-full bg-white/40 blur-lg"
-          />
           <div class="relative z-10">
-            <div
-              class="mb-1.5 flex h-8 w-8 items-center justify-center rounded-lg"
-              :class="lowStockCount > 0 ? 'dark-pill' : 'bg-green-600/20'"
-            >
-              <Package
-                :size="14"
-                :class="lowStockCount > 0 ? 'text-red-300' : 'text-green-600'"
-              />
-            </div>
-            <p class="text-lg font-extrabold tracking-tight text-gray-900">
-              {{ lowStockCount }}
-            </p>
-            <p class="text-[10px] font-semibold text-gray-600/70">
-              {{ lowStockCount > 0 ? "Se acaban" : "Stock OK" }}
-            </p>
+            <Package :size="14" :class="lowStockCount > 0 ? 'text-red-500' : 'text-green-600'" />
+            <p class="mt-1 text-lg font-extrabold tracking-tight text-gray-900">{{ lowStockCount }}</p>
+            <p class="text-[10px] font-semibold text-gray-600/70">{{ lowStockCount > 0 ? "Stock bajo" : "Stock OK" }}</p>
           </div>
         </NuxtLink>
 
         <NuxtLink
-          to="/reports"
-          class="card-lift relative overflow-hidden rounded-[20px] border border-white/80 p-3"
-          :class="
-            cashFlow7d >= 0
-              ? 'bg-gradient-to-br from-[#EEF7FD] to-[#CAE8F8]'
-              : 'bg-gradient-to-br from-[#FEF2F2] to-[#FECACA]'
-          "
+          to="/orders"
+          class="card-lift relative overflow-hidden rounded-[18px] border border-white/80 p-2.5"
+          :class="pendingOrdersCount > 0 ? 'bg-gradient-to-br from-[#EEF7FD] to-[#CAE8F8]' : 'bg-gradient-to-br from-[#F0FDF4] to-[#BBF7D0]'"
         >
-          <div
-            class="absolute -top-3 -right-3 h-10 w-10 rounded-full bg-white/40 blur-lg"
-          />
           <div class="relative z-10">
-            <div
-              class="mb-1.5 flex h-8 w-8 items-center justify-center rounded-lg"
-              :class="cashFlow7d >= 0 ? 'bg-blue-600/15' : 'dark-pill'"
-            >
-              <CreditCard
-                :size="14"
-                :class="cashFlow7d >= 0 ? 'text-blue-600' : 'text-red-300'"
-              />
-            </div>
-            <p
-              class="text-lg font-extrabold tracking-tight"
-              :class="cashFlow7d >= 0 ? 'text-gray-900' : 'text-red-700'"
-            >
-              {{ cashFlow7d >= 0 ? "+" : "" }}${{
-                Math.abs(cashFlow7d).toFixed(0)
-              }}
-            </p>
-            <p class="text-[10px] font-semibold text-gray-600/70">En 7 dias</p>
+            <ShoppingBag :size="14" :class="pendingOrdersCount > 0 ? 'text-blue-600' : 'text-green-600'" />
+            <p class="mt-1 text-lg font-extrabold tracking-tight text-gray-900">{{ pendingOrdersCount }}</p>
+            <p class="text-[10px] font-semibold text-gray-600/70">{{ pendingOrdersCount > 0 ? "Pedidos" : "Sin pedidos" }}</p>
           </div>
         </NuxtLink>
       </div>
 
-      <!-- WEEKLY CHART -->
+      <!-- CTA: Nueva venta (first viewport!) -->
       <NuxtLink
-        v-if="weeklyDays.length > 0"
-        to="/reports"
-        class="card-premium mt-3 block p-4 transition-spring hover:shadow-[0_12px_30px_-10px_rgba(0,0,0,0.08)]"
+        to="/sales"
+        class="dark-pill mt-2.5 flex w-full items-center justify-center gap-2 rounded-[18px] py-3.5 text-center text-[15px] font-extrabold tracking-wide transition-spring"
       >
-        <div class="mb-3 flex items-center justify-between">
-          <p class="text-[12px] font-bold text-gray-500 tracking-wide">
-            Ventas 7 dias
-          </p>
-          <BarChart3 :size="14" class="text-gray-400" />
-        </div>
-        <SharedBarChart
-          :labels="weeklyDays.map((d) => d.day.slice(0, 2))"
-          :data="weeklyDays.map((d) => d.amount)"
-          :height="80"
-        />
+        <DollarSign :size="18" />
+        Nueva venta
       </NuxtLink>
 
-      <!-- DUE TODAY COLLECTIONS -->
-      <div
-        v-if="dueToday.length > 0"
-        class="mt-3 rounded-[20px] border border-amber-200/60 bg-gradient-to-br from-[#FFFBEB] to-[#FEF3C7] p-4"
-      >
-        <p class="mb-2.5 text-[11px] font-bold uppercase tracking-wider text-amber-700">
-          Cobros pendientes
-        </p>
-        <div class="space-y-2">
+      <!-- ============================================================ -->
+      <!-- SCREEN 2: Cobros + Chart + Alerts (scroll) -->
+      <!-- ============================================================ -->
+
+      <!-- COBROS PENDIENTES (always visible, even if 0) -->
+      <div class="mt-3 rounded-[18px] border border-amber-200/60 bg-gradient-to-br from-[#FFFBEB] to-[#FEF3C7] p-3.5">
+        <div class="flex items-center justify-between">
+          <p class="text-[11px] font-bold uppercase tracking-wider text-amber-700">
+            Cobros {{ dueToday.length > 0 ? `(${dueToday.length})` : "" }}
+          </p>
+          <NuxtLink to="/accounts" class="text-[10px] font-bold text-amber-600 hover:underline">
+            Ver todo
+          </NuxtLink>
+        </div>
+        <div v-if="dueToday.length > 0" class="mt-2 space-y-1.5">
           <div
             v-for="d in dueToday"
             :key="d.id"
-            class="flex items-center justify-between gap-3 rounded-xl bg-white/60 px-3 py-2.5"
+            class="flex items-center justify-between gap-2 rounded-xl bg-white/60 px-3 py-2"
           >
             <div class="min-w-0 flex-1">
-              <p class="truncate text-sm font-bold text-gray-800">{{ d.customerName }}</p>
-              <p class="text-xs font-medium text-amber-700">${{ Number(d.balanceUsd).toFixed(2) }}</p>
+              <p class="truncate text-[13px] font-bold text-gray-800">{{ d.customerName }}</p>
+              <p class="text-[11px] font-medium text-amber-700">${{ Number(d.balanceUsd).toFixed(2) }}</p>
             </div>
             <a
               v-if="d.customerPhone"
               :href="`https://wa.me/${d.customerPhone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(`Hola ${d.customerName}, tienes un saldo pendiente de $${Number(d.balanceUsd).toFixed(2)}. ¿Cuando puedes realizar el pago? Gracias!`)}`"
               target="_blank"
               rel="noopener noreferrer"
-              class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-green-600 text-white"
+              class="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg bg-green-600 text-white"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" /></svg>
+              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" /></svg>
             </a>
           </div>
         </div>
-        <NuxtLink
-          to="/accounts"
-          class="mt-2.5 block text-center text-[11px] font-bold text-amber-700 hover:underline"
-        >
-          Ver todas las cuentas
-        </NuxtLink>
-      </div>
-
-      <!-- PAYMENT MIX -->
-      <div
-        v-if="topMethods.length > 0"
-        class="glass mt-3 rounded-[20px] px-4 py-3"
-      >
-        <p class="mb-2 text-[11px] font-bold text-gray-500 tracking-wide">
-          Metodos de pago hoy
+        <p v-else class="mt-1.5 text-[11px] font-medium text-amber-600/70">
+          No hay cobros pendientes hoy
         </p>
-        <div class="space-y-1.5">
-          <div
-            v-for="m in topMethods"
-            :key="m.label"
-            class="flex items-center gap-2.5"
-          >
-            <span class="w-12 text-[10px] font-bold text-gray-600">{{
-              m.label
-            }}</span>
-            <div
-              class="h-2 flex-1 overflow-hidden rounded-full bg-gray-100/80 border border-white"
-            >
-              <div
-                class="progress-glow h-full rounded-full"
-                :style="{
-                  width: `${m.percent}%`,
-                  background: `linear-gradient(to right, ${m.from}, ${m.to})`,
-                }"
-              />
-            </div>
-            <span
-              class="w-14 text-right text-[10px] font-extrabold text-gray-700"
-            >
-              ${{ m.amount.toFixed(0) }}
-              <span class="text-gray-400">{{ m.percent }}%</span>
-            </span>
-          </div>
-        </div>
       </div>
 
-      <!-- 4 INSIGHT TILES -->
-      <div class="mt-3 grid grid-cols-2 gap-2.5">
-        <!-- Top seller -->
-        <div
-          v-if="topSeller"
-          class="card-premium flex items-center gap-3 p-3.5"
-        >
-          <div
-            class="dark-pill flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-[14px]"
-          >
-            <Trophy
-              :size="16"
-              class="text-yellow-300 drop-shadow-[0_0_6px_rgba(253,224,71,0.6)]"
-            />
-          </div>
+      <!-- WEEKLY CHART (compact) -->
+      <NuxtLink
+        v-if="weeklyDays.length > 0"
+        to="/reports"
+        class="card-premium mt-2.5 block p-3.5 transition-spring hover:shadow-[0_8px_20px_-5px_rgba(0,0,0,0.06)]"
+      >
+        <div class="mb-2 flex items-center justify-between">
+          <p class="text-[11px] font-bold text-gray-500 tracking-wide">Ventas 7 dias</p>
+          <BarChart3 :size="12" class="text-gray-400" />
+        </div>
+        <SharedBarChart
+          :labels="weeklyDays.map((d) => d.day.slice(0, 2))"
+          :data="weeklyDays.map((d) => d.amount)"
+          :height="60"
+        />
+      </NuxtLink>
+
+      <!-- INSIGHTS ROW: product estrella + alertas -->
+      <div class="mt-2.5 grid grid-cols-2 gap-2">
+        <div v-if="topProduct" class="card-premium flex items-center gap-2.5 p-3">
+          <Star :size="14" class="flex-shrink-0 text-nova-accent" />
           <div class="min-w-0">
-            <p class="truncate text-[12px] font-extrabold text-gray-800">
-              {{ topSeller.name }}
-            </p>
-            <p class="text-[11px] font-bold text-gray-400">
-              ${{ topSeller.total.toFixed(0) }} vendido
-            </p>
+            <p class="truncate text-[11px] font-bold text-gray-800">{{ topProduct.name }}</p>
+            <p class="text-[10px] font-medium text-gray-400">{{ topProduct.quantity }} uds hoy</p>
           </div>
         </div>
-
-        <!-- Star product -->
-        <div
-          v-if="topProduct"
-          class="card-premium flex items-center gap-3 p-3.5"
-        >
-          <div
-            class="dark-pill flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-[14px]"
-          >
-            <Star
-              :size="16"
-              class="text-blue-300 drop-shadow-[0_0_6px_rgba(147,197,253,0.6)]"
-            />
-          </div>
-          <div class="min-w-0">
-            <p class="truncate text-[12px] font-extrabold text-gray-800">
-              {{ topProduct.name }}
-            </p>
-            <p class="text-[11px] font-bold text-gray-400">
-              {{ topProduct.quantity }} uds hoy
-            </p>
-          </div>
-        </div>
-
-        <!-- Alerts count tile (links to full alerts page) -->
         <NuxtLink
           v-if="dashboardAlerts.length > 0"
           to="/reports"
-          class="card-premium flex items-center gap-3 p-3.5 transition-spring hover:shadow-[0_8px_20px_-5px_rgba(0,0,0,0.06)]"
+          class="card-premium flex items-center gap-2.5 p-3 transition-spring"
         >
-          <div
-            class="dark-pill flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-[14px]"
-          >
-            <AlertTriangle
-              :size="16"
-              class="text-orange-300 drop-shadow-[0_0_6px_rgba(251,146,60,0.6)]"
-            />
-          </div>
+          <AlertTriangle :size="14" class="flex-shrink-0 text-orange-500" />
           <div class="min-w-0">
-            <p class="text-[12px] font-extrabold text-gray-800">
-              {{ dashboardAlerts.length }} alerta{{
-                dashboardAlerts.length > 1 ? "s" : ""
-              }}
-            </p>
-            <p class="text-[11px] font-bold text-gray-400">Requiere atencion</p>
-          </div>
-        </NuxtLink>
-
-        <!-- Gross margin -->
-        <NuxtLink
-          v-if="grossMargin > 0"
-          to="/reports"
-          class="card-premium flex items-center gap-3 p-3.5 transition-spring hover:shadow-[0_8px_20px_-5px_rgba(0,0,0,0.06)]"
-        >
-          <div
-            class="dark-pill flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-[14px]"
-          >
-            <BarChart3
-              :size="16"
-              class="text-green-300 drop-shadow-[0_0_6px_rgba(134,239,172,0.6)]"
-            />
-          </div>
-          <div class="min-w-0">
-            <p class="text-[12px] font-extrabold text-gray-800">
-              {{ grossMargin }}% margen
-            </p>
-            <p class="text-[11px] font-bold text-gray-400">Ganancia bruta</p>
+            <p class="text-[11px] font-bold text-gray-800">{{ dashboardAlerts.length }} alerta{{ dashboardAlerts.length > 1 ? "s" : "" }}</p>
+            <p class="text-[10px] font-medium text-gray-400">Requiere atencion</p>
           </div>
         </NuxtLink>
       </div>
 
-      <!-- SMART ALERTS (actionable cards) -->
-      <div v-if="dashboardAlerts.length > 0" class="mt-3 space-y-2">
-        <p
-          class="px-1 text-[11px] font-bold tracking-wider text-gray-400 uppercase"
-        >
-          Requiere atencion
-        </p>
+      <!-- SMART ALERTS (actionable, compact) -->
+      <div v-if="dashboardAlerts.length > 0" class="mt-2.5 space-y-1.5">
         <NuxtLink
-          v-for="alert in dashboardAlerts"
+          v-for="alert in dashboardAlerts.slice(0, 3)"
           :key="alert.id"
           :to="alert.actionTo"
-          class="card-lift flex items-center gap-3 rounded-[18px] border border-white/80 p-3.5 transition-spring"
+          class="flex items-center gap-2.5 rounded-[14px] border border-white/80 px-3 py-2.5 transition-spring"
           :class="{
-            'bg-gradient-to-r from-red-50/80 to-red-100/40':
-              alert.severity === 'critical',
-            'bg-gradient-to-r from-amber-50/80 to-amber-100/40':
-              alert.severity === 'warning',
-            'bg-gradient-to-r from-blue-50/80 to-blue-100/40':
-              alert.severity === 'info',
+            'bg-gradient-to-r from-red-50/80 to-red-100/40': alert.severity === 'critical',
+            'bg-gradient-to-r from-amber-50/80 to-amber-100/40': alert.severity === 'warning',
+            'bg-gradient-to-r from-blue-50/80 to-blue-100/40': alert.severity === 'info',
           }"
         >
-          <span class="text-lg flex-shrink-0">{{ alert.icon }}</span>
-          <div class="min-w-0 flex-1">
-            <p class="text-[12px] font-bold text-gray-800 leading-tight">
-              {{ alert.title }}
-            </p>
-            <p class="mt-0.5 text-[10px] font-semibold text-gray-500">
-              {{ alert.suggestion }}
-            </p>
-          </div>
+          <span class="text-sm flex-shrink-0">{{ alert.icon }}</span>
+          <p class="min-w-0 flex-1 truncate text-[11px] font-bold text-gray-800">{{ alert.title }}</p>
           <span
-            class="flex-shrink-0 rounded-xl px-2.5 py-1 text-[10px] font-bold transition-spring"
+            class="flex-shrink-0 text-[10px] font-bold"
             :class="{
-              'bg-red-600/10 text-red-700': alert.severity === 'critical',
-              'bg-amber-600/10 text-amber-700': alert.severity === 'warning',
-              'bg-blue-600/10 text-blue-700': alert.severity === 'info',
+              'text-red-600': alert.severity === 'critical',
+              'text-amber-600': alert.severity === 'warning',
+              'text-blue-600': alert.severity === 'info',
             }"
           >
             {{ alert.actionLabel }}
@@ -857,77 +590,19 @@ function openRateEditor() {
         </NuxtLink>
       </div>
 
-      <!-- CTA -->
-      <NuxtLink
-        to="/sales"
-        class="dark-pill mt-3 flex w-full items-center justify-center gap-2.5 rounded-[20px] py-4 text-center text-[15px] font-extrabold tracking-wide transition-spring"
-      >
-        <DollarSign :size="20" />
-        Nueva venta
-      </NuxtLink>
-
-      <!-- QUICK ACTIONS -->
-      <div class="mt-3 grid grid-cols-4 gap-2">
-        <NuxtLink
-          to="/inventory/new"
-          class="card-premium flex flex-col items-center gap-1.5 p-3 transition-spring hover:shadow-[0_8px_20px_-5px_rgba(0,0,0,0.06)]"
-        >
-          <Package :size="18" class="text-gray-500" />
-          <span class="text-[10px] font-bold text-gray-600">Producto</span>
-        </NuxtLink>
-        <NuxtLink
-          to="/inventory/import"
-          class="card-premium flex flex-col items-center gap-1.5 p-3 transition-spring hover:shadow-[0_8px_20px_-5px_rgba(0,0,0,0.06)]"
-        >
-          <Upload :size="18" class="text-gray-500" />
-          <span class="text-[10px] font-bold text-gray-600">Importar</span>
-        </NuxtLink>
-        <NuxtLink
-          to="/clients/new"
-          class="card-premium flex flex-col items-center gap-1.5 p-3 transition-spring hover:shadow-[0_8px_20px_-5px_rgba(0,0,0,0.06)]"
-        >
-          <UserPlus :size="18" class="text-gray-500" />
-          <span class="text-[10px] font-bold text-gray-600">Cliente</span>
-        </NuxtLink>
-        <NuxtLink
-          to="/sales/quotations"
-          class="card-premium flex flex-col items-center gap-1.5 p-3 transition-spring hover:shadow-[0_8px_20px_-5px_rgba(0,0,0,0.06)]"
-        >
-          <ClipboardList :size="18" class="text-gray-500" />
-          <span class="text-[10px] font-bold text-gray-600">Cotizar</span>
-        </NuxtLink>
-      </div>
-
-      <!-- FOOTER -->
-      <div class="mt-2.5 flex items-center justify-between px-1">
-        <div class="flex items-center gap-2">
-          <span
-            class="h-1.5 w-1.5 rounded-full"
-            :class="{
-              'bg-green-500': syncStatus === 'online',
-              'bg-gray-400': syncStatus === 'offline',
-              'bg-yellow-500 animate-pulse': syncStatus === 'syncing',
-            }"
-          />
-          <span class="text-[10px] font-semibold text-gray-400">
-            <template v-if="syncStatus === 'online'">Actualizado</template>
-            <template v-else-if="syncStatus === 'syncing'"
-              >Sincronizando...</template
-            >
-            <template v-else>
-              Offline
-              <template v-if="pendingSyncCount > 0">
-                · {{ pendingSyncCount }}</template
-              >
-            </template>
-          </span>
-        </div>
-        <button
-          class="text-gray-300 transition-spring hover:text-gray-500 hover:scale-110"
-          @click="loadDashboard"
-        >
-          <RefreshCw :size="13" />
-        </button>
+      <!-- FOOTER: status -->
+      <div class="mt-2.5 flex items-center justify-center gap-2 px-1">
+        <span
+          class="h-1.5 w-1.5 rounded-full"
+          :class="{
+            'bg-green-500': syncStatus === 'online',
+            'bg-gray-400': syncStatus === 'offline',
+            'bg-yellow-500 animate-pulse': syncStatus === 'syncing',
+          }"
+        />
+        <span class="text-[10px] font-semibold text-gray-400">
+          {{ syncStatus === "online" ? "Actualizado" : syncStatus === "syncing" ? "Sincronizando..." : "Offline" }}
+        </span>
       </div>
 
       <!-- Rate editor modal -->
@@ -937,19 +612,13 @@ function openRateEditor() {
           class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
           @click.self="showRateEditor = false"
         >
-          <div
-            class="glass-strong w-full max-w-sm rounded-[32px] p-7 shadow-[0_30px_60px_-15px_rgba(0,0,0,0.2)]"
-          >
-            <h3
-              class="mb-5 text-xl font-extrabold tracking-tight text-gradient"
-            >
+          <div class="glass-strong w-full max-w-sm rounded-[32px] p-7 shadow-[0_30px_60px_-15px_rgba(0,0,0,0.2)]">
+            <h3 class="mb-5 text-xl font-extrabold tracking-tight text-gradient">
               Tasa de cambio BCV
             </h3>
             <div class="space-y-4">
               <div>
-                <label class="mb-1.5 block text-[13px] font-bold text-gray-600"
-                  >Dolar (USD)</label
-                >
+                <label class="mb-1.5 block text-[13px] font-bold text-gray-600">Dolar (USD)</label>
                 <input
                   v-model="rateInputUsd"
                   type="number"
@@ -958,12 +627,10 @@ function openRateEditor() {
                   placeholder="86.48"
                   autofocus
                   class="w-full rounded-2xl border border-white bg-white/60 px-4 py-3 text-sm font-semibold text-gray-800 shadow-[inset_0_2px_4px_rgba(0,0,0,0.03)] outline-none focus:ring-[3px] focus:ring-nova-accent/20 focus:bg-white transition-spring placeholder:text-gray-400"
-                />
+                >
               </div>
               <div>
-                <label class="mb-1.5 block text-[13px] font-bold text-gray-600"
-                  >Euro (EUR)</label
-                >
+                <label class="mb-1.5 block text-[13px] font-bold text-gray-600">Euro (EUR)</label>
                 <input
                   v-model="rateInputEur"
                   type="number"
@@ -971,15 +638,10 @@ function openRateEditor() {
                   min="0"
                   placeholder="96.20"
                   class="w-full rounded-2xl border border-white bg-white/60 px-4 py-3 text-sm font-semibold text-gray-800 shadow-[inset_0_2px_4px_rgba(0,0,0,0.03)] outline-none focus:ring-[3px] focus:ring-nova-accent/20 focus:bg-white transition-spring placeholder:text-gray-400"
-                />
+                >
               </div>
             </div>
-            <p
-              v-if="rateSaveError"
-              class="mt-3 text-sm font-semibold text-red-500"
-            >
-              {{ rateSaveError }}
-            </p>
+            <p v-if="rateSaveError" class="mt-3 text-sm font-semibold text-red-500">{{ rateSaveError }}</p>
             <p class="mt-3 text-[10px] font-semibold text-gray-400">
               Consulta la tasa oficial en bcv.org.ve
             </p>
