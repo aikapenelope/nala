@@ -137,13 +137,33 @@ const error = ref("");
 /** Product image state. */
 const imageUrl = ref<string | null>(null);
 const isUploadingImage = ref(false);
+const pendingImageFile = ref<File | null>(null);
+const pendingImagePreview = ref<string | null>(null);
 
-/** Upload product image after creation/edit. */
-async function handleImageUpload(event: Event, targetProductId: string) {
+/** Handle image selection. For editing: upload immediately. For creating: store for later. */
+function handleImageSelect(event: Event) {
   const input = event.target as HTMLInputElement;
   const file = input.files?.[0];
   if (!file) return;
 
+  // Show preview immediately
+  const reader = new FileReader();
+  reader.onload = () => {
+    pendingImagePreview.value = reader.result as string;
+  };
+  reader.readAsDataURL(file);
+
+  if (isEditing.value && productId.value) {
+    // Upload immediately for existing products
+    uploadImage(file, productId.value);
+  } else {
+    // Store for upload after product creation
+    pendingImageFile.value = file;
+  }
+}
+
+/** Upload image to the server. */
+async function uploadImage(file: File, targetProductId: string) {
   isUploadingImage.value = true;
   try {
     const formData = new FormData();
@@ -154,6 +174,7 @@ async function handleImageUpload(event: Event, targetProductId: string) {
       { method: "POST", body: formData },
     );
     imageUrl.value = result.imageUrl;
+    pendingImageFile.value = null;
   } catch {
     // Non-critical: product saved, image failed
   } finally {
@@ -314,6 +335,11 @@ async function submitForm() {
           });
         }
       }
+
+      // Upload pending image if selected during creation
+      if (pendingImageFile.value) {
+        await uploadImage(pendingImageFile.value, result.product.id);
+      }
     }
 
     router.push("/inventory");
@@ -356,7 +382,13 @@ async function submitForm() {
           <div class="flex items-center gap-4">
             <div class="relative flex-shrink-0">
               <img
-                v-if="imageUrl"
+                v-if="pendingImagePreview"
+                :src="pendingImagePreview"
+                alt="Producto"
+                class="h-16 w-16 rounded-xl object-cover"
+              >
+              <img
+                v-else-if="imageUrl"
                 :src="imageUrl"
                 alt="Producto"
                 class="h-16 w-16 rounded-xl object-cover"
@@ -374,24 +406,16 @@ async function submitForm() {
                 <div class="h-5 w-5 animate-spin rounded-full border-2 border-nova-primary border-t-transparent" />
               </div>
             </div>
-            <div>
-              <label
-                v-if="isEditing"
-                class="cursor-pointer text-sm font-medium text-nova-primary hover:underline"
+            <label class="cursor-pointer text-sm font-medium text-nova-primary hover:underline">
+              {{ imageUrl || pendingImagePreview ? "Cambiar foto" : "Agregar foto" }}
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                capture="environment"
+                class="hidden"
+                @change="handleImageSelect"
               >
-                {{ imageUrl ? "Cambiar foto" : "Agregar foto" }}
-                <input
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp"
-                  capture="environment"
-                  class="hidden"
-                  @change="(e: Event) => handleImageUpload(e, productId!)"
-                >
-              </label>
-              <p v-else class="text-xs text-gray-400">
-                Puedes agregar foto despues de crear el producto
-              </p>
-            </div>
+            </label>
           </div>
 
           <div>
