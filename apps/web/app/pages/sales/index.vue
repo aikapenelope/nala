@@ -16,7 +16,14 @@ import { calculateLineTotal, calculateSaleTotal } from "@nova/shared";
 import { ShoppingCart, Minus, Plus, X, Search, PlusCircle } from "lucide-vue-next";
 
 const { isDesktop } = useDevice();
-const { $api } = useApi();
+const { $api, apiBase } = useApi();
+
+/** Resolve image URL: prepend API base for relative paths from the API. */
+function resolveImageUrl(url: string | null): string | undefined {
+  if (!url) return undefined;
+  if (url.startsWith("http")) return url;
+  return `${apiBase}${url}`;
+}
 
 /** Active ticket items. */
 interface TicketItem {
@@ -331,7 +338,7 @@ async function quickCreateProduct() {
           <!-- Product image or initial avatar -->
           <img
             v-if="product.imageUrl"
-            :src="product.imageUrl"
+            :src="resolveImageUrl(product.imageUrl)"
             :alt="product.name"
             class="mb-2 h-10 w-10 rounded-xl object-cover"
           />

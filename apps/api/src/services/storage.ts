@@ -211,6 +211,72 @@ export async function getProofUrl(key: string): Promise<string> {
 }
 
 /**
+ * Get a product image as a readable stream from MinIO.
+ * Used by the proxy endpoint to serve images without exposing MinIO.
+ *
+ * @param keyOrUrl - Storage key or legacy presigned URL
+ * @returns Object with body stream, content type, and ETag, or null if not found
+ */
+export async function getProductImageStream(
+  keyOrUrl: string,
+): Promise<{ body: ReadableStream; contentType: string; etag: string | null } | null> {
+  if (!isStorageConfigured || !keyOrUrl) {
+    return null;
+  }
+
+  // Determine the storage key
+  let key: string;
+
+  if (keyOrUrl.startsWith("products/")) {
+    key = keyOrUrl;
+  } else if (keyOrUrl.startsWith("http")) {
+    try {
+      const url = new URL(keyOrUrl);
+      const pathParts = url.pathname.split("/").filter(Boolean);
+      const productsIdx = pathParts.indexOf("products");
+      if (productsIdx === -1) return null;
+      key = pathParts.slice(productsIdx).join("/");
+    } catch {
+      return null;
+    }
+  } else {
+    return null;
+  }
+
+  try {
+    const client = getClient();
+    const response = await client.send(
+      new GetObjectCommand({ Bucket: MINIO_BUCKET, Key: key }),
+    );
+
+    if (!response.Body) return null;
+
+    // Use the content type from S3 metadata (set during upload).
+    // Fall back to extension-based detection if metadata is missing.
+    let contentType = response.ContentType;
+    if (!contentType || contentType === "application/octet-stream") {
+      const ext = key.split(".").pop()?.toLowerCase();
+      contentType =
+        ext === "jpg" || ext === "jpeg"
+          ? "image/jpeg"
+          : ext === "png"
+            ? "image/png"
+            : ext === "webp"
+              ? "image/webp"
+              : "application/octet-stream";
+    }
+
+    return {
+      body: response.Body.transformToWebStream() as ReadableStream,
+      contentType,
+      etag: response.ETag ?? null,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Generate a presigned URL for a product image.
  * URL expires in 7 days (products are viewed frequently, cache-friendly).
  *

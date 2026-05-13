@@ -21,7 +21,14 @@ import {
 
 const { isDesktop } = useDevice();
 
-const { $api } = useApi();
+const { $api, apiBase } = useApi();
+
+/** Resolve image URL: prepend API base for relative paths from the API. */
+function resolveImageUrl(url: string | null): string | undefined {
+  if (!url) return undefined;
+  if (url.startsWith("http")) return url;
+  return `${apiBase}${url}`;
+}
 
 const searchQuery = ref("");
 const selectedStatus = ref<StockSemaphore | null>(null);
@@ -342,7 +349,7 @@ function margin(cost: string, price: string): string {
                   <div class="flex items-center gap-3">
                     <img
                       v-if="product.imageUrl"
-                      :src="product.imageUrl"
+                      :src="resolveImageUrl(product.imageUrl)"
                       :alt="product.name"
                       class="h-9 w-9 flex-shrink-0 rounded-lg object-cover"
                     />
@@ -409,7 +416,7 @@ function margin(cost: string, price: string): string {
             <div class="relative flex-shrink-0">
               <img
                 v-if="product.imageUrl"
-                :src="product.imageUrl"
+                :src="resolveImageUrl(product.imageUrl)"
                 :alt="product.name"
                 class="h-11 w-11 rounded-xl object-cover"
               />
@@ -486,7 +493,7 @@ function margin(cost: string, price: string): string {
           <div class="relative aspect-square w-full bg-gray-50">
             <img
               v-if="product.imageUrl"
-              :src="product.imageUrl"
+              :src="resolveImageUrl(product.imageUrl)"
               :alt="product.name"
               class="h-full w-full object-cover"
             />
