@@ -39,6 +39,7 @@ const {
   completedCount: onboardingCompletedCount,
   refresh: refreshOnboarding,
 } = useOnboardingChecklist();
+const { isOpen: cashIsOpen, checkOpenStatus } = useCashStatus();
 
 const isLoading = ref(true);
 const loadError = ref("");
@@ -52,6 +53,7 @@ const trendPercent = ref(0);
 const trendPositive = ref(true);
 const topSeller = ref<{ name: string; total: number } | null>(null);
 const topProduct = ref<{ name: string; quantity: number } | null>(null);
+const topProducts = ref<Array<{ name: string; quantity: number }>>([]);
 const salesByMethod = ref<Record<string, number>>({});
 
 /** Weekly chart data. */
@@ -171,6 +173,7 @@ async function loadDashboard() {
       trendPositive.value = d.vsSameDayLastWeek >= 0;
       topSeller.value = d.topSeller;
       topProduct.value = d.topProducts?.[0] ?? null;
+      topProducts.value = d.topProducts?.slice(0, 3) ?? [];
       salesByMethod.value = d.salesByMethod ?? {};
     }
 
@@ -270,6 +273,7 @@ onMounted(() => {
   }
   loadDashboard();
   refreshOnboarding();
+  checkOpenStatus();
 });
 
 async function saveRate() {
@@ -399,6 +403,20 @@ function openRateEditor() {
           />
         </div>
       </div>
+
+      <!-- CASH REGISTER STATUS -->
+      <NuxtLink
+        v-if="cashIsOpen !== null"
+        :to="cashIsOpen ? '/accounts/day-close' : '/accounts/cash-opening'"
+        class="mb-2.5 flex items-center gap-2 rounded-[14px] px-3.5 py-2 text-[12px] font-bold transition-spring"
+        :class="cashIsOpen ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'"
+      >
+        <span class="h-2 w-2 rounded-full" :class="cashIsOpen ? 'bg-green-500' : 'bg-amber-500'" />
+        {{ cashIsOpen ? "Caja abierta" : "Caja cerrada" }}
+        <span class="ml-auto text-[10px] font-medium opacity-70">
+          {{ cashIsOpen ? "Cerrar caja" : "Abrir caja" }} →
+        </span>
+      </NuxtLink>
 
       <!-- HERO: Sales today -->
       <NuxtLink
@@ -539,6 +557,32 @@ function openRateEditor() {
           :height="60"
         />
       </NuxtLink>
+
+      <!-- TOP PRODUCTS TODAY -->
+      <div
+        v-if="topProducts.length > 0"
+        class="mt-2.5 rounded-[18px] bg-white/50 p-3.5"
+      >
+        <p class="mb-2 text-[11px] font-bold uppercase tracking-wider text-gray-400">
+          Mas vendidos hoy
+        </p>
+        <div class="space-y-1.5">
+          <div
+            v-for="(p, idx) in topProducts"
+            :key="p.name"
+            class="flex items-center gap-2.5 rounded-lg px-2 py-1.5"
+          >
+            <span
+              class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-lg text-[10px] font-extrabold"
+              :class="idx === 0 ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-500'"
+            >
+              {{ idx + 1 }}
+            </span>
+            <span class="min-w-0 flex-1 truncate text-[12px] font-medium text-gray-700">{{ p.name }}</span>
+            <span class="flex-shrink-0 text-[11px] font-bold text-gray-500">{{ p.quantity }} uds</span>
+          </div>
+        </div>
+      </div>
 
       <!-- INSIGHTS ROW: product estrella + alertas -->
       <div class="mt-2.5 grid grid-cols-2 gap-2">
