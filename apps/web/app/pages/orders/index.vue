@@ -104,6 +104,24 @@ const methodLabels: Record<string, string> = {
 /** Polling interval. */
 let pollInterval: ReturnType<typeof setInterval> | null = null;
 
+/** Quick confirm state. */
+const confirmingId = ref<string | null>(null);
+
+/** Quick confirm an order from the list. */
+async function quickConfirm(orderId: string) {
+  confirmingId.value = orderId;
+  try {
+    await $api(`/api/orders/${orderId}/confirm`, { method: "PATCH" });
+    // Remove from list and refresh
+    orders.value = orders.value.filter((o) => o.id !== orderId);
+    if (pendingCount.value > 0) pendingCount.value--;
+  } catch {
+    // Non-critical: user can tap to open detail and retry
+  } finally {
+    confirmingId.value = null;
+  }
+}
+
 onMounted(() => {
   fetchOrders();
   // Poll every 30s for new orders
@@ -210,14 +228,14 @@ watch(activeTab, () => {
 
     <!-- Orders list -->
     <div v-else class="space-y-2.5">
-      <NuxtLink
+      <div
         v-for="order in orders"
         :key="order.id"
-        :to="`/orders/${order.id}`"
         class="card-lift flex items-center gap-3 rounded-2xl border border-white/80 bg-white/70 p-4 transition-spring"
       >
         <!-- Status indicator -->
-        <div
+        <NuxtLink
+          :to="`/orders/${order.id}`"
           class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl"
           :class="{
             'bg-amber-100': order.status === 'pending',
@@ -242,10 +260,10 @@ watch(activeTab, () => {
             class="text-blue-600"
           />
           <XCircle v-else :size="18" class="text-gray-400" />
-        </div>
+        </NuxtLink>
 
         <!-- Order info -->
-        <div class="min-w-0 flex-1">
+        <NuxtLink :to="`/orders/${order.id}`" class="min-w-0 flex-1">
           <div class="flex items-center justify-between">
             <p class="text-sm font-semibold text-gray-900">
               {{ order.customerName }}
@@ -259,8 +277,18 @@ watch(activeTab, () => {
             <span class="text-gray-300">·</span>
             <span>{{ formatDate(order.createdAt) }}</span>
           </div>
-        </div>
-      </NuxtLink>
+        </NuxtLink>
+
+        <!-- Quick confirm button (pending only) -->
+        <button
+          v-if="order.status === 'pending'"
+          class="flex-shrink-0 rounded-lg bg-green-600 px-3 py-1.5 text-[11px] font-bold text-white transition-spring hover:bg-green-700 disabled:opacity-50"
+          :disabled="confirmingId === order.id"
+          @click.stop="quickConfirm(order.id)"
+        >
+          {{ confirmingId === order.id ? "..." : "Confirmar" }}
+        </button>
+      </div>
     </div>
   </div>
 </template>
