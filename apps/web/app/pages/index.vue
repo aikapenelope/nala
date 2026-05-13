@@ -183,7 +183,7 @@ async function loadDashboard() {
         data: { grossMargin: number };
       }>("/api/reports/financial?period=month"),
 
-      $api<{ totalPending: number }>("/api/accounts/receivable"),
+      $api<{ accounts: DueReceivable[]; totalPending: number }>("/api/accounts/receivable"),
 
       $api<{ data: { lowStock: number; criticalStock: number } }>(
         "/api/reports/inventory",
@@ -226,7 +226,7 @@ async function loadDashboard() {
       const today = new Date();
       today.setHours(23, 59, 59, 999);
       dueToday.value = (receivableResult.value.accounts ?? [])
-        .filter((a: DueReceivable) => a.dueDate && new Date(a.dueDate) <= today)
+        .filter((a) => a.dueDate && new Date(a.dueDate) <= today)
         .slice(0, 5);
     }
 
