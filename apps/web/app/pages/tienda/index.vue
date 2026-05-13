@@ -10,9 +10,19 @@
 
 definePageMeta({ layout: "storefront" });
 
+const config = useRuntimeConfig();
+const storefrontApiBase = config.public.apiBase as string;
+
 const { business, products, categories, storeInfo, exchangeRate, isLoading, isLoadingMore, hasMore, error, fetchCatalog, fetchMore } =
   useStorefront();
 const { addItem, itemCount, subtotal } = useCart();
+
+/** Resolve image URL: prepend API base for relative paths from the catalog API. */
+function resolveImageUrl(url: string | null): string | undefined {
+  if (!url) return undefined;
+  if (url.startsWith("http")) return url;
+  return `${storefrontApiBase}${url}`;
+}
 
 useStorefrontSeo({ title: "Catalogo" });
 
@@ -272,7 +282,7 @@ onMounted(() => {
           <div class="relative aspect-square bg-gray-50">
             <img
               v-if="product.imageUrl"
-              :src="product.imageUrl"
+              :src="resolveImageUrl(product.imageUrl)"
               :alt="product.name"
               class="h-full w-full object-cover"
               loading="lazy"

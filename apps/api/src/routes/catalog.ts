@@ -18,7 +18,7 @@ import { businesses, products, categories, storeSettings, orders } from "@nova/d
 import { calculateStockSemaphore } from "@nova/shared";
 import { tryGetDb } from "../db";
 import { getRedis } from "../redis";
-import { uploadPaymentProof, isStorageConfigured } from "../services/storage";
+import { uploadPaymentProof, isStorageConfigured, getProductImageStream } from "../services/storage";
 import { getCurrentRate } from "../services/exchange-rate";
 import { logActivity } from "../utils/audit";
 import { uploadRateLimit } from "../middleware/rate-limit";
@@ -146,7 +146,7 @@ catalog.get("/:slug", async (c) => {
       name: p.name,
       description: p.description,
       price: Number(p.price),
-      imageUrl: p.imageUrl,
+      imageUrl: p.imageUrl ? `/catalog/${slug}/products/${p.id}/image` : null,
       categoryName: p.categoryId ? (categoryMap.get(p.categoryId) ?? null) : null,
       available: p.stock > 0,
       semaphore,
@@ -534,6 +534,70 @@ catalog.post(
     );
   },
 );
+
+// ============================================================
+// Public product image proxy (no auth required)
+// ============================================================
+
+/**
+ * GET /catalog/:slug/products/:productId/image - Serve product image.
+ *
+ * Public endpoint for storefront product images. MinIO is on a private
+ * network, so this proxies the image through the API.
+ */
+catalog.get("/:slug/products/:productId/image", async (c) => {
+  const slug = c.req.param("slug");
+  const productId = c.req.param("productId");
+  const db = tryGetDb();
+
+  if (!db) {
+    return c.json({ error: "Service unavailable" }, 503);
+  }
+
+  // Validate UUID format
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!uuidRegex.test(productId)) {
+    return c.json({ error: "Invalid product ID" }, 400);
+  }
+
+  // Look up business by slug
+  const [business] = await db
+    .select({ id: businesses.id })
+    .from(businesses)
+    .where(and(eq(businesses.slug, slug), eq(businesses.isActive, true)))
+    .limit(1);
+
+  if (!business) {
+    return c.json({ error: "Business not found" }, 404);
+  }
+
+  // Fetch product image key
+  const [product] = await db
+    .select({ imageUrl: products.imageUrl })
+    .from(products)
+    .where(
+      and(
+        eq(products.id, productId),
+        eq(products.businessId, business.id),
+        eq(products.isActive, true),
+      ),
+    )
+    .limit(1);
+
+  if (!product?.imageUrl) {
+    return c.json({ error: "No image" }, 404);
+  }
+
+  const result = await getProductImageStream(product.imageUrl);
+  if (!result) {
+    return c.json({ error: "Image not found in storage" }, 404);
+  }
+
+  c.header("Content-Type", result.contentType);
+  c.header("Cache-Control", "public, max-age=86400, immutable");
+
+  return c.body(result.body);
+});
 
 // ============================================================
 // Upload payment proof (public, rate-limited)

@@ -45,6 +45,7 @@ import {
   uploadProductImage,
   isStorageConfigured,
   getProductImageUrl,
+  getProductImageStream,
 } from "../services/storage";
 import type { AppEnv } from "../types";
 
@@ -180,12 +181,13 @@ inventory.get(
       }
     }
 
-    // Add semaphore color, depletion prediction, and resolve image URLs
-    const enriched = await Promise.all(
-      rows.map(async (p) => ({
-        ...p,
-        imageUrl: p.imageUrl ? await getProductImageUrl(p.imageUrl) : null,
-        semaphore: calculateStockSemaphore(
+    // Add semaphore color, depletion prediction, and image proxy URLs.
+    // Images are served via GET /api/products/:id/image (proxy to MinIO)
+    // instead of presigned URLs which point to the private MinIO endpoint.
+    const enriched = rows.map((p) => ({
+      ...p,
+      imageUrl: p.imageUrl ? `/api/products/${p.id}/image` : null,
+      semaphore: calculateStockSemaphore(
           p.stock,
           p.stockMin,
           p.stockCritical,
@@ -195,8 +197,7 @@ inventory.get(
           p.stock,
           salesVelocity[p.id] ?? 0,
         ),
-      })),
-    );
+      }));
 
     return c.json({
       products: enriched,
@@ -250,9 +251,9 @@ inventory.get("/products/:id", validateUuidParam, async (c) => {
     product.lastSoldAt?.toISOString() ?? null,
   );
 
-  // Resolve image URL if stored as key
+  // Use proxy URL for image (MinIO is not publicly accessible)
   const resolvedImageUrl = product.imageUrl
-    ? await getProductImageUrl(product.imageUrl)
+    ? `/api/products/${id}/image`
     : null;
 
   return c.json({
@@ -797,6 +798,45 @@ inventory.post(
 );
 
 // ============================================================
+// Product Image Proxy (serves images from MinIO without exposing it)
+// ============================================================
+
+/**
+ * GET /products/:id/image - Serve product image via API proxy.
+ *
+ * MinIO is on a private network, so presigned URLs are not accessible
+ * from the browser. This endpoint reads the image from MinIO and
+ * streams it to the client with proper caching headers.
+ */
+inventory.get("/products/:id/image", validateUuidParam, async (c) => {
+  const productId = c.req.param("id");
+  const db = c.get("db");
+  const businessId = c.get("businessId");
+
+  // Fetch product to get the image key
+  const [product] = await db
+    .select({ imageUrl: products.imageUrl })
+    .from(products)
+    .where(and(eq(products.id, productId), eq(products.businessId, businessId)))
+    .limit(1);
+
+  if (!product?.imageUrl) {
+    return c.json({ error: "No image" }, 404);
+  }
+
+  const result = await getProductImageStream(product.imageUrl);
+  if (!result) {
+    return c.json({ error: "Image not found in storage" }, 404);
+  }
+
+  // Cache for 1 day (images don't change often)
+  c.header("Content-Type", result.contentType);
+  c.header("Cache-Control", "public, max-age=86400, immutable");
+
+  return c.body(result.body);
+});
+
+// ============================================================
 // Product Image Upload
 // ============================================================
 
@@ -850,7 +890,7 @@ inventory.post("/products/:id/image", validateUuidParam, async (c) => {
   const buffer = Buffer.from(arrayBuffer);
 
   try {
-    const { key, url } = await uploadProductImage(
+    const { key } = await uploadProductImage(
       businessId,
       productId,
       buffer,
@@ -863,11 +903,12 @@ inventory.post("/products/:id/image", validateUuidParam, async (c) => {
       .set({ imageUrl: key, updatedAt: new Date() })
       .where(eq(products.id, productId));
 
-    // Return the presigned URL for immediate display in the frontend
-    return c.json({ imageUrl: url }, 201);
+    // Return the proxy URL for immediate display in the frontend
+    return c.json({ imageUrl: `/api/products/${productId}/image` }, 201);
   } catch (err) {
     const message =
       err instanceof Error ? err.message : "Error subiendo imagen";
+    console.error(`[image-upload] Product ${productId}: ${message}`, err instanceof Error ? err.stack : "");
     return c.json({ error: message }, 500);
   }
 });

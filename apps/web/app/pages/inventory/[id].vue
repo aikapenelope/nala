@@ -17,7 +17,14 @@ import { ChevronDown } from "lucide-vue-next";
 
 const route = useRoute();
 const router = useRouter();
-const { $api } = useApi();
+const { $api, apiBase } = useApi();
+
+/** Resolve image URL: prepend API base for relative paths from the API. */
+function resolveImageUrl(url: string | null): string | undefined {
+  if (!url) return undefined;
+  if (url.startsWith("http")) return url;
+  return `${apiBase}${url}`;
+}
 
 const productId = computed(() => {
   const id = route.params.id as string;
@@ -389,7 +396,7 @@ async function submitForm() {
               >
               <img
                 v-else-if="imageUrl"
-                :src="imageUrl"
+                :src="resolveImageUrl(imageUrl)"
                 alt="Producto"
                 class="h-16 w-16 rounded-xl object-cover"
               >
