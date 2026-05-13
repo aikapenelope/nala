@@ -31,123 +31,48 @@ El vendedor nunca "llena un sistema". Vende, y el sistema se organiza solo. Cada
 
 ---
 
-## Que cambiar en Nala
+## Estado actual post Fase 1 + Fase 2
 
-### Simplificar (inspirado en Treinta/Square/Loyverse)
+### Lo que Nala tiene hoy (completado)
 
-| Que | Hoy | Debe ser |
-|-----|-----|---------|
-| Vender | POS con pasos intermedios | 2 toques: tap producto, tap cobrar |
-| Crear producto | 15+ campos visibles | 3 campos: nombre, precio, foto. "Mas detalles" expandible |
-| Crear cliente | Manual, antes de vender | Automatico: se crea cuando compra o hace pedido |
-| Fiar | Requiere seleccionar cliente primero | "Fiar a [nombre]" directo desde el ticket |
-| Cobrar fiado | Link wa.me manual | Boton "Cobrar" -> WhatsApp con mensaje pre-armado |
-| Reportes | 10 paginas separadas | 1 pagina con 3 tabs: Hoy, Semana, Mes |
-| Settings | 7 sub-paginas | 1 pagina con secciones colapsables |
-| Onboarding | Multiples pasos | Nombre negocio + primer producto = listo |
-| Import productos | Solo Excel, solo desktop | Excel + foto de lista de precios. Mobile y desktop |
+| Feature | Estado | PR |
+|---------|--------|----|
+| POS con venta rapida | Solido | -- |
+| Inventario con semaforo de stock | Solido | -- |
+| Storefront PWA completo (tienda + checkout + pedidos) | Solido | -- |
+| Clientes + fiado con pagos parciales + aging | Solido | -- |
+| Bimoneda USD/Bs con tasa BCV | Solido | -- |
+| OCR facturas (GPT-4o-mini) | Solido | -- |
+| Cierre de caja (apertura + cierre) | Solido | -- |
+| Formulario producto simplificado (3 campos + expandible) | **Completado** | #226 |
+| Reportes consolidados (1 pagina, 3 tabs) | **Completado** | #225 |
+| Settings consolidados (1 pagina colapsable) | **Completado** | #227 |
+| Navegacion simplificada (7 items core + herramientas) | **Completado** | #224, #230 |
+| Validacion precios server-side en pedidos | **Completado** | #228 |
+| Paginacion catalogo publico | **Completado** | #228 |
+| IGTF informativo en storefront checkout | **Completado** | #229 |
+| Cobro individual por WhatsApp en cuentas | **Completado** | #231 |
+| Fecha de cobro en fiado + cobros pendientes en dashboard | **Completado** | #232 |
+| Comprobante de venta detallado por WhatsApp | **Completado** | #233 |
+| Import Excel con deteccion duplicados + mobile | **Completado** | #234 |
+| Import por foto de lista de precios (OCR) | **Completado** | #235 |
 
-### Lo que Nala ya tiene mejor que todos
+### Lo que se elimino/simplifico
 
-| Feature | Treinta | Square | Loyverse | Nala |
-|---------|---------|--------|----------|------|
-| Tienda online PWA | Catalogo basico | Requiere Shopify | No | Completa con checkout |
-| Pedidos online | No | Via Shopify | No | Flujo completo |
-| OCR facturas | No | No | No | Si (GPT-4o-mini) |
-| Inventario semaforo | Basico | Basico | Basico | Completo + prediccion |
-| Cierre de caja | Basico | Si | No | Completo (apertura + cierre) |
-| Cuentas por cobrar | Si | No | No | Con pagos parciales + aging |
-| Bimoneda USD/Bs | No | No | No | Si, con tasa BCV |
+| Componente | Accion | PR |
+|-----------|--------|----|
+| `useOfflineQueue.ts` (cola offline) | Eliminado. Checkout muestra "sin conexion" | #224 |
+| `useProductCache.ts` (sync 1000 items) | Eliminado. Dead code, nadie lo usaba | #224 |
+| `useOfflineDb.ts` (IndexedDB) | Eliminado. Dependencia de los anteriores | #224 |
+| `/catalogo/[slug].vue` | Eliminado. Duplicaba storefront `/tienda` | #224 |
+| Dependencia `dexie` | Eliminada del package.json | #224 |
+| 9 paginas de reportes individuales | Consolidadas en 1 pagina con 3 tabs | #225 |
+| 5 paginas de settings | Consolidadas en 1 pagina colapsable | #227 |
+| Proveedores en navegacion | Oculto (pagina sigue accesible por URL) | #224 |
+| Cotizaciones en navegacion | Oculto (pagina sigue accesible por URL) | #224 |
+| Middleware `/catalogo` | Limpiado de auth y storefront redirect | #224 |
 
----
-
-## Features por agregar
-
-| # | Feature | Descripcion | Fase |
-|---|---------|-------------|------|
-| 1 | **Cobro fiado por WhatsApp** | Boton "Cobrar" en cada deuda -> abre wa.me con mensaje pre-armado | 1 |
-| 2 | **Tasa BCV auto + IGTF** | Fetch automatico cada 6h. IGTF 3% en ventas en divisas | 1 |
-| 3 | **Validacion precios server-side** | Comparar precio enviado vs precio real en DB al crear pedido | 1 |
-| 4 | **Paginacion catalogo** | LIMIT 100 + scroll infinito en storefront | 1 |
-| 5 | **Import Excel mejorado** | Deteccion de duplicados por SKU. Funciona en mobile | 2 |
-| 6 | **Import por foto** | Tomar foto de lista de precios del proveedor -> OCR -> crear productos | 2 |
-| 7 | **Comprobante por WhatsApp** | Post-venta: compartir recibo como imagen por WhatsApp | 2 |
-| 8 | **Multi-usuario** | Roles: owner, manager, cashier. Invitacion por link | 3 |
-| 9 | **Dashboard con sugerencias** | "3 productos criticos" -> tap -> inventario. Reglas simples, no AI | 3 |
-| 10 | **Link de pago compartible** | `nala.app/pay/abc123` con datos de pago + upload comprobante | 4 |
-| 11 | **Personalizacion storefront** | Color de marca + logo + dominio custom | 5 |
-
----
-
-## Que esta sobredimensionado en Nala hoy
-
-### Eliminar (no aporta valor, agrega complejidad)
-
-| Feature | Tabla(s) | Razon |
-|---------|---------|-------|
-| Segmentos de clientes | `customerSegments` | CRM enterprise. 0% uso |
-| Unidades de medida | `unitsOfMeasure` | Sobreingenieria |
-| Cuentas bancarias | `bankAccounts` | El vendedor sabe sus cuentas |
-| Preferencias de notificacion | `notificationPreferences` | No hay notificaciones reales |
-| Tipos de recargo | `surchargeTypes` | Delivery fee ya esta en store_settings |
-| Offline sales queue | `useOfflineQueue` composable | Complejidad alta, uso ~0% |
-| Product cache agresivo | `useProductCache` (1000 items) | Innecesario con buena conexion |
-| Catalogo duplicado | `/catalogo/[slug]` pagina | Duplica el storefront `/tienda` |
-| 10 paginas de reportes | 10 archivos .vue | Consolidar en 1 pagina |
-
-### Simplificar
-
-| Feature | Hoy | Deberia ser |
-|---------|-----|-------------|
-| Crear producto | 15+ campos en formulario | 3 campos: nombre, precio, foto. "Mas detalles" expandible |
-| Reportes | 10 paginas separadas | 1 pagina con 3 tabs: Hoy, Semana, Mes |
-| Settings | 7 sub-paginas | 1 pagina con secciones colapsables |
-| Contabilidad | Pagina dedicada con asientos | Invisible. Se genera sola. Sin UI |
-| Proveedores | CRUD completo con pagina | Solo nombre en OCR. Sin pagina dedicada |
-| Historial de precios | Tabla + UI | Mantener tabla, eliminar UI |
-
----
-
-## Buyer Persona
-
-### Roberto -- Comerciante (el cliente principal)
-
-- **Negocio:** Bodega, mini-market, tienda de ropa, licoreria, tienda de celulares, distribuidora
-- **Productos:** 50-500 items
-- **Personas:** 1-5 (el dueno + ayudantes)
-- **Facturacion:** $500-$10,000 USD/mes
-- **Dispositivo:** Android gama media. Algunos tienen computadora en el mostrador
-- **Hoy usa:** Cuaderno, Excel, Fina, o nada
-- **Dolor:** "No se cuanto vendi", "Se me olvido que me deben", "Quiero que me pidan por internet"
-- **No necesita:** Contabilidad formal, facturacion fiscal, reportes complejos
-
----
-
-## Competencia
-
-| Feature | Square | Loyverse | Treinta | Fina | Nala (propuesto) |
-|---------|--------|----------|---------|------|-----------------|
-| Venta en 2 toques | Si | Si | Si | No | **Si** |
-| Producto en 3 campos | Si | Si | Si | No | **Si** |
-| POS movil | Si | Si | Si | Si | **Si** |
-| Inventario con semaforo | Basico | Basico | Basico | Basico | **Completo** |
-| Fiado + cobro WhatsApp | No | No | Link | Link | **API real** |
-| Tienda online PWA | Si (Shopify) | No | Basico | No | **Completa** |
-| WhatsApp API real | No | No | No | No | **Si** |
-| OCR facturas | No | No | No | No | **Si** |
-| Input por voz | No | No | No | No | **Si** |
-| Link de pago compartible | Si (Square) | No | No | No | **Si** |
-| Import por foto | No | No | No | No | **Si** |
-| Multi-usuario | Si | Add-on | Si | Si | **Si** |
-| Bimoneda (USD/Bs) | No | No | No | Si | **Si** |
-| Tasa BCV auto | No | No | No | Si | **Si** |
-| IGTF | No | No | No | No | **Si** |
-| Sugerencias inteligentes | No | No | No | No | **Si** |
-| Dark mode storefront | Si | No | No | No | **Si** |
-
----
-
-## Que queda por detras (invisible pero funcionando)
+### Lo que queda por detras (invisible pero funcionando)
 
 | Sistema | Que hace | Por que mantenerlo |
 |---------|---------|-------------------|
@@ -160,138 +85,147 @@ El vendedor nunca "llena un sistema". Vende, y el sistema se organiza solo. Cada
 | Suppliers (tabla + endpoint) | Existe sin navegacion | Se usa internamente en OCR para matching |
 | Accounting entries (tabla + endpoint) | Existe sin navegacion | Se generan automaticamente, consultables por API |
 
-## Que se elimina completamente
+---
 
-| Componente | Razon |
-|-----------|-------|
-| `useOfflineQueue.ts` | Cola de ventas offline. Complejidad alta, uso 0% |
-| `useProductCache.ts` sync agresivo (1000 items) | Reemplazar por cache simple |
-| `useOfflineDb.ts` tabla `pendingSales` | Parte del offline queue |
-| `/catalogo/[slug].vue` | Duplica el storefront `/tienda` |
-| `/settings/bank-accounts.vue` | Nadie registra cuentas bancarias |
-| `/settings/notifications.vue` | No hay notificaciones reales |
-| `/settings/surcharges.vue` | Delivery fee ya esta en store_settings |
-| 9 paginas de reportes individuales | Se consolidan en `/reports/index.vue` con tabs |
+## Buyer Persona
+
+### Carlos -- Comerciante pequeno (80% del mercado target)
+
+- **Edad:** 28-45 anos
+- **Negocio:** Bodega, panaderia, tienda de ropa, peluqueria, cafeteria, licoreria
+- **Productos:** 20-200 items
+- **Empleados:** Solo el (dueno-operador), maximo 1-2 ayudantes
+- **Dispositivo:** Celular Android gama media (Samsung A series, Xiaomi Redmi)
+- **Internet:** Movil 4G, no siempre estable pero funciona
+- **Hoy usa:** Cuaderno, Excel, Fina, o nada
+- **Dolor:** "No se cuanto vendi", "Se me olvido que me deben", "Quiero que me pidan por internet"
+- **No necesita:** Contabilidad formal, facturacion fiscal, reportes complejos
+
+### Maria -- Comerciante mediano (15% del mercado target)
+
+- **Negocio:** Mini-market, tienda de repuestos, distribuidora pequena
+- **Productos:** 200-500 items
+- **Empleados:** 2-5 personas
+- **Diferencia con Carlos:** Necesita reportes basicos, import de Excel, y control de fiado mas formal
+- **Usa:** Herramientas colapsables (reportes, OCR, import, cierre de caja)
+
+---
+
+## Competencia
+
+| Feature | Square | Loyverse | Treinta | Fina | Nala |
+|---------|--------|----------|---------|------|------|
+| Venta en 2 toques | Si | Si | Si | No | **Si** |
+| Producto en 3 campos | Si | Si | Si | No | **Si** |
+| POS movil | Si | Si | Si | Si | **Si** |
+| Inventario con semaforo | Basico | Basico | Basico | Basico | **Completo** |
+| Fiado + cobro WhatsApp | No | No | Link | Link | **Boton directo** |
+| Tienda online PWA | Si (Shopify) | No | Basico | No | **Completa** |
+| OCR facturas | No | No | No | No | **Si** |
+| Import por foto | No | No | No | No | **Si** |
+| Bimoneda (USD/Bs) | No | No | No | Si | **Si** |
+| Tasa BCV auto | No | No | No | Si | **Si** |
+| IGTF | No | No | No | No | **Si** |
+| Recibo WhatsApp detallado | No | No | No | No | **Si** |
+| Cobros con fecha de vencimiento | No | No | No | No | **Si** |
 
 ---
 
 ## Fases de ejecucion
 
-### Fase 1 -- Limpiar, simplificar, robustecer (2-3 semanas)
+### Fase 1 -- Limpiar, simplificar, robustecer -- COMPLETADA
 
-**Objetivo:** Convertir Nala de "sistema con 49 paginas" a "app de ventas simple y robusta". Sin agregar features nuevos. Solo quitar lo que sobra y simplificar lo que queda.
+| Sprint | Descripcion | PR | Estado |
+|--------|-------------|-----|--------|
+| 1A | Eliminar dead weight (offline queue, catalogo duplicado, nav) | #224 | Completado |
+| 1B | Consolidar 9 reportes en 3 tabs | #225 | Completado |
+| 1C | Simplificar formulario producto (3 campos + expandible) | #226 | Completado |
+| 1D | Consolidar settings en 1 pagina colapsable | #227 | Completado |
+| 1E | Validacion precios server-side + paginacion catalogo | #228 | Completado |
+| 1E2 | IGTF informativo en storefront checkout | #229 | Completado |
+| 1F | Actualizar links dashboard a reportes consolidados | #230 | Completado |
 
-#### Sprint 1A: Eliminar dead weight (3-4 dias)
+**Resultado:** De 49 paginas a 7 items de navegacion core. -3,429 lineas, +1,155 lineas. Reduccion neta de ~2,274 lineas.
 
-**Codigo a eliminar/ocultar:**
-- Eliminar pagina `/catalogo/[slug].vue` (duplica storefront)
-- Eliminar composable `useOfflineQueue.ts` (cola de ventas offline)
-- Simplificar `useProductCache.ts` (solo cache basico, no sync agresivo de 1000 items)
-- Ocultar paginas de contabilidad de la navegacion (mantener generacion automatica de asientos)
-- Ocultar pagina de proveedores de la navegacion
-- Ocultar pagina de cotizaciones de la navegacion
-
-**Tablas a dejar huerfanas (no eliminar de schema, solo quitar UI):**
-- `customerSegments` -- quitar cualquier referencia en UI
-- `unitsOfMeasure` -- quitar cualquier referencia en UI
-- `bankAccounts` -- quitar pagina settings/bank-accounts
-- `notificationPreferences` -- quitar pagina settings/notifications
-- `surchargeTypes` -- quitar pagina settings/surcharges
-
-#### Sprint 1B: Consolidar reportes (2-3 dias)
-
-**Hoy:** 10 paginas separadas (daily, weekly, monthly-trend, profitability, inventory, receivable, sellers, financial, cash-flow, alerts)
-
-**Despues:** 1 pagina `/reports/index.vue` con 3 tabs:
-- **Hoy**: ventas del dia, comparacion con ayer, top productos, metodos de pago (merge de daily + alerts)
-- **Periodo**: selector semana/mes, grafico de barras, tendencia, rentabilidad (merge de weekly + monthly-trend + profitability + financial)
-- **Inventario**: stock bajo, productos sin movimiento, prediccion de agotamiento (merge de inventory)
-
-Las paginas individuales se eliminan. Los endpoints API se mantienen (el tab llama al endpoint correspondiente).
-
-#### Sprint 1C: Simplificar formulario de producto (2 dias)
-
-**Hoy:** Formulario con 15+ campos visibles: nombre, descripcion, SKU, barcode, costo, precio, stock, stockMin, stockCritical, hasVariants, isService, wholesalePrice, wholesaleMinQty, brand, location, imageUrl, expiresAt, categoryId
-
-**Despues:** 3 campos visibles + seccion expandible:
-```
-[Foto]  (tap para tomar/seleccionar)
-[Nombre del producto]
-[Precio de venta]     [Stock]
-
-v Mas detalles (colapsado por defecto)
-  [Costo]  [SKU]  [Barcode]
-  [Categoria]  [Marca]
-  [Stock minimo]  [Stock critico]
-  [Precio al mayor]  [Cantidad minima]
-  [Fecha vencimiento]
-  [Ubicacion]  [Descripcion]
-  [ ] Es servicio (sin stock)
-  [ ] Tiene variantes
-```
-
-El 80% de los vendedores solo llena nombre + precio + foto. El 20% que necesita mas, expande.
-
-#### Sprint 1D: Simplificar settings (1-2 dias)
-
-**Hoy:** 7 sub-paginas (business, exchange-rate, store, bank-accounts, notifications, surcharges, index)
-
-**Despues:** 1 pagina con secciones colapsables:
-- **Negocio** (nombre, slug, telefono, direccion, WhatsApp)
-- **Tasa de cambio** (BCV auto + manual)
-- **Tienda online** (redirect a /store que ya es completa)
-
-Eliminar: bank-accounts, notifications, surcharges como paginas separadas.
-
-#### Sprint 1E: Robustez critica (2-3 dias)
-
-- **Validacion de precios server-side** en `POST /catalog/:slug/orders` (comparar precio enviado vs precio real en DB)
-- **Paginacion del catalogo publico** (`GET /catalog/:slug` con `?limit=100&offset=0` + scroll infinito en frontend)
-- **Tasa BCV auto-fetch** (cron job o piggyback que jala la tasa BCV cada 6 horas automaticamente)
-- **IGTF automatico** (3% en ventas en divisas, campo en sale + calculo en checkout)
-- **Timeout explicito en OCR** (15 segundos, con mensaje claro al usuario)
-- **Limpiar memory store** de rate limit periodicamente (evitar memory leak)
-
-#### Sprint 1F: Simplificar navegacion final (1 dia)
-
-Ajustar sidebar y mobile "Mas" para reflejar los cambios:
-
-**Sidebar desktop (7 items core):**
-1. Inicio (dashboard)
-2. Vender (POS)
-3. Pedidos (storefront orders)
-4. Tienda Online (storefront config)
-5. Inventario (productos + stock)
-6. Clientes (CRM basico + fiado)
-7. Configuracion
-
-**Herramientas (colapsable):**
-- Historial de ventas
-- Cuentas (por cobrar)
-- Cierre de caja
-- Reportes (1 pagina consolidada)
-- Gastos / OCR
-
-**Eliminado de navegacion (paginas siguen existiendo por si acaso):**
-- Contabilidad (asientos) -- invisible, automatica
-- Proveedores -- solo en OCR
-- Cotizaciones -- oculto
-- Bank accounts, notifications, surcharges -- eliminados
+**Cambios vs plan original:**
+- `useOfflineQueue` se desacoplo del checkout antes de eliminar (el plan decia "eliminar" directo, pero checkout lo usaba)
+- `useProductCache` era dead code puro, se elimino sin simplificar (el plan decia "simplificar")
+- IGTF se implemento como display informativo en storefront (el plan lo ponia como campo en schema + backend)
+- Tasa BCV auto-fetch y limpieza de rate limit store se dejaron fuera (ya existia la base, no era critico)
 
 ---
 
-### Fase 2 -- Import + Comprobantes (2 semanas)
-- Import Excel mejorado: deteccion duplicados por SKU, funciona en mobile
-- Import por foto de lista de precios (OCR -> crear productos)
-- Comprobante de venta compartible por WhatsApp (imagen)
+### Fase 2 -- Import + Comprobantes + Cobro WhatsApp -- COMPLETADA
 
-### Fase 3 -- Multi-usuario + Dashboard inteligente (3 semanas)
-- Roles: owner, manager, cashier. Invitacion por link
-- Dashboard con sugerencias accionables (stock critico, fiados pendientes, tendencia)
+| Sprint | Descripcion | PR | Estado |
+|--------|-------------|-----|--------|
+| 2A | Cobro individual por WhatsApp en cuentas por cobrar | #231 | Completado |
+| 2B | Fecha de cobro en fiado + cobros pendientes en dashboard | #232 | Completado |
+| 2C | Comprobante de venta detallado por WhatsApp | #233 | Completado |
+| 2D | Import Excel con deteccion duplicados + mobile | #234 | Completado |
+| 2E | Import por foto de lista de precios (OCR) | #235 | Completado |
 
-### Fase 4 -- Link de pago + Personalizacion (2 semanas)
-- Link de pago compartible: `nala.app/pay/abc123`
-- Color de marca + logo en storefront
+**Cambios vs plan original:**
+- Se agrego cobro de fiado por WhatsApp (feature #1 del doc original que se habia perdido entre la tabla y los sprints)
+- Se agrego fecha de cobro en fiado + seccion "cobros pendientes" en dashboard (no estaba en el plan original)
+- El comprobante por WhatsApp se implemento como texto formateado rico (no como imagen, que requeriria canvas/server rendering)
+- Multi-usuario (roles) se saco de Fase 3 por decision de producto
+
+---
+
+### Fase 3 -- Dashboard inteligente (2 semanas) -- PENDIENTE
+
+**Objetivo:** El dashboard no solo muestra datos, sugiere acciones. Carlos abre Nala y sabe que hacer.
+
+**Sugerencias accionables (reglas simples, no AI):**
+- "3 productos con stock critico" -> tap -> ir a inventario filtrado por stock rojo
+- "5 fiados vencidos por $120" -> tap -> ir a cuentas por cobrar
+- "$450 en ventas hoy, 15% mas que ayer" -> informativo
+- "Producto estrella: Harina PAN (32 vendidos esta semana)" -> informativo
+- "2 pedidos pendientes" -> tap -> ir a pedidos
+
+**Implementacion:**
+- Endpoint `GET /api/reports/alerts` ya existe y retorna alertas
+- Agregar reglas para: stock critico, fiados vencidos, tendencia de ventas, producto estrella
+- Cada alerta tiene: icono, titulo, sugerencia, link de accion, severidad (critical/warning/info)
+- Mostrar las top 5 alertas en el dashboard con cards accionables
+
+---
+
+### Fase 4 -- Link de pago compartible (1-2 semanas) -- PENDIENTE
+
+**Objetivo:** Carlos comparte un link por WhatsApp y el cliente paga sin necesitar la app.
+
+**Flujo:**
+1. Carlos crea un link de pago: `nala.app/pay/abc123`
+2. El link muestra: nombre del negocio, monto, metodos de pago aceptados
+3. El cliente sube comprobante de pago (foto)
+4. Carlos recibe notificacion y confirma el pago
+
+**Implementacion:**
+- Nueva tabla `payment_links` (businessId, amount, description, status, paymentProofUrl)
+- Endpoint `POST /api/payment-links` (crear link)
+- Endpoint `GET /pay/:code` (pagina publica, sin auth)
+- Endpoint `POST /pay/:code/proof` (subir comprobante)
+- UI: boton "Crear link de pago" en el dashboard o en cuentas
+
+---
+
+### Fase 5 -- Personalizacion storefront (1 semana) -- PENDIENTE
+
+**Objetivo:** La tienda online de cada negocio se ve unica.
+
+**Features:**
+- Color de marca (primary color picker)
+- Logo del negocio (upload a MinIO)
+- Mensaje de bienvenida personalizado (ya existe el campo `welcomeMessage` en store_settings)
+- Dominio custom (subdominio ya funciona, agregar CNAME custom)
+
+**Implementacion:**
+- Agregar campos `brandColor` y `logoUrl` a `store_settings`
+- El storefront layout lee estos valores y aplica CSS custom
+- Upload de logo via endpoint existente de MinIO
+- Para dominio custom: configuracion DNS en Cloudflare (manual por ahora)
 
 ---
 
@@ -299,12 +233,12 @@ Ajustar sidebar y mobile "Mas" para reflejar los cambios:
 
 | Servicio externo | Costo estimado | Uso |
 |-----------------|---------------|-----|
-| WhatsApp Cloud API | ~$5-15/mes por negocio | Notificaciones transaccionales |
-| Groq Whisper | ~$0.001/transcripcion | Input por voz |
-| GPT-4o-mini (OCR + parsing) | ~$0.005-0.01/request | OCR facturas, parsing voz, import foto |
+| GPT-4o-mini (OCR + import foto) | ~$0.005-0.01/request | OCR facturas, import por foto |
 | Clerk auth | $0 (free tier 10K MAU) | Autenticacion |
 | Hetzner hosting | $8.49/mes (CX32) | Soporta 50-100 negocios |
 
-Costo total de infraestructura para 100 negocios: ~$60-80/mes.
+Costo total de infraestructura para 100 negocios: ~$15-25/mes.
 Revenue a 100 negocios x $20/mes promedio: $2,000/mes.
-Margen: ~96%.
+Margen: ~98%.
+
+> Nota: WhatsApp Cloud API ($5-15/mes) no se usa. Todos los features de WhatsApp usan links wa.me/ que abren la app del telefono del vendedor. Cero costo.
