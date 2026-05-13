@@ -182,13 +182,8 @@ export async function uploadProductImage(
     }),
   );
 
-  const url = await getSignedUrl(
-    client,
-    new GetObjectCommand({ Bucket: MINIO_BUCKET, Key: key }),
-    { expiresIn: 86400 },
-  );
-
-  return { key, url };
+  // Store the key, not a presigned URL (URLs expire, keys don't)
+  return { key, url: key };
 }
 
 /**
@@ -210,4 +205,28 @@ export async function getProofUrl(key: string): Promise<string> {
   });
 
   return getSignedUrl(client, command, { expiresIn: 3600 });
+}
+
+/**
+ * Generate a presigned URL for a product image.
+ * URL expires in 7 days (products are viewed frequently, cache-friendly).
+ *
+ * @param key - Storage key (e.g., "products/businessId/productId.jpg")
+ * @returns Presigned URL string, or null if storage not configured
+ */
+export async function getProductImageUrl(key: string): Promise<string | null> {
+  if (!isStorageConfigured || !key || !key.startsWith("products/")) {
+    return null;
+  }
+
+  try {
+    const client = getClient();
+    const command = new GetObjectCommand({
+      Bucket: MINIO_BUCKET,
+      Key: key,
+    });
+    return await getSignedUrl(client, command, { expiresIn: 604800 });
+  } catch {
+    return null;
+  }
 }

@@ -214,3 +214,22 @@ ALTER TABLE notification_preferences ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS notification_preferences_tenant_isolation ON notification_preferences;
 CREATE POLICY notification_preferences_tenant_isolation ON notification_preferences
   USING (business_id = current_business_id());
+
+-- Store settings
+ALTER TABLE store_settings ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS store_settings_tenant_isolation ON store_settings;
+CREATE POLICY store_settings_tenant_isolation ON store_settings
+  USING (business_id = current_business_id());
+
+-- Orders (online storefront orders)
+ALTER TABLE orders ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS orders_tenant_isolation ON orders;
+CREATE POLICY orders_tenant_isolation ON orders
+  USING (business_id = current_business_id());
+
+-- Orders: allow public creation (storefront checkout has no auth context).
+-- The catalog routes filter by slug directly, not via RLS.
+DROP POLICY IF EXISTS orders_public_insert ON orders;
+CREATE POLICY orders_public_insert ON orders
+  FOR INSERT
+  WITH CHECK (current_business_id() IS NULL OR business_id = current_business_id());

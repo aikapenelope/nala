@@ -20,7 +20,7 @@
 import { serve } from "@hono/node-server";
 import { config } from "./config"; // Validates env vars on import
 import { app } from "./app";
-import { initDb } from "./db";
+import { initDb, applyRlsPolicies } from "./db";
 import { initRedis, closeRedis } from "./redis";
 
 // Initialize database (required in production, optional in dev)
@@ -28,6 +28,10 @@ if (config.databaseUrl) {
   try {
     initDb();
     console.log("[startup] Database connected.");
+
+    // Apply RLS policies (idempotent, safe on every deploy)
+    await applyRlsPolicies();
+    console.log("[startup] RLS policies applied.");
   } catch (err) {
     console.error("[startup] FATAL: Database connection failed:", err);
     process.exit(1);
