@@ -68,7 +68,7 @@ export default defineNuxtConfig({
       link: [{ rel: "manifest", href: "/manifest.json" }],
       meta: [
         { charset: "utf-8" },
-        { name: "viewport", content: "width=device-width, initial-scale=1" },
+        { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
         {
           name: "description",
           content: "Backoffice operativo para comerciantes y PyMEs",
