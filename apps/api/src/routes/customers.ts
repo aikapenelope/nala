@@ -324,14 +324,28 @@ customersRoutes.post("/customers/recalculate-segments", async (c) => {
 // Accounts Receivable
 // ============================================================
 
-/** GET /accounts/receivable - List pending accounts receivable. */
+/** GET /accounts/receivable - List pending accounts receivable with customer info. */
 customersRoutes.get("/accounts/receivable", async (c) => {
   const db = c.get("db");
   const businessId = c.get("businessId");
 
   const rows = await db
-    .select()
+    .select({
+      id: accountsReceivable.id,
+      customerId: accountsReceivable.customerId,
+      saleId: accountsReceivable.saleId,
+      amountUsd: accountsReceivable.amountUsd,
+      paidUsd: accountsReceivable.paidUsd,
+      balanceUsd: accountsReceivable.balanceUsd,
+      status: accountsReceivable.status,
+      dueDate: accountsReceivable.dueDate,
+      createdAt: accountsReceivable.createdAt,
+      updatedAt: accountsReceivable.updatedAt,
+      customerName: customers.name,
+      customerPhone: customers.phone,
+    })
     .from(accountsReceivable)
+    .innerJoin(customers, eq(accountsReceivable.customerId, customers.id))
     .where(
       and(
         eq(accountsReceivable.businessId, businessId),
