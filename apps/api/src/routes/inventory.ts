@@ -41,6 +41,7 @@ import {
 import { handleDbError } from "../utils/db-errors";
 import { logActivity } from "../utils/audit";
 import { validateUuidParam } from "../middleware/validate-uuid";
+import { uploadProductImage, isStorageConfigured } from "../services/storage";
 import type { AppEnv } from "../types";
 
 const inventory = new Hono<AppEnv>();
@@ -760,5 +761,79 @@ inventory.post(
     });
   },
 );
+
+// ============================================================
+// Product Image Upload
+// ============================================================
+
+/**
+ * POST /products/:id/image - Upload product image.
+ *
+ * Accepts multipart/form-data with a single file field "image".
+ * Max 5MB, only JPEG/PNG/WebP.
+ * Stores in MinIO and updates the product's image_url.
+ */
+inventory.post("/products/:id/image", validateUuidParam, async (c) => {
+  const productId = c.req.param("id");
+  const db = c.get("db");
+  const businessId = c.get("businessId");
+
+  // Verify product exists and belongs to this business
+  const [product] = await db
+    .select({ id: products.id })
+    .from(products)
+    .where(and(eq(products.id, productId), eq(products.businessId, businessId)))
+    .limit(1);
+
+  if (!product) {
+    return c.json({ error: "Producto no encontrado" }, 404);
+  }
+
+  // Check storage availability
+  if (!isStorageConfigured) {
+    return c.json({ error: "Almacenamiento de archivos no configurado" }, 503);
+  }
+
+  // Parse multipart form data
+  const formData = await c.req.formData();
+  const file = formData.get("image");
+
+  if (!file || !(file instanceof File)) {
+    return c.json({ error: "No se recibio imagen. Campo: image" }, 400);
+  }
+
+  // Validate content type
+  if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+    return c.json({ error: "Solo JPEG, PNG o WebP." }, 400);
+  }
+
+  // Validate size (5MB max)
+  if (file.size > 5 * 1024 * 1024) {
+    return c.json({ error: "Imagen demasiado grande. Maximo 5MB." }, 400);
+  }
+
+  const arrayBuffer = await file.arrayBuffer();
+  const buffer = Buffer.from(arrayBuffer);
+
+  try {
+    const { url } = await uploadProductImage(
+      businessId,
+      productId,
+      buffer,
+      file.type,
+    );
+
+    // Update product imageUrl
+    await db
+      .update(products)
+      .set({ imageUrl: url, updatedAt: new Date() })
+      .where(eq(products.id, productId));
+
+    return c.json({ imageUrl: url }, 201);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Error subiendo imagen";
+    return c.json({ error: message }, 500);
+  }
+});
 
 export { inventory };

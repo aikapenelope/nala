@@ -138,6 +138,60 @@ export async function uploadPaymentProof(
 }
 
 /**
+ * Upload a product image to MinIO.
+ *
+ * @param businessId - Business UUID
+ * @param productId - Product UUID
+ * @param fileBuffer - File content as Buffer
+ * @param contentType - MIME type of the file
+ * @returns The storage key (path) and a presigned URL for display
+ */
+export async function uploadProductImage(
+  businessId: string,
+  productId: string,
+  fileBuffer: Buffer,
+  contentType: string,
+): Promise<{ key: string; url: string }> {
+  if (!isStorageConfigured) {
+    throw new Error("Storage not configured");
+  }
+
+  if (!ALLOWED_TYPES.has(contentType)) {
+    throw new Error("Tipo de archivo no permitido. Solo JPEG, PNG o WebP.");
+  }
+
+  if (fileBuffer.length > MAX_FILE_SIZE) {
+    throw new Error("Archivo demasiado grande. Maximo 5MB.");
+  }
+
+  const ext = contentType === "image/jpeg"
+    ? "jpg"
+    : contentType === "image/png"
+      ? "png"
+      : "webp";
+
+  const key = `products/${businessId}/${productId}.${ext}`;
+
+  const client = getClient();
+  await client.send(
+    new PutObjectCommand({
+      Bucket: MINIO_BUCKET,
+      Key: key,
+      Body: fileBuffer,
+      ContentType: contentType,
+    }),
+  );
+
+  const url = await getSignedUrl(
+    client,
+    new GetObjectCommand({ Bucket: MINIO_BUCKET, Key: key }),
+    { expiresIn: 86400 },
+  );
+
+  return { key, url };
+}
+
+/**
  * Generate a presigned URL for viewing a payment proof.
  * URL expires in 1 hour.
  *
