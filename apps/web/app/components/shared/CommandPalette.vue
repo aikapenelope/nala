@@ -32,9 +32,10 @@ const PAGES: SearchResult[] = [
   { id: "p-inventory", type: "page", title: "Inventario", subtitle: "Productos", to: "/inventory" },
   { id: "p-clients", type: "page", title: "Clientes", subtitle: "CRM", to: "/clients" },
   { id: "p-reports", type: "page", title: "Reportes", subtitle: "Analisis", to: "/reports" },
-  { id: "p-accounting", type: "page", title: "Contabilidad", subtitle: "Gastos y cuentas", to: "/accounting" },
-  { id: "p-settings", type: "page", title: "Configuracion", subtitle: "Equipo y negocio", to: "/settings" },
-  { id: "p-suppliers", type: "page", title: "Proveedores", subtitle: "Directorio", to: "/suppliers" },
+  { id: "p-accounting", type: "page", title: "Gastos", subtitle: "Registro de gastos y OCR", to: "/accounting" },
+  { id: "p-settings", type: "page", title: "Configuracion", subtitle: "Negocio y preferencias", to: "/settings" },
+  { id: "p-orders", type: "page", title: "Pedidos", subtitle: "Pedidos online", to: "/orders" },
+  { id: "p-store", type: "page", title: "Tienda Online", subtitle: "Configurar storefront", to: "/store" },
 ];
 
 /** Open the modal. */

@@ -24,20 +24,10 @@ else
   echo "[entrypoint] WARNING: DATABASE_URL not set, skipping migrations."
 fi
 
-# Step 2: Apply RLS policies via psql
-# init.sql uses DO blocks with pg_tables checks for tables that may not
-# exist yet (e.g., orders, store_settings before migration 0014 runs).
-# Errors here are non-fatal: the API's applyRlsPolicies() also applies
-# policies at startup, so psql failures are logged but don't block boot.
-if [ -n "$DATABASE_URL" ] && [ -f "packages/db/init.sql" ]; then
-  echo "[entrypoint] Applying RLS policies..."
-  if ! psql "$DATABASE_URL" -f packages/db/init.sql 2>&1; then
-    echo "[entrypoint] WARNING: init.sql had errors (see above). The API will retry RLS at startup."
-  fi
-  echo "[entrypoint] RLS policies step complete."
-fi
-
-# Step 3: Start the API server
+# Step 2: Start the API server
+# RLS policies are applied by applyRlsPolicies() in the API at startup.
+# This is the single source of truth for RLS (see apps/api/src/db.ts).
+# init.sql is kept as reference/documentation only and is NOT executed.
 # Uses the tsup-bundled output (single ESM file, no tsx needed)
 echo "[entrypoint] Starting Nova API on port ${PORT:-3001}..."
 exec node apps/api/dist/index.js

@@ -10,7 +10,7 @@
 
 definePageMeta({ layout: "storefront" });
 
-const { business, products, categories, storeInfo, exchangeRate, isLoading, error, fetchCatalog } =
+const { business, products, categories, storeInfo, exchangeRate, isLoading, isLoadingMore, hasMore, error, fetchCatalog, fetchMore } =
   useStorefront();
 const { addItem, itemCount, subtotal } = useCart();
 
@@ -64,6 +64,38 @@ onMounted(() => {
   if (products.value.length === 0) {
     fetchCatalog();
   }
+});
+
+/**
+ * Infinite scroll: IntersectionObserver triggers fetchMore when the
+ * sentinel element at the bottom of the product grid becomes visible.
+ */
+const scrollSentinel = ref<HTMLElement | null>(null);
+
+onMounted(() => {
+  if (!import.meta.client) return;
+
+  const observer = new IntersectionObserver(
+    (entries) => {
+      const entry = entries[0];
+      if (entry?.isIntersecting && hasMore.value && !isLoadingMore.value) {
+        fetchMore();
+      }
+    },
+    { rootMargin: "200px" },
+  );
+
+  // Watch for the sentinel element to appear in the DOM
+  watch(
+    scrollSentinel,
+    (el) => {
+      observer.disconnect();
+      if (el) observer.observe(el);
+    },
+    { immediate: true },
+  );
+
+  onUnmounted(() => observer.disconnect());
 });
 </script>
 
@@ -321,6 +353,19 @@ onMounted(() => {
             </button>
           </div>
         </div>
+      </div>
+
+      <!-- Infinite scroll sentinel + loading indicator -->
+      <div
+        v-if="hasMore || isLoadingMore"
+        ref="scrollSentinel"
+        class="py-6 text-center"
+      >
+        <div
+          v-if="isLoadingMore"
+          class="mx-auto h-6 w-6 animate-spin rounded-full border-2 border-gray-200 border-t-gray-900"
+        />
+        <p v-else class="text-xs text-gray-400">Cargando mas productos...</p>
       </div>
       </template>
     </template>
