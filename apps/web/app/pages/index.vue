@@ -526,7 +526,7 @@ function openRateEditor() {
         </NuxtLink>
 
         <NuxtLink
-          to="/reports/cash-flow"
+          to="/reports"
           class="card-lift relative overflow-hidden rounded-[20px] border border-white/80 p-3"
           :class="
             cashFlow7d >= 0
@@ -563,7 +563,7 @@ function openRateEditor() {
       <!-- WEEKLY CHART -->
       <NuxtLink
         v-if="weeklyDays.length > 0"
-        to="/reports/weekly"
+        to="/reports"
         class="card-premium mt-3 block p-4 transition-spring hover:shadow-[0_12px_30px_-10px_rgba(0,0,0,0.08)]"
       >
         <div class="mb-3 flex items-center justify-between">
@@ -692,7 +692,7 @@ function openRateEditor() {
         <!-- Gross margin -->
         <NuxtLink
           v-if="grossMargin > 0"
-          to="/reports/financial"
+          to="/reports"
           class="card-premium flex items-center gap-3 p-3.5 transition-spring hover:shadow-[0_8px_20px_-5px_rgba(0,0,0,0.06)]"
         >
           <div
