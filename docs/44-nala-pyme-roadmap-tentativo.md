@@ -177,121 +177,73 @@ El vendedor nunca "llena un sistema". Vende, y el sistema se organiza solo. Cada
 
 ## Fases de ejecucion
 
-### Fase 1 -- Limpiar, simplificar, robustecer (2-3 semanas)
+### Fase 1 -- Limpiar, simplificar, robustecer -- COMPLETADA
 
-**Objetivo:** Convertir Nala de "sistema con 49 paginas" a "app de ventas simple y robusta". Sin agregar features nuevos. Solo quitar lo que sobra y simplificar lo que queda.
+| Sprint | PR | Descripcion |
+|--------|-----|-------------|
+| 1A | #224 | Eliminar dead weight: offline queue, catalogo duplicado, nav cleanup |
+| 1B | #225 | Consolidar 9 reportes en 1 pagina con 3 tabs |
+| 1C | #226 | Simplificar formulario producto (3 campos + expandible) |
+| 1D | #227 | Consolidar settings en 1 pagina colapsable |
+| 1E | #228 | Validacion precios server-side + paginacion catalogo |
+| 1E2 | #229 | IGTF informativo en storefront checkout |
+| 1F | #230 | Actualizar links dashboard a reportes consolidados |
 
-#### Sprint 1A: Eliminar dead weight (3-4 dias)
-
-**Codigo a eliminar/ocultar:**
-- Eliminar pagina `/catalogo/[slug].vue` (duplica storefront)
-- Eliminar composable `useOfflineQueue.ts` (cola de ventas offline)
-- Simplificar `useProductCache.ts` (solo cache basico, no sync agresivo de 1000 items)
-- Ocultar paginas de contabilidad de la navegacion (mantener generacion automatica de asientos)
-- Ocultar pagina de proveedores de la navegacion
-- Ocultar pagina de cotizaciones de la navegacion
-
-**Tablas a dejar huerfanas (no eliminar de schema, solo quitar UI):**
-- `customerSegments` -- quitar cualquier referencia en UI
-- `unitsOfMeasure` -- quitar cualquier referencia en UI
-- `bankAccounts` -- quitar pagina settings/bank-accounts
-- `notificationPreferences` -- quitar pagina settings/notifications
-- `surchargeTypes` -- quitar pagina settings/surcharges
-
-#### Sprint 1B: Consolidar reportes (2-3 dias)
-
-**Hoy:** 10 paginas separadas (daily, weekly, monthly-trend, profitability, inventory, receivable, sellers, financial, cash-flow, alerts)
-
-**Despues:** 1 pagina `/reports/index.vue` con 3 tabs:
-- **Hoy**: ventas del dia, comparacion con ayer, top productos, metodos de pago (merge de daily + alerts)
-- **Periodo**: selector semana/mes, grafico de barras, tendencia, rentabilidad (merge de weekly + monthly-trend + profitability + financial)
-- **Inventario**: stock bajo, productos sin movimiento, prediccion de agotamiento (merge de inventory)
-
-Las paginas individuales se eliminan. Los endpoints API se mantienen (el tab llama al endpoint correspondiente).
-
-#### Sprint 1C: Simplificar formulario de producto (2 dias)
-
-**Hoy:** Formulario con 15+ campos visibles: nombre, descripcion, SKU, barcode, costo, precio, stock, stockMin, stockCritical, hasVariants, isService, wholesalePrice, wholesaleMinQty, brand, location, imageUrl, expiresAt, categoryId
-
-**Despues:** 3 campos visibles + seccion expandible:
-```
-[Foto]  (tap para tomar/seleccionar)
-[Nombre del producto]
-[Precio de venta]     [Stock]
-
-v Mas detalles (colapsado por defecto)
-  [Costo]  [SKU]  [Barcode]
-  [Categoria]  [Marca]
-  [Stock minimo]  [Stock critico]
-  [Precio al mayor]  [Cantidad minima]
-  [Fecha vencimiento]
-  [Ubicacion]  [Descripcion]
-  [ ] Es servicio (sin stock)
-  [ ] Tiene variantes
-```
-
-El 80% de los vendedores solo llena nombre + precio + foto. El 20% que necesita mas, expande.
-
-#### Sprint 1D: Simplificar settings (1-2 dias)
-
-**Hoy:** 7 sub-paginas (business, exchange-rate, store, bank-accounts, notifications, surcharges, index)
-
-**Despues:** 1 pagina con secciones colapsables:
-- **Negocio** (nombre, slug, telefono, direccion, WhatsApp)
-- **Tasa de cambio** (BCV auto + manual)
-- **Tienda online** (redirect a /store que ya es completa)
-
-Eliminar: bank-accounts, notifications, surcharges como paginas separadas.
-
-#### Sprint 1E: Robustez critica (2-3 dias)
-
-- **Validacion de precios server-side** en `POST /catalog/:slug/orders` (comparar precio enviado vs precio real en DB)
-- **Paginacion del catalogo publico** (`GET /catalog/:slug` con `?limit=100&offset=0` + scroll infinito en frontend)
-- **Tasa BCV auto-fetch** (cron job o piggyback que jala la tasa BCV cada 6 horas automaticamente)
-- **IGTF automatico** (3% en ventas en divisas, campo en sale + calculo en checkout)
-- **Timeout explicito en OCR** (15 segundos, con mensaje claro al usuario)
-- **Limpiar memory store** de rate limit periodicamente (evitar memory leak)
-
-#### Sprint 1F: Simplificar navegacion final (1 dia)
-
-Ajustar sidebar y mobile "Mas" para reflejar los cambios:
-
-**Sidebar desktop (7 items core):**
-1. Inicio (dashboard)
-2. Vender (POS)
-3. Pedidos (storefront orders)
-4. Tienda Online (storefront config)
-5. Inventario (productos + stock)
-6. Clientes (CRM basico + fiado)
-7. Configuracion
-
-**Herramientas (colapsable):**
-- Historial de ventas
-- Cuentas (por cobrar)
-- Cierre de caja
-- Reportes (1 pagina consolidada)
-- Gastos / OCR
-
-**Eliminado de navegacion (paginas siguen existiendo por si acaso):**
-- Contabilidad (asientos) -- invisible, automatica
-- Proveedores -- solo en OCR
-- Cotizaciones -- oculto
-- Bank accounts, notifications, surcharges -- eliminados
+Resultado: -2,274 lineas netas. De 49 paginas a 7 items de navegacion core.
 
 ---
 
-### Fase 2 -- Import + Comprobantes (2 semanas)
-- Import Excel mejorado: deteccion duplicados por SKU, funciona en mobile
-- Import por foto de lista de precios (OCR -> crear productos)
-- Comprobante de venta compartible por WhatsApp (imagen)
+### Fase 2 -- Import + Comprobantes + Cobro WhatsApp -- COMPLETADA
 
-### Fase 3 -- Multi-usuario + Dashboard inteligente (3 semanas)
-- Roles: owner, manager, cashier. Invitacion por link
-- Dashboard con sugerencias accionables (stock critico, fiados pendientes, tendencia)
+| Sprint | PR | Descripcion |
+|--------|-----|-------------|
+| 2A | #231 | Cobro individual por WhatsApp en cuentas por cobrar |
+| 2B | #232 | Fecha de cobro en fiado + cobros pendientes en dashboard |
+| 2C | #233 | Comprobante de venta detallado por WhatsApp |
+| 2D | #234 | Import Excel con deteccion duplicados + mobile |
+| 2E | #235 | Import por foto de lista de precios (OCR) |
 
-### Fase 4 -- Link de pago + Personalizacion (2 semanas)
-- Link de pago compartible: `nala.app/pay/abc123`
-- Color de marca + logo en storefront
+---
+
+### PWA-first + Imagenes -- COMPLETADA
+
+| Sprint | PR | Descripcion |
+|--------|-----|-------------|
+| PWA | #238 | SSR default mobile, safe area insets, POS grid responsive |
+| Imagen | #239 | Upload de imagenes de producto (camara/galeria + MinIO) |
+| Nav | #240 | Link de import por foto en inventario |
+| UX | #241 | Pull-to-refresh en dashboard |
+
+---
+
+### Fase 3 -- Dashboard inteligente (2 semanas) -- PENDIENTE
+
+Sugerencias accionables en el dashboard (reglas simples, no AI):
+- "3 productos con stock critico" -> tap -> inventario filtrado
+- "5 fiados vencidos por $120" -> tap -> cuentas por cobrar
+- "Producto estrella: Harina PAN (32 vendidos)" -> informativo
+- "2 pedidos pendientes" -> tap -> pedidos
+
+### Fase 4 -- Link de pago compartible (1-2 semanas) -- PENDIENTE
+
+`nala.app/pay/abc123` con datos de pago + upload comprobante. Carlos lo comparte por WhatsApp.
+
+### Fase 5 -- Personalizacion storefront (1 semana) -- PENDIENTE
+
+Color de marca + logo + mensaje de bienvenida en la tienda online.
+
+---
+
+## Pipelines de limpieza
+
+| Pipeline | Estado | Riesgo |
+|----------|--------|--------|
+| Auto-cancel pedidos >24h | Funciona (piggyback en GET /orders) | Sin cron configurado. Si vendedor no abre pedidos, no se ejecuta |
+| Cache catalogo Redis (TTL 60s) | Funciona | Ninguno |
+| Idempotencia pedidos (Redis TTL 10min) | Funciona | Ninguno |
+| Rate limit memory store | **Problema potencial** | Map nunca se limpia. Si Redis cae, crece sin limite |
+| Stock movements | Crece indefinidamente | OK para 1-2 anos. Despues necesita particionamiento |
+| Activity log | Crece indefinidamente | OK para 1-2 anos |
 
 ---
 
@@ -299,12 +251,12 @@ Ajustar sidebar y mobile "Mas" para reflejar los cambios:
 
 | Servicio externo | Costo estimado | Uso |
 |-----------------|---------------|-----|
-| WhatsApp Cloud API | ~$5-15/mes por negocio | Notificaciones transaccionales |
-| Groq Whisper | ~$0.001/transcripcion | Input por voz |
-| GPT-4o-mini (OCR + parsing) | ~$0.005-0.01/request | OCR facturas, parsing voz, import foto |
+| GPT-4o-mini (OCR + import foto) | ~$0.005-0.01/request | OCR facturas, import por foto |
 | Clerk auth | $0 (free tier 10K MAU) | Autenticacion |
 | Hetzner hosting | $8.49/mes (CX32) | Soporta 50-100 negocios |
 
-Costo total de infraestructura para 100 negocios: ~$60-80/mes.
+Costo total de infraestructura para 100 negocios: ~$15-25/mes.
 Revenue a 100 negocios x $20/mes promedio: $2,000/mes.
-Margen: ~96%.
+Margen: ~98%.
+
+> Nota: WhatsApp Cloud API ($5-15/mes) no se usa. Todos los features de WhatsApp usan links wa.me/ que abren la app del telefono del vendedor. Cero costo.
