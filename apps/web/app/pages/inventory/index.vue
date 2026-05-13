@@ -9,7 +9,7 @@
  */
 
 import type { StockSemaphore } from "@nova/shared";
-import { Search, Upload, Plus } from "lucide-vue-next";
+import { Search, Upload, Plus, Camera } from "lucide-vue-next";
 
 const { isDesktop } = useDevice();
 
@@ -141,11 +141,18 @@ function margin(cost: string, price: string): string {
       <h1 class="text-2xl font-extrabold tracking-tight text-gradient">Inventario</h1>
       <div class="flex gap-2">
         <NuxtLink
+          to="/inventory/import-photo"
+          class="glass flex items-center gap-1.5 rounded-2xl px-4 py-2 text-sm font-bold text-gray-700 transition-spring hover:shadow-[0_4px_12px_-2px_rgba(0,0,0,0.08)]"
+        >
+          <Camera :size="14" />
+          Foto
+        </NuxtLink>
+        <NuxtLink
           to="/inventory/import"
           class="glass flex items-center gap-1.5 rounded-2xl px-4 py-2 text-sm font-bold text-gray-700 transition-spring hover:shadow-[0_4px_12px_-2px_rgba(0,0,0,0.08)]"
         >
           <Upload :size="14" />
-          Importar
+          Excel
         </NuxtLink>
         <NuxtLink
           to="/inventory/new"
