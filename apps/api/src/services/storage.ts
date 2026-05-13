@@ -75,11 +75,7 @@ export async function ensureBucket(): Promise<void> {
 }
 
 /** Allowed MIME types for payment proof uploads. */
-const ALLOWED_TYPES = new Set([
-  "image/jpeg",
-  "image/png",
-  "image/webp",
-]);
+const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 
 /** Max file size: 5MB. */
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
@@ -105,9 +101,7 @@ export async function uploadPaymentProof(
 
   // Validate content type
   if (!ALLOWED_TYPES.has(contentType)) {
-    throw new Error(
-      `Tipo de archivo no permitido. Solo JPEG, PNG o WebP.`,
-    );
+    throw new Error(`Tipo de archivo no permitido. Solo JPEG, PNG o WebP.`);
   }
 
   // Validate file size
@@ -116,11 +110,12 @@ export async function uploadPaymentProof(
   }
 
   // Determine file extension
-  const ext = contentType === "image/jpeg"
-    ? "jpg"
-    : contentType === "image/png"
-      ? "png"
-      : "webp";
+  const ext =
+    contentType === "image/jpeg"
+      ? "jpg"
+      : contentType === "image/png"
+        ? "png"
+        : "webp";
 
   const key = `${businessId}/${orderId}.${ext}`;
 
@@ -164,11 +159,12 @@ export async function uploadProductImage(
     throw new Error("Archivo demasiado grande. Maximo 5MB.");
   }
 
-  const ext = contentType === "image/jpeg"
-    ? "jpg"
-    : contentType === "image/png"
-      ? "png"
-      : "webp";
+  const ext =
+    contentType === "image/jpeg"
+      ? "jpg"
+      : contentType === "image/png"
+        ? "png"
+        : "webp";
 
   const key = `products/${businessId}/${productId}.${ext}`;
 
@@ -182,8 +178,15 @@ export async function uploadProductImage(
     }),
   );
 
-  // Store the key, not a presigned URL (URLs expire, keys don't)
-  return { key, url: key };
+  // Generate a presigned URL for immediate display after upload.
+  // The DB stores the key (stable); the URL is for the API response only.
+  const presignedUrl = await getSignedUrl(
+    client,
+    new GetObjectCommand({ Bucket: MINIO_BUCKET, Key: key }),
+    { expiresIn: 604800 },
+  );
+
+  return { key, url: presignedUrl };
 }
 
 /**
@@ -211,11 +214,42 @@ export async function getProofUrl(key: string): Promise<string> {
  * Generate a presigned URL for a product image.
  * URL expires in 7 days (products are viewed frequently, cache-friendly).
  *
- * @param key - Storage key (e.g., "products/businessId/productId.jpg")
+ * Handles two formats stored in the DB:
+ * - Storage key (current): "products/businessId/productId.jpg"
+ * - Legacy presigned URL (pre-fix): "http://...?X-Amz-..." -- these expired,
+ *   so we extract the key from the URL path and generate a fresh presigned URL.
+ *
+ * @param keyOrUrl - Storage key or legacy presigned URL
  * @returns Presigned URL string, or null if storage not configured
  */
-export async function getProductImageUrl(key: string): Promise<string | null> {
-  if (!isStorageConfigured || !key || !key.startsWith("products/")) {
+export async function getProductImageUrl(
+  keyOrUrl: string,
+): Promise<string | null> {
+  if (!isStorageConfigured || !keyOrUrl) {
+    return null;
+  }
+
+  // Determine the storage key from whatever is in the DB
+  let key: string;
+
+  if (keyOrUrl.startsWith("products/")) {
+    // Current format: raw storage key
+    key = keyOrUrl;
+  } else if (keyOrUrl.startsWith("http")) {
+    // Legacy format: expired presigned URL. Extract the key from the URL path.
+    // URL looks like: http://10.0.1.20:9000/bucket/products/biz/prod.jpg?X-Amz-...
+    try {
+      const url = new URL(keyOrUrl);
+      // Path is /bucket/products/biz/prod.jpg -- strip leading /bucket/
+      const pathParts = url.pathname.split("/").filter(Boolean);
+      // Find "products" in the path and take everything from there
+      const productsIdx = pathParts.indexOf("products");
+      if (productsIdx === -1) return null;
+      key = pathParts.slice(productsIdx).join("/");
+    } catch {
+      return null;
+    }
+  } else {
     return null;
   }
 

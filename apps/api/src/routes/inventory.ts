@@ -41,7 +41,11 @@ import {
 import { handleDbError } from "../utils/db-errors";
 import { logActivity } from "../utils/audit";
 import { validateUuidParam } from "../middleware/validate-uuid";
-import { uploadProductImage, isStorageConfigured, getProductImageUrl } from "../services/storage";
+import {
+  uploadProductImage,
+  isStorageConfigured,
+  getProductImageUrl,
+} from "../services/storage";
 import type { AppEnv } from "../types";
 
 const inventory = new Hono<AppEnv>();
@@ -251,7 +255,10 @@ inventory.get("/products/:id", validateUuidParam, async (c) => {
     ? await getProductImageUrl(product.imageUrl)
     : null;
 
-  return c.json({ product: { ...product, imageUrl: resolvedImageUrl, semaphore }, variants });
+  return c.json({
+    product: { ...product, imageUrl: resolvedImageUrl, semaphore },
+    variants,
+  });
 });
 
 /** POST /products - Create a new product. */
@@ -299,7 +306,10 @@ inventory.post(
           stockCritical: data.stockCritical,
           hasVariants: data.hasVariants,
           isService: data.isService,
-          wholesalePrice: data.wholesalePrice !== undefined ? String(data.wholesalePrice) : undefined,
+          wholesalePrice:
+            data.wholesalePrice !== undefined
+              ? String(data.wholesalePrice)
+              : undefined,
           wholesaleMinQty: data.wholesaleMinQty,
           brand: data.brand,
           location: data.location,
@@ -384,10 +394,10 @@ inventory.patch(
       updateValues.stockCritical = data.stockCritical;
     if (data.hasVariants !== undefined)
       updateValues.hasVariants = data.hasVariants;
-    if (data.isService !== undefined)
-      updateValues.isService = data.isService;
+    if (data.isService !== undefined) updateValues.isService = data.isService;
     if (data.wholesalePrice !== undefined)
-      updateValues.wholesalePrice = data.wholesalePrice !== undefined ? String(data.wholesalePrice) : null;
+      updateValues.wholesalePrice =
+        data.wholesalePrice !== undefined ? String(data.wholesalePrice) : null;
     if (data.wholesaleMinQty !== undefined)
       updateValues.wholesaleMinQty = data.wholesaleMinQty;
     if (data.brand !== undefined) updateValues.brand = data.brand;
@@ -420,7 +430,13 @@ inventory.patch(
       });
     }
 
-    logActivity({ db, businessId, userId: user.id, action: "product_updated", detail: `${updated.name}` });
+    logActivity({
+      db,
+      businessId,
+      userId: user.id,
+      action: "product_updated",
+      detail: `${updated.name}`,
+    });
 
     return c.json({ product: updated });
   },
@@ -450,7 +466,13 @@ inventory.delete("/products/:id", validateUuidParam, async (c) => {
     .where(eq(productVariants.productId, id));
 
   const user = c.get("user");
-  logActivity({ db, businessId, userId: user.id, action: "product_deleted", detail: `${deleted.name}` });
+  logActivity({
+    db,
+    businessId,
+    userId: user.id,
+    action: "product_deleted",
+    detail: `${deleted.name}`,
+  });
 
   return c.json({ message: "Product deleted", id });
 });
@@ -547,7 +569,13 @@ inventory.patch(
     }
 
     const user = c.get("user");
-    logActivity({ db, businessId, userId: user.id, action: "variant_updated", detail: `Variant ${updated.id.slice(0, 8)}` });
+    logActivity({
+      db,
+      businessId,
+      userId: user.id,
+      action: "variant_updated",
+      detail: `Variant ${updated.id.slice(0, 8)}`,
+    });
 
     return c.json({ variant: updated });
   },
@@ -575,7 +603,13 @@ inventory.delete("/products/variants/:id", validateUuidParam, async (c) => {
   }
 
   const user = c.get("user");
-  logActivity({ db, businessId, userId: user.id, action: "variant_deleted", detail: `Variant ${id.slice(0, 8)}` });
+  logActivity({
+    db,
+    businessId,
+    userId: user.id,
+    action: "variant_deleted",
+    detail: `Variant ${id.slice(0, 8)}`,
+  });
 
   return c.json({ message: "Variant deleted", id });
 });
@@ -676,10 +710,7 @@ inventory.post(
       throw err;
     }
 
-    return c.json(
-      { products: result, count: result.length },
-      201,
-    );
+    return c.json({ products: result, count: result.length }, 201);
   },
 );
 
@@ -713,9 +744,7 @@ inventory.post(
     const [product] = await db
       .select({ id: products.id, stock: products.stock, cost: products.cost })
       .from(products)
-      .where(
-        and(eq(products.id, id), eq(products.businessId, businessId)),
-      )
+      .where(and(eq(products.id, id), eq(products.businessId, businessId)))
       .limit(1);
 
     if (!product) {
@@ -821,22 +850,24 @@ inventory.post("/products/:id/image", validateUuidParam, async (c) => {
   const buffer = Buffer.from(arrayBuffer);
 
   try {
-    const { url } = await uploadProductImage(
+    const { key, url } = await uploadProductImage(
       businessId,
       productId,
       buffer,
       file.type,
     );
 
-    // Update product imageUrl
+    // Store the stable key in DB (not the presigned URL which expires)
     await db
       .update(products)
-      .set({ imageUrl: url, updatedAt: new Date() })
+      .set({ imageUrl: key, updatedAt: new Date() })
       .where(eq(products.id, productId));
 
+    // Return the presigned URL for immediate display in the frontend
     return c.json({ imageUrl: url }, 201);
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Error subiendo imagen";
+    const message =
+      err instanceof Error ? err.message : "Error subiendo imagen";
     return c.json({ error: message }, 500);
   }
 });
