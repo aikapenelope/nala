@@ -437,4 +437,110 @@ accounting.post(
   },
 );
 
+// ============================================================
+// OCR: Price list import (photo -> products)
+// ============================================================
+
+const priceListSchema = z.object({
+  imageBase64: z.string().min(1),
+});
+
+/** Schema for extracted price list products. */
+const priceListResultSchema = z.object({
+  products: z.array(
+    z.object({
+      name: z.string(),
+      price: z.number(),
+      sku: z.string().optional(),
+    }),
+  ),
+});
+
+/**
+ * POST /ocr/price-list - Extract products from a supplier price list photo.
+ *
+ * Takes a photo of a price list (handwritten, printed, or digital) and
+ * extracts product names and prices using GPT-4o-mini vision.
+ * Returns a list of products ready to be created via POST /products/batch.
+ */
+accounting.post(
+  "/ocr/price-list",
+  zValidator("json", priceListSchema),
+  async (c) => {
+    const { imageBase64 } = c.req.valid("json");
+
+    if (!process.env.OPENROUTER_API_KEY) {
+      return c.json(
+        { error: "OCR no disponible. Configura OPENROUTER_API_KEY." },
+        503,
+      );
+    }
+
+    try {
+      const response = await fetch(
+        "https://openrouter.ai/api/v1/chat/completions",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+          },
+          body: JSON.stringify({
+            model: "openai/gpt-4o-mini",
+            messages: [
+              {
+                role: "system",
+                content:
+                  "Extrae productos y precios de listas de precios venezolanas. " +
+                  "Devuelve JSON con un array 'products', cada uno con 'name' (string) y 'price' (number en USD). " +
+                  "Si ves un codigo o referencia, incluyelo como 'sku'. " +
+                  "Ignora encabezados, totales, y texto que no sea un producto. " +
+                  "Los precios pueden estar en USD o Bs. Si estan en Bs, conviertelos a USD usando la tasa que aparezca en la imagen, o dejalo como esta.",
+              },
+              {
+                role: "user",
+                content: [
+                  { type: "image_url", image_url: { url: imageBase64 } },
+                  {
+                    type: "text",
+                    text: "Extrae todos los productos y precios de esta lista de precios.",
+                  },
+                ],
+              },
+            ],
+            response_format: { type: "json_object" },
+            max_tokens: 2000,
+          }),
+          signal: AbortSignal.timeout(15000),
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error(`OpenRouter error: ${response.status}`);
+      }
+
+      const data = (await response.json()) as {
+        choices: Array<{ message: { content: string } }>;
+      };
+
+      const content = data.choices[0]?.message?.content;
+      if (!content) throw new Error("Empty OCR response");
+
+      const parsed = priceListResultSchema.safeParse(JSON.parse(content));
+      if (!parsed.success) {
+        throw new Error("No se pudieron extraer productos de la imagen");
+      }
+
+      return c.json({
+        products: parsed.data.products,
+        count: parsed.data.products.length,
+      });
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Error procesando imagen";
+      return c.json({ error: message }, 500);
+    }
+  },
+);
+
 export { accounting };
