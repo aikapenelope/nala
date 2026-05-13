@@ -41,7 +41,7 @@ import {
 import { handleDbError } from "../utils/db-errors";
 import { logActivity } from "../utils/audit";
 import { validateUuidParam } from "../middleware/validate-uuid";
-import { uploadProductImage, isStorageConfigured } from "../services/storage";
+import { uploadProductImage, isStorageConfigured, getProductImageUrl } from "../services/storage";
 import type { AppEnv } from "../types";
 
 const inventory = new Hono<AppEnv>();
@@ -176,20 +176,23 @@ inventory.get(
       }
     }
 
-    // Add semaphore color and depletion prediction to response
-    const enriched = rows.map((p) => ({
-      ...p,
-      semaphore: calculateStockSemaphore(
-        p.stock,
-        p.stockMin,
-        p.stockCritical,
-        p.lastSoldAt?.toISOString() ?? null,
-      ),
-      daysUntilDepletion: predictStockDepletion(
-        p.stock,
-        salesVelocity[p.id] ?? 0,
-      ),
-    }));
+    // Add semaphore color, depletion prediction, and resolve image URLs
+    const enriched = await Promise.all(
+      rows.map(async (p) => ({
+        ...p,
+        imageUrl: p.imageUrl ? await getProductImageUrl(p.imageUrl) : null,
+        semaphore: calculateStockSemaphore(
+          p.stock,
+          p.stockMin,
+          p.stockCritical,
+          p.lastSoldAt?.toISOString() ?? null,
+        ),
+        daysUntilDepletion: predictStockDepletion(
+          p.stock,
+          salesVelocity[p.id] ?? 0,
+        ),
+      })),
+    );
 
     return c.json({
       products: enriched,
@@ -243,7 +246,12 @@ inventory.get("/products/:id", validateUuidParam, async (c) => {
     product.lastSoldAt?.toISOString() ?? null,
   );
 
-  return c.json({ product: { ...product, semaphore }, variants });
+  // Resolve image URL if stored as key
+  const resolvedImageUrl = product.imageUrl
+    ? await getProductImageUrl(product.imageUrl)
+    : null;
+
+  return c.json({ product: { ...product, imageUrl: resolvedImageUrl, semaphore }, variants });
 });
 
 /** POST /products - Create a new product. */
