@@ -53,6 +53,7 @@ const subtotalUsd = ref(0);
 const selectedMethod = ref<PaymentMethod | null>(null);
 const reference = ref("");
 const selectedCustomerId = ref<string | null>(null);
+const fiadoDueDate = ref("");
 const isSubmitting = ref(false);
 const saleComplete = ref(false);
 const saleError = ref("");
@@ -246,6 +247,7 @@ async function confirmSale() {
           amount: s.amount,
         })),
         channel: selectedChannel.value,
+        fiadoDueDate: fiadoDueDate.value || undefined,
       },
     });
 
@@ -459,6 +461,16 @@ function newSale() {
         <p class="mt-2 text-[11px] font-medium text-yellow-600">
           Se generara una cuenta por cobrar automaticamente
         </p>
+        <div class="mt-3">
+          <label class="mb-1 block text-[13px] font-bold text-yellow-800">
+            Fecha de cobro (opcional)
+          </label>
+          <input
+            v-model="fiadoDueDate"
+            type="date"
+            class="w-full rounded-2xl border border-yellow-200 bg-white/60 px-4 py-3 text-sm font-semibold text-gray-800 outline-none transition-spring focus:ring-[3px] focus:ring-yellow-400/20"
+          >
+        </div>
       </div>
 
       <!-- Offline indicator -->
