@@ -134,6 +134,33 @@ const isSubmitting = ref(false);
 const isLoadingProduct = ref(false);
 const error = ref("");
 
+/** Product image state. */
+const imageUrl = ref<string | null>(null);
+const isUploadingImage = ref(false);
+
+/** Upload product image after creation/edit. */
+async function handleImageUpload(event: Event, targetProductId: string) {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+  if (!file) return;
+
+  isUploadingImage.value = true;
+  try {
+    const formData = new FormData();
+    formData.append("image", file);
+
+    const result = await $api<{ imageUrl: string }>(
+      `/api/products/${targetProductId}/image`,
+      { method: "POST", body: formData },
+    );
+    imageUrl.value = result.imageUrl;
+  } catch {
+    // Non-critical: product saved, image failed
+  } finally {
+    isUploadingImage.value = false;
+  }
+}
+
 /** Load categories and existing product data. */
 onMounted(async () => {
   // Load categories
@@ -169,6 +196,7 @@ onMounted(async () => {
           brand: string | null;
           location: string | null;
           expiresAt: string | null;
+          imageUrl: string | null;
         };
         variants: Array<{
           id: string;
@@ -198,6 +226,7 @@ onMounted(async () => {
       form.brand = p.brand ?? "";
       form.location = p.location ?? "";
       form.expiresAt = p.expiresAt ? (p.expiresAt.split("T")[0] ?? "") : "";
+      imageUrl.value = p.imageUrl;
 
       if (result.variants.length > 0) {
         variants.value = result.variants.map((v) => ({
@@ -323,6 +352,48 @@ async function submitForm() {
       <!-- ============================================================ -->
       <div class="rounded-xl bg-white p-5 shadow-sm">
         <div class="space-y-4">
+          <!-- Product image -->
+          <div class="flex items-center gap-4">
+            <div class="relative flex-shrink-0">
+              <img
+                v-if="imageUrl"
+                :src="imageUrl"
+                alt="Producto"
+                class="h-16 w-16 rounded-xl object-cover"
+              >
+              <div
+                v-else
+                class="flex h-16 w-16 items-center justify-center rounded-xl bg-gray-100 text-2xl text-gray-300"
+              >
+                📷
+              </div>
+              <div
+                v-if="isUploadingImage"
+                class="absolute inset-0 flex items-center justify-center rounded-xl bg-white/80"
+              >
+                <div class="h-5 w-5 animate-spin rounded-full border-2 border-nova-primary border-t-transparent" />
+              </div>
+            </div>
+            <div>
+              <label
+                v-if="isEditing"
+                class="cursor-pointer text-sm font-medium text-nova-primary hover:underline"
+              >
+                {{ imageUrl ? "Cambiar foto" : "Agregar foto" }}
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  capture="environment"
+                  class="hidden"
+                  @change="(e: Event) => handleImageUpload(e, productId!)"
+                >
+              </label>
+              <p v-else class="text-xs text-gray-400">
+                Puedes agregar foto despues de crear el producto
+              </p>
+            </div>
+          </div>
+
           <div>
             <label class="mb-1 block text-sm font-medium text-gray-700">Nombre del producto *</label>
             <input
