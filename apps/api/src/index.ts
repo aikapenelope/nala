@@ -22,6 +22,7 @@ import { config } from "./config"; // Validates env vars on import
 import { app } from "./app";
 import { initDb, applyRlsPolicies } from "./db";
 import { initRedis, closeRedis } from "./redis";
+import { initStorage } from "./services/storage";
 
 // Initialize database (required in production, optional in dev)
 if (config.databaseUrl) {
@@ -52,6 +53,9 @@ if (config.redisUrl) {
     "[startup] Redis not configured. Exchange rate caching disabled.",
   );
 }
+
+// Initialize MinIO storage (optional, degrades gracefully)
+await initStorage();
 
 // Start server
 console.log(`[startup] Nova API starting on port ${config.port}...`);

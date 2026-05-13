@@ -2,13 +2,13 @@
  * MinIO/S3 storage service for file uploads.
  *
  * Uses the AWS S3 SDK to interact with MinIO (S3-compatible).
- * Handles bucket creation, file upload, and presigned URL generation.
+ * Handles bucket creation, file upload, and image streaming.
  *
  * Environment variables:
  * - MINIO_ENDPOINT: MinIO server URL (e.g., http://10.0.1.20:9000)
  * - MINIO_ACCESS_KEY: Access key for authentication
  * - MINIO_SECRET_KEY: Secret key for authentication
- * - MINIO_BUCKET: Bucket name (default: order-proofs)
+ * - MINIO_BUCKET: Bucket name for all Nova files (default: nova-media)
  * - MINIO_REGION: Region (default: us-east-1)
  */
 
@@ -24,7 +24,7 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 const MINIO_ENDPOINT = process.env.MINIO_ENDPOINT ?? "http://10.0.1.20:9000";
 const MINIO_ACCESS_KEY = process.env.MINIO_ACCESS_KEY ?? "";
 const MINIO_SECRET_KEY = process.env.MINIO_SECRET_KEY ?? "";
-const MINIO_BUCKET = process.env.MINIO_BUCKET ?? "order-proofs";
+const MINIO_BUCKET = process.env.MINIO_BUCKET ?? "nova-media";
 const MINIO_REGION = process.env.MINIO_REGION ?? "us-east-1";
 
 /** Whether MinIO is configured (has credentials). */
@@ -50,35 +50,70 @@ function getClient(): S3Client {
 }
 
 /**
- * Ensure the bucket exists. Creates it if not found.
- * Called once at startup.
+ * Initialize storage: verify connectivity and ensure the bucket exists.
+ * Must be called once at startup. Logs clearly whether storage is ready.
  */
-export async function ensureBucket(): Promise<void> {
+export async function initStorage(): Promise<void> {
   if (!isStorageConfigured) {
-    console.warn("[storage] MinIO not configured. File uploads disabled.");
+    console.warn(
+      "[storage] MinIO not configured (MINIO_ACCESS_KEY/MINIO_SECRET_KEY empty). " +
+        "File uploads will be disabled.",
+    );
     return;
   }
 
+  console.log(
+    `[storage] Connecting to MinIO at ${MINIO_ENDPOINT}, bucket: ${MINIO_BUCKET}`,
+  );
+
   const client = getClient();
 
+  // Check if bucket exists
   try {
     await client.send(new HeadBucketCommand({ Bucket: MINIO_BUCKET }));
-  } catch {
-    // Bucket doesn't exist, create it
+    console.log(`[storage] Bucket "${MINIO_BUCKET}" verified.`);
+  } catch (headErr) {
+    // Bucket doesn't exist — try to create it
+    console.warn(
+      `[storage] Bucket "${MINIO_BUCKET}" not found. Creating...`,
+    );
     try {
       await client.send(new CreateBucketCommand({ Bucket: MINIO_BUCKET }));
-      console.log(`[storage] Created bucket: ${MINIO_BUCKET}`);
+      console.log(`[storage] Bucket "${MINIO_BUCKET}" created.`);
     } catch (createErr) {
-      console.error("[storage] Failed to create bucket:", createErr);
+      // If creation also fails, log the real error from both attempts.
+      // This covers: wrong credentials, network unreachable, permission denied.
+      const headMsg =
+        headErr instanceof Error ? headErr.message : String(headErr);
+      const createMsg =
+        createErr instanceof Error ? createErr.message : String(createErr);
+      console.error(
+        `[storage] FATAL: Cannot access or create bucket "${MINIO_BUCKET}". ` +
+          `HeadBucket error: ${headMsg}. CreateBucket error: ${createMsg}. ` +
+          `Check MINIO_ENDPOINT, MINIO_ACCESS_KEY, MINIO_SECRET_KEY.`,
+      );
+      // Don't throw — let the server start, but uploads will fail with clear errors.
+      // This is better than crashing the entire API when storage is misconfigured.
     }
   }
 }
 
-/** Allowed MIME types for payment proof uploads. */
-const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+/** Allowed MIME types for image uploads. */
+const ALLOWED_IMAGE_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+]);
 
 /** Max file size: 5MB. */
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
+
+/** Map MIME type to file extension. */
+function mimeToExt(contentType: string): string {
+  if (contentType === "image/jpeg") return "jpg";
+  if (contentType === "image/png") return "png";
+  return "webp";
+}
 
 /**
  * Upload a payment proof image to MinIO.
@@ -99,25 +134,15 @@ export async function uploadPaymentProof(
     throw new Error("Storage not configured");
   }
 
-  // Validate content type
-  if (!ALLOWED_TYPES.has(contentType)) {
-    throw new Error(`Tipo de archivo no permitido. Solo JPEG, PNG o WebP.`);
+  if (!ALLOWED_IMAGE_TYPES.has(contentType)) {
+    throw new Error("Tipo de archivo no permitido. Solo JPEG, PNG o WebP.");
   }
 
-  // Validate file size
   if (fileBuffer.length > MAX_FILE_SIZE) {
     throw new Error("Archivo demasiado grande. Maximo 5MB.");
   }
 
-  // Determine file extension
-  const ext =
-    contentType === "image/jpeg"
-      ? "jpg"
-      : contentType === "image/png"
-        ? "png"
-        : "webp";
-
-  const key = `${businessId}/${orderId}.${ext}`;
+  const key = `${businessId}/${orderId}.${mimeToExt(contentType)}`;
 
   const client = getClient();
   await client.send(
@@ -139,19 +164,19 @@ export async function uploadPaymentProof(
  * @param productId - Product UUID
  * @param fileBuffer - File content as Buffer
  * @param contentType - MIME type of the file
- * @returns The storage key (path) and a presigned URL for display
+ * @returns The storage key (path) of the uploaded file
  */
 export async function uploadProductImage(
   businessId: string,
   productId: string,
   fileBuffer: Buffer,
   contentType: string,
-): Promise<{ key: string; url: string }> {
+): Promise<{ key: string }> {
   if (!isStorageConfigured) {
     throw new Error("Storage not configured");
   }
 
-  if (!ALLOWED_TYPES.has(contentType)) {
+  if (!ALLOWED_IMAGE_TYPES.has(contentType)) {
     throw new Error("Tipo de archivo no permitido. Solo JPEG, PNG o WebP.");
   }
 
@@ -159,14 +184,7 @@ export async function uploadProductImage(
     throw new Error("Archivo demasiado grande. Maximo 5MB.");
   }
 
-  const ext =
-    contentType === "image/jpeg"
-      ? "jpg"
-      : contentType === "image/png"
-        ? "png"
-        : "webp";
-
-  const key = `products/${businessId}/${productId}.${ext}`;
+  const key = `products/${businessId}/${productId}.${mimeToExt(contentType)}`;
 
   const client = getClient();
   await client.send(
@@ -178,15 +196,7 @@ export async function uploadProductImage(
     }),
   );
 
-  // Generate a presigned URL for immediate display after upload.
-  // The DB stores the key (stable); the URL is for the API response only.
-  const presignedUrl = await getSignedUrl(
-    client,
-    new GetObjectCommand({ Bucket: MINIO_BUCKET, Key: key }),
-    { expiresIn: 604800 },
-  );
-
-  return { key, url: presignedUrl };
+  return { key };
 }
 
 /**
@@ -214,12 +224,20 @@ export async function getProofUrl(key: string): Promise<string> {
  * Get a product image as a readable stream from MinIO.
  * Used by the proxy endpoint to serve images without exposing MinIO.
  *
+ * Handles two formats stored in the DB:
+ * - Storage key (current): "products/businessId/productId.jpg"
+ * - Legacy presigned URL (pre-fix): "http://...?X-Amz-..." — extracts the key
+ *
  * @param keyOrUrl - Storage key or legacy presigned URL
  * @returns Object with body stream, content type, and ETag, or null if not found
  */
 export async function getProductImageStream(
   keyOrUrl: string,
-): Promise<{ body: ReadableStream; contentType: string; etag: string | null } | null> {
+): Promise<{
+  body: ReadableStream;
+  contentType: string;
+  etag: string | null;
+} | null> {
   if (!isStorageConfigured || !keyOrUrl) {
     return null;
   }
@@ -271,61 +289,6 @@ export async function getProductImageStream(
       contentType,
       etag: response.ETag ?? null,
     };
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Generate a presigned URL for a product image.
- * URL expires in 7 days (products are viewed frequently, cache-friendly).
- *
- * Handles two formats stored in the DB:
- * - Storage key (current): "products/businessId/productId.jpg"
- * - Legacy presigned URL (pre-fix): "http://...?X-Amz-..." -- these expired,
- *   so we extract the key from the URL path and generate a fresh presigned URL.
- *
- * @param keyOrUrl - Storage key or legacy presigned URL
- * @returns Presigned URL string, or null if storage not configured
- */
-export async function getProductImageUrl(
-  keyOrUrl: string,
-): Promise<string | null> {
-  if (!isStorageConfigured || !keyOrUrl) {
-    return null;
-  }
-
-  // Determine the storage key from whatever is in the DB
-  let key: string;
-
-  if (keyOrUrl.startsWith("products/")) {
-    // Current format: raw storage key
-    key = keyOrUrl;
-  } else if (keyOrUrl.startsWith("http")) {
-    // Legacy format: expired presigned URL. Extract the key from the URL path.
-    // URL looks like: http://10.0.1.20:9000/bucket/products/biz/prod.jpg?X-Amz-...
-    try {
-      const url = new URL(keyOrUrl);
-      // Path is /bucket/products/biz/prod.jpg -- strip leading /bucket/
-      const pathParts = url.pathname.split("/").filter(Boolean);
-      // Find "products" in the path and take everything from there
-      const productsIdx = pathParts.indexOf("products");
-      if (productsIdx === -1) return null;
-      key = pathParts.slice(productsIdx).join("/");
-    } catch {
-      return null;
-    }
-  } else {
-    return null;
-  }
-
-  try {
-    const client = getClient();
-    const command = new GetObjectCommand({
-      Bucket: MINIO_BUCKET,
-      Key: key,
-    });
-    return await getSignedUrl(client, command, { expiresIn: 604800 });
   } catch {
     return null;
   }
