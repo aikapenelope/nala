@@ -4,17 +4,18 @@
  * Determines if the user is on mobile, tablet, or desktop
  * based on viewport width. Used to switch between layouts.
  *
- * On SSR, defaults to desktop to prevent layout flash (the desktop
- * layout is rendered server-side, then hydrated on the client).
+ * On SSR, defaults to mobile (PWA-first). This prevents layout flash
+ * on mobile devices which are the primary target. Desktop users get
+ * a brief mobile flash that resolves on hydration.
  */
 
 export function useDevice() {
-  const isMobile = useMediaQuery("(max-width: 768px)", false);
+  const isMobile = useMediaQuery("(max-width: 768px)", true);
   const isTablet = useMediaQuery(
     "(min-width: 769px) and (max-width: 1024px)",
     false,
   );
-  const isDesktop = useMediaQuery("(min-width: 1025px)", true);
+  const isDesktop = useMediaQuery("(min-width: 1025px)", false);
 
   return { isMobile, isTablet, isDesktop };
 }

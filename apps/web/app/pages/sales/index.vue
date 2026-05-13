@@ -263,7 +263,7 @@ function goToCheckout() {
       <div
         v-else
         class="grid gap-2.5"
-        :class="isDesktop ? 'grid-cols-4' : 'grid-cols-3'"
+        :class="isDesktop ? 'grid-cols-4' : 'grid-cols-2 sm:grid-cols-3'"
       >
         <button
           v-for="product in filteredProducts"
@@ -315,7 +315,7 @@ function goToCheckout() {
       :class="
         isDesktop
           ? 'w-80 flex flex-col rounded-3xl'
-          : 'fixed bottom-16 left-0 right-0 z-40 mx-2 max-h-[50vh] flex flex-col rounded-t-3xl'
+          : 'fixed bottom-16 left-0 right-0 z-40 mx-2 mb-[env(safe-area-inset-bottom)] max-h-[50vh] flex flex-col rounded-t-3xl'
       "
     >
       <div
