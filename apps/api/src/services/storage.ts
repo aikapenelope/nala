@@ -16,8 +16,11 @@ import {
   S3Client,
   PutObjectCommand,
   GetObjectCommand,
+  CopyObjectCommand,
   CreateBucketCommand,
   HeadBucketCommand,
+  HeadObjectCommand,
+  ListObjectsV2Command,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
@@ -50,8 +53,23 @@ function getClient(): S3Client {
 }
 
 /**
- * Initialize storage: verify connectivity and ensure the bucket exists.
+ * Legacy bucket name used before the nova-media consolidation (PR #266).
+ * Images uploaded before that change live here. We migrate them on startup.
+ */
+const LEGACY_BUCKET = "order-proofs";
+
+/**
+ * Initialize storage: verify connectivity, ensure the bucket exists,
+ * and migrate objects from the legacy bucket if needed.
+ *
  * Must be called once at startup. Logs clearly whether storage is ready.
+ *
+ * Migration strategy (idempotent, safe to run on every deploy):
+ * 1. Ensure the current bucket (nova-media) exists.
+ * 2. Check if the legacy bucket (order-proofs) exists.
+ * 3. If it does, list all objects and copy any that don't already exist
+ *    in the current bucket. This handles partial migrations gracefully.
+ * 4. Log a summary of migrated vs skipped objects.
  */
 export async function initStorage(): Promise<void> {
   if (!isStorageConfigured) {
@@ -68,33 +86,139 @@ export async function initStorage(): Promise<void> {
 
   const client = getClient();
 
-  // Check if bucket exists
+  // --- Step 1: Ensure the current bucket exists ---
+  const bucketReady = await ensureBucketExists(client, MINIO_BUCKET);
+  if (!bucketReady) {
+    // Error already logged by ensureBucketExists. Server continues but
+    // uploads will fail with clear errors.
+    return;
+  }
+
+  // --- Step 2: Migrate from legacy bucket if it exists ---
+  if (MINIO_BUCKET !== LEGACY_BUCKET) {
+    await migrateLegacyBucket(client);
+  }
+
+  console.log("[storage] Storage ready.");
+}
+
+/**
+ * Ensure a bucket exists, creating it if necessary.
+ * @returns true if the bucket is accessible, false on failure.
+ */
+async function ensureBucketExists(
+  client: S3Client,
+  bucket: string,
+): Promise<boolean> {
   try {
-    await client.send(new HeadBucketCommand({ Bucket: MINIO_BUCKET }));
-    console.log(`[storage] Bucket "${MINIO_BUCKET}" verified.`);
-  } catch (headErr) {
+    await client.send(new HeadBucketCommand({ Bucket: bucket }));
+    console.log(`[storage] Bucket "${bucket}" verified.`);
+    return true;
+  } catch {
     // Bucket doesn't exist — try to create it
-    console.warn(
-      `[storage] Bucket "${MINIO_BUCKET}" not found. Creating...`,
-    );
+    console.warn(`[storage] Bucket "${bucket}" not found. Creating...`);
     try {
-      await client.send(new CreateBucketCommand({ Bucket: MINIO_BUCKET }));
-      console.log(`[storage] Bucket "${MINIO_BUCKET}" created.`);
+      await client.send(new CreateBucketCommand({ Bucket: bucket }));
+      console.log(`[storage] Bucket "${bucket}" created.`);
+      return true;
     } catch (createErr) {
-      // If creation also fails, log the real error from both attempts.
-      // This covers: wrong credentials, network unreachable, permission denied.
-      const headMsg =
-        headErr instanceof Error ? headErr.message : String(headErr);
-      const createMsg =
+      const msg =
         createErr instanceof Error ? createErr.message : String(createErr);
       console.error(
-        `[storage] FATAL: Cannot access or create bucket "${MINIO_BUCKET}". ` +
-          `HeadBucket error: ${headMsg}. CreateBucket error: ${createMsg}. ` +
+        `[storage] FATAL: Cannot create bucket "${bucket}": ${msg}. ` +
           `Check MINIO_ENDPOINT, MINIO_ACCESS_KEY, MINIO_SECRET_KEY.`,
       );
-      // Don't throw — let the server start, but uploads will fail with clear errors.
-      // This is better than crashing the entire API when storage is misconfigured.
+      return false;
     }
+  }
+}
+
+/**
+ * Migrate all objects from the legacy bucket to the current bucket.
+ *
+ * Uses server-side CopyObject (no data leaves MinIO). Skips objects that
+ * already exist in the destination (checked via HeadObject). Handles
+ * pagination for buckets with >1000 objects.
+ *
+ * This is idempotent: running it multiple times is safe and fast because
+ * already-migrated objects are skipped via HeadObject.
+ */
+async function migrateLegacyBucket(client: S3Client): Promise<void> {
+  // Check if legacy bucket exists
+  try {
+    await client.send(new HeadBucketCommand({ Bucket: LEGACY_BUCKET }));
+  } catch {
+    // Legacy bucket doesn't exist — nothing to migrate
+    return;
+  }
+
+  console.log(
+    `[storage] Legacy bucket "${LEGACY_BUCKET}" found. Checking for objects to migrate...`,
+  );
+
+  let migrated = 0;
+  let skipped = 0;
+  let failed = 0;
+  let continuationToken: string | undefined;
+
+  do {
+    const listResponse = await client.send(
+      new ListObjectsV2Command({
+        Bucket: LEGACY_BUCKET,
+        ContinuationToken: continuationToken,
+      }),
+    );
+
+    const objects = listResponse.Contents ?? [];
+
+    for (const obj of objects) {
+      if (!obj.Key) continue;
+
+      // Check if the object already exists in the destination bucket
+      try {
+        await client.send(
+          new HeadObjectCommand({ Bucket: MINIO_BUCKET, Key: obj.Key }),
+        );
+        // Already exists — skip
+        skipped++;
+        continue;
+      } catch {
+        // Doesn't exist in destination — proceed with copy
+      }
+
+      // Server-side copy: data stays within MinIO, no download/upload
+      try {
+        await client.send(
+          new CopyObjectCommand({
+            Bucket: MINIO_BUCKET,
+            Key: obj.Key,
+            CopySource: `${LEGACY_BUCKET}/${obj.Key}`,
+          }),
+        );
+        migrated++;
+      } catch (copyErr) {
+        const msg =
+          copyErr instanceof Error ? copyErr.message : String(copyErr);
+        console.error(
+          `[storage] Failed to migrate "${obj.Key}": ${msg}`,
+        );
+        failed++;
+      }
+    }
+
+    continuationToken = listResponse.IsTruncated
+      ? listResponse.NextContinuationToken
+      : undefined;
+  } while (continuationToken);
+
+  if (migrated > 0 || failed > 0) {
+    console.log(
+      `[storage] Legacy migration complete: ${migrated} copied, ${skipped} already existed, ${failed} failed.`,
+    );
+  } else if (skipped > 0) {
+    console.log(
+      `[storage] Legacy migration: all ${skipped} objects already in "${MINIO_BUCKET}". Nothing to do.`,
+    );
   }
 }
 
