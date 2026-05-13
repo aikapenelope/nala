@@ -48,6 +48,9 @@ export interface StoreInfo {
   minOrderAmount: number;
 }
 
+/** Page size for paginated catalog requests. */
+const CATALOG_PAGE_SIZE = 50;
+
 export function useStorefront() {
   const config = useRuntimeConfig();
   const apiBase = config.public.apiBase as string;
@@ -68,9 +71,14 @@ export function useStorefront() {
   const storeInfo = useState<StoreInfo | null>("storefront-info", () => null);
   const exchangeRate = useState<number | null>("storefront-rate", () => null);
   const isLoading = ref(false);
+  const isLoadingMore = ref(false);
+  const hasMore = ref(false);
   const error = ref<string | null>(null);
 
-  /** Fetch catalog data from the public API. */
+  /** Current pagination offset (tracks how many products have been loaded). */
+  let currentOffset = 0;
+
+  /** Fetch the first page of catalog data from the public API. */
   async function fetchCatalog() {
     if (!tenantSlug.value) {
       error.value = "No se detecto la tienda.";
@@ -79,6 +87,7 @@ export function useStorefront() {
 
     isLoading.value = true;
     error.value = null;
+    currentOffset = 0;
 
     try {
       const [catalogData, storeData] = await Promise.all([
@@ -87,7 +96,8 @@ export function useStorefront() {
           categories: StorefrontCategory[];
           products: StorefrontProduct[];
           exchangeRate: number | null;
-        }>(`${apiBase}/catalog/${tenantSlug.value}`),
+          pagination?: { total: number; limit: number; offset: number; hasMore: boolean };
+        }>(`${apiBase}/catalog/${tenantSlug.value}?limit=${CATALOG_PAGE_SIZE}&offset=0`),
         $fetch<StoreInfo>(`${apiBase}/catalog/${tenantSlug.value}/store-info`).catch(
           () => null,
         ),
@@ -98,6 +108,8 @@ export function useStorefront() {
       categories.value = catalogData.categories;
       exchangeRate.value = catalogData.exchangeRate;
       storeInfo.value = storeData;
+      hasMore.value = catalogData.pagination?.hasMore ?? false;
+      currentOffset = catalogData.products.length;
     } catch {
       error.value = "No se pudo cargar la tienda. Verifica el enlace.";
     } finally {
@@ -105,7 +117,39 @@ export function useStorefront() {
     }
   }
 
-  /** Refresh all storefront data. */
+  /**
+   * Fetch the next page of products and append to the existing list.
+   * Returns false if there are no more products to load.
+   */
+  async function fetchMore(): Promise<boolean> {
+    if (!tenantSlug.value || !hasMore.value || isLoadingMore.value) {
+      return false;
+    }
+
+    isLoadingMore.value = true;
+
+    try {
+      const catalogData = await $fetch<{
+        products: StorefrontProduct[];
+        pagination?: { total: number; limit: number; offset: number; hasMore: boolean };
+      }>(`${apiBase}/catalog/${tenantSlug.value}?limit=${CATALOG_PAGE_SIZE}&offset=${currentOffset}`);
+
+      // Append new products (use a writable copy via useState)
+      const currentProducts = useState<StorefrontProduct[]>("storefront-products");
+      currentProducts.value = [...currentProducts.value, ...catalogData.products];
+      hasMore.value = catalogData.pagination?.hasMore ?? false;
+      currentOffset += catalogData.products.length;
+
+      return hasMore.value;
+    } catch {
+      // Non-fatal: user can retry by scrolling again
+      return false;
+    } finally {
+      isLoadingMore.value = false;
+    }
+  }
+
+  /** Refresh all storefront data (resets pagination). */
   async function refresh() {
     await fetchCatalog();
   }
@@ -117,8 +161,11 @@ export function useStorefront() {
     storeInfo: readonly(storeInfo),
     exchangeRate: readonly(exchangeRate),
     isLoading: readonly(isLoading),
+    isLoadingMore: readonly(isLoadingMore),
+    hasMore: readonly(hasMore),
     error: readonly(error),
     fetchCatalog,
+    fetchMore,
     refresh,
   };
 }

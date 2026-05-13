@@ -59,6 +59,19 @@ const isSubmitting = ref(false);
 const saleComplete = ref(false);
 const saleError = ref("");
 
+/**
+ * IGTF (Impuesto a las Grandes Transacciones Financieras) - 3%.
+ * Applies to payments in foreign currency (USD cash, Zelle, Binance, Zinli).
+ * Same logic as the storefront checkout for consistency.
+ */
+const IGTF_RATE = 0.03;
+const IGTF_NAME = "IGTF (3%)";
+const divisaMethods = new Set<PaymentMethod>(["efectivo", "zelle", "binance", "zinli"]);
+
+const isIgtfApplicable = computed(() => {
+  return selectedMethod.value !== null && divisaMethods.has(selectedMethod.value);
+});
+
 /** Sale channel (defaults to POS). */
 const selectedChannel = ref<SaleChannel>("pos");
 
@@ -85,14 +98,42 @@ interface AppliedSurcharge {
 }
 const appliedSurcharges = ref<AppliedSurcharge[]>([]);
 
-/** Total surcharges amount. */
+/** Total surcharges amount (includes IGTF when applicable). */
 const surchargesTotal = computed(() =>
   appliedSurcharges.value.reduce((sum, s) => sum + s.amount, 0),
 );
 
-/** Grand total including surcharges. */
+/** Grand total including surcharges and IGTF. */
 const totalUsd = computed(() =>
   Math.round((subtotalUsd.value + surchargesTotal.value) * 100) / 100,
+);
+
+/**
+ * Auto-manage IGTF surcharge when payment method changes.
+ * Adds IGTF as a surcharge for divisa methods, removes it otherwise.
+ * The IGTF amount is calculated on the subtotal + other surcharges (excluding IGTF itself).
+ */
+watch(
+  [selectedMethod, subtotalUsd],
+  () => {
+    // Remove any existing IGTF surcharge first
+    const igtfIdx = appliedSurcharges.value.findIndex((s) => s.name === IGTF_NAME);
+    if (igtfIdx !== -1) {
+      appliedSurcharges.value.splice(igtfIdx, 1);
+    }
+
+    // Add IGTF if applicable
+    if (isIgtfApplicable.value) {
+      const baseForIgtf =
+        subtotalUsd.value +
+        appliedSurcharges.value.reduce((sum, s) => sum + s.amount, 0);
+      const igtfAmount = Math.round(baseForIgtf * IGTF_RATE * 100) / 100;
+      if (igtfAmount > 0) {
+        appliedSurcharges.value.push({ name: IGTF_NAME, amount: igtfAmount });
+      }
+    }
+  },
+  { immediate: false },
 );
 
 /** Total in Bs. */
@@ -432,30 +473,32 @@ function newSale() {
           </button>
         </div>
 
-        <!-- Applied surcharges with editable amounts -->
-        <div v-if="appliedSurcharges.length > 0" class="space-y-2">
+        <!-- Applied surcharges with editable amounts (IGTF is auto-managed, not shown here) -->
+        <div v-if="appliedSurcharges.filter((s) => s.name !== IGTF_NAME).length > 0" class="space-y-2">
           <div
             v-for="(surcharge, idx) in appliedSurcharges"
             :key="idx"
             class="glass flex items-center gap-2 rounded-2xl px-4 py-2.5"
           >
-            <span class="flex-1 text-sm font-semibold text-gray-700">
-              {{ surcharge.name }}
-            </span>
-            <span class="text-xs font-bold text-gray-400">$</span>
-            <input
-              v-model.number="surcharge.amount"
-              type="number"
-              step="0.01"
-              min="0"
-              class="w-20 rounded-xl border border-white bg-white/60 px-2 py-1.5 text-right text-sm font-bold text-gray-800 outline-none transition-spring focus:ring-[2px] focus:ring-nova-accent/20"
-            >
-            <button
-              class="flex h-6 w-6 items-center justify-center rounded-lg text-gray-300 transition-spring hover:bg-red-50 hover:text-red-500"
-              @click="removeSurcharge(idx)"
-            >
-              <X :size="12" />
-            </button>
+            <template v-if="surcharge.name !== IGTF_NAME">
+              <span class="flex-1 text-sm font-semibold text-gray-700">
+                {{ surcharge.name }}
+              </span>
+              <span class="text-xs font-bold text-gray-400">$</span>
+              <input
+                v-model.number="surcharge.amount"
+                type="number"
+                step="0.01"
+                min="0"
+                class="w-20 rounded-xl border border-white bg-white/60 px-2 py-1.5 text-right text-sm font-bold text-gray-800 outline-none transition-spring focus:ring-[2px] focus:ring-nova-accent/20"
+              >
+              <button
+                class="flex h-6 w-6 items-center justify-center rounded-lg text-gray-300 transition-spring hover:bg-red-50 hover:text-red-500"
+                @click="removeSurcharge(idx)"
+              >
+                <X :size="12" />
+              </button>
+            </template>
           </div>
         </div>
       </div>
@@ -481,6 +524,19 @@ function newSale() {
             </span>
           </button>
         </div>
+      </div>
+
+      <!-- IGTF notice (for divisa payment methods) -->
+      <div
+        v-if="isIgtfApplicable"
+        class="mb-4 glass rounded-2xl px-4 py-3"
+      >
+        <p class="text-[13px] font-semibold text-amber-700">
+          Este metodo incluye IGTF (3%): +${{ appliedSurcharges.find((s) => s.name === IGTF_NAME)?.amount.toFixed(2) ?? "0.00" }}
+        </p>
+        <p class="mt-0.5 text-[11px] font-medium text-amber-600/80">
+          Impuesto a las Grandes Transacciones Financieras sobre pagos en divisas.
+        </p>
       </div>
 
       <!-- Reference number (for digital payments) -->

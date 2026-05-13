@@ -1,7 +1,7 @@
 # Nova API + Web - Multi-stage Dockerfile for Coolify deployment.
 #
 # Builds both the API (Hono) and Web (Nuxt SSR) in a single image.
-# On startup, runs drizzle-kit migrate for versioned migrations + init.sql for RLS.
+# On startup, runs versioned migrations then starts the API (RLS applied in-process).
 #
 # Build args:
 #   NUXT_PUBLIC_API_BASE - API URL for the frontend (e.g. https://nova-api.aikalabs.cc)
@@ -71,7 +71,7 @@ RUN npx turbo build --filter=@nova/web
 FROM node:${NODE_VERSION} AS api
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    openssl ca-certificates curl postgresql-client \
+    openssl ca-certificates curl \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -86,11 +86,10 @@ COPY --from=builder --chown=node:node /app/packages/db/src/schema.ts ./packages/
 COPY --from=builder --chown=node:node /app/packages/db/drizzle.config.ts ./packages/db/drizzle.config.ts
 COPY --from=builder --chown=node:node /app/packages/db/drizzle ./packages/db/drizzle
 COPY --from=builder --chown=node:node /app/packages/db/migrate.mjs ./packages/db/migrate.mjs
-COPY --from=builder --chown=node:node /app/packages/db/init.sql ./packages/db/init.sql
 COPY --from=builder --chown=node:node /app/package.json ./
 COPY --from=builder --chown=node:node /app/node_modules ./node_modules
 
-# Entrypoint: sync schema + apply RLS + start server
+# Entrypoint: run migrations + start server (RLS applied by API at startup)
 COPY --chown=node:node entrypoint-api.sh ./entrypoint-api.sh
 RUN chmod +x entrypoint-api.sh
 

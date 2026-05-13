@@ -16,6 +16,7 @@ import {
   Package,
   Calendar,
   PackageX,
+  Download,
 } from "lucide-vue-next";
 
 const { $api } = useApi();
@@ -170,11 +171,57 @@ watch(activeTab, (tab) => {
   else if (tab === "periodo") fetchPeriodo();
   else if (tab === "inventario") fetchInventario();
 }, { immediate: true });
+
+// ============================================================
+// Export to Excel
+// ============================================================
+
+const isExporting = ref(false);
+
+/** Download the current tab's data as an XLSX file. */
+async function exportExcel() {
+  isExporting.value = true;
+  try {
+    let endpoint = "";
+    if (activeTab.value === "hoy") {
+      endpoint = "/api/reports/daily/export-xlsx?period=today";
+    } else if (activeTab.value === "periodo") {
+      endpoint = `/api/reports/weekly/export-xlsx?period=${periodoPeriod.value}`;
+    } else {
+      // Inventory tab doesn't have an XLSX endpoint yet
+      isExporting.value = false;
+      return;
+    }
+
+    const blob = await $api<Blob>(endpoint, { responseType: "blob" as never });
+    const url = URL.createObjectURL(blob as unknown as Blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `reporte-${activeTab.value}-${new Date().toISOString().split("T")[0]}.xlsx`;
+    a.click();
+    URL.revokeObjectURL(url);
+  } catch {
+    // Non-critical: user can retry
+  } finally {
+    isExporting.value = false;
+  }
+}
 </script>
 
 <template>
   <div>
-    <h1 class="mb-5 text-2xl font-extrabold tracking-tight text-gradient">Reportes</h1>
+    <div class="mb-5 flex items-center justify-between">
+      <h1 class="text-2xl font-extrabold tracking-tight text-gradient">Reportes</h1>
+      <button
+        v-if="activeTab !== 'inventario'"
+        class="dark-pill flex items-center gap-1.5 rounded-2xl px-4 py-2 text-sm font-bold transition-spring disabled:opacity-50"
+        :disabled="isExporting"
+        @click="exportExcel"
+      >
+        <Download :size="14" />
+        {{ isExporting ? "Exportando..." : "Excel" }}
+      </button>
+    </div>
 
     <!-- Tab selector -->
     <div class="mb-5 flex gap-1.5 rounded-2xl bg-white/40 p-1">
@@ -202,31 +249,31 @@ watch(activeTab, (tab) => {
       <template v-else-if="hoyLoaded">
         <!-- KPI cards -->
         <div class="mb-4 grid grid-cols-4 gap-3">
-          <div class="rounded-xl bg-white p-4 text-center shadow-sm">
-            <p class="text-2xl font-bold text-gray-900">${{ hoyData.totalSales.toFixed(0) }}</p>
-            <p class="text-xs text-gray-500">Ventas</p>
+          <div class="card-premium p-4 text-center">
+            <p class="text-2xl font-extrabold text-gray-800">${{ hoyData.totalSales.toFixed(0) }}</p>
+            <p class="text-[11px] font-bold text-gray-500">Ventas</p>
           </div>
-          <div class="rounded-xl bg-white p-4 text-center shadow-sm">
-            <p class="text-2xl font-bold text-gray-900">{{ hoyData.totalCount }}</p>
-            <p class="text-xs text-gray-500">Transacciones</p>
+          <div class="card-premium p-4 text-center">
+            <p class="text-2xl font-extrabold text-gray-800">{{ hoyData.totalCount }}</p>
+            <p class="text-[11px] font-bold text-gray-500">Transacciones</p>
           </div>
-          <div class="rounded-xl bg-white p-4 text-center shadow-sm">
+          <div class="card-premium p-4 text-center">
             <p
-              class="text-2xl font-bold"
+              class="text-2xl font-extrabold"
               :class="hoyData.vsPreviousDay >= 0 ? 'text-green-600' : 'text-red-600'"
             >
               {{ hoyData.vsPreviousDay >= 0 ? "+" : "" }}{{ hoyData.vsPreviousDay }}%
             </p>
-            <p class="text-xs text-gray-500">vs ayer</p>
+            <p class="text-[11px] font-bold text-gray-500">vs ayer</p>
           </div>
-          <div class="rounded-xl bg-white p-4 text-center shadow-sm">
-            <p class="text-2xl font-bold text-gray-900">${{ hoyData.avgTicket.toFixed(2) }}</p>
-            <p class="text-xs text-gray-500">Ticket prom.</p>
+          <div class="card-premium p-4 text-center">
+            <p class="text-2xl font-extrabold text-gray-800">${{ hoyData.avgTicket.toFixed(2) }}</p>
+            <p class="text-[11px] font-bold text-gray-500">Ticket prom.</p>
           </div>
         </div>
 
         <!-- Payment methods breakdown -->
-        <div v-if="methodEntries.length > 0" class="mb-4 rounded-xl bg-white p-5 shadow-sm">
+        <div v-if="methodEntries.length > 0" class="card-premium mb-4 p-5">
           <h3 class="mb-3 text-sm font-semibold text-gray-700">Ventas por metodo</h3>
           <div class="space-y-2">
             <div v-for="m in methodEntries" :key="m.method" class="flex items-center gap-3">
@@ -240,7 +287,7 @@ watch(activeTab, (tab) => {
         </div>
 
         <!-- Top products -->
-        <div v-if="hoyData.topProducts.length > 0" class="overflow-hidden rounded-xl bg-white shadow-sm">
+        <div v-if="hoyData.topProducts.length > 0" class="card-premium overflow-hidden">
           <h3 class="px-5 pt-4 text-sm font-semibold text-gray-700">Top productos</h3>
           <table class="mt-2 w-full text-left text-sm">
             <thead class="border-b bg-gray-50">
@@ -292,27 +339,27 @@ watch(activeTab, (tab) => {
       <div v-if="periodoLoading" class="py-12 text-center text-gray-400">Cargando...</div>
       <template v-else-if="periodoLoaded">
         <div class="mb-4 grid grid-cols-3 gap-3">
-          <div class="rounded-xl bg-white p-4 text-center shadow-sm">
-            <p class="text-2xl font-bold text-gray-900">${{ periodoData.totalSales.toFixed(0) }}</p>
-            <p class="text-xs text-gray-500">Total</p>
+          <div class="card-premium p-4 text-center">
+            <p class="text-2xl font-extrabold text-gray-800">${{ periodoData.totalSales.toFixed(0) }}</p>
+            <p class="text-[11px] font-bold text-gray-500">Total</p>
           </div>
-          <div class="rounded-xl bg-white p-4 text-center shadow-sm">
-            <p class="text-2xl font-bold text-gray-900">{{ periodoData.totalCount }}</p>
-            <p class="text-xs text-gray-500">Ventas</p>
+          <div class="card-premium p-4 text-center">
+            <p class="text-2xl font-extrabold text-gray-800">{{ periodoData.totalCount }}</p>
+            <p class="text-[11px] font-bold text-gray-500">Ventas</p>
           </div>
-          <div class="rounded-xl bg-white p-4 text-center shadow-sm">
+          <div class="card-premium p-4 text-center">
             <p
-              class="text-2xl font-bold"
+              class="text-2xl font-extrabold"
               :class="periodoData.vsPrevPeriod >= 0 ? 'text-green-600' : 'text-red-600'"
             >
               {{ periodoData.vsPrevPeriod >= 0 ? "+" : "" }}{{ periodoData.vsPrevPeriod }}%
             </p>
-            <p class="text-xs text-gray-500">vs anterior</p>
+            <p class="text-[11px] font-bold text-gray-500">vs anterior</p>
           </div>
         </div>
 
         <!-- Daily breakdown chart -->
-        <div v-if="periodoData.dailyBreakdown.length > 0" class="rounded-xl bg-white p-5 shadow-sm">
+        <div v-if="periodoData.dailyBreakdown.length > 0" class="card-premium p-5">
           <h3 class="mb-4 text-sm font-semibold text-gray-700">Desglose diario</h3>
           <SharedBarChart
             :labels="periodoData.dailyBreakdown.map((d) => d.day)"

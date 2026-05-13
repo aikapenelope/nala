@@ -1,5 +1,7 @@
 -- Nova PostgreSQL initialization script.
--- Safe to re-run on every deploy (all statements are idempotent).
+-- REFERENCE ONLY: This file is NOT executed at deploy time.
+-- RLS policies are applied by applyRlsPolicies() in apps/api/src/db.ts,
+-- which is the single source of truth. This file is kept for documentation.
 
 -- Enable required extensions
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";

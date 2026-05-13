@@ -27,6 +27,9 @@ function reAuthenticate() {
     <!-- Global search (Cmd+K) -->
     <SharedCommandPalette />
 
+    <!-- Global toast notifications -->
+    <SharedToastContainer />
+
     <!-- Session expired banner -->
     <div
       v-if="sessionExpired"

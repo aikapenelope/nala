@@ -101,18 +101,18 @@ const toolItems: MenuItem[] = [
 
 <template>
   <div>
-    <h1 class="mb-4 text-xl font-bold text-gray-900">Mas</h1>
+    <h1 class="mb-4 text-xl font-extrabold tracking-tight text-gradient">Mas</h1>
 
     <!-- Current user card -->
-    <div class="mb-6 rounded-xl bg-white p-4 shadow-sm">
+    <div class="card-premium mb-6 p-4">
       <div class="flex items-center gap-3">
         <span
-          class="flex h-10 w-10 items-center justify-center rounded-full bg-nova-primary text-sm font-bold text-white"
+          class="dark-pill flex h-10 w-10 items-center justify-center rounded-xl text-sm font-bold"
         >
           {{ user?.name?.charAt(0) ?? "?" }}
         </span>
         <div class="flex-1">
-          <p class="font-medium text-gray-900">
+          <p class="font-semibold text-gray-800">
             {{ user?.name ?? "Sin usuario" }}
           </p>
         </div>
@@ -125,16 +125,16 @@ const toolItems: MenuItem[] = [
         v-for="item in mainItems"
         :key="item.to"
         :to="item.to"
-        class="flex items-center gap-4 rounded-xl bg-white p-4 shadow-sm transition-all hover:shadow-md"
+        class="card-premium card-lift flex items-center gap-4 p-4"
       >
         <div
-          class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-gray-100"
+          class="dark-pill flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl"
         >
-          <component :is="item.icon" :size="20" class="text-gray-600" />
+          <component :is="item.icon" :size="18" class="text-white" />
         </div>
         <div class="flex-1">
-          <p class="text-sm font-semibold text-gray-900">{{ item.label }}</p>
-          <p class="text-xs text-gray-500">{{ item.description }}</p>
+          <p class="text-sm font-bold text-gray-800">{{ item.label }}</p>
+          <p class="text-[11px] font-medium text-gray-500">{{ item.description }}</p>
         </div>
       </NuxtLink>
     </div>
@@ -148,16 +148,16 @@ const toolItems: MenuItem[] = [
         v-for="item in toolItems"
         :key="item.to"
         :to="item.to"
-        class="flex items-center gap-4 rounded-xl bg-white/70 p-3.5 shadow-sm transition-all hover:shadow-md"
+        class="glass card-lift flex items-center gap-4 rounded-2xl p-3.5"
       >
         <div
-          class="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-gray-50"
+          class="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-white/60"
         >
-          <component :is="item.icon" :size="18" class="text-gray-400" />
+          <component :is="item.icon" :size="16" class="text-gray-500" />
         </div>
         <div class="flex-1">
-          <p class="text-sm font-medium text-gray-700">{{ item.label }}</p>
-          <p class="text-[11px] text-gray-400">{{ item.description }}</p>
+          <p class="text-[13px] font-semibold text-gray-700">{{ item.label }}</p>
+          <p class="text-[11px] font-medium text-gray-400">{{ item.description }}</p>
         </div>
       </NuxtLink>
     </div>

@@ -7,7 +7,7 @@
  * - POST /api/sales/:id/void
  */
 
-import { Plus, Calendar } from "lucide-vue-next";
+import { Plus, Calendar, Share2 } from "lucide-vue-next";
 
 const { isDesktop } = useDevice();
 const { $api } = useApi();
@@ -85,6 +85,39 @@ function formatDate(iso: string): string {
 function saleProfit(sale: Sale): number | null {
   if (!sale.totalCostUsd) return null;
   return Number(sale.totalUsd) - Number(sale.totalCostUsd);
+}
+
+/**
+ * Share receipt via Web Share API (native on mobile) or download as fallback.
+ * Uses the existing GET /api/sales/:id/receipt endpoint that returns a PDF.
+ */
+async function shareReceipt(saleId: string) {
+  try {
+    const blob = await $api<Blob>(`/api/sales/${saleId}/receipt`, {
+      responseType: "blob" as never,
+    });
+
+    // Try Web Share API first (native share sheet on mobile)
+    if (import.meta.client && navigator.share) {
+      const file = new File([blob as unknown as Blob], `recibo-${saleId.slice(0, 8)}.pdf`, {
+        type: "application/pdf",
+      });
+      await navigator.share({
+        title: "Recibo de venta",
+        files: [file],
+      });
+    } else {
+      // Fallback: direct download
+      const url = URL.createObjectURL(blob as unknown as Blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `recibo-${saleId.slice(0, 8)}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+  } catch {
+    // Non-critical: user can retry
+  }
 }
 
 /** Void sale flow: reason input -> API call (admin-only, no PIN needed). */
@@ -297,13 +330,22 @@ async function confirmReason() {
                 </span>
               </td>
               <td class="px-4 py-3.5">
-                <button
-                  v-if="sale.status === 'completed'"
-                  class="rounded-xl bg-red-50 px-2.5 py-1 text-[11px] font-bold text-red-600 transition-spring hover:bg-red-100"
-                  @click="requestVoid(sale.id)"
-                >
-                  Anular
-                </button>
+                <div class="flex gap-2">
+                  <button
+                    v-if="sale.status === 'completed'"
+                    class="rounded-xl bg-nova-primary/10 px-2.5 py-1 text-[11px] font-bold text-nova-primary transition-spring hover:bg-nova-primary/20"
+                    @click="shareReceipt(sale.id)"
+                  >
+                    <Share2 :size="12" class="inline" /> Recibo
+                  </button>
+                  <button
+                    v-if="sale.status === 'completed'"
+                    class="rounded-xl bg-red-50 px-2.5 py-1 text-[11px] font-bold text-red-600 transition-spring hover:bg-red-100"
+                    @click="requestVoid(sale.id)"
+                  >
+                    Anular
+                  </button>
+                </div>
               </td>
             </tr>
           </tbody>
@@ -354,6 +396,13 @@ async function confirmReason() {
               >
                 {{ sale.status === "voided" ? "Anulada" : "Completada" }}
               </span>
+              <button
+                v-if="sale.status === 'completed'"
+                class="rounded-lg bg-nova-primary/10 px-2 py-0.5 text-[10px] font-bold text-nova-primary transition-spring hover:bg-nova-primary/20"
+                @click="shareReceipt(sale.id)"
+              >
+                <Share2 :size="10" class="inline" />
+              </button>
               <button
                 v-if="sale.status === 'completed'"
                 class="rounded-lg bg-red-50 px-2 py-0.5 text-[10px] font-bold text-red-500 transition-spring hover:bg-red-100"
