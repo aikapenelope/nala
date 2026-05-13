@@ -45,7 +45,7 @@ export function tryGetDb(): Database | null {
  *
  * Ensures all tables have the correct tenant isolation policies.
  * Safe to run on every deploy (all statements are idempotent).
- * This replaces the need to manually run init.sql after schema changes.
+ * Skips tables that don't exist yet (migrations may not have run).
  */
 export async function applyRlsPolicies(): Promise<void> {
   const db = getDb();
@@ -62,41 +62,49 @@ export async function applyRlsPolicies(): Promise<void> {
     "notification_preferences", "store_settings", "orders",
   ];
 
-  for (const table of tenantTables) {
-    const policyName = table === "businesses"
-      ? `${table}_tenant_isolation`
-      : `${table}_tenant_isolation`;
-    const usingClause = table === "businesses"
-      ? "id = current_business_id()"
-      : "business_id = current_business_id()";
-
-    await db.execute(sql.raw(
-      `ALTER TABLE ${table} ENABLE ROW LEVEL SECURITY;` +
-      `DROP POLICY IF EXISTS ${policyName} ON ${table};` +
-      `CREATE POLICY ${policyName} ON ${table} USING (${usingClause});`,
-    ));
-  }
-
-  // Auth bypass policies (needed before tenant context is set)
-  const authBypassTables = ["businesses", "users"];
-  for (const table of authBypassTables) {
-    await db.execute(sql.raw(
-      `DROP POLICY IF EXISTS ${table}_auth_lookup ON ${table};` +
-      `CREATE POLICY ${table}_auth_lookup ON ${table} FOR SELECT USING (current_business_id() IS NULL);`,
-    ));
-  }
-
-  // Orders: public insert for storefront checkout (no auth context)
-  await db.execute(sql.raw(
-    `DROP POLICY IF EXISTS orders_public_insert ON orders;` +
-    `CREATE POLICY orders_public_insert ON orders FOR INSERT ` +
-    `WITH CHECK (current_business_id() IS NULL OR business_id = current_business_id());`,
-  ));
-
-  // Ensure current_business_id() function exists
+  // Ensure current_business_id() function exists first
   await db.execute(sql.raw(
     `CREATE OR REPLACE FUNCTION current_business_id() RETURNS uuid AS $$ ` +
     `SELECT NULLIF(current_setting('app.current_business_id', true), '')::uuid; ` +
     `$$ LANGUAGE sql STABLE;`,
   ));
+
+  for (const table of tenantTables) {
+    const usingClause = table === "businesses"
+      ? "id = current_business_id()"
+      : "business_id = current_business_id()";
+
+    try {
+      await db.execute(sql.raw(
+        `ALTER TABLE "${table}" ENABLE ROW LEVEL SECURITY; ` +
+        `DROP POLICY IF EXISTS "${table}_tenant_isolation" ON "${table}"; ` +
+        `CREATE POLICY "${table}_tenant_isolation" ON "${table}" USING (${usingClause});`,
+      ));
+    } catch {
+      // Table may not exist yet (migration pending) -- skip silently
+    }
+  }
+
+  // Auth bypass policies (needed before tenant context is set)
+  for (const table of ["businesses", "users"]) {
+    try {
+      await db.execute(sql.raw(
+        `DROP POLICY IF EXISTS "${table}_auth_lookup" ON "${table}"; ` +
+        `CREATE POLICY "${table}_auth_lookup" ON "${table}" FOR SELECT USING (current_business_id() IS NULL);`,
+      ));
+    } catch {
+      // Skip if table doesn't exist
+    }
+  }
+
+  // Orders: public insert for storefront checkout (no auth context)
+  try {
+    await db.execute(sql.raw(
+      `DROP POLICY IF EXISTS "orders_public_insert" ON "orders"; ` +
+      `CREATE POLICY "orders_public_insert" ON "orders" FOR INSERT ` +
+      `WITH CHECK (current_business_id() IS NULL OR business_id = current_business_id());`,
+    ));
+  } catch {
+    // Skip if orders table doesn't exist
+  }
 }

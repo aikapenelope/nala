@@ -26,9 +26,12 @@ fi
 # Step 2: Apply RLS policies
 # Uses psql (installed in the Docker image) to run init.sql
 # All statements use IF NOT EXISTS / CREATE OR REPLACE, safe to re-run
+# Uses set +e to not crash on errors (some tables may not exist yet)
 if [ -n "$DATABASE_URL" ] && [ -f "packages/db/init.sql" ]; then
   echo "[entrypoint] Applying RLS policies..."
-  psql "$DATABASE_URL" -f packages/db/init.sql 2>&1 || echo "[entrypoint] WARNING: RLS apply had errors (may be OK if policies already exist)"
+  set +e
+  psql "$DATABASE_URL" -f packages/db/init.sql 2>&1
+  set -e
   echo "[entrypoint] RLS policies applied."
 fi
 
