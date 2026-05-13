@@ -28,6 +28,16 @@ const WRITE_LIMIT: RateLimitConfig = { max: 30, windowSeconds: 60 };
 /** In-memory fallback when Redis is unavailable. */
 const memoryStore = new Map<string, { count: number; resetAt: number }>();
 
+/** Clean up expired entries from the memory store every 5 minutes. */
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, entry] of memoryStore) {
+    if (now > entry.resetAt) {
+      memoryStore.delete(key);
+    }
+  }
+}, 5 * 60 * 1000).unref();
+
 /** Check rate limit using Redis INCR + EXPIRE. */
 async function checkRedis(
   key: string,
