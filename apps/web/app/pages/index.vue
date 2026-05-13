@@ -257,6 +257,38 @@ async function loadDashboard() {
   }
 }
 
+/** Pull-to-refresh for PWA mobile. */
+const pullDistance = ref(0);
+const isPulling = ref(false);
+const isRefreshing = ref(false);
+let touchStartY = 0;
+
+function onTouchStart(e: TouchEvent) {
+  if (window.scrollY === 0 && e.touches[0]) {
+    touchStartY = e.touches[0].clientY;
+    isPulling.value = true;
+  }
+}
+
+function onTouchMove(e: TouchEvent) {
+  if (!isPulling.value || !e.touches[0]) return;
+  const delta = e.touches[0].clientY - touchStartY;
+  if (delta > 0 && window.scrollY === 0) {
+    pullDistance.value = Math.min(delta * 0.4, 80);
+  }
+}
+
+async function onTouchEnd() {
+  if (!isPulling.value) return;
+  isPulling.value = false;
+  if (pullDistance.value >= 60) {
+    isRefreshing.value = true;
+    await loadDashboard();
+    isRefreshing.value = false;
+  }
+  pullDistance.value = 0;
+}
+
 function updateOnlineStatus() {
   if (import.meta.client) {
     syncStatus.value = navigator.onLine ? "online" : "offline";
@@ -311,7 +343,23 @@ function openRateEditor() {
 </script>
 
 <template>
-  <div>
+  <div
+    @touchstart.passive="onTouchStart"
+    @touchmove.passive="onTouchMove"
+    @touchend="onTouchEnd"
+  >
+    <!-- Pull-to-refresh indicator -->
+    <div
+      v-if="pullDistance > 0 || isRefreshing"
+      class="flex items-center justify-center transition-all"
+      :style="{ height: `${isRefreshing ? 40 : pullDistance}px` }"
+    >
+      <div
+        class="h-5 w-5 rounded-full border-2 border-nova-primary"
+        :class="isRefreshing || pullDistance >= 60 ? 'animate-spin border-t-transparent' : 'opacity-50'"
+      />
+    </div>
+
     <SharedContextualTip
       tip-id="dashboard"
       title="Tu panel de control"
