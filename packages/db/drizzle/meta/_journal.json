@@ -69,28 +69,28 @@
       "idx": 9,
       "version": "7",
       "when": 1776907200000,
-      "tag": "0011_nullable_pin_hash",
+      "tag": "0009_qty_after_transaction",
       "breakpoints": true
     },
     {
       "idx": 10,
       "version": "7",
       "when": 1777000000000,
-      "tag": "0012_clerk_organizations",
+      "tag": "0010_sales_composite_index",
       "breakpoints": true
     },
     {
       "idx": 11,
       "version": "7",
       "when": 1777100000000,
-      "tag": "0009_qty_after_transaction",
+      "tag": "0011_nullable_pin_hash",
       "breakpoints": true
     },
     {
       "idx": 12,
       "version": "7",
       "when": 1777200000000,
-      "tag": "0010_sales_composite_index",
+      "tag": "0012_clerk_organizations",
       "breakpoints": true
     },
     {
