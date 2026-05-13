@@ -44,7 +44,6 @@ import { validateUuidParam } from "../middleware/validate-uuid";
 import {
   uploadProductImage,
   isStorageConfigured,
-  getProductImageStream,
 } from "../services/storage";
 import type { AppEnv } from "../types";
 
@@ -181,11 +180,11 @@ inventory.get(
     }
 
     // Add semaphore color, depletion prediction, and image proxy URLs.
-    // Images are served via GET /api/products/:id/image (proxy to MinIO)
-    // instead of presigned URLs which point to the private MinIO endpoint.
+    // Images are served via GET /images/products/:id (public proxy to MinIO)
+    // instead of /api/products/:id/image which requires auth.
     const enriched = rows.map((p) => ({
       ...p,
-      imageUrl: p.imageUrl ? `/api/products/${p.id}/image` : null,
+      imageUrl: p.imageUrl ? `/images/products/${p.id}` : null,
       semaphore: calculateStockSemaphore(
           p.stock,
           p.stockMin,
@@ -250,9 +249,9 @@ inventory.get("/products/:id", validateUuidParam, async (c) => {
     product.lastSoldAt?.toISOString() ?? null,
   );
 
-  // Use proxy URL for image (MinIO is not publicly accessible)
+  // Use public proxy URL for image (no auth needed for <img> tags)
   const resolvedImageUrl = product.imageUrl
-    ? `/api/products/${id}/image`
+    ? `/images/products/${id}`
     : null;
 
   return c.json({
@@ -797,54 +796,6 @@ inventory.post(
 );
 
 // ============================================================
-// Product Image Proxy (serves images from MinIO without exposing it)
-// ============================================================
-
-/**
- * GET /products/:id/image - Serve product image via API proxy.
- *
- * MinIO is on a private network, so presigned URLs are not accessible
- * from the browser. This endpoint reads the image from MinIO and
- * streams it to the client with proper caching headers.
- */
-inventory.get("/products/:id/image", validateUuidParam, async (c) => {
-  const productId = c.req.param("id");
-  const db = c.get("db");
-  const businessId = c.get("businessId");
-
-  // Fetch product to get the image key
-  const [product] = await db
-    .select({ imageUrl: products.imageUrl })
-    .from(products)
-    .where(and(eq(products.id, productId), eq(products.businessId, businessId)))
-    .limit(1);
-
-  if (!product?.imageUrl) {
-    return c.json({ error: "No image" }, 404);
-  }
-
-  const result = await getProductImageStream(product.imageUrl);
-  if (!result) {
-    return c.json({ error: "Image not found in storage" }, 404);
-  }
-
-  // ETag-based caching: browser revalidates when image changes (re-upload).
-  // If the client sends If-None-Match matching the ETag, return 304.
-  if (result.etag) {
-    const ifNoneMatch = c.req.header("If-None-Match");
-    if (ifNoneMatch && ifNoneMatch === result.etag) {
-      return c.body(null, 304);
-    }
-    c.header("ETag", result.etag);
-  }
-
-  c.header("Content-Type", result.contentType);
-  c.header("Cache-Control", "public, max-age=3600, must-revalidate");
-
-  return c.body(result.body);
-});
-
-// ============================================================
 // Product Image Upload
 // ============================================================
 
@@ -911,8 +862,8 @@ inventory.post("/products/:id/image", validateUuidParam, async (c) => {
       .set({ imageUrl: key, updatedAt: new Date() })
       .where(eq(products.id, productId));
 
-    // Return the proxy URL for immediate display in the frontend
-    return c.json({ imageUrl: `/api/products/${productId}/image` }, 201);
+    // Return the public proxy URL for immediate display in the frontend
+    return c.json({ imageUrl: `/images/products/${productId}` }, 201);
   } catch (err) {
     const message =
       err instanceof Error ? err.message : "Error subiendo imagen";
