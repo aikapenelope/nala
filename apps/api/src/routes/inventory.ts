@@ -18,7 +18,7 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import { eq, and, ilike, sql, desc } from "drizzle-orm";
+import { eq, and, ilike, sql, desc, inArray } from "drizzle-orm";
 import {
   createProductSchema,
   updateProductSchema,
@@ -164,7 +164,7 @@ inventory.get(
         .innerJoin(sales, eq(saleItems.saleId, sales.id))
         .where(
           and(
-            sql`${saleItems.productId} = ANY(${productIds})`,
+            inArray(saleItems.productId, productIds),
             sql`${sales.createdAt} >= NOW() - INTERVAL '30 days'`,
             eq(sales.status, "completed"),
           ),
