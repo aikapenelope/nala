@@ -32,6 +32,7 @@ import {
 
 const { $api } = useApi();
 const { user } = useNovaAuth();
+const { toast } = useToast();
 
 interface PaymentMethod {
   method: string;
@@ -51,7 +52,6 @@ const minOrderAmount = ref("0");
 // UI state
 const isLoading = ref(true);
 const isSaving = ref(false);
-const saveSuccess = ref(false);
 const saveError = ref("");
 const linkCopied = ref(false);
 const showSetup = ref(false);
@@ -123,7 +123,6 @@ async function fetchSettings() {
 async function saveSettings() {
   isSaving.value = true;
   saveError.value = "";
-  saveSuccess.value = false;
   try {
     await $api("/api/store-settings", {
       method: "PATCH",
@@ -137,9 +136,8 @@ async function saveSettings() {
         minOrderAmount: Number(minOrderAmount.value) || 0,
       },
     });
-    saveSuccess.value = true;
     showSetup.value = false;
-    setTimeout(() => { saveSuccess.value = false; }, 3000);
+    toast("Configuracion de tienda guardada");
   } catch (err) {
     const e = err as { data?: { error?: string } };
     saveError.value = e.data?.error ?? "Error al guardar";
@@ -520,7 +518,7 @@ onMounted(() => {
           <Save :size="18" />
           {{ isSaving ? "Guardando..." : "Guardar configuracion" }}
         </button>
-        <p v-if="saveSuccess" class="mt-2 text-center text-sm font-medium text-green-600">Configuracion guardada</p>
+
         <p v-if="saveError" class="mt-2 text-center text-sm text-red-500">{{ saveError }}</p>
       </div>
     </template>
