@@ -99,6 +99,62 @@ const dueToday = ref<DueReceivable[]>([]);
 /** Sync status. */
 const syncStatus = ref<"online" | "offline" | "syncing">("online");
 
+/** Pending orders for quick action. */
+interface PendingOrder {
+  id: string;
+  customerName: string;
+  customerPhone: string;
+  total: number;
+  paymentMethod: string;
+  createdAt: string;
+}
+const pendingOrders = ref<PendingOrder[]>([]);
+const confirmingOrderId = ref<string | null>(null);
+
+/** Recent activity feed. */
+interface FeedItem {
+  id: string;
+  icon: string;
+  text: string;
+  time: string;
+  to?: string;
+}
+const activityFeed = ref<FeedItem[]>([]);
+
+const methodLabel: Record<string, string> = {
+  efectivo: "Efectivo",
+  pago_movil: "Pago Movil",
+  binance: "Binance",
+  zinli: "Zinli",
+  transferencia: "Transferencia",
+  zelle: "Zelle",
+  fiado: "Fiado",
+};
+
+/** Quick confirm an order from the dashboard. */
+async function quickConfirmOrder(orderId: string) {
+  confirmingOrderId.value = orderId;
+  try {
+    await $api(`/api/orders/${orderId}/confirm`, { method: "PATCH" });
+    pendingOrders.value = pendingOrders.value.filter((o) => o.id !== orderId);
+  } catch {
+    // Non-critical: user can go to /orders to retry
+  } finally {
+    confirmingOrderId.value = null;
+  }
+}
+
+/** Format relative time for feed. */
+function timeAgo(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const min = Math.floor(diff / 60000);
+  if (min < 1) return "Ahora";
+  if (min < 60) return `Hace ${min}min`;
+  const hrs = Math.floor(min / 60);
+  if (hrs < 24) return `Hace ${hrs}h`;
+  return new Date(dateStr).toLocaleDateString("es-VE", { day: "numeric", month: "short" });
+}
+
 const greeting = computed(() => {
   const hour = new Date().getHours();
   if (hour < 12) return "Buenos dias";
@@ -124,6 +180,8 @@ async function loadDashboard() {
       alertsResult,
       rateResult,
       cashFlowResult,
+      ordersResult,
+      recentSalesResult,
     ] = await Promise.allSettled([
       $api<{
         data: {
@@ -158,6 +216,12 @@ async function loadDashboard() {
 
       $api<{ data: { projection7d: { net: number } } }>(
         "/api/reports/cash-flow",
+      ),
+
+      $api<{ orders: PendingOrder[]; pendingCount: number }>("/api/orders?status=pending&limit=5"),
+
+      $api<{ sales: Array<{ id: string; totalUsd: string; channel: string; createdAt: string }> }>(
+        "/api/sales?limit=5",
       ),
     ]);
 
@@ -209,6 +273,27 @@ async function loadDashboard() {
 
     if (cashFlowResult.status === "fulfilled") {
       cashFlow7d.value = cashFlowResult.value.data.projection7d.net;
+    }
+
+    // Pending orders for quick action
+    if (ordersResult.status === "fulfilled") {
+      pendingOrders.value = ordersResult.value.orders.slice(0, 5);
+    }
+
+    // Build activity feed from recent sales
+    if (recentSalesResult.status === "fulfilled") {
+      const feed: FeedItem[] = [];
+      for (const sale of recentSalesResult.value.sales.slice(0, 5)) {
+        const channelLabel = sale.channel === "pos" ? "POS" : sale.channel === "online" ? "Online" : sale.channel;
+        feed.push({
+          id: `sale-${sale.id}`,
+          icon: "💰",
+          text: `Venta ${channelLabel} $${Number(sale.totalUsd).toFixed(2)}`,
+          time: timeAgo(sale.createdAt),
+          to: `/sales/history`,
+        });
+      }
+      activityFeed.value = feed;
     }
   } catch (err) {
     const message =
@@ -484,8 +569,44 @@ function openRateEditor() {
       </NuxtLink>
 
       <!-- ============================================================ -->
-      <!-- SCREEN 2: Cobros + Chart + Alerts (scroll) -->
+      <!-- SCREEN 2: Orders + Cobros + Feed + Chart + Alerts (scroll) -->
       <!-- ============================================================ -->
+
+      <!-- PENDING ORDERS with quick confirm -->
+      <div
+        v-if="pendingOrders.length > 0"
+        class="mt-3 rounded-[18px] border border-blue-200/60 bg-gradient-to-br from-[#EEF7FD] to-[#DBEAFE] p-3.5"
+      >
+        <div class="flex items-center justify-between">
+          <p class="text-[11px] font-bold uppercase tracking-wider text-blue-700">
+            Pedidos ({{ pendingOrders.length }})
+          </p>
+          <NuxtLink to="/orders" class="text-[10px] font-bold text-blue-600 hover:underline">
+            Ver todo
+          </NuxtLink>
+        </div>
+        <div class="mt-2 space-y-1.5">
+          <div
+            v-for="o in pendingOrders"
+            :key="o.id"
+            class="flex items-center justify-between gap-2 rounded-xl bg-white/60 px-3 py-2"
+          >
+            <div class="min-w-0 flex-1">
+              <p class="truncate text-[13px] font-bold text-gray-800">{{ o.customerName }}</p>
+              <p class="text-[11px] text-gray-500">
+                ${{ o.total.toFixed(2) }} · {{ methodLabel[o.paymentMethod] ?? o.paymentMethod }} · {{ timeAgo(o.createdAt) }}
+              </p>
+            </div>
+            <button
+              class="flex-shrink-0 rounded-lg bg-green-600 px-3 py-1.5 text-[10px] font-bold text-white transition-spring hover:bg-green-700 disabled:opacity-50"
+              :disabled="confirmingOrderId === o.id"
+              @click="quickConfirmOrder(o.id)"
+            >
+              {{ confirmingOrderId === o.id ? "..." : "Confirmar" }}
+            </button>
+          </div>
+        </div>
+      </div>
 
       <!-- COBROS PENDIENTES (always visible, even if 0) -->
       <div class="mt-3 rounded-[18px] border border-amber-200/60 bg-gradient-to-br from-[#FFFBEB] to-[#FEF3C7] p-3.5">
@@ -539,6 +660,28 @@ function openRateEditor() {
           :height="60"
         />
       </NuxtLink>
+
+      <!-- ACTIVITY FEED -->
+      <div
+        v-if="activityFeed.length > 0"
+        class="mt-2.5 rounded-[18px] bg-white/50 p-3.5"
+      >
+        <p class="mb-2 text-[11px] font-bold uppercase tracking-wider text-gray-400">
+          Actividad reciente
+        </p>
+        <div class="space-y-1">
+          <NuxtLink
+            v-for="item in activityFeed"
+            :key="item.id"
+            :to="item.to ?? '#'"
+            class="flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-[12px] transition-spring hover:bg-white/60"
+          >
+            <span class="flex-shrink-0">{{ item.icon }}</span>
+            <span class="min-w-0 flex-1 truncate font-medium text-gray-700">{{ item.text }}</span>
+            <span class="flex-shrink-0 text-[10px] font-medium text-gray-400">{{ item.time }}</span>
+          </NuxtLink>
+        </div>
+      </div>
 
       <!-- INSIGHTS ROW: product estrella + alertas -->
       <div class="mt-2.5 grid grid-cols-2 gap-2">
