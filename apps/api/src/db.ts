@@ -105,6 +105,8 @@ export async function applyRlsPolicies(): Promise<void> {
     "notification_preferences",
     "store_settings",
     "orders",
+    "sale_returns",
+    "sale_return_items",
   ];
 
   const skipped: string[] = [];
