@@ -13,7 +13,7 @@
  */
 
 import { calculateLineTotal, calculateSaleTotal } from "@nova/shared";
-import { ShoppingCart, Minus, Plus, X, Search } from "lucide-vue-next";
+import { ShoppingCart, Minus, Plus, X, Search, PlusCircle } from "lucide-vue-next";
 
 const { isDesktop } = useDevice();
 const { $api } = useApi();
@@ -178,6 +178,49 @@ function goToCheckout() {
 
   navigateTo("/sales/checkout");
 }
+
+/** Quick product creation modal. */
+const showQuickAdd = ref(false);
+const quickName = ref("");
+const quickPrice = ref<number | null>(null);
+const quickCreating = ref(false);
+
+async function quickCreateProduct() {
+  if (!quickName.value.trim() || !quickPrice.value || quickPrice.value <= 0) return;
+  quickCreating.value = true;
+  try {
+    const result = await $api<{ product: { id: string; name: string; price: string } }>(
+      "/api/products",
+      {
+        method: "POST",
+        body: {
+          name: quickName.value.trim(),
+          price: quickPrice.value,
+          stock: 999,
+        },
+      },
+    );
+    // Add to grid and ticket immediately
+    const newProduct: GridProduct = {
+      id: result.product.id,
+      name: result.product.name,
+      price: result.product.price,
+      stock: 999,
+      barcode: null,
+      imageUrl: null,
+      categoryId: null,
+    };
+    gridProducts.value.unshift(newProduct);
+    addToTicket(newProduct);
+    showQuickAdd.value = false;
+    quickName.value = "";
+    quickPrice.value = null;
+  } catch {
+    // Error creating product
+  } finally {
+    quickCreating.value = false;
+  }
+}
 </script>
 
 <template>
@@ -190,7 +233,7 @@ function goToCheckout() {
         description="Selecciona una categoria, toca un producto para agregarlo al ticket, y presiona Cobrar cuando estes listo. Puedes escanear codigos de barras con la camara."
       />
 
-      <!-- Search bar -->
+      <!-- Search bar + quick actions -->
       <div class="mb-3 flex gap-2">
         <div
           class="glass relative flex flex-1 items-center rounded-2xl px-4 py-2.5"
@@ -202,12 +245,20 @@ function goToCheckout() {
             placeholder="Buscar o escanear..."
             class="w-full bg-transparent text-sm font-medium text-gray-800 outline-none placeholder:text-gray-400"
             @keydown.enter="autoAddScannedProduct"
-          />
+          >
         </div>
         <SharedBarcodeScanner
           @scanned="(code: string) => (searchQuery = code)"
           @close="searchQuery = ''"
         />
+        <button
+          class="flex items-center gap-1 rounded-2xl bg-nova-primary px-3 py-2.5 text-xs font-bold text-white transition-spring hover:bg-nova-primary/90"
+          title="Crear producto rapido"
+          @click="showQuickAdd = true"
+        >
+          <PlusCircle :size="14" />
+          <span class="hidden sm:inline">Nuevo</span>
+        </button>
       </div>
 
       <!-- Category tabs -->
@@ -394,5 +445,50 @@ function goToCheckout() {
         </button>
       </div>
     </div>
+
+    <!-- Quick product creation modal -->
+    <Teleport to="body">
+      <div
+        v-if="showQuickAdd"
+        class="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm"
+        @click.self="showQuickAdd = false"
+      >
+        <div class="glass-strong w-full max-w-sm rounded-t-[32px] sm:rounded-[32px] p-6 shadow-[0_30px_60px_-15px_rgba(0,0,0,0.2)]">
+          <h3 class="mb-4 text-lg font-extrabold text-gradient">Producto rapido</h3>
+          <div class="space-y-3">
+            <input
+              v-model="quickName"
+              type="text"
+              placeholder="Nombre del producto"
+              autofocus
+              class="w-full rounded-2xl border border-white bg-white/60 px-4 py-3 text-sm font-semibold text-gray-800 outline-none transition-spring placeholder:text-gray-400 focus:bg-white focus:ring-[3px] focus:ring-nova-accent/20"
+            >
+            <input
+              v-model.number="quickPrice"
+              type="number"
+              step="0.01"
+              min="0"
+              placeholder="Precio ($)"
+              class="w-full rounded-2xl border border-white bg-white/60 px-4 py-3 text-sm font-semibold text-gray-800 outline-none transition-spring placeholder:text-gray-400 focus:bg-white focus:ring-[3px] focus:ring-nova-accent/20"
+            >
+          </div>
+          <div class="mt-4 flex gap-3">
+            <button
+              class="glass flex-1 rounded-2xl py-3 text-sm font-bold text-gray-700 transition-spring"
+              @click="showQuickAdd = false"
+            >
+              Cancelar
+            </button>
+            <button
+              class="dark-pill flex-1 rounded-2xl py-3 text-sm font-bold transition-spring disabled:opacity-50"
+              :disabled="!quickName.trim() || !quickPrice || quickPrice <= 0 || quickCreating"
+              @click="quickCreateProduct"
+            >
+              {{ quickCreating ? "Creando..." : "Crear y agregar" }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
