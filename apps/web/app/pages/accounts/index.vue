@@ -32,9 +32,12 @@ const agingBadge: Record<AgingColor, string> = {
 interface Receivable {
   id: string;
   customerId: string;
+  customerName: string;
+  customerPhone: string | null;
   balanceUsd: string;
   amountUsd: string;
   paidUsd: string;
+  dueDate: string | null;
   createdAt: string;
 }
 
@@ -115,17 +118,16 @@ function daysSince(d: string): number {
   );
 }
 
-async function collectAll() {
-  try {
-    const result = await $api<{
-      links: Array<{ whatsappUrl: string }>;
-    }>("/api/accounts/receivable/collect-all", { method: "POST" });
-    for (const link of result.links) {
-      window.open(link.whatsappUrl, "_blank");
-    }
-  } catch {
-    // Non-critical
-  }
+/** Build a wa.me link for collecting a specific receivable. */
+function collectLink(rec: Receivable): string | null {
+  if (!rec.customerPhone) return null;
+  const phone = rec.customerPhone.replace(/[^0-9]/g, "");
+  if (!phone) return null;
+  const amount = Number(rec.balanceUsd).toFixed(2);
+  const text = encodeURIComponent(
+    `Hola ${rec.customerName}, tienes un saldo pendiente de $${amount}. ¿Cuando puedes realizar el pago? Gracias!`,
+  );
+  return `https://wa.me/${phone}?text=${text}`;
 }
 
 /** Open payment modal for a receivable. */
@@ -277,15 +279,6 @@ async function submitPayPayable() {
     <template v-else>
       <!-- RECEIVABLE TAB -->
       <div v-if="activeTab === 'receivable'" class="space-y-3">
-        <button
-          v-if="receivables.length > 0"
-          class="flex w-full items-center justify-center gap-2 rounded-2xl bg-green-600 py-3 text-sm font-bold text-white transition-spring hover:bg-green-700"
-          @click="collectAll"
-        >
-          <MessageCircle :size="16" />
-          Cobrar a todos por WhatsApp
-        </button>
-
         <div v-if="receivables.length === 0" class="card-premium py-8 text-center">
           <p class="text-sm font-medium text-gray-400">No hay cuentas por cobrar</p>
         </div>
@@ -295,9 +288,10 @@ async function submitPayPayable() {
           :key="a.id"
           class="card-premium p-4"
         >
-          <div class="flex items-center justify-between">
-            <div>
-              <div class="flex items-center gap-2">
+          <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0 flex-1">
+              <p class="truncate text-sm font-bold text-gray-800">{{ a.customerName }}</p>
+              <div class="mt-1 flex items-center gap-2">
                 <span
                   class="rounded-full px-2 py-0.5 text-[10px] font-bold"
                   :class="agingBadge[calculateAgingColor(a.createdAt)]"
@@ -311,13 +305,32 @@ async function submitPayPayable() {
               <p class="mt-0.5 text-xs font-medium text-gray-500">
                 Total ${{ Number(a.amountUsd).toFixed(2) }} · Pagado ${{ Number(a.paidUsd).toFixed(2) }}
               </p>
+              <p
+                v-if="a.dueDate"
+                class="mt-0.5 text-[10px] font-semibold"
+                :class="new Date(a.dueDate) <= new Date() ? 'text-red-500' : 'text-gray-400'"
+              >
+                Vence: {{ new Date(a.dueDate).toLocaleDateString("es-VE", { day: "numeric", month: "short" }) }}
+              </p>
             </div>
-            <button
-              class="dark-pill rounded-2xl px-4 py-2 text-xs font-bold transition-spring"
-              @click="openPayment(a)"
-            >
-              Abonar
-            </button>
+            <div class="flex flex-shrink-0 gap-2">
+              <a
+                v-if="collectLink(a)"
+                :href="collectLink(a)!"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="flex h-9 w-9 items-center justify-center rounded-xl bg-green-600 text-white transition-spring hover:bg-green-700"
+                title="Cobrar por WhatsApp"
+              >
+                <MessageCircle :size="16" />
+              </a>
+              <button
+                class="dark-pill rounded-2xl px-4 py-2 text-xs font-bold transition-spring"
+                @click="openPayment(a)"
+              >
+                Abonar
+              </button>
+            </div>
           </div>
         </div>
       </div>
