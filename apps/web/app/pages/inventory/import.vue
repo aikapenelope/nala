@@ -156,9 +156,10 @@ const importableCount = computed(() => {
   if (!skipDuplicates.value || duplicateSkus.value.size === 0) {
     return rows.value.length;
   }
-  if (!columnMap.value.sku) return rows.value.length;
+  const skuCol = columnMap.value.sku;
+  if (!skuCol) return rows.value.length;
   return rows.value.filter((row) => {
-    const sku = row[columnMap.value.sku]?.trim().toLowerCase();
+    const sku = row[skuCol]?.trim().toLowerCase();
     return !sku || !duplicateSkus.value.has(sku);
   }).length;
 });
