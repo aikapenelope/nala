@@ -2,14 +2,22 @@
 /**
  * Inventory list page.
  *
- * Desktop: table with columns (name, SKU, stock, cost, price, margin, status).
- * Mobile: list with cards and semaphore indicator.
+ * Two view modes (toggle in header):
+ * - List: table (desktop) or cards (mobile) with thumbnails.
+ * - Grid: product cards with large images, name, price, stock, semaphore.
  *
  * Connected to: GET /api/products?search=&status=&page=&limit=
  */
 
 import type { StockSemaphore } from "@nova/shared";
-import { Search, Upload, Plus, Camera } from "lucide-vue-next";
+import {
+  Search,
+  Upload,
+  Plus,
+  Camera,
+  List,
+  LayoutGrid,
+} from "lucide-vue-next";
 
 const { isDesktop } = useDevice();
 
@@ -19,6 +27,9 @@ const searchQuery = ref("");
 const selectedStatus = ref<StockSemaphore | null>(null);
 const isLoading = ref(true);
 const loadError = ref("");
+
+/** View mode: list (default) or grid. */
+const viewMode = ref<"list" | "grid">("list");
 
 /** Product type from API response. */
 interface Product {
@@ -143,6 +154,33 @@ function margin(cost: string, price: string): string {
         Inventario
       </h1>
       <div class="flex gap-2">
+        <!-- View mode toggle -->
+        <div class="glass flex rounded-2xl p-0.5">
+          <button
+            class="flex items-center justify-center rounded-xl px-2.5 py-1.5 transition-spring"
+            :class="
+              viewMode === 'list'
+                ? 'bg-white shadow-sm text-gray-800'
+                : 'text-gray-400 hover:text-gray-600'
+            "
+            title="Vista lista"
+            @click="viewMode = 'list'"
+          >
+            <List :size="16" />
+          </button>
+          <button
+            class="flex items-center justify-center rounded-xl px-2.5 py-1.5 transition-spring"
+            :class="
+              viewMode === 'grid'
+                ? 'bg-white shadow-sm text-gray-800'
+                : 'text-gray-400 hover:text-gray-600'
+            "
+            title="Vista cuadricula"
+            @click="viewMode = 'grid'"
+          >
+            <LayoutGrid :size="16" />
+          </button>
+        </div>
         <NuxtLink
           to="/inventory/import-photo"
           class="glass flex items-center gap-1.5 rounded-2xl px-4 py-2 text-sm font-bold text-gray-700 transition-spring hover:shadow-[0_4px_12px_-2px_rgba(0,0,0,0.08)]"
@@ -230,193 +268,276 @@ function margin(cost: string, price: string): string {
     </div>
 
     <template v-else>
-      <!-- Desktop: Table view -->
-      <div v-if="isDesktop" class="card-premium overflow-hidden">
-        <table class="w-full text-left text-sm">
-          <thead class="border-b border-white/50">
-            <tr>
-              <th
-                class="px-4 py-3.5 text-[11px] font-bold tracking-wider text-gray-400 uppercase"
-              >
-                Estado
-              </th>
-              <th
-                class="px-4 py-3.5 text-[11px] font-bold tracking-wider text-gray-400 uppercase"
-              >
-                Producto
-              </th>
-              <th
-                class="px-4 py-3.5 text-[11px] font-bold tracking-wider text-gray-400 uppercase"
-              >
-                SKU
-              </th>
-              <th
-                class="px-4 py-3.5 text-right text-[11px] font-bold tracking-wider text-gray-400 uppercase"
-              >
-                Stock
-              </th>
-              <th
-                class="px-4 py-3.5 text-right text-[11px] font-bold tracking-wider text-gray-400 uppercase"
-              >
-                Duracion
-              </th>
-              <th
-                class="px-4 py-3.5 text-right text-[11px] font-bold tracking-wider text-gray-400 uppercase"
-              >
-                Costo
-              </th>
-              <th
-                class="px-4 py-3.5 text-right text-[11px] font-bold tracking-wider text-gray-400 uppercase"
-              >
-                Precio
-              </th>
-              <th
-                class="px-4 py-3.5 text-right text-[11px] font-bold tracking-wider text-gray-400 uppercase"
-              >
-                Margen
-              </th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-white/30">
-            <tr
-              v-for="product in products"
-              :key="product.id"
-              class="cursor-pointer transition-spring hover:bg-white/60"
-              @click="navigateTo(`/inventory/${product.id}`)"
-            >
-              <td class="px-4 py-3.5">
-                <span
-                  class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold"
-                  :class="semaphoreBadge[product.semaphore]"
+      <!-- ============================================================ -->
+      <!-- LIST VIEW -->
+      <!-- ============================================================ -->
+      <template v-if="viewMode === 'list'">
+        <!-- Desktop: Table view -->
+        <div v-if="isDesktop" class="card-premium overflow-hidden">
+          <table class="w-full text-left text-sm">
+            <thead class="border-b border-white/50">
+              <tr>
+                <th
+                  class="px-4 py-3.5 text-[11px] font-bold tracking-wider text-gray-400 uppercase"
                 >
+                  Estado
+                </th>
+                <th
+                  class="px-4 py-3.5 text-[11px] font-bold tracking-wider text-gray-400 uppercase"
+                >
+                  Producto
+                </th>
+                <th
+                  class="px-4 py-3.5 text-[11px] font-bold tracking-wider text-gray-400 uppercase"
+                >
+                  SKU
+                </th>
+                <th
+                  class="px-4 py-3.5 text-right text-[11px] font-bold tracking-wider text-gray-400 uppercase"
+                >
+                  Stock
+                </th>
+                <th
+                  class="px-4 py-3.5 text-right text-[11px] font-bold tracking-wider text-gray-400 uppercase"
+                >
+                  Duracion
+                </th>
+                <th
+                  class="px-4 py-3.5 text-right text-[11px] font-bold tracking-wider text-gray-400 uppercase"
+                >
+                  Costo
+                </th>
+                <th
+                  class="px-4 py-3.5 text-right text-[11px] font-bold tracking-wider text-gray-400 uppercase"
+                >
+                  Precio
+                </th>
+                <th
+                  class="px-4 py-3.5 text-right text-[11px] font-bold tracking-wider text-gray-400 uppercase"
+                >
+                  Margen
+                </th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-white/30">
+              <tr
+                v-for="product in products"
+                :key="product.id"
+                class="cursor-pointer transition-spring hover:bg-white/60"
+                @click="navigateTo(`/inventory/${product.id}`)"
+              >
+                <td class="px-4 py-3.5">
                   <span
-                    class="mr-1.5 h-1.5 w-1.5 rounded-full"
-                    :class="semaphoreColors[product.semaphore]"
-                  />
-                  {{ semaphoreLabels[product.semaphore] }}
-                </span>
-              </td>
-              <td class="px-4 py-3.5">
-                <div class="flex items-center gap-3">
-                  <img
-                    v-if="product.imageUrl"
-                    :src="product.imageUrl"
-                    :alt="product.name"
-                    class="h-9 w-9 flex-shrink-0 rounded-lg object-cover"
-                  />
-                  <div
-                    v-else
-                    class="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-[#EFECFF] to-[#D0CCF9] text-xs font-extrabold text-nova-accent"
+                    class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold"
+                    :class="semaphoreBadge[product.semaphore]"
                   >
-                    {{ product.name.charAt(0) }}
+                    <span
+                      class="mr-1.5 h-1.5 w-1.5 rounded-full"
+                      :class="semaphoreColors[product.semaphore]"
+                    />
+                    {{ semaphoreLabels[product.semaphore] }}
+                  </span>
+                </td>
+                <td class="px-4 py-3.5">
+                  <div class="flex items-center gap-3">
+                    <img
+                      v-if="product.imageUrl"
+                      :src="product.imageUrl"
+                      :alt="product.name"
+                      class="h-9 w-9 flex-shrink-0 rounded-lg object-cover"
+                    />
+                    <div
+                      v-else
+                      class="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-[#EFECFF] to-[#D0CCF9] text-xs font-extrabold text-nova-accent"
+                    >
+                      {{ product.name.charAt(0) }}
+                    </div>
+                    <span class="font-semibold text-gray-800">{{
+                      product.name
+                    }}</span>
                   </div>
-                  <span class="font-semibold text-gray-800">{{
-                    product.name
-                  }}</span>
-                </div>
-              </td>
-              <td class="px-4 py-3.5 text-gray-500">
-                {{ product.sku ?? "-" }}
-              </td>
-              <td class="px-4 py-3.5 text-right font-semibold text-gray-800">
-                {{ product.stock }}
-              </td>
-              <td class="px-4 py-3.5 text-right text-xs text-gray-500">
-                <template v-if="product.daysUntilDepletion === 0">
-                  <span class="font-bold text-red-600">Agotado</span>
-                </template>
-                <template v-else-if="product.daysUntilDepletion !== null">
-                  ~{{ product.daysUntilDepletion }}d
-                </template>
-                <template v-else>-</template>
-              </td>
-              <td class="px-4 py-3.5 text-right text-gray-500">
-                ${{ Number(product.cost).toFixed(2) }}
-              </td>
-              <td class="px-4 py-3.5 text-right font-semibold text-gray-800">
-                ${{ Number(product.price).toFixed(2) }}
-              </td>
-              <td class="px-4 py-3.5 text-right">
-                <span
-                  class="rounded-lg px-1.5 py-0.5 text-xs font-bold"
-                  :class="
-                    Number(margin(product.cost, product.price)) >= 30
-                      ? 'bg-green-50 text-green-700'
-                      : Number(margin(product.cost, product.price)) >= 15
-                        ? 'bg-yellow-50 text-yellow-700'
-                        : 'bg-red-50 text-red-600'
+                </td>
+                <td class="px-4 py-3.5 text-gray-500">
+                  {{ product.sku ?? "-" }}
+                </td>
+                <td class="px-4 py-3.5 text-right font-semibold text-gray-800">
+                  {{ product.stock }}
+                </td>
+                <td class="px-4 py-3.5 text-right text-xs text-gray-500">
+                  <template v-if="product.daysUntilDepletion === 0">
+                    <span class="font-bold text-red-600">Agotado</span>
+                  </template>
+                  <template v-else-if="product.daysUntilDepletion !== null">
+                    ~{{ product.daysUntilDepletion }}d
+                  </template>
+                  <template v-else>-</template>
+                </td>
+                <td class="px-4 py-3.5 text-right text-gray-500">
+                  ${{ Number(product.cost).toFixed(2) }}
+                </td>
+                <td class="px-4 py-3.5 text-right font-semibold text-gray-800">
+                  ${{ Number(product.price).toFixed(2) }}
+                </td>
+                <td class="px-4 py-3.5 text-right">
+                  <span
+                    class="rounded-lg px-1.5 py-0.5 text-xs font-bold"
+                    :class="
+                      Number(margin(product.cost, product.price)) >= 30
+                        ? 'bg-green-50 text-green-700'
+                        : Number(margin(product.cost, product.price)) >= 15
+                          ? 'bg-yellow-50 text-yellow-700'
+                          : 'bg-red-50 text-red-600'
+                    "
+                  >
+                    {{ margin(product.cost, product.price) }}%
+                  </span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Mobile: Card list -->
+        <div v-else class="space-y-2.5">
+          <NuxtLink
+            v-for="product in products"
+            :key="product.id"
+            :to="`/inventory/${product.id}`"
+            class="card-premium card-lift flex items-center gap-3 p-4"
+          >
+            <!-- Thumbnail with semaphore indicator -->
+            <div class="relative flex-shrink-0">
+              <img
+                v-if="product.imageUrl"
+                :src="product.imageUrl"
+                :alt="product.name"
+                class="h-11 w-11 rounded-xl object-cover"
+              />
+              <div
+                v-else
+                class="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-[#EFECFF] to-[#D0CCF9] text-sm font-extrabold text-nova-accent"
+              >
+                {{ product.name.charAt(0) }}
+              </div>
+              <span
+                class="absolute -right-0.5 -top-0.5 h-3 w-3 rounded-full border-2 border-white shadow-sm"
+                :class="semaphoreColors[product.semaphore]"
+              />
+            </div>
+            <div class="min-w-0 flex-1">
+              <p class="truncate font-semibold text-gray-800">
+                {{ product.name }}
+              </p>
+              <p class="text-xs font-medium text-gray-500">
+                {{ product.stock }} en stock
+                <template
+                  v-if="
+                    product.daysUntilDepletion !== null &&
+                    product.daysUntilDepletion > 0
                   "
                 >
-                  {{ margin(product.cost, product.price) }}%
-                </span>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+                  · ~{{ product.daysUntilDepletion }}d
+                </template>
+                <template v-else-if="product.daysUntilDepletion === 0">
+                  · <span class="font-bold text-red-600">Agotado</span>
+                </template>
+              </p>
+            </div>
+            <div class="text-right">
+              <p class="font-bold text-gray-800">
+                ${{ Number(product.price).toFixed(2) }}
+              </p>
+              <span
+                class="text-[10px] font-bold"
+                :class="
+                  Number(margin(product.cost, product.price)) >= 30
+                    ? 'text-green-600'
+                    : Number(margin(product.cost, product.price)) >= 15
+                      ? 'text-yellow-600'
+                      : 'text-red-600'
+                "
+              >
+                {{ margin(product.cost, product.price) }}%
+              </span>
+            </div>
+          </NuxtLink>
+        </div>
+      </template>
 
-      <!-- Mobile: Card list -->
-      <div v-else class="space-y-2.5">
+      <!-- ============================================================ -->
+      <!-- GRID VIEW -->
+      <!-- ============================================================ -->
+      <div
+        v-else
+        class="grid gap-3"
+        :class="
+          isDesktop
+            ? 'grid-cols-4 lg:grid-cols-5 xl:grid-cols-6'
+            : 'grid-cols-2 sm:grid-cols-3'
+        "
+      >
         <NuxtLink
           v-for="product in products"
           :key="product.id"
           :to="`/inventory/${product.id}`"
-          class="card-premium card-lift flex items-center gap-3 p-4"
+          class="card-premium card-lift flex flex-col overflow-hidden"
         >
-          <!-- Thumbnail with semaphore indicator -->
-          <div class="relative flex-shrink-0">
+          <!-- Image area -->
+          <div class="relative aspect-square w-full bg-gray-50">
             <img
               v-if="product.imageUrl"
               :src="product.imageUrl"
               :alt="product.name"
-              class="h-11 w-11 rounded-xl object-cover"
+              class="h-full w-full object-cover"
             />
             <div
               v-else
-              class="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-[#EFECFF] to-[#D0CCF9] text-sm font-extrabold text-nova-accent"
+              class="flex h-full w-full items-center justify-center bg-gradient-to-br from-[#EFECFF] to-[#D0CCF9]"
             >
-              {{ product.name.charAt(0) }}
+              <span class="text-3xl font-extrabold text-nova-accent/60">
+                {{ product.name.charAt(0) }}
+              </span>
             </div>
+            <!-- Semaphore badge -->
             <span
-              class="absolute -right-0.5 -top-0.5 h-3 w-3 rounded-full border-2 border-white shadow-sm"
-              :class="semaphoreColors[product.semaphore]"
-            />
+              class="absolute left-2 top-2 inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-bold backdrop-blur-sm"
+              :class="semaphoreBadge[product.semaphore]"
+            >
+              <span
+                class="mr-1 h-1.5 w-1.5 rounded-full"
+                :class="semaphoreColors[product.semaphore]"
+              />
+              {{ semaphoreLabels[product.semaphore] }}
+            </span>
+            <!-- Stock count -->
+            <span
+              class="absolute bottom-2 right-2 rounded-lg bg-black/60 px-1.5 py-0.5 text-[10px] font-bold text-white backdrop-blur-sm"
+            >
+              {{ product.stock }} uds
+            </span>
           </div>
-          <div class="min-w-0 flex-1">
-            <p class="truncate font-semibold text-gray-800">
+          <!-- Info -->
+          <div class="p-3">
+            <p class="truncate text-[13px] font-semibold text-gray-800">
               {{ product.name }}
             </p>
-            <p class="text-xs font-medium text-gray-500">
-              {{ product.stock }} en stock
-              <template
-                v-if="
-                  product.daysUntilDepletion !== null &&
-                  product.daysUntilDepletion > 0
+            <div class="mt-1 flex items-center justify-between">
+              <span class="text-sm font-bold text-nova-primary">
+                ${{ Number(product.price).toFixed(2) }}
+              </span>
+              <span
+                class="text-[10px] font-bold"
+                :class="
+                  Number(margin(product.cost, product.price)) >= 30
+                    ? 'text-green-600'
+                    : Number(margin(product.cost, product.price)) >= 15
+                      ? 'text-yellow-600'
+                      : 'text-red-600'
                 "
               >
-                · ~{{ product.daysUntilDepletion }}d
-              </template>
-              <template v-else-if="product.daysUntilDepletion === 0">
-                · <span class="font-bold text-red-600">Agotado</span>
-              </template>
-            </p>
-          </div>
-          <div class="text-right">
-            <p class="font-bold text-gray-800">
-              ${{ Number(product.price).toFixed(2) }}
-            </p>
-            <span
-              class="text-[10px] font-bold"
-              :class="
-                Number(margin(product.cost, product.price)) >= 30
-                  ? 'text-green-600'
-                  : Number(margin(product.cost, product.price)) >= 15
-                    ? 'text-yellow-600'
-                    : 'text-red-600'
-              "
-            >
-              {{ margin(product.cost, product.price) }}%
-            </span>
+                {{ margin(product.cost, product.price) }}%
+              </span>
+            </div>
           </div>
         </NuxtLink>
       </div>
