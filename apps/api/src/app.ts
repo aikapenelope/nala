@@ -22,6 +22,7 @@ import { timeout } from "hono/timeout";
 import { structuredLogger } from "./middleware/structured-logger";
 import { health } from "./routes/health";
 import { catalog } from "./routes/catalog";
+import { images } from "./routes/images";
 import { onboarding } from "./routes/onboarding";
 import { inventory } from "./routes/inventory";
 import { salesRoutes } from "./routes/sales";
@@ -187,6 +188,8 @@ app.use(
 app.route("/health", health);
 app.use("/catalog/*", publicRateLimit);
 app.route("/catalog", catalog);
+app.use("/images/*", publicRateLimit);
+app.route("/images", images);
 app.use("/onboarding/check-slug/*", publicRateLimit);
 app.use("/onboarding", publicRateLimit);
 app.route("/onboarding", onboarding);
