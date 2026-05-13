@@ -215,21 +215,33 @@ DROP POLICY IF EXISTS notification_preferences_tenant_isolation ON notification_
 CREATE POLICY notification_preferences_tenant_isolation ON notification_preferences
   USING (business_id = current_business_id());
 
--- Store settings
-ALTER TABLE store_settings ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS store_settings_tenant_isolation ON store_settings;
-CREATE POLICY store_settings_tenant_isolation ON store_settings
-  USING (business_id = current_business_id());
+-- Store settings (may not exist yet if migration 0014 hasn't run)
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'store_settings') THEN
+    ALTER TABLE store_settings ENABLE ROW LEVEL SECURITY;
+    DROP POLICY IF EXISTS store_settings_tenant_isolation ON store_settings;
+    CREATE POLICY store_settings_tenant_isolation ON store_settings
+      USING (business_id = current_business_id());
+  ELSE
+    RAISE NOTICE 'init.sql: skipping store_settings (table does not exist yet)';
+  END IF;
+END $$;
 
--- Orders (online storefront orders)
-ALTER TABLE orders ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS orders_tenant_isolation ON orders;
-CREATE POLICY orders_tenant_isolation ON orders
-  USING (business_id = current_business_id());
+-- Orders (may not exist yet if migration 0014 hasn't run)
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'orders') THEN
+    ALTER TABLE orders ENABLE ROW LEVEL SECURITY;
+    DROP POLICY IF EXISTS orders_tenant_isolation ON orders;
+    CREATE POLICY orders_tenant_isolation ON orders
+      USING (business_id = current_business_id());
 
--- Orders: allow public creation (storefront checkout has no auth context).
--- The catalog routes filter by slug directly, not via RLS.
-DROP POLICY IF EXISTS orders_public_insert ON orders;
-CREATE POLICY orders_public_insert ON orders
-  FOR INSERT
-  WITH CHECK (current_business_id() IS NULL OR business_id = current_business_id());
+    -- Orders: allow public creation (storefront checkout has no auth context).
+    -- The catalog routes filter by slug directly, not via RLS.
+    DROP POLICY IF EXISTS orders_public_insert ON orders;
+    CREATE POLICY orders_public_insert ON orders
+      FOR INSERT
+      WITH CHECK (current_business_id() IS NULL OR business_id = current_business_id());
+  ELSE
+    RAISE NOTICE 'init.sql: skipping orders (table does not exist yet)';
+  END IF;
+END $$;

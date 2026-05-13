@@ -13,6 +13,7 @@ set -e
 # Step 1: Apply versioned Drizzle migrations
 # Uses DATABASE_URL directly (port 5432, not PgBouncer).
 # Only applies new migrations that haven't been run yet (safe on every deploy).
+# Migrations MUST succeed -- if they fail, the container should not start.
 # See packages/db/migrate.mjs for details on the bootstrap logic.
 if [ -n "$DATABASE_URL" ]; then
   echo "[entrypoint] Running migrations..."
@@ -23,13 +24,17 @@ else
   echo "[entrypoint] WARNING: DATABASE_URL not set, skipping migrations."
 fi
 
-# Step 2: Apply RLS policies
-# Uses psql (installed in the Docker image) to run init.sql
-# All statements use IF NOT EXISTS / CREATE OR REPLACE, safe to re-run
+# Step 2: Apply RLS policies via psql
+# init.sql uses DO blocks with pg_tables checks for tables that may not
+# exist yet (e.g., orders, store_settings before migration 0014 runs).
+# Errors here are non-fatal: the API's applyRlsPolicies() also applies
+# policies at startup, so psql failures are logged but don't block boot.
 if [ -n "$DATABASE_URL" ] && [ -f "packages/db/init.sql" ]; then
   echo "[entrypoint] Applying RLS policies..."
-  psql "$DATABASE_URL" -f packages/db/init.sql 2>&1 || echo "[entrypoint] WARNING: RLS apply had errors (may be OK if policies already exist)"
-  echo "[entrypoint] RLS policies applied."
+  if ! psql "$DATABASE_URL" -f packages/db/init.sql 2>&1; then
+    echo "[entrypoint] WARNING: init.sql had errors (see above). The API will retry RLS at startup."
+  fi
+  echo "[entrypoint] RLS policies step complete."
 fi
 
 # Step 3: Start the API server
