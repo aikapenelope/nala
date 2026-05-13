@@ -12,6 +12,7 @@ import { Clock, CheckCircle, Truck, XCircle, RefreshCw, Volume2, VolumeX } from 
 
 const { $api } = useApi();
 const { muted, toggleMute, playNotification } = useOrderSound();
+const { toast } = useToast();
 
 interface OrderRow {
   id: string;
@@ -115,6 +116,7 @@ async function quickConfirm(orderId: string) {
     // Remove from list and refresh
     orders.value = orders.value.filter((o) => o.id !== orderId);
     if (pendingCount.value > 0) pendingCount.value--;
+    toast("Pedido confirmado");
   } catch {
     // Non-critical: user can tap to open detail and retry
   } finally {

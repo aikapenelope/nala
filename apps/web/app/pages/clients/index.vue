@@ -10,6 +10,7 @@ import { Search, UserPlus } from "lucide-vue-next";
 
 const { isDesktop } = useDevice();
 const { $api } = useApi();
+const { toast } = useToast();
 
 const searchQuery = ref("");
 const isLoading = ref(true);
@@ -112,6 +113,7 @@ async function submitEdit() {
       },
     });
     showEditModal.value = false;
+    toast("Cliente actualizado");
     await fetchCustomers();
   } catch (err) {
     const fetchError = err as { data?: { error?: string } };

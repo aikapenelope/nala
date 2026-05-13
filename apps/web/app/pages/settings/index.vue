@@ -25,6 +25,7 @@ import {
 
 const { $api } = useApi();
 const { user } = useNovaAuth();
+const { toast } = useToast();
 
 // ============================================================
 // Section expand state
@@ -43,7 +44,6 @@ const whatsappNumber = ref("");
 const originalEmail = ref("");
 const originalWhatsapp = ref("");
 const businessSaving = ref(false);
-const businessSaveSuccess = ref(false);
 const businessSaveError = ref("");
 
 const businessHasChanges = computed(
@@ -76,7 +76,6 @@ async function saveBusinessSettings() {
   if (!businessHasChanges.value) return;
   businessSaving.value = true;
   businessSaveError.value = "";
-  businessSaveSuccess.value = false;
   try {
     const body: Record<string, string | null> = {};
     if (accountantEmail.value !== originalEmail.value) {
@@ -92,8 +91,7 @@ async function saveBusinessSettings() {
     whatsappNumber.value = result.settings.whatsappNumber ?? "";
     originalEmail.value = accountantEmail.value;
     originalWhatsapp.value = whatsappNumber.value;
-    businessSaveSuccess.value = true;
-    setTimeout(() => { businessSaveSuccess.value = false; }, 3000);
+    toast("Configuracion guardada");
   } catch (err) {
     const fetchError = err as { data?: { error?: string } };
     businessSaveError.value = fetchError.data?.error ?? "Error al guardar";
@@ -111,7 +109,6 @@ const rateInputUsd = ref("");
 const rateInputEur = ref("");
 const rateSaving = ref(false);
 const rateSaveError = ref("");
-const rateSaveSuccess = ref(false);
 
 const bcvOfficial = ref<{ usd: number; eur: number; date: string } | null>(null);
 const loadingBcv = ref(false);
@@ -157,11 +154,9 @@ async function saveRate() {
   }
   rateSaving.value = true;
   rateSaveError.value = "";
-  rateSaveSuccess.value = false;
   try {
     await $api("/api/exchange-rate", { method: "POST", body: { rateBcv: usd, rateEur: eur } });
-    rateSaveSuccess.value = true;
-    setTimeout(() => { rateSaveSuccess.value = false; }, 3000);
+    toast("Tasa guardada");
   } catch (err) {
     const fetchError = err as { data?: { error?: string } };
     rateSaveError.value = fetchError.data?.error ?? "Error guardando tasa";
@@ -244,7 +239,6 @@ onMounted(() => {
               <Save :size="14" />
               {{ businessSaving ? "Guardando..." : "Guardar" }}
             </button>
-            <p v-if="businessSaveSuccess" class="text-center text-xs font-medium text-green-600">Guardado</p>
             <p v-if="businessSaveError" class="text-center text-xs text-red-500">{{ businessSaveError }}</p>
           </div>
         </div>
@@ -327,7 +321,6 @@ onMounted(() => {
             >
               {{ rateSaving ? "Guardando..." : "Guardar tasa" }}
             </button>
-            <p v-if="rateSaveSuccess" class="text-center text-xs font-medium text-green-600">Tasa guardada</p>
             <p v-if="rateSaveError" class="text-center text-xs text-red-500">{{ rateSaveError }}</p>
           </div>
         </div>

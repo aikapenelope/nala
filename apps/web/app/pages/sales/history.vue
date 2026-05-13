@@ -11,6 +11,7 @@ import { Plus, Calendar, Share2 } from "lucide-vue-next";
 
 const { isDesktop } = useDevice();
 const { $api } = useApi();
+const { toast } = useToast();
 
 const dateFilter = ref("");
 const methodFilter = ref<string | null>(null);
@@ -156,6 +157,7 @@ async function confirmReason() {
     // Update local state
     const sale = salesList.value.find((s) => s.id === voidingSaleId.value);
     if (sale) sale.status = "voided";
+    toast("Venta anulada");
   } catch (err) {
     const fetchError = err as { data?: { error?: string } };
     voidError.value = fetchError.data?.error ?? "Error al anular la venta";
