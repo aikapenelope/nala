@@ -40,6 +40,34 @@ import type { AppEnv } from "./types";
 export const app = new Hono();
 
 // ---------------------------------------------------------------------------
+// Global error handler: catch all unhandled errors, log them, return 500
+// ---------------------------------------------------------------------------
+
+app.onError((err, c) => {
+  const method = c.req.method;
+  const path = c.req.path;
+  const message = err instanceof Error ? err.message : "Unknown error";
+  const stack = err instanceof Error ? err.stack : undefined;
+
+  console.error(`[ERROR] ${method} ${path}: ${message}`);
+  if (stack) {
+    console.error(stack);
+  }
+
+  // Don't leak internal details in production
+  const isDev = process.env.NODE_ENV === "development";
+
+  return c.json(
+    {
+      error: isDev ? message : "Internal server error",
+      path,
+      ...(isDev && { stack }),
+    },
+    500,
+  );
+});
+
+// ---------------------------------------------------------------------------
 // Security: block scanner bots early (before logging to reduce noise)
 // ---------------------------------------------------------------------------
 
@@ -206,6 +234,14 @@ api.route("/", configRoutes);
 api.route("/", ordersRoutes);
 
 app.route("/api", api);
+
+// ---------------------------------------------------------------------------
+// 404 handler for unmatched routes
+// ---------------------------------------------------------------------------
+
+app.notFound((c) => {
+  return c.json({ error: "Not found", path: c.req.path }, 404);
+});
 
 // ---------------------------------------------------------------------------
 // Root
