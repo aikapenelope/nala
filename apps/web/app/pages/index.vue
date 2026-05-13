@@ -91,6 +91,16 @@ const rateInputEur = ref("");
 const rateSaving = ref(false);
 const rateSaveError = ref("");
 
+/** Receivables due today or overdue. */
+interface DueReceivable {
+  id: string;
+  customerName: string;
+  customerPhone: string | null;
+  balanceUsd: string;
+  dueDate: string | null;
+}
+const dueToday = ref<DueReceivable[]>([]);
+
 /** Sync status. */
 const syncStatus = ref<"online" | "offline" | "syncing">("online");
 const pendingSyncCount = ref(0);
@@ -211,6 +221,13 @@ async function loadDashboard() {
 
     if (receivableResult.status === "fulfilled") {
       receivableTotal.value = receivableResult.value.totalPending;
+
+      // Filter receivables due today or overdue for the dashboard section
+      const today = new Date();
+      today.setHours(23, 59, 59, 999);
+      dueToday.value = (receivableResult.value.accounts ?? [])
+        .filter((a: DueReceivable) => a.dueDate && new Date(a.dueDate) <= today)
+        .slice(0, 5);
     }
 
     if (inventoryResult.status === "fulfilled") {
@@ -578,6 +595,43 @@ function openRateEditor() {
           :height="80"
         />
       </NuxtLink>
+
+      <!-- DUE TODAY COLLECTIONS -->
+      <div
+        v-if="dueToday.length > 0"
+        class="mt-3 rounded-[20px] border border-amber-200/60 bg-gradient-to-br from-[#FFFBEB] to-[#FEF3C7] p-4"
+      >
+        <p class="mb-2.5 text-[11px] font-bold uppercase tracking-wider text-amber-700">
+          Cobros pendientes
+        </p>
+        <div class="space-y-2">
+          <div
+            v-for="d in dueToday"
+            :key="d.id"
+            class="flex items-center justify-between gap-3 rounded-xl bg-white/60 px-3 py-2.5"
+          >
+            <div class="min-w-0 flex-1">
+              <p class="truncate text-sm font-bold text-gray-800">{{ d.customerName }}</p>
+              <p class="text-xs font-medium text-amber-700">${{ Number(d.balanceUsd).toFixed(2) }}</p>
+            </div>
+            <a
+              v-if="d.customerPhone"
+              :href="`https://wa.me/${d.customerPhone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(`Hola ${d.customerName}, tienes un saldo pendiente de $${Number(d.balanceUsd).toFixed(2)}. ¿Cuando puedes realizar el pago? Gracias!`)}`"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-green-600 text-white"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" /></svg>
+            </a>
+          </div>
+        </div>
+        <NuxtLink
+          to="/accounts"
+          class="mt-2.5 block text-center text-[11px] font-bold text-amber-700 hover:underline"
+        >
+          Ver todas las cuentas
+        </NuxtLink>
+      </div>
 
       <!-- PAYMENT MIX -->
       <div

@@ -52,6 +52,8 @@ export const createSaleSchema = z.object({
   /** Sale channel. */
   channel: z.enum(SALE_CHANNELS).default("pos"),
   notes: z.string().max(500).optional(),
+  /** Optional due date for fiado payments (ISO date string). */
+  fiadoDueDate: z.string().optional(),
 });
 
 /** Schema for voiding a sale (requires owner authorization). */

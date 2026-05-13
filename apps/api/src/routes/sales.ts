@@ -627,6 +627,7 @@ salesRoutes.post("/sales", zValidator("json", createSaleSchema), async (c) => {
           saleId: sale.id,
           amountUsd: String(fiadoPayment.amountUsd),
           balanceUsd: String(fiadoPayment.amountUsd),
+          dueDate: data.fiadoDueDate ? new Date(data.fiadoDueDate) : undefined,
         });
 
         // Update customer balance
