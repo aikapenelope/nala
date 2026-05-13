@@ -155,9 +155,6 @@ inventory.get(
     const salesVelocity: Record<string, number> = {};
 
     if (productIds.length > 0) {
-      const thirtyDaysAgo = new Date();
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-
       const velocityRows = await db
         .select({
           productId: saleItems.productId,
@@ -168,7 +165,7 @@ inventory.get(
         .where(
           and(
             sql`${saleItems.productId} = ANY(${productIds})`,
-            sql`${sales.createdAt} >= ${thirtyDaysAgo}`,
+            sql`${sales.createdAt} >= NOW() - INTERVAL '30 days'`,
             eq(sales.status, "completed"),
           ),
         )
