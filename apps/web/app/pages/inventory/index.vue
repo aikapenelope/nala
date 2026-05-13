@@ -32,6 +32,7 @@ interface Product {
   price: string;
   categoryId: string | null;
   lastSoldAt: string | null;
+  imageUrl: string | null;
   semaphore: StockSemaphore;
   daysUntilDepletion: number | null;
 }
@@ -138,7 +139,9 @@ function margin(cost: string, price: string): string {
 
     <!-- Header -->
     <div class="mb-4 flex items-center justify-between">
-      <h1 class="text-2xl font-extrabold tracking-tight text-gradient">Inventario</h1>
+      <h1 class="text-2xl font-extrabold tracking-tight text-gradient">
+        Inventario
+      </h1>
       <div class="flex gap-2">
         <NuxtLink
           to="/inventory/import-photo"
@@ -166,7 +169,9 @@ function margin(cost: string, price: string): string {
 
     <!-- Search and filters -->
     <div class="mb-4 flex gap-3">
-      <div class="glass relative flex flex-1 items-center rounded-2xl px-4 py-2.5">
+      <div
+        class="glass relative flex flex-1 items-center rounded-2xl px-4 py-2.5"
+      >
         <Search :size="16" class="mr-2 flex-shrink-0 text-gray-400" />
         <input
           v-model="searchQuery"
@@ -174,7 +179,7 @@ function margin(cost: string, price: string): string {
           placeholder="Buscar producto..."
           class="w-full bg-transparent text-sm font-medium text-gray-800 outline-none placeholder:text-gray-400"
           @input="onSearchInput"
-        >
+        />
       </div>
       <select
         v-model="selectedStatus"
@@ -190,15 +195,14 @@ function margin(cost: string, price: string): string {
 
     <!-- Loading -->
     <div v-if="isLoading" class="py-12 text-center text-gray-400">
-      <div class="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2 border-gray-200 border-t-nova-primary" />
+      <div
+        class="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2 border-gray-200 border-t-nova-primary"
+      />
       Cargando inventario...
     </div>
 
     <!-- Error -->
-    <div
-      v-else-if="loadError"
-      class="card-premium p-6 text-center"
-    >
+    <div v-else-if="loadError" class="card-premium p-6 text-center">
       <p class="text-sm font-semibold text-red-500">{{ loadError }}</p>
       <button
         class="mt-3 text-xs font-bold text-nova-primary underline"
@@ -213,7 +217,9 @@ function margin(cost: string, price: string): string {
       v-else-if="products.length === 0"
       class="card-premium py-12 text-center"
     >
-      <p class="text-sm font-medium text-gray-400">No hay productos{{ searchQuery ? " que coincidan" : "" }}</p>
+      <p class="text-sm font-medium text-gray-400">
+        No hay productos{{ searchQuery ? " que coincidan" : "" }}
+      </p>
       <NuxtLink
         v-if="!searchQuery"
         to="/inventory/new"
@@ -225,20 +231,33 @@ function margin(cost: string, price: string): string {
 
     <template v-else>
       <!-- Desktop: Table view -->
-      <div
-        v-if="isDesktop"
-        class="card-premium overflow-hidden"
-      >
+      <div v-if="isDesktop" class="card-premium overflow-hidden">
         <table class="w-full text-left text-sm">
           <thead class="border-b border-white/50">
             <tr>
-              <th class="px-4 py-3.5 text-[11px] font-bold tracking-wider text-gray-400 uppercase">Estado</th>
-              <th class="px-4 py-3.5 text-[11px] font-bold tracking-wider text-gray-400 uppercase">Producto</th>
-              <th class="px-4 py-3.5 text-[11px] font-bold tracking-wider text-gray-400 uppercase">SKU</th>
-              <th class="px-4 py-3.5 text-right text-[11px] font-bold tracking-wider text-gray-400 uppercase">
+              <th
+                class="px-4 py-3.5 text-[11px] font-bold tracking-wider text-gray-400 uppercase"
+              >
+                Estado
+              </th>
+              <th
+                class="px-4 py-3.5 text-[11px] font-bold tracking-wider text-gray-400 uppercase"
+              >
+                Producto
+              </th>
+              <th
+                class="px-4 py-3.5 text-[11px] font-bold tracking-wider text-gray-400 uppercase"
+              >
+                SKU
+              </th>
+              <th
+                class="px-4 py-3.5 text-right text-[11px] font-bold tracking-wider text-gray-400 uppercase"
+              >
                 Stock
               </th>
-              <th class="px-4 py-3.5 text-right text-[11px] font-bold tracking-wider text-gray-400 uppercase">
+              <th
+                class="px-4 py-3.5 text-right text-[11px] font-bold tracking-wider text-gray-400 uppercase"
+              >
                 Duracion
               </th>
               <th
@@ -246,7 +265,9 @@ function margin(cost: string, price: string): string {
               >
                 Costo
               </th>
-              <th class="px-4 py-3.5 text-right text-[11px] font-bold tracking-wider text-gray-400 uppercase">
+              <th
+                class="px-4 py-3.5 text-right text-[11px] font-bold tracking-wider text-gray-400 uppercase"
+              >
                 Precio
               </th>
               <th
@@ -275,10 +296,28 @@ function margin(cost: string, price: string): string {
                   {{ semaphoreLabels[product.semaphore] }}
                 </span>
               </td>
-              <td class="px-4 py-3.5 font-semibold text-gray-800">
-                {{ product.name }}
+              <td class="px-4 py-3.5">
+                <div class="flex items-center gap-3">
+                  <img
+                    v-if="product.imageUrl"
+                    :src="product.imageUrl"
+                    :alt="product.name"
+                    class="h-9 w-9 flex-shrink-0 rounded-lg object-cover"
+                  />
+                  <div
+                    v-else
+                    class="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-[#EFECFF] to-[#D0CCF9] text-xs font-extrabold text-nova-accent"
+                  >
+                    {{ product.name.charAt(0) }}
+                  </div>
+                  <span class="font-semibold text-gray-800">{{
+                    product.name
+                  }}</span>
+                </div>
               </td>
-              <td class="px-4 py-3.5 text-gray-500">{{ product.sku ?? "-" }}</td>
+              <td class="px-4 py-3.5 text-gray-500">
+                {{ product.sku ?? "-" }}
+              </td>
               <td class="px-4 py-3.5 text-right font-semibold text-gray-800">
                 {{ product.stock }}
               </td>
@@ -300,7 +339,13 @@ function margin(cost: string, price: string): string {
               <td class="px-4 py-3.5 text-right">
                 <span
                   class="rounded-lg px-1.5 py-0.5 text-xs font-bold"
-                  :class="Number(margin(product.cost, product.price)) >= 30 ? 'bg-green-50 text-green-700' : Number(margin(product.cost, product.price)) >= 15 ? 'bg-yellow-50 text-yellow-700' : 'bg-red-50 text-red-600'"
+                  :class="
+                    Number(margin(product.cost, product.price)) >= 30
+                      ? 'bg-green-50 text-green-700'
+                      : Number(margin(product.cost, product.price)) >= 15
+                        ? 'bg-yellow-50 text-yellow-700'
+                        : 'bg-red-50 text-red-600'
+                  "
                 >
                   {{ margin(product.cost, product.price) }}%
                 </span>
@@ -318,10 +363,25 @@ function margin(cost: string, price: string): string {
           :to="`/inventory/${product.id}`"
           class="card-premium card-lift flex items-center gap-3 p-4"
         >
-          <span
-            class="h-3 w-3 flex-shrink-0 rounded-full shadow-sm"
-            :class="semaphoreColors[product.semaphore]"
-          />
+          <!-- Thumbnail with semaphore indicator -->
+          <div class="relative flex-shrink-0">
+            <img
+              v-if="product.imageUrl"
+              :src="product.imageUrl"
+              :alt="product.name"
+              class="h-11 w-11 rounded-xl object-cover"
+            />
+            <div
+              v-else
+              class="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-[#EFECFF] to-[#D0CCF9] text-sm font-extrabold text-nova-accent"
+            >
+              {{ product.name.charAt(0) }}
+            </div>
+            <span
+              class="absolute -right-0.5 -top-0.5 h-3 w-3 rounded-full border-2 border-white shadow-sm"
+              :class="semaphoreColors[product.semaphore]"
+            />
+          </div>
           <div class="min-w-0 flex-1">
             <p class="truncate font-semibold text-gray-800">
               {{ product.name }}
@@ -347,7 +407,13 @@ function margin(cost: string, price: string): string {
             </p>
             <span
               class="text-[10px] font-bold"
-              :class="Number(margin(product.cost, product.price)) >= 30 ? 'text-green-600' : Number(margin(product.cost, product.price)) >= 15 ? 'text-yellow-600' : 'text-red-600'"
+              :class="
+                Number(margin(product.cost, product.price)) >= 30
+                  ? 'text-green-600'
+                  : Number(margin(product.cost, product.price)) >= 15
+                    ? 'text-yellow-600'
+                    : 'text-red-600'
+              "
             >
               {{ margin(product.cost, product.price) }}%
             </span>
