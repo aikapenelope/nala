@@ -24,6 +24,7 @@ import { Check, WifiOff, X, MessageCircle, ShoppingCart } from "lucide-vue-next"
 
 const router = useRouter();
 const { $api } = useApi();
+const { user } = useNovaAuth();
 
 /** Simple online status check (no IndexedDB dependency). */
 const isOnline = ref(true);
@@ -262,13 +263,61 @@ async function confirmSale() {
   }
 }
 
-/** Send receipt via WhatsApp (wa.me link). */
+/** Send receipt via WhatsApp (wa.me link with detailed receipt). */
 function sendWhatsAppReceipt() {
-  const bsText =
-    exchangeRate.value > 0 ? ` (Bs.${totalBs.value.toFixed(2)})` : "";
-  const text = encodeURIComponent(
-    `Recibo Nova\nTotal: $${totalUsd.value.toFixed(2)}${bsText}\nMetodo: ${selectedMethod.value}\nGracias por su compra!`,
-  );
+  const businessName = user.value?.businessName ?? "Mi Negocio";
+  const now = new Date();
+  const dateStr = now.toLocaleDateString("es-VE", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+  const timeStr = now.toLocaleTimeString("es-VE", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
+  // Build itemized list
+  const itemLines = items.value
+    .map(
+      (item) =>
+        `  ${item.name} x${item.quantity} — $${(item.unitPrice * item.quantity).toFixed(2)}`,
+    )
+    .join("\n");
+
+  // Build surcharges section
+  const surchargeLines =
+    appliedSurcharges.value.length > 0
+      ? appliedSurcharges.value
+          .map((s) => `  ${s.name}: $${s.amount.toFixed(2)}`)
+          .join("\n")
+      : "";
+
+  const bsLine =
+    exchangeRate.value > 0
+      ? `\nBs. ${totalBs.value.toFixed(2)} (tasa ${exchangeRate.value.toFixed(2)})`
+      : "";
+
+  const methodLabel =
+    paymentMethods.find((m) => m.value === selectedMethod.value)?.label ??
+    selectedMethod.value;
+
+  const receipt = [
+    `📋 *${businessName}*`,
+    `${dateStr} ${timeStr}`,
+    `─────────────────`,
+    itemLines,
+    `─────────────────`,
+    surchargeLines ? `${surchargeLines}\n─────────────────` : "",
+    `*Total: $${totalUsd.value.toFixed(2)}*${bsLine}`,
+    `Pago: ${methodLabel}`,
+    ``,
+    `Gracias por su compra! 🙏`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  const text = encodeURIComponent(receipt);
   window.open(`https://wa.me/?text=${text}`, "_blank");
 }
 
