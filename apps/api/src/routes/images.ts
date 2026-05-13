@@ -20,16 +20,6 @@ import {
 
 export const images = new Hono();
 
-// Override Cross-Origin-Resource-Policy for all image routes.
-// The global secureHeaders() middleware sets it to "same-origin", which blocks
-// <img> tags on the frontend (https://novaincs.com) from loading images served
-// by the API (https://api.novaincs.com). Product images are public data, so
-// "cross-origin" is safe here.
-images.use("*", async (c, next) => {
-  await next();
-  c.header("Cross-Origin-Resource-Policy", "cross-origin");
-});
-
 /**
  * GET /images/products/:id - Serve product image via API proxy.
  *

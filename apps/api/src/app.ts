@@ -189,6 +189,16 @@ app.route("/health", health);
 app.use("/catalog/*", publicRateLimit);
 app.route("/catalog", catalog);
 app.use("/images/*", publicRateLimit);
+// Override Cross-Origin-Resource-Policy for image routes.
+// secureHeaders() sets it to "same-origin", which blocks <img> tags on the
+// frontend (novaincs.com) from loading images from the API (api.novaincs.com).
+// Product images are public data, so "cross-origin" is safe.
+// Must use c.res.headers.set() to forcefully replace the header already set
+// by secureHeaders() — c.header() alone does not overwrite it.
+app.use("/images/*", async (c, next) => {
+  await next();
+  c.res.headers.set("Cross-Origin-Resource-Policy", "cross-origin");
+});
 app.route("/images", images);
 app.use("/onboarding/check-slug/*", publicRateLimit);
 app.use("/onboarding", publicRateLimit);
