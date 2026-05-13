@@ -1068,6 +1068,80 @@ export const orders = pgTable(
   ],
 );
 
+// ============================================================
+// Sale Returns (partial/full product returns)
+// ============================================================
+
+/**
+ * Sale returns - tracks partial or full product returns.
+ * Unlike voids (which cancel the entire sale), returns allow
+ * returning specific items while keeping the sale active.
+ */
+export const saleReturns = pgTable(
+  "sale_returns",
+  {
+    id: uuid("id")
+      .default(sql`gen_random_uuid()`)
+      .primaryKey(),
+    businessId: uuid("business_id")
+      .notNull()
+      .references(() => businesses.id),
+    saleId: uuid("sale_id")
+      .notNull()
+      .references(() => sales.id),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id),
+    /** Reason for the return. */
+    reason: text("reason").notNull(),
+    /** Total refund amount in USD. */
+    totalRefundUsd: numeric("total_refund_usd", {
+      precision: 12,
+      scale: 2,
+    })
+      .notNull()
+      .default("0"),
+    /** Return status. */
+    status: text("status").notNull().default("completed"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("idx_sale_returns_sale").on(table.saleId),
+    index("idx_sale_returns_business").on(table.businessId),
+  ],
+);
+
+/**
+ * Sale return items - individual products returned.
+ */
+export const saleReturnItems = pgTable(
+  "sale_return_items",
+  {
+    id: uuid("id")
+      .default(sql`gen_random_uuid()`)
+      .primaryKey(),
+    returnId: uuid("return_id")
+      .notNull()
+      .references(() => saleReturns.id, { onDelete: "cascade" }),
+    saleItemId: uuid("sale_item_id")
+      .notNull()
+      .references(() => saleItems.id),
+    productId: uuid("product_id")
+      .notNull()
+      .references(() => products.id),
+    variantId: uuid("variant_id").references(() => productVariants.id),
+    /** Quantity returned. */
+    quantity: integer("quantity").notNull(),
+    /** Unit price at time of original sale (USD). */
+    unitPrice: numeric("unit_price", { precision: 12, scale: 2 }).notNull(),
+    /** Line total refunded (USD). */
+    lineTotal: numeric("line_total", { precision: 12, scale: 2 }).notNull(),
+  },
+  (table) => [index("idx_sale_return_items_return").on(table.returnId)],
+);
+
 /**
  * Store settings - per-business storefront configuration.
  * Controls payment methods, delivery options, and store activation.

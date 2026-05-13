@@ -40,6 +40,8 @@ import {
   customers,
   users,
   stockMovements,
+  saleReturns,
+  saleReturnItems,
 } from "@nova/db";
 import { getCurrentRate, setCurrentRate } from "../services/exchange-rate";
 import { fetchBcvRates } from "../services/bcv-rates";
@@ -904,6 +906,241 @@ salesRoutes.post(
     }
 
     return c.json({ sale: result });
+  },
+);
+
+// ============================================================
+// Partial Returns
+// ============================================================
+
+/** Schema for partial return request. */
+const returnItemSchema = z.object({
+  saleItemId: z.string().uuid(),
+  quantity: z.number().int().min(1),
+});
+
+const createReturnSchema = z.object({
+  reason: z.string().min(1).max(500),
+  items: z.array(returnItemSchema).min(1).max(50),
+});
+
+/**
+ * POST /sales/:id/return - Create a partial (or full) return.
+ *
+ * Accepts specific items and quantities to return. Restores stock,
+ * creates a return record, and logs stock movements.
+ * The original sale remains "completed" (not voided).
+ */
+salesRoutes.post(
+  "/sales/:id/return",
+  validateUuidParam,
+  zValidator("json", createReturnSchema),
+  async (c) => {
+    const saleId = c.req.param("id");
+    const { reason, items: returnItems } = c.req.valid("json");
+    const user = c.get("user");
+    const db = c.get("db");
+    const businessId = c.get("businessId");
+
+    let result;
+    try {
+      result = await db.transaction(async (tx) => {
+        // Verify sale exists and is completed
+        const [sale] = await tx
+          .select()
+          .from(sales)
+          .where(
+            and(
+              eq(sales.id, saleId),
+              eq(sales.businessId, businessId),
+              eq(sales.status, "completed"),
+            ),
+          )
+          .limit(1);
+
+        if (!sale) {
+          throw new Error(
+            JSON.stringify({ userError: "Venta no encontrada o ya anulada" }),
+          );
+        }
+
+        // Fetch all sale items for this sale
+        const allSaleItems = await tx
+          .select()
+          .from(saleItems)
+          .where(eq(saleItems.saleId, saleId));
+
+        const saleItemMap = new Map(allSaleItems.map((si) => [si.id, si]));
+
+        // Fetch existing returns for this sale to check already-returned quantities
+        const existingReturnItems = await tx
+          .select({
+            saleItemId: saleReturnItems.saleItemId,
+            totalReturned: sql<number>`COALESCE(SUM(${saleReturnItems.quantity}), 0)::int`,
+          })
+          .from(saleReturnItems)
+          .innerJoin(saleReturns, eq(saleReturnItems.returnId, saleReturns.id))
+          .where(eq(saleReturns.saleId, saleId))
+          .groupBy(saleReturnItems.saleItemId);
+
+        const returnedMap = new Map(
+          existingReturnItems.map((r) => [r.saleItemId, r.totalReturned]),
+        );
+
+        // Validate each return item
+        const errors: string[] = [];
+        const validatedItems: Array<{
+          saleItem: typeof allSaleItems[number];
+          quantity: number;
+          lineTotal: number;
+        }> = [];
+
+        for (const ri of returnItems) {
+          const saleItem = saleItemMap.get(ri.saleItemId);
+          if (!saleItem) {
+            errors.push(`Item ${ri.saleItemId} no encontrado en esta venta`);
+            continue;
+          }
+
+          const alreadyReturned = returnedMap.get(ri.saleItemId) ?? 0;
+          const maxReturnable = saleItem.quantity - alreadyReturned;
+
+          if (ri.quantity > maxReturnable) {
+            errors.push(
+              `Solo puedes devolver ${maxReturnable} unidades de este item (ya devueltas: ${alreadyReturned})`,
+            );
+            continue;
+          }
+
+          const unitPrice = Number(saleItem.unitPrice);
+          const discountPct = Number(saleItem.discountPercent ?? 0);
+          const effectivePrice = unitPrice * (1 - discountPct / 100);
+          const lineTotal =
+            Math.round(effectivePrice * ri.quantity * 100) / 100;
+
+          validatedItems.push({
+            saleItem,
+            quantity: ri.quantity,
+            lineTotal,
+          });
+        }
+
+        if (errors.length > 0) {
+          throw new Error(JSON.stringify({ validationErrors: errors }));
+        }
+
+        const totalRefund = validatedItems.reduce(
+          (sum, vi) => sum + vi.lineTotal,
+          0,
+        );
+
+        // Create the return record
+        const [returnRecord] = await tx
+          .insert(saleReturns)
+          .values({
+            businessId,
+            saleId,
+            userId: user.id,
+            reason,
+            totalRefundUsd: String(Math.round(totalRefund * 100) / 100),
+          })
+          .returning();
+
+        // Create return items and restore stock
+        for (const vi of validatedItems) {
+          await tx.insert(saleReturnItems).values({
+            returnId: returnRecord.id,
+            saleItemId: vi.saleItem.id,
+            productId: vi.saleItem.productId,
+            variantId: vi.saleItem.variantId,
+            quantity: vi.quantity,
+            unitPrice: vi.saleItem.unitPrice,
+            lineTotal: String(vi.lineTotal),
+          });
+
+          // Restore stock for the product
+          if (vi.saleItem.variantId) {
+            await tx
+              .update(productVariants)
+              .set({
+                stock: sql`${productVariants.stock} + ${vi.quantity}`,
+                updatedAt: new Date(),
+              })
+              .where(eq(productVariants.id, vi.saleItem.variantId));
+          }
+
+          const [restored] = await tx
+            .update(products)
+            .set({
+              stock: sql`${products.stock} + ${vi.quantity}`,
+              updatedAt: new Date(),
+            })
+            .where(eq(products.id, vi.saleItem.productId))
+            .returning({ stock: products.stock });
+
+          // Log stock movement
+          await tx.insert(stockMovements).values({
+            businessId,
+            productId: vi.saleItem.productId,
+            variantId: vi.saleItem.variantId,
+            type: "return",
+            quantity: vi.quantity,
+            costUnit: vi.saleItem.unitPrice,
+            referenceType: "sale",
+            referenceId: saleId,
+            userId: user.id,
+            qtyAfterTransaction: restored?.stock ?? null,
+          });
+        }
+
+        // Log activity
+        await tx.insert(activityLog).values({
+          businessId,
+          userId: user.id,
+          action: "sale_return",
+          detail: `Return on sale ${saleId.slice(0, 8)}: ${validatedItems.length} items, $${totalRefund.toFixed(2)} refund. Reason: ${reason}`,
+        });
+
+        return {
+          returnId: returnRecord.id,
+          totalRefund: Math.round(totalRefund * 100) / 100,
+          itemsReturned: validatedItems.length,
+        };
+      });
+    } catch (err) {
+      if (err instanceof Error && err.message.startsWith("{")) {
+        try {
+          const parsed = JSON.parse(err.message) as {
+            userError?: string;
+            validationErrors?: string[];
+          };
+          if (parsed.userError) {
+            return c.json({ error: parsed.userError }, 404);
+          }
+          if (parsed.validationErrors) {
+            return c.json(
+              { error: "Error de validacion", details: parsed.validationErrors },
+              400,
+            );
+          }
+        } catch {
+          // Not a validation error
+        }
+      }
+      const dbErr = handleDbError(err);
+      if (dbErr) return c.json({ error: dbErr.message }, dbErr.status);
+      throw err;
+    }
+
+    return c.json(
+      {
+        returnId: result.returnId,
+        totalRefund: result.totalRefund,
+        itemsReturned: result.itemsReturned,
+        message: "Devolucion procesada exitosamente",
+      },
+      201,
+    );
   },
 );
 
