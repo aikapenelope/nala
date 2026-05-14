@@ -751,11 +751,13 @@ salesRoutes.post("/sales", zValidator("json", createSaleSchema), async (c) => {
  *
  * This follows the Treinta philosophy: 2 taps to register a sale.
  */
-salesRoutes.post(
-  "/sales/quick",
-  zValidator("json", quickSaleSchema),
-  async (c) => {
-    const data = c.req.valid("json");
+salesRoutes.post("/sales/quick", async (c) => {
+    const body = await c.req.json();
+    const parsed = quickSaleSchema.safeParse(body);
+    if (!parsed.success) {
+      return c.json({ error: parsed.error.issues[0]?.message ?? "Datos invalidos" }, 400);
+    }
+    const data = parsed.data;
     const user = c.get("user");
     const db = c.get("db");
     const businessId = c.get("businessId");
@@ -815,10 +817,12 @@ salesRoutes.post(
         201,
       );
     } catch (err) {
-      return handleDbError(c, err, "Error registrando venta rapida");
+      const dbErr = handleDbError(err);
+      if (dbErr) return c.json({ error: dbErr.message }, dbErr.status);
+      const message = err instanceof Error ? err.message : "Error registrando venta rapida";
+      return c.json({ error: message }, 500);
     }
-  },
-);
+});
 
 /**
  * POST /sales/:id/void - Void a sale.
