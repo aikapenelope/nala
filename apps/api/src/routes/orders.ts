@@ -409,6 +409,27 @@ ordersRoutes.patch(
 // Store Settings
 // ============================================================
 
+/** Schema for a single day's hours. null means closed. */
+const dayHoursSchema = z
+  .object({
+    open: z.string().regex(/^\d{2}:\d{2}$/, "Formato HH:MM"),
+    close: z.string().regex(/^\d{2}:\d{2}$/, "Formato HH:MM"),
+  })
+  .nullable();
+
+/** Business hours schema: one entry per day of the week. */
+const businessHoursSchema = z
+  .object({
+    mon: dayHoursSchema,
+    tue: dayHoursSchema,
+    wed: dayHoursSchema,
+    thu: dayHoursSchema,
+    fri: dayHoursSchema,
+    sat: dayHoursSchema,
+    sun: dayHoursSchema,
+  })
+  .nullable();
+
 const updateStoreSettingsSchema = z.object({
   storeEnabled: z.boolean().optional(),
   paymentMethods: z
@@ -425,6 +446,7 @@ const updateStoreSettingsSchema = z.object({
   deliveryZones: z.string().max(500).optional().nullable(),
   welcomeMessage: z.string().max(500).optional().nullable(),
   minOrderAmount: z.number().min(0).optional(),
+  businessHours: businessHoursSchema.optional(),
 });
 
 /** GET /store-settings - Get current store configuration. */
@@ -449,6 +471,7 @@ ordersRoutes.get("/store-settings", async (c) => {
         deliveryZones: null,
         welcomeMessage: null,
         minOrderAmount: 0,
+        businessHours: null,
       },
     });
   }
@@ -462,6 +485,7 @@ ordersRoutes.get("/store-settings", async (c) => {
       deliveryZones: settings.deliveryZones,
       welcomeMessage: settings.welcomeMessage,
       minOrderAmount: Number(settings.minOrderAmount),
+      businessHours: settings.businessHours ?? null,
     },
   });
 });
@@ -491,6 +515,8 @@ ordersRoutes.patch(
       updates.welcomeMessage = data.welcomeMessage;
     if (data.minOrderAmount !== undefined)
       updates.minOrderAmount = String(data.minOrderAmount);
+    if (data.businessHours !== undefined)
+      updates.businessHours = data.businessHours;
 
     // Upsert: create if not exists, update if exists
     const [existing] = await db
@@ -535,6 +561,7 @@ ordersRoutes.patch(
         deliveryZones: settings.deliveryZones,
         welcomeMessage: settings.welcomeMessage,
         minOrderAmount: Number(settings.minOrderAmount),
+        businessHours: settings.businessHours ?? null,
       },
     });
   },

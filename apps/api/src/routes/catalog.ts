@@ -282,6 +282,7 @@ catalog.get("/:slug/store-info", async (c) => {
     deliveryZones: settings.deliveryZones,
     welcomeMessage: settings.welcomeMessage,
     minOrderAmount: Number(settings.minOrderAmount),
+    businessHours: settings.businessHours ?? null,
   };
 
   // Cache the response

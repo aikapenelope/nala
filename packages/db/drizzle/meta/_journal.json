@@ -120,6 +120,13 @@
       "when": 1778717340972,
       "tag": "0016_product_images",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1778796272088,
+      "tag": "0017_business_hours",
+      "breakpoints": true
     }
   ]
 }
