@@ -21,7 +21,7 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import { eq, and, sql, desc, gte, lte, ilike } from "drizzle-orm";
+import { eq, and, sql, desc, gte, lte, ilike, inArray } from "drizzle-orm";
 import {
   createCustomerSchema,
   updateCustomerSchema,
@@ -56,7 +56,7 @@ const listCustomersQuery = z.object({
   search: z.string().optional(),
   segment: z.string().optional(),
   page: z.coerce.number().int().min(1).default(1),
-  limit: z.coerce.number().int().min(1).max(100).default(50),
+  limit: z.coerce.number().int().min(1).max(200).default(50),
 });
 
 /** GET /customers - List customers with search and pagination. */
@@ -102,7 +102,7 @@ customersRoutes.get(
           segment: customerSegments.segment,
         })
         .from(customerSegments)
-        .where(sql`${customerSegments.customerId} = ANY(${customerIds})`);
+        .where(inArray(customerSegments.customerId, customerIds));
 
       segmentMap = segmentRows.reduce<Record<string, string[]>>((acc, row) => {
         if (!acc[row.customerId]) acc[row.customerId] = [];
@@ -659,7 +659,7 @@ customersRoutes.post(
         .from(salePayments)
         .where(
           and(
-            sql`${salePayments.saleId} = ANY(${saleIds})`,
+            inArray(salePayments.saleId, saleIds),
             eq(salePayments.method, "efectivo"),
           ),
         );
