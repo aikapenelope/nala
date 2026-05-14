@@ -55,6 +55,70 @@ const selectedMethod = ref<PaymentMethod | null>(null);
 const reference = ref("");
 const selectedCustomerId = ref<string | null>(null);
 const fiadoDueDate = ref("");
+
+// ============================================================
+// Customer search for fiado
+// ============================================================
+
+interface CustomerOption {
+  id: string;
+  name: string;
+  phone: string | null;
+  balanceUsd: string;
+}
+
+const customerQuery = ref("");
+const customerResults = ref<CustomerOption[]>([]);
+const selectedCustomerName = ref("");
+const isSearchingCustomers = ref(false);
+const showCustomerDropdown = ref(false);
+let customerSearchTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** Search customers as the user types (debounced). */
+function onCustomerInput() {
+  selectedCustomerId.value = null;
+  selectedCustomerName.value = "";
+  if (customerSearchTimer) clearTimeout(customerSearchTimer);
+
+  const q = customerQuery.value.trim();
+  if (q.length < 2) {
+    customerResults.value = [];
+    showCustomerDropdown.value = false;
+    return;
+  }
+
+  customerSearchTimer = setTimeout(async () => {
+    isSearchingCustomers.value = true;
+    try {
+      const result = await $api<{ customers: CustomerOption[] }>(
+        `/api/customers?search=${encodeURIComponent(q)}&limit=5`,
+      );
+      customerResults.value = result.customers;
+      showCustomerDropdown.value = result.customers.length > 0;
+    } catch {
+      customerResults.value = [];
+    } finally {
+      isSearchingCustomers.value = false;
+    }
+  }, 250);
+}
+
+/** Select a customer from the dropdown. */
+function selectCustomer(c: CustomerOption) {
+  selectedCustomerId.value = c.id;
+  selectedCustomerName.value = c.name;
+  customerQuery.value = c.name;
+  showCustomerDropdown.value = false;
+}
+
+/** Clear customer selection. */
+function clearCustomer() {
+  selectedCustomerId.value = null;
+  selectedCustomerName.value = "";
+  customerQuery.value = "";
+  customerResults.value = [];
+  showCustomerDropdown.value = false;
+}
 const isSubmitting = ref(false);
 const saleComplete = ref(false);
 const saleError = ref("");
@@ -557,12 +621,74 @@ function newSale() {
         <p class="mb-2 text-[13px] font-bold text-yellow-800">
           Fiado requiere seleccionar un cliente
         </p>
-        <input
-          v-model="selectedCustomerId"
-          type="text"
-          placeholder="ID del cliente..."
-          class="w-full rounded-2xl border border-yellow-200 bg-white/60 px-4 py-3 text-sm font-semibold text-gray-800 outline-none transition-spring placeholder:text-gray-400 focus:ring-[3px] focus:ring-yellow-400/20"
+
+        <!-- Selected customer display -->
+        <div
+          v-if="selectedCustomerId && selectedCustomerName"
+          class="flex items-center justify-between rounded-2xl border border-green-300 bg-green-50 px-4 py-3"
         >
+          <div>
+            <p class="text-sm font-bold text-gray-800">{{ selectedCustomerName }}</p>
+            <p class="text-[11px] font-medium text-green-700">Cliente seleccionado</p>
+          </div>
+          <button
+            class="flex h-7 w-7 items-center justify-center rounded-lg text-gray-400 transition-spring hover:bg-red-50 hover:text-red-500"
+            @click="clearCustomer"
+          >
+            <X :size="14" />
+          </button>
+        </div>
+
+        <!-- Customer search input -->
+        <div v-else class="relative">
+          <input
+            v-model="customerQuery"
+            type="text"
+            placeholder="Buscar cliente por nombre..."
+            class="w-full rounded-2xl border border-yellow-200 bg-white/60 px-4 py-3 text-sm font-semibold text-gray-800 outline-none transition-spring placeholder:text-gray-400 focus:ring-[3px] focus:ring-yellow-400/20"
+            @input="onCustomerInput"
+            @focus="showCustomerDropdown = customerResults.length > 0"
+          >
+          <div
+            v-if="isSearchingCustomers"
+            class="absolute right-3 top-1/2 -translate-y-1/2"
+          >
+            <div class="h-4 w-4 animate-spin rounded-full border-2 border-gray-200 border-t-yellow-500" />
+          </div>
+
+          <!-- Search results dropdown -->
+          <div
+            v-if="showCustomerDropdown"
+            class="absolute left-0 right-0 top-full z-10 mt-1 overflow-hidden rounded-2xl border border-yellow-200 bg-white shadow-lg"
+          >
+            <button
+              v-for="c in customerResults"
+              :key="c.id"
+              class="flex w-full items-center justify-between px-4 py-3 text-left transition-spring hover:bg-yellow-50"
+              @mousedown.prevent="selectCustomer(c)"
+            >
+              <div>
+                <p class="text-sm font-semibold text-gray-800">{{ c.name }}</p>
+                <p v-if="c.phone" class="text-[11px] text-gray-500">{{ c.phone }}</p>
+              </div>
+              <span
+                v-if="Number(c.balanceUsd) > 0"
+                class="rounded-lg bg-red-50 px-2 py-0.5 text-[11px] font-bold text-red-600"
+              >
+                Debe ${{ Number(c.balanceUsd).toFixed(2) }}
+              </span>
+            </button>
+          </div>
+
+          <!-- No results hint -->
+          <p
+            v-if="customerQuery.length >= 2 && !isSearchingCustomers && customerResults.length === 0 && !selectedCustomerId"
+            class="mt-2 text-[11px] font-medium text-yellow-600"
+          >
+            No se encontro cliente. <NuxtLink to="/clients/new" class="font-bold underline">Crear nuevo</NuxtLink>
+          </p>
+        </div>
+
         <p class="mt-2 text-[11px] font-medium text-yellow-600">
           Se generara una cuenta por cobrar automaticamente
         </p>
