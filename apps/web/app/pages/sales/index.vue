@@ -310,6 +310,14 @@ async function quickCreateProduct() {
     quickCreating.value = false;
   }
 }
+/** Navigate to advanced checkout (fiado, surcharges, IGTF). */
+function goToAdvancedCheckout() {
+  if (import.meta.client) {
+    sessionStorage.setItem("nova:checkout:items", JSON.stringify(ticketItems.value));
+    sessionStorage.setItem("nova:checkout:total", String(ticketTotal.value));
+  }
+  navigateTo("/sales/checkout");
+}
 </script>
 
 <template>
@@ -591,20 +599,13 @@ async function quickCreateProduct() {
           >
 
           <!-- Advanced options link -->
-          <NuxtLink
-            to="/sales/checkout"
-            class="block text-center text-[11px] font-medium text-gray-400 hover:text-nova-primary"
-            @click="
-              () => {
-                if (import.meta.client) {
-                  sessionStorage.setItem('nova:checkout:items', JSON.stringify(ticketItems));
-                  sessionStorage.setItem('nova:checkout:total', String(ticketTotal));
-                }
-              }
-            "
+          <button
+            type="button"
+            class="block w-full text-center text-[11px] font-medium text-gray-400 hover:text-nova-primary"
+            @click="goToAdvancedCheckout"
           >
             Fiado, recargos, IGTF →
-          </NuxtLink>
+          </button>
 
           <!-- Confirm button -->
           <button
