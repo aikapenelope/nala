@@ -55,6 +55,7 @@ const categories = ref<Category[]>([]);
 const selectedCategory = ref<string | null>(null);
 const searchQuery = ref("");
 const isLoadingProducts = ref(true);
+const loadError = ref("");
 const recentlyAdded = ref<string | null>(null);
 
 onMounted(async () => {
@@ -65,12 +66,33 @@ onMounted(async () => {
     ]);
     categories.value = catResult.categories;
     gridProducts.value = prodResult.products;
-  } catch {
-    // Will show empty grid
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Error cargando productos";
+    loadError.value = message;
+    console.error("[POS] Failed to load products:", message);
   } finally {
     isLoadingProducts.value = false;
   }
 });
+
+/** Retry loading products after an error. */
+async function retryLoadProducts() {
+  loadError.value = "";
+  isLoadingProducts.value = true;
+  try {
+    const [catResult, prodResult] = await Promise.all([
+      $api<{ categories: Category[] }>("/api/categories"),
+      $api<{ products: GridProduct[] }>("/api/products?limit=200"),
+    ]);
+    categories.value = catResult.categories;
+    gridProducts.value = prodResult.products;
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Error cargando productos";
+    loadError.value = message;
+  } finally {
+    isLoadingProducts.value = false;
+  }
+}
 
 const filteredProducts = computed(() => {
   let result = gridProducts.value;
@@ -404,6 +426,23 @@ function goToAdvancedCheckout() {
           class="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2 border-gray-200 border-t-nova-primary"
         />
         Cargando productos...
+      </div>
+
+      <!-- Error loading products -->
+      <div
+        v-else-if="loadError"
+        class="card-premium py-12 text-center"
+      >
+        <p class="text-sm font-semibold text-red-500">{{ loadError }}</p>
+        <button
+          class="mt-3 text-xs font-bold text-nova-primary underline"
+          @click="retryLoadProducts"
+        >
+          Reintentar
+        </button>
+        <p class="mt-2 text-xs text-gray-400">
+          Usa el boton <span class="font-bold text-green-600">$ Rapida</span> para registrar una venta sin producto
+        </p>
       </div>
 
       <!-- Empty -->

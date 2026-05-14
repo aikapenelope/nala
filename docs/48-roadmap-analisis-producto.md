@@ -207,6 +207,77 @@ Es un feature que no funciona bien y que Treinta misma reconoce que esta en reco
 
 ---
 
+## Que hace Nova por detras (y por que ya es mas complejo que Treinta)
+
+Nova parece simple por fuera pero por detras hace mucho mas que Treinta. Esto es lo que pasa automaticamente cuando registras una venta:
+
+### Al confirmar una venta (POST /api/sales)
+
+1. **Valida stock** — verifica que cada producto tiene suficiente inventario
+2. **Descuenta stock** — resta la cantidad vendida de cada producto
+3. **Registra movimiento de stock** — crea un registro en `stock_movements` con tipo "sale" para auditoria
+4. **Calcula costo** — suma el costo de los productos vendidos para calcular ganancia
+5. **Aplica tasa BCV** — convierte el total a bolivares automaticamente
+6. **Registra pagos** — soporta pagos divididos (parte efectivo, parte pago movil)
+7. **Si es fiado** — crea cuenta por cobrar automatica, actualiza balance del cliente, valida limite de credito
+8. **Genera asientos contables** — debito/credito automatico en el plan de cuentas
+9. **Registra actividad** — log de auditoria con quien hizo la venta y cuando
+10. **Todo en transaccion atomica** — si algo falla, nada se guarda (no queda data inconsistente)
+
+### Al anular una venta (POST /api/sales/:id/void)
+
+1. **Restaura stock** de cada producto
+2. **Revierte cuenta por cobrar** si era fiado
+3. **Revierte balance del cliente**
+4. **Revierte asientos contables**
+5. **Registra movimiento de stock** tipo "void"
+6. **Requiere razon** obligatoria
+
+### Al hacer devolucion parcial (POST /api/sales/:id/return)
+
+1. **Restaura stock** solo de los items devueltos
+2. **Calcula reembolso** proporcional
+3. **Registra movimiento** tipo "credit_note"
+
+### Reportes automaticos
+
+- **Ventas del dia** con ganancia, costo, margen
+- **Top productos** por cantidad y por ingreso
+- **Ventas por metodo de pago** (donut chart)
+- **Ventas por canal** (POS, WhatsApp, delivery, online)
+- **Prediccion de agotamiento** por producto (dias restantes basado en velocidad de venta)
+- **Semaforo de stock** (verde/amarillo/rojo/gris) calculado en tiempo real
+- **Export a Excel** de reportes e inventario
+
+### Lo que Treinta NO hace
+
+| Feature | Nova | Treinta |
+|---------|------|---------|
+| Transaccion atomica (rollback si falla) | Si | No |
+| Asientos contables automaticos | Si | No |
+| Prediccion de agotamiento | Si | No |
+| Devolucion parcial | Si | No |
+| Validacion de limite de credito | Si | No |
+| Movimientos de stock auditables | Si | No |
+| Tasa BCV automatica | Si | No |
+| IGTF automatico | Si | No |
+| OCR de facturas | Si | No |
+| Storefront PWA con checkout | Si | Catalogo basico (roto) |
+| Multi-imagen con carousel | Si | 1 foto |
+| Subdominio por tenant | Si | No |
+
+### Conclusion
+
+Nova ya es significativamente mas complejo que Treinta en el backend. Lo que falta no es complejidad — es **pulir la experiencia de usuario** para que toda esa complejidad sea invisible. El usuario deberia sentir que es tan simple como Treinta, pero con superpoderes por detras.
+
+Las cosas que mas impacto tendrian:
+1. **Mostrar errores en vez de pantallas vacias** (fix en este PR)
+2. **Tutorial de primer uso** en el POS
+3. **Boton compartir catalogo** por WhatsApp
+4. **App en Play Store** (TWA wrapper)
+
+---
+
 ## Orden de ejecucion recomendado
 
 ```
