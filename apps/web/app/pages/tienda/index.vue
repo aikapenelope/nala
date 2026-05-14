@@ -221,7 +221,7 @@ onMounted(() => {
       <!-- Store info banner -->
       <div
         v-if="storeInfo && (storeInfo.welcomeMessage || todayHours || storeInfo.deliveryEnabled || paymentLabels)"
-        class="mb-4 space-y-2 rounded-2xl border border-gray-100 bg-white p-4 dark:border-gray-800 dark:bg-gray-900"
+        class="mb-4 space-y-2 rounded-2xl border border-white/60 bg-white/70 p-4 backdrop-blur-md dark:border-gray-800/60 dark:bg-gray-900/70"
       >
         <!-- Welcome message -->
         <p v-if="storeInfo.welcomeMessage" class="text-sm text-gray-700 dark:text-gray-300">
@@ -279,7 +279,7 @@ onMounted(() => {
           v-model="searchQuery"
           type="text"
           placeholder="Buscar productos..."
-          class="w-full rounded-xl border border-gray-200 bg-white py-2.5 pl-9 pr-4 text-sm text-gray-900 outline-none transition-colors placeholder:text-gray-400 focus:border-gray-400 focus:ring-2 focus:ring-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:placeholder:text-gray-500 dark:focus:border-gray-600 dark:focus:ring-gray-700"
+          class="w-full rounded-2xl border border-white/60 bg-white/70 py-2.5 pl-9 pr-4 text-sm text-gray-900 shadow-sm outline-none backdrop-blur-md transition-all placeholder:text-gray-400 focus:border-gray-300 focus:ring-2 focus:ring-gray-200/50 dark:border-gray-700/60 dark:bg-gray-800/70 dark:text-white dark:placeholder:text-gray-500 dark:focus:border-gray-600 dark:focus:ring-gray-700/50"
         >
       </div>
 
@@ -290,11 +290,11 @@ onMounted(() => {
       >
         <div class="flex gap-2">
           <button
-            class="flex-shrink-0 rounded-full px-4 py-1.5 text-sm font-medium transition-colors"
+            class="flex-shrink-0 rounded-full px-4 py-1.5 text-sm font-semibold transition-all"
             :class="
               selectedCategory === null
-                ? 'bg-gray-900 text-white'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                ? 'bg-gray-900 text-white shadow-md dark:bg-white dark:text-gray-900'
+                : 'bg-white/70 text-gray-600 backdrop-blur-sm hover:bg-white dark:bg-gray-800/70 dark:text-gray-300 dark:hover:bg-gray-800'
             "
             @click="selectedCategory = null"
           >
@@ -303,11 +303,11 @@ onMounted(() => {
           <button
             v-for="cat in categories"
             :key="cat.id"
-            class="flex-shrink-0 rounded-full px-4 py-1.5 text-sm font-medium transition-colors"
+            class="flex-shrink-0 rounded-full px-4 py-1.5 text-sm font-semibold transition-all"
             :class="
               selectedCategory === cat.name
-                ? 'bg-gray-900 text-white'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                ? 'bg-gray-900 text-white shadow-md dark:bg-white dark:text-gray-900'
+                : 'bg-white/70 text-gray-600 backdrop-blur-sm hover:bg-white dark:bg-gray-800/70 dark:text-gray-300 dark:hover:bg-gray-800'
             "
             @click="selectedCategory = cat.name"
           >
@@ -338,7 +338,7 @@ onMounted(() => {
         <div
           v-for="product in filteredProducts"
           :key="product.id"
-          class="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900"
+          class="overflow-hidden rounded-2xl border border-white/60 bg-white/70 shadow-sm backdrop-blur-md transition-all hover:shadow-md hover:-translate-y-0.5 dark:border-gray-800/60 dark:bg-gray-900/70"
         >
           <!-- Product image carousel -->
           <div class="relative aspect-square bg-gray-50 overflow-hidden">
@@ -443,8 +443,8 @@ onMounted(() => {
               class="mt-2 w-full rounded-xl py-2 text-xs font-bold transition-all"
               :class="
                 addedProductId === product.id
-                  ? 'bg-green-500 text-white'
-                  : 'bg-gray-900 text-white hover:bg-gray-800 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-200'
+                  ? 'bg-green-500 text-white scale-95'
+                  : 'bg-gray-900 text-white shadow-sm hover:bg-gray-800 hover:shadow-md active:scale-95 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-200'
               "
               :disabled="addedProductId === product.id"
               @click="handleAddToCart(product)"
@@ -479,7 +479,7 @@ onMounted(() => {
       <NuxtLink
         v-if="itemCount > 0"
         to="/tienda/cart"
-        class="fixed bottom-6 left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 rounded-full bg-gray-900 px-6 py-3.5 text-sm font-bold text-white shadow-[0_8px_30px_rgba(0,0,0,0.3)] transition-transform hover:scale-105 dark:bg-white dark:text-gray-900 dark:shadow-[0_8px_30px_rgba(255,255,255,0.15)]"
+        class="fixed bottom-6 left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 rounded-full bg-gray-900 px-6 py-3.5 text-sm font-bold text-white shadow-[0_8px_30px_rgba(0,0,0,0.25)] transition-all hover:scale-105 hover:shadow-[0_12px_40px_rgba(0,0,0,0.3)] dark:bg-white dark:text-gray-900 dark:shadow-[0_8px_30px_rgba(255,255,255,0.1)]"
       >
         <div class="flex items-center gap-2">
           <svg
