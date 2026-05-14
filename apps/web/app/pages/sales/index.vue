@@ -18,7 +18,7 @@
 
 import { calculateLineTotal, calculateSaleTotal } from "@nova/shared";
 import type { PaymentMethod } from "@nova/shared";
-import { ShoppingCart, Minus, Plus, X, Search, PlusCircle, DollarSign, Check, MessageCircle } from "lucide-vue-next";
+import { ShoppingCart, Minus, Plus, X, Search, PlusCircle, DollarSign, Check } from "lucide-vue-next";
 
 const { isDesktop } = useDevice();
 const { $api, apiBase } = useApi();
