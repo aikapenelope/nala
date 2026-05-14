@@ -1201,7 +1201,25 @@ reports.get("/reports/customer-stats/:id", validateUuidParam, async (c) => {
     .groupBy(sql`TO_CHAR(${sales.createdAt}, 'YYYY-MM')`)
     .orderBy(sql`TO_CHAR(${sales.createdAt}, 'YYYY-MM')`);
 
+  // Build response matching the frontend CustomerStats interface.
+  const totalRevenue = Number(customer.totalSpentUsd);
+  const totalSalesCount = customer.totalPurchases;
+  const averageTicket = Number(customer.averageTicketUsd);
+
   return c.json({
+    totalSales: totalSalesCount,
+    totalRevenue,
+    averageTicket,
+    topProducts: topProducts.map((p) => ({
+      name: p.name,
+      quantity: p.totalQty,
+      total: p.totalSpent,
+    })),
+    monthlyTrend: spendingTrend.map((s) => ({
+      month: s.month,
+      revenue: s.total,
+      count: s.count,
+    })),
     customer: {
       id: customer.id,
       name: customer.name,
@@ -1212,8 +1230,6 @@ reports.get("/reports/customer-stats/:id", validateUuidParam, async (c) => {
       lastPurchaseAt: customer.lastPurchaseAt,
     },
     recentSales,
-    topProducts,
-    spendingTrend,
   });
 });
 
