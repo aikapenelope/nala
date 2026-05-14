@@ -141,11 +141,23 @@ const isSubmitting = ref(false);
 const isLoadingProduct = ref(false);
 const error = ref("");
 
-/** Product image state. */
-const imageUrl = ref<string | null>(null);
+/** Product image gallery state. */
+interface ProductImage {
+  id: string;
+  url: string;
+  sortOrder: number;
+  altText: string | null;
+}
+const imageGallery = ref<ProductImage[]>([]);
 const isUploadingImage = ref(false);
 const pendingImageFile = ref<File | null>(null);
 const pendingImagePreview = ref<string | null>(null);
+
+/** Maximum images per product (must match backend). */
+const MAX_IMAGES = 5;
+
+/** Whether we can add more images. */
+const canAddImage = computed(() => imageGallery.value.length < MAX_IMAGES);
 
 /** Handle image selection. For editing: upload immediately. For creating: store for later. */
 function handleImageSelect(event: Event) {
@@ -167,6 +179,9 @@ function handleImageSelect(event: Event) {
     // Store for upload after product creation
     pendingImageFile.value = file;
   }
+
+  // Reset input so the same file can be selected again
+  input.value = "";
 }
 
 /** Upload image to the server. */
@@ -176,16 +191,45 @@ async function uploadImage(file: File, targetProductId: string) {
     const formData = new FormData();
     formData.append("image", file);
 
-    const result = await $api<{ imageUrl: string }>(
+    const result = await $api<{
+      image: { id: string; storageKey: string; sortOrder: number; url: string };
+      imageUrl: string;
+    }>(
       `/api/products/${targetProductId}/image`,
       { method: "POST", body: formData },
     );
-    imageUrl.value = result.imageUrl;
+
+    // Add to gallery
+    imageGallery.value.push({
+      id: result.image.id,
+      url: result.image.url,
+      sortOrder: result.image.sortOrder,
+      altText: null,
+    });
+
     pendingImageFile.value = null;
+    pendingImagePreview.value = null;
   } catch {
     // Non-critical: product saved, image failed
   } finally {
     isUploadingImage.value = false;
+  }
+}
+
+/** Delete an image from the gallery. */
+async function deleteImage(imageId: string) {
+  if (!productId.value) return;
+  try {
+    await $api(`/api/products/${productId.value}/images/${imageId}`, {
+      method: "DELETE",
+    });
+    imageGallery.value = imageGallery.value.filter((img) => img.id !== imageId);
+    // Re-number sort orders locally
+    imageGallery.value.forEach((img, i) => {
+      img.sortOrder = i;
+    });
+  } catch {
+    // Non-critical
   }
 }
 
@@ -225,6 +269,12 @@ onMounted(async () => {
           location: string | null;
           expiresAt: string | null;
           imageUrl: string | null;
+          images: Array<{
+            id: string;
+            url: string;
+            sortOrder: number;
+            altText: string | null;
+          }>;
         };
         variants: Array<{
           id: string;
@@ -254,7 +304,14 @@ onMounted(async () => {
       form.brand = p.brand ?? "";
       form.location = p.location ?? "";
       form.expiresAt = p.expiresAt ? (p.expiresAt.split("T")[0] ?? "") : "";
-      imageUrl.value = p.imageUrl;
+
+      // Load image gallery
+      imageGallery.value = (p.images ?? []).map((img) => ({
+        id: img.id,
+        url: img.url,
+        sortOrder: img.sortOrder,
+        altText: img.altText,
+      }));
 
       if (result.variants.length > 0) {
         variants.value = result.variants.map((v) => ({
@@ -385,44 +442,73 @@ async function submitForm() {
       <!-- ============================================================ -->
       <div class="rounded-xl bg-white p-5 shadow-sm">
         <div class="space-y-4">
-          <!-- Product image -->
-          <div class="flex items-center gap-4">
-            <div class="relative flex-shrink-0">
-              <img
-                v-if="pendingImagePreview"
-                :src="pendingImagePreview"
-                alt="Producto"
-                class="h-16 w-16 rounded-xl object-cover"
-              >
-              <img
-                v-else-if="imageUrl"
-                :src="resolveImageUrl(imageUrl)"
-                alt="Producto"
-                class="h-16 w-16 rounded-xl object-cover"
-              >
+          <!-- Product image gallery -->
+          <div>
+            <div class="flex flex-wrap gap-3">
+              <!-- Existing images -->
               <div
-                v-else
-                class="flex h-16 w-16 items-center justify-center rounded-xl bg-gray-100 text-2xl text-gray-300"
+                v-for="img in imageGallery"
+                :key="img.id"
+                class="group relative"
               >
-                📷
+                <img
+                  :src="resolveImageUrl(img.url)"
+                  :alt="img.altText ?? 'Producto'"
+                  class="h-16 w-16 rounded-xl object-cover"
+                >
+                <!-- Primary badge -->
+                <span
+                  v-if="img.sortOrder === 0"
+                  class="absolute -left-1 -top-1 rounded-full bg-nova-primary px-1.5 py-0.5 text-[8px] font-bold text-white"
+                >
+                  1ra
+                </span>
+                <!-- Delete button (visible on hover) -->
+                <button
+                  v-if="isEditing"
+                  type="button"
+                  class="absolute -right-1.5 -top-1.5 hidden h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white shadow-sm group-hover:flex"
+                  title="Eliminar imagen"
+                  @click="deleteImage(img.id)"
+                >
+                  x
+                </button>
               </div>
-              <div
-                v-if="isUploadingImage"
-                class="absolute inset-0 flex items-center justify-center rounded-xl bg-white/80"
+
+              <!-- Pending preview (for new products) -->
+              <div v-if="pendingImagePreview" class="relative">
+                <img
+                  :src="pendingImagePreview"
+                  alt="Preview"
+                  class="h-16 w-16 rounded-xl object-cover opacity-70"
+                >
+                <div
+                  v-if="isUploadingImage"
+                  class="absolute inset-0 flex items-center justify-center rounded-xl bg-white/80"
+                >
+                  <div class="h-5 w-5 animate-spin rounded-full border-2 border-nova-primary border-t-transparent" />
+                </div>
+              </div>
+
+              <!-- Add image button -->
+              <label
+                v-if="canAddImage"
+                class="flex h-16 w-16 cursor-pointer items-center justify-center rounded-xl border-2 border-dashed border-gray-300 text-gray-400 transition-colors hover:border-nova-primary hover:text-nova-primary"
+                :title="`Agregar foto (${imageGallery.length}/${MAX_IMAGES})`"
               >
-                <div class="h-5 w-5 animate-spin rounded-full border-2 border-nova-primary border-t-transparent" />
-              </div>
+                <span class="text-xl">+</span>
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  capture="environment"
+                  class="hidden"
+                  @change="handleImageSelect"
+                >
+              </label>
             </div>
-            <label class="cursor-pointer text-sm font-medium text-nova-primary hover:underline">
-              {{ imageUrl || pendingImagePreview ? "Cambiar foto" : "Agregar foto" }}
-              <input
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                capture="environment"
-                class="hidden"
-                @change="handleImageSelect"
-              >
-            </label>
+            <p class="mt-1.5 text-[11px] font-medium text-gray-400">
+              {{ imageGallery.length }}/{{ MAX_IMAGES }} fotos. La primera es la principal.
+            </p>
           </div>
 
           <div>
