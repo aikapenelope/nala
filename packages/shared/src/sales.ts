@@ -56,6 +56,25 @@ export const createSaleSchema = z.object({
   fiadoDueDate: z.string().optional(),
 });
 
+/**
+ * Quick sale schema — register a sale by amount only, no product required.
+ *
+ * For informal sales, services, or products not yet in inventory.
+ * Follows the Treinta philosophy: 2 taps to register a sale.
+ */
+export const quickSaleSchema = z.object({
+  /** Total amount in USD. */
+  amountUsd: z.number().min(0.01),
+  /** Payment method. */
+  method: paymentMethodSchema,
+  /** Optional description (e.g. "Corte de cabello", "Reparacion"). */
+  description: z.string().max(200).optional(),
+  /** Payment reference (for digital payments). */
+  reference: z.string().max(100).optional(),
+  /** Sale channel. */
+  channel: z.enum(SALE_CHANNELS).default("pos"),
+});
+
 /** Schema for voiding a sale (requires owner authorization). */
 export const voidSaleSchema = z.object({
   reason: z.string().min(1).max(500),

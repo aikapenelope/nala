@@ -21,6 +21,7 @@ import { z } from "zod";
 import { eq, and, sql, desc, gte, lte, inArray } from "drizzle-orm";
 import {
   createSaleSchema,
+  quickSaleSchema,
   voidSaleSchema,
   createQuotationSchema,
   calculateSaleTotal,
@@ -736,6 +737,88 @@ salesRoutes.post("/sales", zValidator("json", createSaleSchema), async (c) => {
 
   return c.json({ sale: result }, 201);
 });
+
+// ============================================================
+// Quick Sale (amount-only, no product required)
+// ============================================================
+
+/**
+ * POST /sales/quick - Register a sale by amount only.
+ *
+ * For informal sales, services, or products not in inventory.
+ * Creates a sale with no items — just a total and a payment.
+ * Stock is not affected. The sale appears in history and reports.
+ *
+ * This follows the Treinta philosophy: 2 taps to register a sale.
+ */
+salesRoutes.post(
+  "/sales/quick",
+  zValidator("json", quickSaleSchema),
+  async (c) => {
+    const data = c.req.valid("json");
+    const user = c.get("user");
+    const db = c.get("db");
+    const businessId = c.get("businessId");
+
+    // Get exchange rate (optional for quick sales — don't block if unavailable)
+    let rateBcv = 0;
+    try {
+      const rate = await getCurrentRate(businessId);
+      rateBcv = Number(rate.rateBcv);
+    } catch {
+      // No rate available — sale will be USD-only
+    }
+
+    const totalUsd = Math.round(data.amountUsd * 100) / 100;
+    const totalBs = rateBcv > 0 ? Math.round(totalUsd * rateBcv * 100) / 100 : null;
+
+    try {
+      const [sale] = await db
+        .insert(sales)
+        .values({
+          businessId,
+          userId: user.id,
+          totalUsd: String(totalUsd),
+          totalBs: totalBs !== null ? String(totalBs) : null,
+          exchangeRate: rateBcv > 0 ? String(rateBcv) : null,
+          channel: data.channel,
+          notes: data.description ?? null,
+          status: "completed",
+        })
+        .returning({ id: sales.id });
+
+      if (!sale) {
+        return c.json({ error: "Error creating sale" }, 500);
+      }
+
+      // Insert single payment
+      await db.insert(salePayments).values({
+        saleId: sale.id,
+        businessId,
+        method: data.method,
+        amountUsd: String(totalUsd),
+        amountBs: totalBs !== null ? String(totalBs) : null,
+        exchangeRate: rateBcv > 0 ? String(rateBcv) : null,
+        reference: data.reference ?? null,
+      });
+
+      return c.json(
+        {
+          sale: {
+            id: sale.id,
+            totalUsd,
+            totalBs,
+            method: data.method,
+            channel: data.channel,
+          },
+        },
+        201,
+      );
+    } catch (err) {
+      return handleDbError(c, err, "Error registrando venta rapida");
+    }
+  },
+);
 
 /**
  * POST /sales/:id/void - Void a sale.
