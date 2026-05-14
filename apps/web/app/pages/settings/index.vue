@@ -25,7 +25,7 @@ import {
 } from "lucide-vue-next";
 
 const { $api } = useApi();
-const { user } = useNovaAuth();
+const { user, resolveUser } = useNovaAuth();
 const { toast } = useToast();
 
 // ============================================================
@@ -144,6 +144,9 @@ async function saveBusinessSettings() {
     originalEmail.value = accountantEmail.value;
     originalWhatsapp.value = whatsappNumber.value;
     toast("Configuracion guardada");
+    // Refresh cached user so businessSlug/businessName update across the app
+    // (e.g., the store page reads user.businessSlug to build the store URL).
+    await resolveUser();
   } catch (err) {
     const fetchError = err as { data?: { error?: string } };
     businessSaveError.value = fetchError.data?.error ?? "Error al guardar";

@@ -8,9 +8,19 @@
 
 definePageMeta({ layout: "storefront" });
 
+const config = useRuntimeConfig();
+const storefrontApiBase = config.public.apiBase as string;
+
 const { items, removeItem, updateQuantity, itemCount, subtotal, clear } =
   useCart();
 const { storeInfo, exchangeRate } = useStorefront();
+
+/** Resolve image URL: prepend API base for relative paths from the catalog API. */
+function resolveImageUrl(url: string | null): string | undefined {
+  if (!url) return undefined;
+  if (url.startsWith("http")) return url;
+  return `${storefrontApiBase}${url}`;
+}
 
 useStorefrontSeo({ title: "Carrito" });
 
@@ -102,7 +112,7 @@ const meetsMinimum = computed(() => {
           >
             <img
               v-if="item.imageUrl"
-              :src="item.imageUrl"
+              :src="resolveImageUrl(item.imageUrl)"
               :alt="item.name"
               class="h-full w-full object-cover"
             >
