@@ -278,36 +278,68 @@ onMounted(() => {
           :key="product.id"
           class="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900"
         >
-          <!-- Product image -->
-          <div class="relative aspect-square bg-gray-50">
-            <img
-              v-if="product.imageUrl"
-              :src="resolveImageUrl(product.imageUrl)"
-              :alt="product.name"
-              class="h-full w-full object-cover"
-              loading="lazy"
-            >
-            <div
-              v-else
-              class="flex h-full w-full items-center justify-center text-3xl text-gray-300"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="32"
-                height="32"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="1.5"
-                stroke-linecap="round"
-                stroke-linejoin="round"
+          <!-- Product image carousel -->
+          <div class="relative aspect-square bg-gray-50 overflow-hidden">
+            <!-- Multi-image carousel (swipe on mobile) -->
+            <template v-if="product.images && product.images.length > 1">
+              <div
+                class="flex h-full w-full snap-x snap-mandatory overflow-x-auto scrollbar-hide"
+                :data-product-id="product.id"
               >
-                <path d="m7.5 4.27 9 5.15" />
-                <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" />
-                <path d="m3.3 7 8.7 5 8.7-5" />
-                <path d="M12 22V12" />
-              </svg>
-            </div>
+                <div
+                  v-for="img in product.images"
+                  :key="img.id"
+                  class="h-full w-full flex-shrink-0 snap-center"
+                >
+                  <img
+                    :src="resolveImageUrl(img.url)"
+                    :alt="product.name"
+                    class="h-full w-full object-cover"
+                    :loading="img.sortOrder === 0 ? 'eager' : 'lazy'"
+                  >
+                </div>
+              </div>
+              <!-- Dot indicators -->
+              <div class="absolute bottom-2 left-1/2 flex -translate-x-1/2 gap-1">
+                <span
+                  v-for="(img, idx) in product.images"
+                  :key="img.id"
+                  class="h-1.5 w-1.5 rounded-full"
+                  :class="idx === 0 ? 'bg-gray-900/70' : 'bg-gray-900/25'"
+                />
+              </div>
+            </template>
+            <!-- Single image or fallback -->
+            <template v-else>
+              <img
+                v-if="product.imageUrl"
+                :src="resolveImageUrl(product.imageUrl)"
+                :alt="product.name"
+                class="h-full w-full object-cover"
+                loading="lazy"
+              >
+              <div
+                v-else
+                class="flex h-full w-full items-center justify-center text-3xl text-gray-300"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="32"
+                  height="32"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="m7.5 4.27 9 5.15" />
+                  <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" />
+                  <path d="m3.3 7 8.7 5 8.7-5" />
+                  <path d="M12 22V12" />
+                </svg>
+              </div>
+            </template>
 
             <!-- Out of stock badge -->
             <div

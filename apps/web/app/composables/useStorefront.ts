@@ -14,6 +14,7 @@ export interface StorefrontProduct {
   description: string | null;
   price: number;
   imageUrl: string | null;
+  images: Array<{ id: string; url: string; sortOrder: number }>;
   categoryName: string | null;
   available: boolean;
 }
