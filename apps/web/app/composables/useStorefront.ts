@@ -39,6 +39,16 @@ export interface PaymentMethodDetail {
   details: Record<string, string>;
 }
 
+export interface DayHours {
+  open: string;
+  close: string;
+}
+
+export type BusinessHours = Record<
+  "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun",
+  DayHours | null
+> | null;
+
 export interface StoreInfo {
   storeEnabled: boolean;
   paymentMethods: PaymentMethodDetail[];
@@ -47,6 +57,7 @@ export interface StoreInfo {
   deliveryZones: string | null;
   welcomeMessage: string | null;
   minOrderAmount: number;
+  businessHours: BusinessHours;
 }
 
 /** Page size for paginated catalog requests. */

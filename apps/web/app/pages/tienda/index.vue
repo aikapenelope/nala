@@ -30,6 +30,28 @@ const selectedCategory = ref<string | null>(null);
 const searchQuery = ref("");
 const addedProductId = ref<string | null>(null);
 
+/** Day keys matching JS getDay() (0=Sun, 1=Mon, ..., 6=Sat). */
+const dayKeys = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as const;
+
+/** Compute today's open/close status from storeInfo.businessHours. */
+const todayHours = computed(() => {
+  const hours = storeInfo.value?.businessHours;
+  if (!hours) return null;
+  const dayIdx = new Date().getDay();
+  const key = dayKeys[dayIdx] as keyof typeof hours;
+  if (!key) return null;
+  const day = hours[key];
+  if (!day) return { open: false, label: "Cerrado hoy" };
+  return { open: true, label: `Hoy: ${day.open} - ${day.close}` };
+});
+
+/** Payment method labels for display. */
+const paymentLabels = computed(() => {
+  const methods = storeInfo.value?.paymentMethods;
+  if (!methods || methods.length === 0) return null;
+  return methods.map((m) => m.label).join(", ");
+});
+
 /** Filtered products by category and search query. */
 const filteredProducts = computed(() => {
   let result = products.value;
@@ -194,6 +216,46 @@ onMounted(() => {
         <p v-if="business.address" class="mt-0.5 text-sm text-gray-500 dark:text-gray-400">
           {{ business.address }}
         </p>
+      </div>
+
+      <!-- Store info banner -->
+      <div
+        v-if="storeInfo && (storeInfo.welcomeMessage || todayHours || storeInfo.deliveryEnabled || paymentLabels)"
+        class="mb-4 space-y-2 rounded-2xl border border-gray-100 bg-white p-4 dark:border-gray-800 dark:bg-gray-900"
+      >
+        <!-- Welcome message -->
+        <p v-if="storeInfo.welcomeMessage" class="text-sm text-gray-700 dark:text-gray-300">
+          {{ storeInfo.welcomeMessage }}
+        </p>
+
+        <div class="flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-gray-500 dark:text-gray-400">
+          <!-- Business hours (today) -->
+          <span v-if="todayHours" class="flex items-center gap-1">
+            <span
+              class="inline-block h-1.5 w-1.5 rounded-full"
+              :class="todayHours.open ? 'bg-green-500' : 'bg-red-400'"
+            />
+            {{ todayHours.label }}
+          </span>
+
+          <!-- Delivery -->
+          <span v-if="storeInfo.deliveryEnabled" class="flex items-center gap-1">
+            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"/><path d="M15 18H9"/><path d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.624l-3.48-4.35A1 1 0 0 0 17.52 8H14"/><circle cx="17" cy="18" r="2"/><circle cx="7" cy="18" r="2"/></svg>
+            Delivery {{ storeInfo.deliveryFee > 0 ? `$${storeInfo.deliveryFee.toFixed(2)}` : "gratis" }}
+            <span v-if="storeInfo.deliveryZones" class="text-gray-400">· {{ storeInfo.deliveryZones }}</span>
+          </span>
+
+          <!-- Accepted payment methods -->
+          <span v-if="paymentLabels" class="flex items-center gap-1">
+            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>
+            {{ paymentLabels }}
+          </span>
+
+          <!-- Minimum order -->
+          <span v-if="storeInfo.minOrderAmount > 0" class="flex items-center gap-1">
+            Pedido min. ${{ storeInfo.minOrderAmount.toFixed(2) }}
+          </span>
+        </div>
       </div>
 
       <!-- Search input -->

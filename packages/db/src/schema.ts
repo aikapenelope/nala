@@ -1224,6 +1224,13 @@ export const storeSettings = pgTable("store_settings", {
     .notNull()
     .default("0"),
 
+  /**
+   * Business hours as JSON object.
+   * Format: { "mon": { "open": "08:00", "close": "18:00" }, "tue": ..., "sun": null }
+   * null value for a day means closed. Keys: mon, tue, wed, thu, fri, sat, sun.
+   */
+  businessHours: jsonb("business_hours"),
+
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

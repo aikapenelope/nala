@@ -30,6 +30,8 @@ import {
   Clock,
 } from "lucide-vue-next";
 
+import type { BusinessHours, DayHours } from "~/composables/useStorefront";
+
 const { $api } = useApi();
 const { user } = useNovaAuth();
 const { toast } = useToast();
@@ -48,6 +50,39 @@ const deliveryFee = ref("0");
 const deliveryZones = ref("");
 const welcomeMessage = ref("");
 const minOrderAmount = ref("0");
+
+// Business hours state
+type DayKey = "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun";
+
+const dayLabels: Array<{ key: DayKey; label: string }> = [
+  { key: "mon", label: "Lunes" },
+  { key: "tue", label: "Martes" },
+  { key: "wed", label: "Miercoles" },
+  { key: "thu", label: "Jueves" },
+  { key: "fri", label: "Viernes" },
+  { key: "sat", label: "Sabado" },
+  { key: "sun", label: "Domingo" },
+];
+
+const businessHours = ref<Record<DayKey, DayHours | null>>({
+  mon: { open: "08:00", close: "18:00" },
+  tue: { open: "08:00", close: "18:00" },
+  wed: { open: "08:00", close: "18:00" },
+  thu: { open: "08:00", close: "18:00" },
+  fri: { open: "08:00", close: "18:00" },
+  sat: { open: "08:00", close: "13:00" },
+  sun: null,
+});
+const hoursEnabled = ref(false);
+
+/** Toggle a day open/closed. */
+function toggleDay(day: DayKey) {
+  if (businessHours.value[day]) {
+    businessHours.value[day] = null;
+  } else {
+    businessHours.value[day] = { open: "08:00", close: "18:00" };
+  }
+}
 
 // UI state
 const isLoading = ref(true);
@@ -101,6 +136,7 @@ async function fetchSettings() {
         deliveryZones: string | null;
         welcomeMessage: string | null;
         minOrderAmount: number;
+        businessHours: BusinessHours;
       };
     }>("/api/store-settings");
 
@@ -111,6 +147,10 @@ async function fetchSettings() {
     deliveryZones.value = result.settings.deliveryZones ?? "";
     welcomeMessage.value = result.settings.welcomeMessage ?? "";
     minOrderAmount.value = String(result.settings.minOrderAmount);
+    if (result.settings.businessHours) {
+      hoursEnabled.value = true;
+      businessHours.value = result.settings.businessHours;
+    }
     showSetup.value = !result.settings.storeEnabled && result.settings.paymentMethods.length === 0;
   } catch {
     // API failed - show setup wizard instead of error
@@ -134,6 +174,7 @@ async function saveSettings() {
         deliveryZones: deliveryZones.value || null,
         welcomeMessage: welcomeMessage.value || null,
         minOrderAmount: Number(minOrderAmount.value) || 0,
+        businessHours: hoursEnabled.value ? businessHours.value : null,
       },
     });
     showSetup.value = false;
@@ -487,6 +528,59 @@ onMounted(() => {
             <div>
               <label class="mb-1 block text-xs font-medium text-gray-600">Zonas</label>
               <input v-model="deliveryZones" type="text" placeholder="Centro, Norte, Sur..." class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-nova-primary focus:outline-none">
+            </div>
+          </div>
+        </div>
+
+        <!-- Business hours -->
+        <div class="card-premium p-5">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <div class="flex h-9 w-9 items-center justify-center rounded-lg" :class="hoursEnabled ? 'bg-amber-50' : 'bg-gray-100'">
+                <Clock :size="18" :class="hoursEnabled ? 'text-amber-600' : 'text-gray-400'" />
+              </div>
+              <div>
+                <p class="text-sm font-bold text-gray-900">Horario de atencion</p>
+                <p class="text-xs text-gray-500">Visible en tu tienda online</p>
+              </div>
+            </div>
+            <button
+              class="relative h-6 w-11 rounded-full transition-colors"
+              :class="hoursEnabled ? 'bg-green-500' : 'bg-gray-300'"
+              @click="hoursEnabled = !hoursEnabled"
+            >
+              <span class="absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform" :class="hoursEnabled ? 'left-[22px]' : 'left-0.5'" />
+            </button>
+          </div>
+          <div v-if="hoursEnabled" class="mt-3 space-y-2">
+            <div
+              v-for="day in dayLabels"
+              :key="day.key"
+              class="flex items-center gap-3 rounded-lg px-2 py-1.5"
+            >
+              <button
+                class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md text-[10px] font-bold transition-colors"
+                :class="businessHours[day.key] ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-400'"
+                :title="businessHours[day.key] ? 'Marcar como cerrado' : 'Marcar como abierto'"
+                @click="toggleDay(day.key)"
+              >
+                {{ businessHours[day.key] ? "A" : "C" }}
+              </button>
+              <span class="w-20 text-sm font-medium text-gray-700">{{ day.label }}</span>
+              <template v-if="businessHours[day.key]">
+                <input
+                  v-model="businessHours[day.key]!.open"
+                  type="time"
+                  class="rounded-lg border border-gray-300 px-2 py-1.5 text-xs focus:border-nova-primary focus:outline-none"
+                >
+                <span class="text-xs text-gray-400">a</span>
+                <input
+                  v-model="businessHours[day.key]!.close"
+                  type="time"
+                  class="rounded-lg border border-gray-300 px-2 py-1.5 text-xs focus:border-nova-primary focus:outline-none"
+                >
+              </template>
+              <span v-else class="text-xs font-medium text-gray-400">Cerrado</span>
             </div>
           </div>
         </div>
