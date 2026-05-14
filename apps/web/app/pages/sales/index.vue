@@ -1,22 +1,28 @@
 <script setup lang="ts">
 /**
- * POS sales screen.
+ * POS sales screen — simplified flow.
  *
- * Design: Category tabs + product grid + active ticket.
+ * Two modes:
+ * 1. Product sale: tap product -> select payment -> confirm (one screen)
+ * 2. Quick sale: tap "$" -> enter amount -> select payment -> confirm
+ *
+ * Design: Category tabs + product grid + ticket with inline payment.
  * Mobile: product grid fills screen, ticket slides up from bottom.
- *
- * Flow: select category -> tap product -> adds to ticket -> "Cobrar $XX" -> checkout.
  *
  * Connected to:
  * - GET /api/categories (category tabs)
- * - GET /api/products?categoryId=&limit=100 (product grid)
+ * - GET /api/products?limit=200 (product grid)
+ * - POST /api/sales (product sale)
+ * - POST /api/sales/quick (quick sale)
  */
 
 import { calculateLineTotal, calculateSaleTotal } from "@nova/shared";
-import { ShoppingCart, Minus, Plus, X, Search, PlusCircle } from "lucide-vue-next";
+import type { PaymentMethod } from "@nova/shared";
+import { ShoppingCart, Minus, Plus, X, Search, PlusCircle, DollarSign, Check, MessageCircle } from "lucide-vue-next";
 
 const { isDesktop } = useDevice();
 const { $api, apiBase } = useApi();
+const { toast } = useToast();
 
 /** Resolve image URL: prepend API base for relative paths from the API. */
 function resolveImageUrl(url: string | null): string | undefined {
@@ -25,22 +31,10 @@ function resolveImageUrl(url: string | null): string | undefined {
   return `${apiBase}${url}`;
 }
 
-/** Active ticket items. */
-interface TicketItem {
-  id: string;
-  productId: string;
-  name: string;
-  quantity: number;
-  unitPrice: number;
-  discountPercent: number;
-  maxStock: number;
-}
+// ============================================================
+// Product grid state
+// ============================================================
 
-const ticketItems = ref<TicketItem[]>([]);
-const searchQuery = ref("");
-const isLoadingProducts = ref(true);
-
-/** Products from API for the grid. */
 interface GridProduct {
   id: string;
   name: string;
@@ -59,11 +53,10 @@ interface Category {
 const gridProducts = ref<GridProduct[]>([]);
 const categories = ref<Category[]>([]);
 const selectedCategory = ref<string | null>(null);
-
-/** Track recently added product for animation. */
+const searchQuery = ref("");
+const isLoadingProducts = ref(true);
 const recentlyAdded = ref<string | null>(null);
 
-/** Load categories and products on mount. */
 onMounted(async () => {
   try {
     const [catResult, prodResult] = await Promise.all([
@@ -79,13 +72,49 @@ onMounted(async () => {
   }
 });
 
-/** Add product to ticket or increment quantity if already there. */
+const filteredProducts = computed(() => {
+  let result = gridProducts.value;
+  if (selectedCategory.value) {
+    result = result.filter((p) => p.categoryId === selectedCategory.value);
+  }
+  if (searchQuery.value) {
+    const q = searchQuery.value.toLowerCase().trim();
+    result = result.filter(
+      (p) =>
+        p.name.toLowerCase().includes(q) ||
+        (p.barcode && p.barcode.toLowerCase() === q),
+    );
+  }
+  return result;
+});
+
+function autoAddScannedProduct() {
+  const match = filteredProducts.value[0];
+  if (filteredProducts.value.length === 1 && match) {
+    addToTicket(match);
+    searchQuery.value = "";
+  }
+}
+
+// ============================================================
+// Ticket state
+// ============================================================
+
+interface TicketItem {
+  id: string;
+  productId: string;
+  name: string;
+  quantity: number;
+  unitPrice: number;
+  discountPercent: number;
+  maxStock: number;
+}
+
+const ticketItems = ref<TicketItem[]>([]);
+
 function addToTicket(product: GridProduct) {
   if (product.stock <= 0) return;
-
-  const existing = ticketItems.value.find(
-    (item) => item.productId === product.id,
-  );
+  const existing = ticketItems.value.find((item) => item.productId === product.id);
   if (existing) {
     if (existing.quantity >= product.stock) return;
     existing.quantity++;
@@ -100,12 +129,8 @@ function addToTicket(product: GridProduct) {
       maxStock: product.stock,
     });
   }
-
-  // Trigger add animation
   recentlyAdded.value = product.id;
-  setTimeout(() => {
-    recentlyAdded.value = null;
-  }, 500);
+  setTimeout(() => { recentlyAdded.value = null; }, 500);
 }
 
 function removeFromTicket(itemId: string) {
@@ -121,11 +146,7 @@ function updateQuantity(itemId: string, delta: number) {
 }
 
 function lineTotal(item: TicketItem): number {
-  return calculateLineTotal(
-    item.quantity,
-    item.unitPrice,
-    item.discountPercent,
-  );
+  return calculateLineTotal(item.quantity, item.unitPrice, item.discountPercent);
 }
 
 const ticketTotal = computed(() => {
@@ -138,55 +159,121 @@ const ticketTotal = computed(() => {
   );
 });
 
-/** Filtered products based on search and category. */
-const filteredProducts = computed(() => {
-  let result = gridProducts.value;
+// ============================================================
+// Inline payment + confirm
+// ============================================================
 
-  // Filter by category
-  if (selectedCategory.value) {
-    result = result.filter((p) => p.categoryId === selectedCategory.value);
-  }
+const selectedMethod = ref<PaymentMethod | null>(null);
+const paymentReference = ref("");
+const isSubmitting = ref(false);
+const saleComplete = ref(false);
 
-  // Filter by search
-  if (searchQuery.value) {
-    const q = searchQuery.value.toLowerCase().trim();
-    result = result.filter(
-      (p) =>
-        p.name.toLowerCase().includes(q) ||
-        (p.barcode && p.barcode.toLowerCase() === q),
-    );
-  }
+const paymentMethods: Array<{ value: PaymentMethod; label: string; icon: string; needsRef: boolean }> = [
+  { value: "efectivo", label: "Efectivo", icon: "💵", needsRef: false },
+  { value: "pago_movil", label: "P. Movil", icon: "📱", needsRef: true },
+  { value: "binance", label: "Binance", icon: "🪙", needsRef: true },
+  { value: "zelle", label: "Zelle", icon: "💸", needsRef: true },
+  { value: "transferencia", label: "Transfer.", icon: "🏦", needsRef: true },
+];
 
-  return result;
+const needsReference = computed(() => {
+  if (!selectedMethod.value) return false;
+  return paymentMethods.find((m) => m.value === selectedMethod.value)?.needsRef ?? false;
 });
 
-/**
- * Auto-add scanned product to ticket.
- * Triggered by Enter key -- barcode guns send digits + Enter automatically.
- */
-function autoAddScannedProduct() {
-  const match = filteredProducts.value[0];
-  if (filteredProducts.value.length === 1 && match) {
-    addToTicket(match);
-    searchQuery.value = "";
+const canConfirm = computed(() => {
+  return ticketItems.value.length > 0 && selectedMethod.value !== null;
+});
+
+/** Confirm sale with products (POST /api/sales). */
+async function confirmSale() {
+  if (!canConfirm.value || !selectedMethod.value) return;
+  isSubmitting.value = true;
+
+  try {
+    await $api("/api/sales", {
+      method: "POST",
+      body: {
+        items: ticketItems.value.map((item) => ({
+          productId: item.productId,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          discountPercent: item.discountPercent,
+        })),
+        payments: [{
+          method: selectedMethod.value,
+          amountUsd: ticketTotal.value,
+          reference: paymentReference.value || undefined,
+        }],
+        discountPercent: 0,
+        discountAmount: 0,
+        channel: "pos",
+      },
+    });
+
+    saleComplete.value = true;
+    toast("Venta registrada", "success");
+  } catch (err) {
+    const fetchError = err as { data?: { error?: string } };
+    toast(fetchError.data?.error ?? "Error al registrar la venta", "error");
+  } finally {
+    isSubmitting.value = false;
   }
 }
 
-function goToCheckout() {
-  if (ticketItems.value.length === 0) return;
-
-  if (import.meta.client) {
-    sessionStorage.setItem(
-      "nova:checkout:items",
-      JSON.stringify(ticketItems.value),
-    );
-    sessionStorage.setItem("nova:checkout:total", String(ticketTotal.value));
-  }
-
-  navigateTo("/sales/checkout");
+/** Reset for next sale. */
+function newSale() {
+  ticketItems.value = [];
+  selectedMethod.value = null;
+  paymentReference.value = "";
+  saleComplete.value = false;
 }
 
-/** Quick product creation modal. */
+// ============================================================
+// Quick sale modal (amount-only, no product)
+// ============================================================
+
+const showQuickSale = ref(false);
+const quickAmount = ref<number | null>(null);
+const quickMethod = ref<PaymentMethod | null>(null);
+const quickDescription = ref("");
+const quickReference = ref("");
+const quickSubmitting = ref(false);
+
+async function submitQuickSale() {
+  if (!quickAmount.value || quickAmount.value <= 0 || !quickMethod.value) return;
+  quickSubmitting.value = true;
+
+  try {
+    await $api("/api/sales/quick", {
+      method: "POST",
+      body: {
+        amountUsd: quickAmount.value,
+        method: quickMethod.value,
+        description: quickDescription.value || undefined,
+        reference: quickReference.value || undefined,
+        channel: "pos",
+      },
+    });
+
+    toast(`Venta rapida $${quickAmount.value.toFixed(2)} registrada`, "success");
+    showQuickSale.value = false;
+    quickAmount.value = null;
+    quickMethod.value = null;
+    quickDescription.value = "";
+    quickReference.value = "";
+  } catch (err) {
+    const fetchError = err as { data?: { error?: string } };
+    toast(fetchError.data?.error ?? "Error al registrar venta", "error");
+  } finally {
+    quickSubmitting.value = false;
+  }
+}
+
+// ============================================================
+// Quick product creation modal
+// ============================================================
+
 const showQuickAdd = ref(false);
 const quickName = ref("");
 const quickPrice = ref<number | null>(null);
@@ -200,14 +287,9 @@ async function quickCreateProduct() {
       "/api/products",
       {
         method: "POST",
-        body: {
-          name: quickName.value.trim(),
-          price: quickPrice.value,
-          stock: 999,
-        },
+        body: { name: quickName.value.trim(), price: quickPrice.value, stock: 999 },
       },
     );
-    // Add to grid and ticket immediately
     const newProduct: GridProduct = {
       id: result.product.id,
       name: result.product.name,
@@ -237,7 +319,7 @@ async function quickCreateProduct() {
       <SharedContextualTip
         tip-id="pos"
         title="Punto de venta"
-        description="Selecciona una categoria, toca un producto para agregarlo al ticket, y presiona Cobrar cuando estes listo. Puedes escanear codigos de barras con la camara."
+        description="Toca un producto para agregarlo, selecciona como te pagan, y confirma. O usa Venta Rapida ($) para registrar solo el monto."
       />
 
       <!-- Search bar + quick actions -->
@@ -258,6 +340,15 @@ async function quickCreateProduct() {
           @scanned="(code: string) => (searchQuery = code)"
           @close="searchQuery = ''"
         />
+        <!-- Quick sale button -->
+        <button
+          class="flex items-center gap-1 rounded-2xl bg-green-600 px-3 py-2.5 text-xs font-bold text-white transition-spring hover:bg-green-700"
+          title="Venta rapida (solo monto)"
+          @click="showQuickSale = true"
+        >
+          <DollarSign :size="14" />
+          <span class="hidden sm:inline">Rapida</span>
+        </button>
         <button
           class="flex items-center gap-1 rounded-2xl bg-nova-primary px-3 py-2.5 text-xs font-bold text-white transition-spring hover:bg-nova-primary/90"
           title="Crear producto rapido"
@@ -315,6 +406,9 @@ async function quickCreateProduct() {
         <p class="text-sm font-medium text-gray-400">
           {{ searchQuery ? "Sin resultados" : "No hay productos registrados" }}
         </p>
+        <p class="mt-2 text-xs text-gray-400">
+          Usa el boton <span class="font-bold text-green-600">$ Rapida</span> para registrar una venta sin producto
+        </p>
       </div>
 
       <!-- Product grid -->
@@ -335,7 +429,6 @@ async function quickCreateProduct() {
           :disabled="product.stock <= 0"
           @click="addToTicket(product)"
         >
-          <!-- Product image or initial avatar -->
           <img
             v-if="product.imageUrl"
             :src="resolveImageUrl(product.imageUrl)"
@@ -366,94 +459,242 @@ async function quickCreateProduct() {
       </div>
     </div>
 
-    <!-- Ticket (right side on desktop, bottom sheet on mobile) -->
+    <!-- ============================================================ -->
+    <!-- Ticket + inline payment (right side desktop, bottom mobile) -->
+    <!-- ============================================================ -->
     <div
       v-if="ticketItems.length > 0 || isDesktop"
       class="glass-strong"
       :class="
         isDesktop
           ? 'w-80 flex flex-col rounded-3xl'
-          : 'fixed bottom-16 left-0 right-0 z-40 mx-2 mb-[env(safe-area-inset-bottom)] max-h-[50vh] flex flex-col rounded-t-3xl'
+          : 'fixed bottom-16 left-0 right-0 z-40 mx-2 mb-[env(safe-area-inset-bottom)] max-h-[60vh] flex flex-col rounded-t-3xl'
       "
     >
-      <div
-        class="flex items-center justify-between border-b border-white/50 px-4 py-3"
-      >
-        <div class="flex items-center gap-2">
-          <div
-            class="flex h-7 w-7 items-center justify-center rounded-lg bg-nova-primary/10"
+      <!-- Sale complete state -->
+      <div v-if="saleComplete" class="flex flex-col items-center justify-center p-6">
+        <div class="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-green-100">
+          <Check :size="24" class="text-green-600" />
+        </div>
+        <p class="text-lg font-extrabold text-gradient">Venta registrada</p>
+        <p class="mt-1 text-sm font-bold text-gray-500">${{ ticketTotal.toFixed(2) }}</p>
+        <div class="mt-4 flex w-full gap-2">
+          <button
+            class="dark-pill flex-1 rounded-2xl py-3 text-sm font-bold transition-spring"
+            @click="newSale"
           >
-            <ShoppingCart :size="14" class="text-nova-primary" />
-          </div>
-          <h2 class="text-sm font-bold text-gray-800">
-            Ticket ({{ ticketItems.length }})
-          </h2>
+            <ShoppingCart :size="14" class="mr-1 inline" />
+            Nueva venta
+          </button>
         </div>
       </div>
 
-      <!-- Items list -->
-      <div class="flex-1 overflow-y-auto px-4 py-2">
+      <!-- Active ticket -->
+      <template v-else>
         <div
-          v-for="item in ticketItems"
-          :key="item.id"
-          class="flex items-center justify-between rounded-2xl px-2 py-2.5 transition-spring hover:bg-white/60"
+          class="flex items-center justify-between border-b border-white/50 px-4 py-3"
         >
-          <div class="min-w-0 flex-1">
-            <p class="truncate text-[13px] font-semibold text-gray-800">
-              {{ item.name }}
-            </p>
-            <div class="mt-1 flex items-center gap-1.5">
+          <div class="flex items-center gap-2">
+            <div
+              class="flex h-7 w-7 items-center justify-center rounded-lg bg-nova-primary/10"
+            >
+              <ShoppingCart :size="14" class="text-nova-primary" />
+            </div>
+            <h2 class="text-sm font-bold text-gray-800">
+              Ticket ({{ ticketItems.length }})
+            </h2>
+          </div>
+        </div>
+
+        <!-- Items list -->
+        <div class="flex-1 overflow-y-auto px-4 py-2">
+          <div
+            v-for="item in ticketItems"
+            :key="item.id"
+            class="flex items-center justify-between rounded-2xl px-2 py-2.5 transition-spring hover:bg-white/60"
+          >
+            <div class="min-w-0 flex-1">
+              <p class="truncate text-[13px] font-semibold text-gray-800">
+                {{ item.name }}
+              </p>
+              <div class="mt-1 flex items-center gap-1.5">
+                <button
+                  class="flex h-6 w-6 items-center justify-center rounded-lg bg-gray-100/80 text-gray-500 transition-spring hover:bg-gray-200"
+                  @click="updateQuantity(item.id, -1)"
+                >
+                  <Minus :size="12" />
+                </button>
+                <span
+                  class="min-w-[20px] text-center text-xs font-bold text-gray-700"
+                  >{{ item.quantity }}</span
+                >
+                <button
+                  class="flex h-6 w-6 items-center justify-center rounded-lg bg-gray-100/80 text-gray-500 transition-spring hover:bg-gray-200"
+                  @click="updateQuantity(item.id, 1)"
+                >
+                  <Plus :size="12" />
+                </button>
+              </div>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-sm font-bold text-gray-800">
+                ${{ lineTotal(item).toFixed(2) }}
+              </span>
               <button
-                class="flex h-6 w-6 items-center justify-center rounded-lg bg-gray-100/80 text-gray-500 transition-spring hover:bg-gray-200"
-                @click="updateQuantity(item.id, -1)"
+                class="flex h-6 w-6 items-center justify-center rounded-lg text-gray-300 transition-spring hover:bg-red-50 hover:text-red-500"
+                @click="removeFromTicket(item.id)"
               >
-                <Minus :size="12" />
-              </button>
-              <span
-                class="min-w-[20px] text-center text-xs font-bold text-gray-700"
-                >{{ item.quantity }}</span
-              >
-              <button
-                class="flex h-6 w-6 items-center justify-center rounded-lg bg-gray-100/80 text-gray-500 transition-spring hover:bg-gray-200"
-                @click="updateQuantity(item.id, 1)"
-              >
-                <Plus :size="12" />
+                <X :size="12" />
               </button>
             </div>
           </div>
-          <div class="flex items-center gap-2">
-            <span class="text-sm font-bold text-gray-800">
-              ${{ lineTotal(item).toFixed(2) }}
-            </span>
+
+          <p
+            v-if="ticketItems.length === 0"
+            class="py-8 text-center text-sm font-medium text-gray-400"
+          >
+            Toca un producto para agregar
+          </p>
+        </div>
+
+        <!-- Inline payment + confirm -->
+        <div v-if="ticketItems.length > 0" class="border-t border-white/50 p-4 space-y-3">
+          <!-- Total -->
+          <div class="text-center">
+            <span class="text-2xl font-extrabold text-gradient">${{ ticketTotal.toFixed(2) }}</span>
+          </div>
+
+          <!-- Payment method pills -->
+          <div class="flex flex-wrap gap-1.5 justify-center">
             <button
-              class="flex h-6 w-6 items-center justify-center rounded-lg text-gray-300 transition-spring hover:bg-red-50 hover:text-red-500"
-              @click="removeFromTicket(item.id)"
+              v-for="method in paymentMethods"
+              :key="method.value"
+              class="rounded-xl px-2.5 py-1.5 text-[11px] font-bold transition-spring"
+              :class="
+                selectedMethod === method.value
+                  ? 'bg-nova-primary text-white shadow-sm'
+                  : 'glass text-gray-600 hover:bg-white/80'
+              "
+              @click="selectedMethod = method.value"
             >
-              <X :size="12" />
+              {{ method.icon }} {{ method.label }}
+            </button>
+          </div>
+
+          <!-- Reference input (for digital payments) -->
+          <input
+            v-if="needsReference"
+            v-model="paymentReference"
+            type="text"
+            placeholder="Referencia de pago"
+            class="w-full rounded-xl border border-white/80 bg-white/40 px-3 py-2 text-xs font-medium text-gray-800 outline-none placeholder:text-gray-400 focus:bg-white focus:ring-2 focus:ring-nova-accent/20"
+          >
+
+          <!-- Advanced options link -->
+          <NuxtLink
+            to="/sales/checkout"
+            class="block text-center text-[11px] font-medium text-gray-400 hover:text-nova-primary"
+            @click="
+              () => {
+                if (import.meta.client) {
+                  sessionStorage.setItem('nova:checkout:items', JSON.stringify(ticketItems));
+                  sessionStorage.setItem('nova:checkout:total', String(ticketTotal));
+                }
+              }
+            "
+          >
+            Fiado, recargos, IGTF →
+          </NuxtLink>
+
+          <!-- Confirm button -->
+          <button
+            class="w-full rounded-2xl py-3.5 text-[15px] font-extrabold tracking-wide transition-spring disabled:opacity-50"
+            :class="canConfirm ? 'dark-pill' : 'bg-gray-200 text-gray-400'"
+            :disabled="!canConfirm || isSubmitting"
+            @click="confirmSale"
+          >
+            {{ isSubmitting ? "Registrando..." : "Confirmar venta" }}
+          </button>
+        </div>
+      </template>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- Quick sale modal -->
+    <!-- ============================================================ -->
+    <Teleport to="body">
+      <div
+        v-if="showQuickSale"
+        class="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm"
+        @click.self="showQuickSale = false"
+      >
+        <div class="glass-strong w-full max-w-sm rounded-t-[32px] sm:rounded-[32px] p-6 shadow-[0_30px_60px_-15px_rgba(0,0,0,0.2)]">
+          <h3 class="mb-4 text-lg font-extrabold text-gradient">Venta rapida</h3>
+          <div class="space-y-3">
+            <input
+              v-model.number="quickAmount"
+              type="number"
+              step="0.01"
+              min="0"
+              placeholder="Monto ($)"
+              autofocus
+              class="w-full rounded-2xl border border-white bg-white/60 px-4 py-3 text-center text-xl font-extrabold text-gray-800 outline-none transition-spring placeholder:text-gray-400 placeholder:text-base placeholder:font-medium focus:bg-white focus:ring-[3px] focus:ring-nova-accent/20"
+            >
+            <input
+              v-model="quickDescription"
+              type="text"
+              placeholder="Descripcion (opcional)"
+              class="w-full rounded-2xl border border-white bg-white/60 px-4 py-2.5 text-sm font-medium text-gray-800 outline-none transition-spring placeholder:text-gray-400 focus:bg-white focus:ring-[3px] focus:ring-nova-accent/20"
+            >
+
+            <!-- Payment methods -->
+            <div class="flex flex-wrap gap-1.5 justify-center">
+              <button
+                v-for="method in paymentMethods"
+                :key="method.value"
+                class="rounded-xl px-3 py-2 text-xs font-bold transition-spring"
+                :class="
+                  quickMethod === method.value
+                    ? 'bg-nova-primary text-white shadow-sm'
+                    : 'glass text-gray-600 hover:bg-white/80'
+                "
+                @click="quickMethod = method.value"
+              >
+                {{ method.icon }} {{ method.label }}
+              </button>
+            </div>
+
+            <!-- Reference (if needed) -->
+            <input
+              v-if="quickMethod && paymentMethods.find((m) => m.value === quickMethod)?.needsRef"
+              v-model="quickReference"
+              type="text"
+              placeholder="Referencia"
+              class="w-full rounded-2xl border border-white bg-white/60 px-4 py-2.5 text-sm font-medium text-gray-800 outline-none transition-spring placeholder:text-gray-400 focus:bg-white focus:ring-[3px] focus:ring-nova-accent/20"
+            >
+          </div>
+          <div class="mt-4 flex gap-3">
+            <button
+              class="glass flex-1 rounded-2xl py-3 text-sm font-bold text-gray-700 transition-spring"
+              @click="showQuickSale = false"
+            >
+              Cancelar
+            </button>
+            <button
+              class="dark-pill flex-1 rounded-2xl py-3 text-sm font-bold transition-spring disabled:opacity-50"
+              :disabled="!quickAmount || quickAmount <= 0 || !quickMethod || quickSubmitting"
+              @click="submitQuickSale"
+            >
+              {{ quickSubmitting ? "Registrando..." : `Registrar $${(quickAmount ?? 0).toFixed(2)}` }}
             </button>
           </div>
         </div>
-
-        <p
-          v-if="ticketItems.length === 0"
-          class="py-8 text-center text-sm font-medium text-gray-400"
-        >
-          Toca un producto para agregar
-        </p>
       </div>
+    </Teleport>
 
-      <!-- Checkout button -->
-      <div v-if="ticketItems.length > 0" class="border-t border-white/50 p-4">
-        <button
-          class="dark-pill block w-full rounded-2xl py-3.5 text-center text-[15px] font-extrabold tracking-wide transition-spring"
-          @click="goToCheckout"
-        >
-          Cobrar ${{ ticketTotal.toFixed(2) }}
-        </button>
-      </div>
-    </div>
-
+    <!-- ============================================================ -->
     <!-- Quick product creation modal -->
+    <!-- ============================================================ -->
     <Teleport to="body">
       <div
         v-if="showQuickAdd"
