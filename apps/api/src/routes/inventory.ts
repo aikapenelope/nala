@@ -31,6 +31,7 @@ import {
 import {
   products,
   productVariants,
+  productImages,
   categories,
   priceHistory,
   saleItems,
@@ -43,6 +44,7 @@ import { logActivity } from "../utils/audit";
 import { validateUuidParam } from "../middleware/validate-uuid";
 import {
   uploadProductImage,
+  deleteProductImage,
   isStorageConfigured,
 } from "../services/storage";
 import type { AppEnv } from "../types";
@@ -254,8 +256,29 @@ inventory.get("/products/:id", validateUuidParam, async (c) => {
     ? `/images/products/${id}`
     : null;
 
+  // Fetch image gallery for the product detail view
+  const imageGallery = await db
+    .select({
+      id: productImages.id,
+      sortOrder: productImages.sortOrder,
+      altText: productImages.altText,
+    })
+    .from(productImages)
+    .where(eq(productImages.productId, id))
+    .orderBy(productImages.sortOrder);
+
   return c.json({
-    product: { ...product, imageUrl: resolvedImageUrl, semaphore },
+    product: {
+      ...product,
+      imageUrl: resolvedImageUrl,
+      images: imageGallery.map((img) => ({
+        id: img.id,
+        url: `/images/products/${id}/${img.id}`,
+        sortOrder: img.sortOrder,
+        altText: img.altText,
+      })),
+      semaphore,
+    },
     variants,
   });
 });
@@ -796,15 +819,24 @@ inventory.post(
 );
 
 // ============================================================
-// Product Image Upload
+// Product Image Management (multi-image gallery, max 5 per product)
 // ============================================================
 
+/** Maximum images per product. */
+const MAX_IMAGES_PER_PRODUCT = 5;
+
 /**
- * POST /products/:id/image - Upload product image.
+ * POST /products/:id/image - Upload a product image.
  *
  * Accepts multipart/form-data with a single file field "image".
- * Max 5MB, only JPEG/PNG/WebP.
- * Stores in MinIO and updates the product's image_url.
+ * Max 5MB, only JPEG/PNG/WebP. Max 5 images per product.
+ *
+ * New images are appended to the gallery. The first image uploaded
+ * becomes the primary (sort_order=0). Subsequent images get the next
+ * available sort_order.
+ *
+ * Also updates products.image_url (denormalized cache of primary image)
+ * for backward compatibility with listing queries.
  */
 inventory.post("/products/:id/image", validateUuidParam, async (c) => {
   const productId = c.req.param("id");
@@ -822,9 +854,21 @@ inventory.post("/products/:id/image", validateUuidParam, async (c) => {
     return c.json({ error: "Producto no encontrado" }, 404);
   }
 
-  // Check storage availability
   if (!isStorageConfigured) {
     return c.json({ error: "Almacenamiento de archivos no configurado" }, 503);
+  }
+
+  // Check current image count
+  const existingImages = await db
+    .select({ id: productImages.id })
+    .from(productImages)
+    .where(eq(productImages.productId, productId));
+
+  if (existingImages.length >= MAX_IMAGES_PER_PRODUCT) {
+    return c.json(
+      { error: `Maximo ${MAX_IMAGES_PER_PRODUCT} imagenes por producto.` },
+      400,
+    );
   }
 
   // Parse multipart form data
@@ -835,12 +879,10 @@ inventory.post("/products/:id/image", validateUuidParam, async (c) => {
     return c.json({ error: "No se recibio imagen. Campo: image" }, 400);
   }
 
-  // Validate content type
   if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
     return c.json({ error: "Solo JPEG, PNG o WebP." }, 400);
   }
 
-  // Validate size (5MB max)
   if (file.size > 5 * 1024 * 1024) {
     return c.json({ error: "Imagen demasiado grande. Maximo 5MB." }, 400);
   }
@@ -848,22 +890,50 @@ inventory.post("/products/:id/image", validateUuidParam, async (c) => {
   const arrayBuffer = await file.arrayBuffer();
   const buffer = Buffer.from(arrayBuffer);
 
+  // Generate a unique image ID for the storage key
+  const imageId = crypto.randomUUID();
+  const sortOrder = existingImages.length; // 0 for first, 1+ for gallery
+
   try {
     const { key } = await uploadProductImage(
       businessId,
       productId,
+      imageId,
       buffer,
       file.type,
     );
 
-    // Store the stable key in DB (not the presigned URL which expires)
-    await db
-      .update(products)
-      .set({ imageUrl: key, updatedAt: new Date() })
-      .where(eq(products.id, productId));
+    // Create the product_images record
+    await db.insert(productImages).values({
+      id: imageId,
+      productId,
+      businessId,
+      storageKey: key,
+      sortOrder,
+    });
 
-    // Return the public proxy URL for immediate display in the frontend
-    return c.json({ imageUrl: `/images/products/${productId}` }, 201);
+    // Update the denormalized primary image cache on the product.
+    // If this is the first image (sort_order=0), set it as the primary.
+    if (sortOrder === 0) {
+      await db
+        .update(products)
+        .set({ imageUrl: key, updatedAt: new Date() })
+        .where(eq(products.id, productId));
+    }
+
+    return c.json(
+      {
+        image: {
+          id: imageId,
+          storageKey: key,
+          sortOrder,
+          url: `/images/products/${productId}/${imageId}`,
+        },
+        // Backward compatible: primary image proxy URL
+        imageUrl: `/images/products/${productId}`,
+      },
+      201,
+    );
   } catch (err) {
     const message =
       err instanceof Error ? err.message : "Error subiendo imagen";
@@ -871,5 +941,185 @@ inventory.post("/products/:id/image", validateUuidParam, async (c) => {
     return c.json({ error: message }, 500);
   }
 });
+
+/**
+ * GET /products/:id/images - List all images for a product.
+ *
+ * Returns images ordered by sort_order (0 = primary).
+ */
+inventory.get("/products/:id/images", validateUuidParam, async (c) => {
+  const productId = c.req.param("id");
+  const db = c.get("db");
+  const businessId = c.get("businessId");
+
+  const images = await db
+    .select({
+      id: productImages.id,
+      storageKey: productImages.storageKey,
+      sortOrder: productImages.sortOrder,
+      altText: productImages.altText,
+      createdAt: productImages.createdAt,
+    })
+    .from(productImages)
+    .where(
+      and(
+        eq(productImages.productId, productId),
+        eq(productImages.businessId, businessId),
+      ),
+    )
+    .orderBy(productImages.sortOrder);
+
+  return c.json({
+    images: images.map((img) => ({
+      ...img,
+      url: `/images/products/${productId}/${img.id}`,
+    })),
+  });
+});
+
+/**
+ * DELETE /products/:id/images/:imageId - Delete a product image.
+ *
+ * Removes the image from MinIO and the database.
+ * If the deleted image was the primary (sort_order=0), the next image
+ * is promoted to primary and products.image_url is updated.
+ */
+inventory.delete("/products/:id/images/:imageId", validateUuidParam, async (c) => {
+  const productId = c.req.param("id");
+  const imageId = c.req.param("imageId");
+  const db = c.get("db");
+  const businessId = c.get("businessId");
+
+  // Find the image to delete
+  const [image] = await db
+    .select()
+    .from(productImages)
+    .where(
+      and(
+        eq(productImages.id, imageId),
+        eq(productImages.productId, productId),
+        eq(productImages.businessId, businessId),
+      ),
+    )
+    .limit(1);
+
+  if (!image) {
+    return c.json({ error: "Imagen no encontrada" }, 404);
+  }
+
+  // Delete from MinIO (best-effort)
+  await deleteProductImage(image.storageKey);
+
+  // Delete from DB
+  await db.delete(productImages).where(eq(productImages.id, imageId));
+
+  // Re-number remaining images to keep sort_order contiguous
+  const remaining = await db
+    .select({ id: productImages.id, sortOrder: productImages.sortOrder })
+    .from(productImages)
+    .where(eq(productImages.productId, productId))
+    .orderBy(productImages.sortOrder);
+
+  for (let i = 0; i < remaining.length; i++) {
+    const img = remaining[i];
+    if (img && img.sortOrder !== i) {
+      await db
+        .update(productImages)
+        .set({ sortOrder: i })
+        .where(eq(productImages.id, img.id));
+    }
+  }
+
+  // Update the denormalized primary image on the product
+  if (remaining.length > 0) {
+    const newPrimary = remaining[0];
+    if (newPrimary) {
+      // Refetch to get the (possibly updated) storage key of the new primary
+      const [freshPrimary] = await db
+        .select({ storageKey: productImages.storageKey })
+        .from(productImages)
+        .where(eq(productImages.productId, productId))
+        .orderBy(productImages.sortOrder)
+        .limit(1);
+      await db
+        .update(products)
+        .set({
+          imageUrl: freshPrimary?.storageKey ?? null,
+          updatedAt: new Date(),
+        })
+        .where(eq(products.id, productId));
+    }
+  } else {
+    // No images left — clear the product's image_url
+    await db
+      .update(products)
+      .set({ imageUrl: null, updatedAt: new Date() })
+      .where(eq(products.id, productId));
+  }
+
+  return c.json({ success: true });
+});
+
+/**
+ * PATCH /products/:id/images/reorder - Reorder product images.
+ *
+ * Body: { imageIds: [uuid, uuid, ...] }
+ * The first ID becomes sort_order=0 (primary), second becomes 1, etc.
+ * Updates products.image_url to match the new primary.
+ */
+inventory.patch(
+  "/products/:id/images/reorder",
+  validateUuidParam,
+  zValidator(
+    "json",
+    z.object({
+      imageIds: z.array(z.string().uuid()).min(1).max(MAX_IMAGES_PER_PRODUCT),
+    }),
+  ),
+  async (c) => {
+    const productId = c.req.param("id");
+    const { imageIds } = c.req.valid("json");
+    const db = c.get("db");
+    const businessId = c.get("businessId");
+
+    // Verify all image IDs belong to this product
+    const existing = await db
+      .select({ id: productImages.id, storageKey: productImages.storageKey })
+      .from(productImages)
+      .where(
+        and(
+          eq(productImages.productId, productId),
+          eq(productImages.businessId, businessId),
+        ),
+      );
+
+    const existingIds = new Set(existing.map((img) => img.id));
+    for (const id of imageIds) {
+      if (!existingIds.has(id)) {
+        return c.json({ error: `Imagen ${id} no pertenece a este producto` }, 400);
+      }
+    }
+
+    // Update sort_order for each image
+    for (let i = 0; i < imageIds.length; i++) {
+      await db
+        .update(productImages)
+        .set({ sortOrder: i })
+        .where(eq(productImages.id, imageIds[i]!));
+    }
+
+    // Update the denormalized primary image
+    const newPrimaryId = imageIds[0];
+    const newPrimary = existing.find((img) => img.id === newPrimaryId);
+    if (newPrimary) {
+      await db
+        .update(products)
+        .set({ imageUrl: newPrimary.storageKey, updatedAt: new Date() })
+        .where(eq(products.id, productId));
+    }
+
+    return c.json({ success: true });
+  },
+);
 
 export { inventory };

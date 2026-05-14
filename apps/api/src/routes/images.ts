@@ -6,12 +6,15 @@
  * to load them directly (browsers don't send Authorization headers for
  * image requests).
  *
- * GET /images/products/:id - Serve a product image from MinIO
+ * Routes:
+ * GET /images/products/:productId           - Primary image (sort_order=0)
+ * GET /images/products/:productId/:imageId  - Specific image by ID
  */
 
 import { Hono } from "hono";
-import { eq } from "drizzle-orm";
-import { products } from "@nova/db";
+import type { Context } from "hono";
+import { eq, and } from "drizzle-orm";
+import { products, productImages } from "@nova/db";
 import { tryGetDb } from "../db";
 import {
   getProductImageStream,
@@ -20,47 +23,16 @@ import {
 
 export const images = new Hono();
 
+/** Validate UUID format. */
+const UUID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 /**
- * GET /images/products/:id - Serve product image via API proxy.
- *
- * Public endpoint. MinIO is on a private network, so this proxies the
- * image bytes to the browser with proper caching headers.
- *
- * Security: product images are public data (shown in storefront).
- * The endpoint only serves images for active products that exist in the DB.
+ * Stream an image from MinIO to the browser with caching headers.
+ * Shared by both the primary and specific image endpoints.
  */
-images.get("/products/:id", async (c) => {
-  const productId = c.req.param("id");
-
-  // Validate UUID format
-  const uuidRegex =
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-  if (!uuidRegex.test(productId)) {
-    return c.json({ error: "Invalid product ID" }, 400);
-  }
-
-  if (!isStorageConfigured) {
-    return c.json({ error: "Storage not configured" }, 503);
-  }
-
-  const db = tryGetDb();
-  if (!db) {
-    return c.json({ error: "Service unavailable" }, 503);
-  }
-
-  // Fetch product image key by ID.
-  // No tenant context needed — product images are public (same as storefront catalog).
-  const [product] = await db
-    .select({ imageUrl: products.imageUrl, isActive: products.isActive })
-    .from(products)
-    .where(eq(products.id, productId))
-    .limit(1);
-
-  if (!product?.imageUrl || !product.isActive) {
-    return c.json({ error: "Image not found" }, 404);
-  }
-
-  const result = await getProductImageStream(product.imageUrl);
+async function streamImage(c: Context, storageKey: string) {
+  const result = await getProductImageStream(storageKey);
   if (!result) {
     return c.json({ error: "Image not found in storage" }, 404);
   }
@@ -78,4 +50,97 @@ images.get("/products/:id", async (c) => {
   c.header("Cache-Control", "public, max-age=3600, must-revalidate");
 
   return c.body(result.body);
+}
+
+/**
+ * GET /images/products/:productId - Serve the primary product image.
+ *
+ * Backward compatible: uses products.image_url (denormalized cache).
+ * Falls back to the first image in product_images if image_url is empty.
+ */
+images.get("/products/:productId", async (c) => {
+  const productId = c.req.param("productId");
+
+  if (!UUID_REGEX.test(productId)) {
+    return c.json({ error: "Invalid product ID" }, 400);
+  }
+
+  if (!isStorageConfigured) {
+    return c.json({ error: "Storage not configured" }, 503);
+  }
+
+  const db = tryGetDb();
+  if (!db) {
+    return c.json({ error: "Service unavailable" }, 503);
+  }
+
+  // Fast path: use the denormalized image_url on the product
+  const [product] = await db
+    .select({ imageUrl: products.imageUrl, isActive: products.isActive })
+    .from(products)
+    .where(eq(products.id, productId))
+    .limit(1);
+
+  if (!product?.isActive) {
+    return c.json({ error: "Product not found" }, 404);
+  }
+
+  // Try denormalized cache first, then fall back to product_images table
+  let storageKey = product.imageUrl;
+  if (!storageKey) {
+    const [primaryImage] = await db
+      .select({ storageKey: productImages.storageKey })
+      .from(productImages)
+      .where(eq(productImages.productId, productId))
+      .orderBy(productImages.sortOrder)
+      .limit(1);
+    storageKey = primaryImage?.storageKey ?? null;
+  }
+
+  if (!storageKey) {
+    return c.json({ error: "No image" }, 404);
+  }
+
+  return streamImage(c, storageKey);
+});
+
+/**
+ * GET /images/products/:productId/:imageId - Serve a specific product image.
+ *
+ * Used by the storefront carousel and product detail gallery.
+ */
+images.get("/products/:productId/:imageId", async (c) => {
+  const productId = c.req.param("productId");
+  const imageId = c.req.param("imageId");
+
+  if (!UUID_REGEX.test(productId) || !UUID_REGEX.test(imageId)) {
+    return c.json({ error: "Invalid ID" }, 400);
+  }
+
+  if (!isStorageConfigured) {
+    return c.json({ error: "Storage not configured" }, 503);
+  }
+
+  const db = tryGetDb();
+  if (!db) {
+    return c.json({ error: "Service unavailable" }, 503);
+  }
+
+  // Look up the specific image
+  const [image] = await db
+    .select({ storageKey: productImages.storageKey })
+    .from(productImages)
+    .where(
+      and(
+        eq(productImages.id, imageId),
+        eq(productImages.productId, productId),
+      ),
+    )
+    .limit(1);
+
+  if (!image) {
+    return c.json({ error: "Image not found" }, 404);
+  }
+
+  return streamImage(c, image.storageKey);
 });

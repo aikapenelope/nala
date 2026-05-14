@@ -14,7 +14,7 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { eq, and, desc, inArray, sql } from "drizzle-orm";
-import { businesses, products, categories, storeSettings, orders } from "@nova/db";
+import { businesses, products, productImages, categories, storeSettings, orders } from "@nova/db";
 import { calculateStockSemaphore } from "@nova/shared";
 import { tryGetDb } from "../db";
 import { getRedis } from "../redis";
@@ -147,11 +147,45 @@ catalog.get("/:slug", async (c) => {
       description: p.description,
       price: Number(p.price),
       imageUrl: p.imageUrl ? `/images/products/${p.id}` : null,
+      images: [] as Array<{ id: string; url: string; sortOrder: number }>,
       categoryName: p.categoryId ? (categoryMap.get(p.categoryId) ?? null) : null,
       available: p.stock > 0,
       semaphore,
     };
   });
+
+  // Batch-fetch image galleries for all products in this page.
+  // Single query with IN clause — much faster than N+1 queries.
+  const productIds = catalogProducts.map((p) => p.id);
+  if (productIds.length > 0) {
+    const allImages = await db
+      .select({
+        id: productImages.id,
+        productId: productImages.productId,
+        sortOrder: productImages.sortOrder,
+      })
+      .from(productImages)
+      .where(inArray(productImages.productId, productIds))
+      .orderBy(productImages.sortOrder);
+
+    // Group images by product ID
+    const imagesByProduct = new Map<string, typeof allImages>();
+    for (const img of allImages) {
+      const existing = imagesByProduct.get(img.productId) ?? [];
+      existing.push(img);
+      imagesByProduct.set(img.productId, existing);
+    }
+
+    // Attach images to each product
+    for (const product of catalogProducts) {
+      const imgs = imagesByProduct.get(product.id) ?? [];
+      product.images = imgs.map((img) => ({
+        id: img.id,
+        url: `/images/products/${product.id}/${img.id}`,
+        sortOrder: img.sortOrder,
+      }));
+    }
+  }
 
   // Fetch exchange rate for Bs display (non-blocking, optional)
   let exchangeRate: number | null = null;

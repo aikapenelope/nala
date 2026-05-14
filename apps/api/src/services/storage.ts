@@ -18,6 +18,7 @@ import {
   GetObjectCommand,
   CopyObjectCommand,
   CreateBucketCommand,
+  DeleteObjectCommand,
   HeadBucketCommand,
   HeadObjectCommand,
   ListObjectsV2Command,
@@ -284,8 +285,12 @@ export async function uploadPaymentProof(
 /**
  * Upload a product image to MinIO.
  *
+ * Key format: products/{businessId}/{productId}/{imageId}.{ext}
+ * The imageId makes each image unique within a product, supporting galleries.
+ *
  * @param businessId - Business UUID
  * @param productId - Product UUID
+ * @param imageId - Image UUID (unique per image in the gallery)
  * @param fileBuffer - File content as Buffer
  * @param contentType - MIME type of the file
  * @returns The storage key (path) of the uploaded file
@@ -293,6 +298,7 @@ export async function uploadPaymentProof(
 export async function uploadProductImage(
   businessId: string,
   productId: string,
+  imageId: string,
   fileBuffer: Buffer,
   contentType: string,
 ): Promise<{ key: string }> {
@@ -308,7 +314,7 @@ export async function uploadProductImage(
     throw new Error("Archivo demasiado grande. Maximo 5MB.");
   }
 
-  const key = `products/${businessId}/${productId}.${mimeToExt(contentType)}`;
+  const key = `products/${businessId}/${productId}/${imageId}.${mimeToExt(contentType)}`;
 
   const client = getClient();
   await client.send(
@@ -321,6 +327,26 @@ export async function uploadProductImage(
   );
 
   return { key };
+}
+
+/**
+ * Delete a product image from MinIO.
+ *
+ * @param storageKey - The storage key of the image to delete
+ */
+export async function deleteProductImage(storageKey: string): Promise<void> {
+  if (!isStorageConfigured || !storageKey) return;
+
+  try {
+    const client = getClient();
+    await client.send(
+      new DeleteObjectCommand({ Bucket: MINIO_BUCKET, Key: storageKey }),
+    );
+  } catch {
+    // Non-critical: orphaned files in MinIO are harmless.
+    // Log but don't throw — the DB record is the source of truth.
+    console.warn(`[storage] Failed to delete object: ${storageKey}`);
+  }
 }
 
 /**

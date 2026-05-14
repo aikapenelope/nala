@@ -292,6 +292,51 @@ export const productVariants = pgTable(
 );
 
 /**
+ * Product images - multiple images per product for gallery display.
+ *
+ * Design follows the industry standard (Shopify, Square, MercadoLibre):
+ * - Each product can have up to 5 images.
+ * - sort_order = 0 is the primary image (shown in listings, POS, search).
+ * - sort_order 1-4 are gallery images (shown in product detail, storefront carousel).
+ * - The products.image_url field is kept as a denormalized cache of the primary
+ *   image's storage key for backward compatibility and fast listing queries.
+ *
+ * Storage keys follow: products/{businessId}/{productId}/{imageId}.{ext}
+ */
+export const productImages = pgTable(
+  "product_images",
+  {
+    id: uuid("id")
+      .default(sql`gen_random_uuid()`)
+      .primaryKey(),
+    productId: uuid("product_id")
+      .notNull()
+      .references(() => products.id, { onDelete: "cascade" }),
+    businessId: uuid("business_id")
+      .notNull()
+      .references(() => businesses.id),
+
+    /** MinIO storage key (e.g. "products/{businessId}/{productId}/{imageId}.jpg"). */
+    storageKey: text("storage_key").notNull(),
+
+    /** Display order. 0 = primary image, 1-4 = gallery. */
+    sortOrder: integer("sort_order").notNull().default(0),
+
+    /** Alt text for accessibility and SEO (storefront). */
+    altText: text("alt_text"),
+
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("idx_product_images_product").on(table.productId),
+    index("idx_product_images_business").on(table.businessId),
+    index("idx_product_images_sort").on(table.productId, table.sortOrder),
+  ],
+);
+
+/**
  * Price history - tracks every cost/price change for a product.
  * Used for "alert when cost rises and margin drops" feature.
  */
