@@ -21,6 +21,7 @@ import {
   Phone,
   Save,
   RefreshCw,
+  Link,
 } from "lucide-vue-next";
 
 const { $api } = useApi();
@@ -39,8 +40,16 @@ const rateExpanded = ref(false);
 // ============================================================
 
 const businessLoading = ref(true);
+const businessName = ref("");
+const businessSlug = ref("");
+const businessPhone = ref("");
+const businessAddress = ref("");
 const accountantEmail = ref("");
 const whatsappNumber = ref("");
+const originalName = ref("");
+const originalSlug = ref("");
+const originalPhone = ref("");
+const originalAddress = ref("");
 const originalEmail = ref("");
 const originalWhatsapp = ref("");
 const businessSaving = ref(false);
@@ -48,6 +57,10 @@ const businessSaveError = ref("");
 
 const businessHasChanges = computed(
   () =>
+    businessName.value !== originalName.value ||
+    businessSlug.value !== originalSlug.value ||
+    businessPhone.value !== originalPhone.value ||
+    businessAddress.value !== originalAddress.value ||
     accountantEmail.value !== originalEmail.value ||
     whatsappNumber.value !== originalWhatsapp.value,
 );
@@ -57,12 +70,24 @@ async function fetchBusinessSettings() {
   try {
     const result = await $api<{
       settings: {
+        name: string | null;
+        slug: string | null;
+        phone: string | null;
+        address: string | null;
         accountantEmail: string | null;
         whatsappNumber: string | null;
       };
     }>("/api/settings");
+    businessName.value = result.settings.name ?? "";
+    businessSlug.value = result.settings.slug ?? "";
+    businessPhone.value = result.settings.phone ?? "";
+    businessAddress.value = result.settings.address ?? "";
     accountantEmail.value = result.settings.accountantEmail ?? "";
     whatsappNumber.value = result.settings.whatsappNumber ?? "";
+    originalName.value = businessName.value;
+    originalSlug.value = businessSlug.value;
+    originalPhone.value = businessPhone.value;
+    originalAddress.value = businessAddress.value;
     originalEmail.value = accountantEmail.value;
     originalWhatsapp.value = whatsappNumber.value;
   } catch {
@@ -78,6 +103,18 @@ async function saveBusinessSettings() {
   businessSaveError.value = "";
   try {
     const body: Record<string, string | null> = {};
+    if (businessName.value !== originalName.value) {
+      body.name = businessName.value || null;
+    }
+    if (businessSlug.value !== originalSlug.value) {
+      body.slug = businessSlug.value || null;
+    }
+    if (businessPhone.value !== originalPhone.value) {
+      body.phone = businessPhone.value || null;
+    }
+    if (businessAddress.value !== originalAddress.value) {
+      body.address = businessAddress.value || null;
+    }
     if (accountantEmail.value !== originalEmail.value) {
       body.accountantEmail = accountantEmail.value || null;
     }
@@ -85,10 +122,25 @@ async function saveBusinessSettings() {
       body.whatsappNumber = whatsappNumber.value || null;
     }
     const result = await $api<{
-      settings: { accountantEmail: string | null; whatsappNumber: string | null };
+      settings: {
+        name: string | null;
+        slug: string | null;
+        phone: string | null;
+        address: string | null;
+        accountantEmail: string | null;
+        whatsappNumber: string | null;
+      };
     }>("/api/settings", { method: "PATCH", body });
+    businessName.value = result.settings.name ?? "";
+    businessSlug.value = result.settings.slug ?? "";
+    businessPhone.value = result.settings.phone ?? "";
+    businessAddress.value = result.settings.address ?? "";
     accountantEmail.value = result.settings.accountantEmail ?? "";
     whatsappNumber.value = result.settings.whatsappNumber ?? "";
+    originalName.value = businessName.value;
+    originalSlug.value = businessSlug.value;
+    originalPhone.value = businessPhone.value;
+    originalAddress.value = businessAddress.value;
     originalEmail.value = accountantEmail.value;
     originalWhatsapp.value = whatsappNumber.value;
     toast("Configuracion guardada");
@@ -199,7 +251,7 @@ onMounted(() => {
           </div>
           <div class="flex-1">
             <p class="text-sm font-bold text-gray-800">Negocio</p>
-            <p class="text-xs font-medium text-gray-600/70">Email del contador, WhatsApp</p>
+            <p class="text-xs font-medium text-gray-600/70">Nombre, slug, contacto</p>
           </div>
           <ChevronDown :size="16" class="text-gray-400 transition-transform" :class="businessExpanded ? 'rotate-180' : ''" />
         </button>
@@ -209,13 +261,42 @@ onMounted(() => {
           <div v-else class="space-y-4">
             <div>
               <div class="mb-2 flex items-center gap-2">
-                <Mail :size="14" class="text-blue-600" />
-                <label class="text-sm font-medium text-gray-700">Email del contador</label>
+                <Store :size="14" class="text-blue-600" />
+                <label class="text-sm font-medium text-gray-700">Nombre del negocio</label>
               </div>
               <input
-                v-model="accountantEmail"
-                type="email"
-                placeholder="contador@ejemplo.com"
+                v-model="businessName"
+                type="text"
+                placeholder="Mi Bodega"
+                class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm focus:border-nova-primary focus:outline-none"
+              >
+            </div>
+            <div>
+              <div class="mb-2 flex items-center gap-2">
+                <Link :size="14" class="text-purple-600" />
+                <label class="text-sm font-medium text-gray-700">Slug (URL de tu tienda)</label>
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="text-xs font-medium text-gray-400">https://</span>
+                <input
+                  v-model="businessSlug"
+                  type="text"
+                  placeholder="mi-bodega"
+                  class="flex-1 rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm focus:border-nova-primary focus:outline-none"
+                >
+                <span class="text-xs font-medium text-gray-400">.novaincs.com</span>
+              </div>
+              <p class="mt-1 text-[11px] text-gray-400">Solo letras minusculas, numeros y guiones. Ej: mi-bodega</p>
+            </div>
+            <div>
+              <div class="mb-2 flex items-center gap-2">
+                <Phone :size="14" class="text-green-600" />
+                <label class="text-sm font-medium text-gray-700">Telefono del negocio</label>
+              </div>
+              <input
+                v-model="businessPhone"
+                type="tel"
+                placeholder="+58 212 1234567"
                 class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm focus:border-nova-primary focus:outline-none"
               >
             </div>
@@ -228,6 +309,18 @@ onMounted(() => {
                 v-model="whatsappNumber"
                 type="tel"
                 placeholder="+58 412 1234567"
+                class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm focus:border-nova-primary focus:outline-none"
+              >
+            </div>
+            <div>
+              <div class="mb-2 flex items-center gap-2">
+                <Mail :size="14" class="text-blue-600" />
+                <label class="text-sm font-medium text-gray-700">Email del contador</label>
+              </div>
+              <input
+                v-model="accountantEmail"
+                type="email"
+                placeholder="contador@ejemplo.com"
                 class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm focus:border-nova-primary focus:outline-none"
               >
             </div>

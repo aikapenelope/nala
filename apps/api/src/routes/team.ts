@@ -22,6 +22,18 @@ const team = new Hono<AppEnv>();
 // ============================================================
 
 const updateSettingsSchema = z.object({
+  name: z.string().min(1, "Nombre es obligatorio").max(100).optional(),
+  slug: z
+    .string()
+    .min(3, "Minimo 3 caracteres")
+    .max(50)
+    .regex(
+      /^[a-z0-9]+(?:-[a-z0-9]+)*$/,
+      "Solo letras minusculas, numeros y guiones",
+    )
+    .optional(),
+  phone: z.string().max(20).optional().nullable(),
+  address: z.string().max(200).optional().nullable(),
   accountantEmail: z.string().email("Email invalido").optional().nullable(),
   whatsappNumber: z.string().max(20).optional().nullable(),
 });
@@ -33,6 +45,10 @@ team.get("/settings", async (c) => {
 
   const [business] = await db
     .select({
+      name: businesses.name,
+      slug: businesses.slug,
+      phone: businesses.phone,
+      address: businesses.address,
       accountantEmail: businesses.accountantEmail,
       whatsappNumber: businesses.whatsappNumber,
     })
@@ -51,6 +67,10 @@ team.patch("/settings", zValidator("json", updateSettingsSchema), async (c) => {
   const data = c.req.valid("json");
 
   const updates: Record<string, unknown> = { updatedAt: new Date() };
+  if (data.name !== undefined) updates.name = data.name;
+  if (data.slug !== undefined) updates.slug = data.slug;
+  if (data.phone !== undefined) updates.phone = data.phone;
+  if (data.address !== undefined) updates.address = data.address;
   if (data.accountantEmail !== undefined)
     updates.accountantEmail = data.accountantEmail;
   if (data.whatsappNumber !== undefined)
@@ -61,6 +81,10 @@ team.patch("/settings", zValidator("json", updateSettingsSchema), async (c) => {
     .set(updates)
     .where(eq(businesses.id, currentUser.businessId))
     .returning({
+      name: businesses.name,
+      slug: businesses.slug,
+      phone: businesses.phone,
+      address: businesses.address,
       accountantEmail: businesses.accountantEmail,
       whatsappNumber: businesses.whatsappNumber,
     });
