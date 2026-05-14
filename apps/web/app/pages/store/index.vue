@@ -314,7 +314,10 @@ onMounted(() => {
             </a>
           </div>
           <div v-else class="mt-3 rounded-xl border border-dashed border-amber-200 bg-amber-50/50 px-3 py-2.5">
-            <p class="text-xs text-amber-700">Tu negocio no tiene slug. Configuralo en Config. &gt; Negocio.</p>
+            <p class="text-xs text-amber-700">
+              Tu negocio no tiene slug.
+              <NuxtLink to="/settings" class="font-bold underline">Configuralo en Negocio</NuxtLink>.
+            </p>
           </div>
 
           <!-- Preview store button -->
