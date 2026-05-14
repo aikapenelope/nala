@@ -158,7 +158,7 @@ async function submitOrder() {
     <h1 class="mb-5 text-xl font-bold text-gray-900 dark:text-white">Confirmar pedido</h1>
 
     <!-- Order summary -->
-    <div class="mb-5 rounded-2xl border border-gray-100 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
+    <div class="mb-5 rounded-2xl border border-white/60 bg-white/70 p-4 backdrop-blur-md dark:border-gray-800/60 dark:bg-gray-900/70">
       <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
         Resumen
       </p>
@@ -231,7 +231,7 @@ async function submitOrder() {
           v-model="customerName"
           type="text"
           placeholder="Nombre completo"
-          class="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-900 outline-none transition-colors focus:border-gray-400 focus:ring-2 focus:ring-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:focus:border-gray-600 dark:focus:ring-gray-700"
+          class="w-full rounded-2xl border border-white/60 bg-white/70 px-4 py-3 text-sm text-gray-900 shadow-sm outline-none backdrop-blur-md transition-all focus:border-gray-300 focus:ring-2 focus:ring-gray-200/50 dark:border-gray-700/60 dark:bg-gray-800/70 dark:text-white dark:focus:border-gray-600 dark:focus:ring-gray-700/50"
         >
       </div>
 
@@ -243,7 +243,7 @@ async function submitOrder() {
           v-model="customerPhone"
           type="tel"
           placeholder="0412-1234567"
-          class="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-900 outline-none transition-colors focus:border-gray-400 focus:ring-2 focus:ring-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:focus:border-gray-600 dark:focus:ring-gray-700"
+          class="w-full rounded-2xl border border-white/60 bg-white/70 px-4 py-3 text-sm text-gray-900 shadow-sm outline-none backdrop-blur-md transition-all focus:border-gray-300 focus:ring-2 focus:ring-gray-200/50 dark:border-gray-700/60 dark:bg-gray-800/70 dark:text-white dark:focus:border-gray-600 dark:focus:ring-gray-700/50"
         >
       </div>
 
@@ -255,7 +255,7 @@ async function submitOrder() {
           v-model="customerNotes"
           rows="2"
           placeholder="Instrucciones especiales, direccion, etc."
-          class="w-full resize-none rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-900 outline-none transition-colors focus:border-gray-400 focus:ring-2 focus:ring-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:focus:border-gray-600 dark:focus:ring-gray-700"
+          class="w-full resize-none rounded-2xl border border-white/60 bg-white/70 px-4 py-3 text-sm text-gray-900 shadow-sm outline-none backdrop-blur-md transition-all focus:border-gray-300 focus:ring-2 focus:ring-gray-200/50 dark:border-gray-700/60 dark:bg-gray-800/70 dark:text-white dark:focus:border-gray-600 dark:focus:ring-gray-700/50"
         />
       </div>
 
@@ -310,11 +310,11 @@ async function submitOrder() {
           <label
             v-for="pm in storeInfo?.paymentMethods ?? []"
             :key="pm.method"
-            class="flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition-colors"
+            class="flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition-all"
             :class="
               selectedPaymentMethod === pm.method
-                ? 'border-gray-900 bg-gray-50'
-                : 'border-gray-200 bg-white hover:border-gray-300'
+                ? 'border-gray-900 bg-gray-50 shadow-sm dark:border-white dark:bg-gray-800'
+                : 'border-white/60 bg-white/70 backdrop-blur-sm hover:border-gray-300 dark:border-gray-700/60 dark:bg-gray-800/70 dark:hover:border-gray-600'
             "
           >
             <input
@@ -363,7 +363,7 @@ async function submitOrder() {
           v-model="paymentReference"
           type="text"
           placeholder="Nro. de transferencia o referencia"
-          class="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-900 outline-none transition-colors focus:border-gray-400 focus:ring-2 focus:ring-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:focus:border-gray-600 dark:focus:ring-gray-700"
+          class="w-full rounded-2xl border border-white/60 bg-white/70 px-4 py-3 text-sm text-gray-900 shadow-sm outline-none backdrop-blur-md transition-all focus:border-gray-300 focus:ring-2 focus:ring-gray-200/50 dark:border-gray-700/60 dark:bg-gray-800/70 dark:text-white dark:focus:border-gray-600 dark:focus:ring-gray-700/50"
         >
       </div>
 

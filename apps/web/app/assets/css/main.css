@@ -1,6 +1,9 @@
 @import "tailwindcss";
 @import url("https://api.fontshare.com/v2/css?f[]=plus-jakarta-sans@500,700,800&display=swap");
 
+/* Enable class-based dark mode (toggle via .dark on <html>). */
+@custom-variant dark (&:where(.dark, .dark *));
+
 /*
  * Nova design system - Premium visual language.
  *

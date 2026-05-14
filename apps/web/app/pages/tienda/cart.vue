@@ -104,7 +104,7 @@ const meetsMinimum = computed(() => {
         <div
           v-for="item in items"
           :key="item.productId"
-          class="flex gap-3 rounded-2xl border border-gray-100 bg-white p-3 shadow-sm dark:border-gray-800 dark:bg-gray-900"
+          class="flex gap-3 rounded-2xl border border-white/60 bg-white/70 p-3 shadow-sm backdrop-blur-md dark:border-gray-800/60 dark:bg-gray-900/70"
         >
           <!-- Product image -->
           <div
@@ -213,7 +213,7 @@ const meetsMinimum = computed(() => {
       </button>
 
       <!-- Summary -->
-      <div class="mt-6 space-y-2 rounded-2xl border border-gray-100 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
+      <div class="mt-6 space-y-2 rounded-2xl border border-white/60 bg-white/70 p-4 backdrop-blur-md dark:border-gray-800/60 dark:bg-gray-900/70">
         <div class="flex justify-between text-sm text-gray-600">
           <span>Subtotal ({{ itemCount }} items)</span>
           <div class="text-right">
