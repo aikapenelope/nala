@@ -18,11 +18,14 @@
 
 import { calculateLineTotal, calculateSaleTotal } from "@nova/shared";
 import type { PaymentMethod } from "@nova/shared";
-import { ShoppingCart, Minus, Plus, X, Search, PlusCircle, DollarSign, Check } from "lucide-vue-next";
+import { ShoppingCart, Minus, Plus, X, Search, PlusCircle, DollarSign, Check, Share2 } from "lucide-vue-next";
+import { shareReceipt } from "~/composables/useReceiptImage";
+import type { ReceiptData } from "~/composables/useReceiptImage";
 
 const { isDesktop } = useDevice();
 const { $api, apiBase } = useApi();
 const { toast } = useToast();
+const { user } = useNovaAuth();
 
 /** Resolve image URL: prepend API base for relative paths from the API. */
 function resolveImageUrl(url: string | null): string | undefined {
@@ -249,6 +252,44 @@ function newSale() {
   selectedMethod.value = null;
   paymentReference.value = "";
   saleComplete.value = false;
+}
+
+const isSharingPosReceipt = ref(false);
+
+/** Share POS receipt as image. */
+async function sharePosReceipt() {
+  if (!selectedMethod.value) return;
+  isSharingPosReceipt.value = true;
+  try {
+    const methodLabel =
+      paymentMethods.find((m) => m.value === selectedMethod.value)?.label ??
+      (selectedMethod.value ?? "");
+
+    const data: ReceiptData = {
+      businessName: user.value?.businessName ?? "Mi Negocio",
+      items: ticketItems.value.map((item) => ({
+        name: item.name,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        lineTotal: lineTotal(item),
+      })),
+      subtotal: ticketTotal.value,
+      totalUsd: ticketTotal.value,
+      paymentMethod: methodLabel,
+      date: new Date(),
+    };
+
+    const fallback = [
+      `📋 *${data.businessName}*`,
+      data.items.map((i) => `  ${i.name} x${i.quantity} — $${i.lineTotal.toFixed(2)}`).join("\n"),
+      `*Total: $${data.totalUsd.toFixed(2)}*`,
+      `Pago: ${methodLabel}`,
+    ].join("\n");
+
+    await shareReceipt(data, fallback);
+  } finally {
+    isSharingPosReceipt.value = false;
+  }
 }
 
 // ============================================================
@@ -526,6 +567,14 @@ function goToAdvancedCheckout() {
         <p class="text-lg font-extrabold text-gradient">Venta registrada</p>
         <p class="mt-1 text-sm font-bold text-gray-500">${{ ticketTotal.toFixed(2) }}</p>
         <div class="mt-4 flex w-full gap-2">
+          <button
+            class="flex flex-1 items-center justify-center gap-1.5 rounded-2xl bg-green-600 py-3 text-sm font-bold text-white transition-spring disabled:opacity-50"
+            :disabled="isSharingPosReceipt"
+            @click="sharePosReceipt"
+          >
+            <Share2 :size="14" />
+            {{ isSharingPosReceipt ? "..." : "Recibo" }}
+          </button>
           <button
             class="dark-pill flex-1 rounded-2xl py-3 text-sm font-bold transition-spring"
             @click="newSale"

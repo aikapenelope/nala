@@ -20,7 +20,9 @@
 
 import { usdToBs } from "@nova/shared";
 import type { PaymentMethod, SaleChannel } from "@nova/shared";
-import { Check, WifiOff, X, MessageCircle, ShoppingCart } from "lucide-vue-next";
+import { Check, WifiOff, X, MessageCircle, ShoppingCart, Share2 } from "lucide-vue-next";
+import { shareReceipt } from "~/composables/useReceiptImage";
+import type { ReceiptData } from "~/composables/useReceiptImage";
 
 const router = useRouter();
 const { $api } = useApi();
@@ -370,8 +372,34 @@ async function confirmSale() {
   }
 }
 
-/** Send receipt via WhatsApp (wa.me link with detailed receipt). */
-function sendWhatsAppReceipt() {
+/** Build receipt data for image generation. */
+function buildReceiptData(): ReceiptData {
+  const methodLabel =
+    paymentMethods.find((m) => m.value === selectedMethod.value)?.label ??
+    (selectedMethod.value ?? "");
+
+  return {
+    businessName: user.value?.businessName ?? "Mi Negocio",
+    items: items.value.map((item) => ({
+      name: item.name,
+      quantity: item.quantity,
+      unitPrice: item.unitPrice,
+      lineTotal: item.unitPrice * item.quantity,
+    })),
+    subtotal: subtotalUsd.value,
+    surcharges: appliedSurcharges.value.length > 0
+      ? appliedSurcharges.value
+      : undefined,
+    totalUsd: totalUsd.value,
+    totalBs: exchangeRate.value > 0 ? totalBs.value : undefined,
+    exchangeRate: exchangeRate.value > 0 ? exchangeRate.value : undefined,
+    paymentMethod: methodLabel,
+    date: new Date(),
+  };
+}
+
+/** Build plain text fallback for WhatsApp. */
+function buildReceiptText(): string {
   const businessName = user.value?.businessName ?? "Mi Negocio";
   const now = new Date();
   const dateStr = now.toLocaleDateString("es-VE", {
@@ -384,7 +412,6 @@ function sendWhatsAppReceipt() {
     minute: "2-digit",
   });
 
-  // Build itemized list
   const itemLines = items.value
     .map(
       (item) =>
@@ -392,7 +419,6 @@ function sendWhatsAppReceipt() {
     )
     .join("\n");
 
-  // Build surcharges section
   const surchargeLines =
     appliedSurcharges.value.length > 0
       ? appliedSurcharges.value
@@ -409,7 +435,7 @@ function sendWhatsAppReceipt() {
     paymentMethods.find((m) => m.value === selectedMethod.value)?.label ??
     selectedMethod.value;
 
-  const receipt = [
+  return [
     `📋 *${businessName}*`,
     `${dateStr} ${timeStr}`,
     `─────────────────`,
@@ -423,8 +449,25 @@ function sendWhatsAppReceipt() {
   ]
     .filter(Boolean)
     .join("\n");
+}
 
-  const text = encodeURIComponent(receipt);
+const isSharing = ref(false);
+
+/** Share receipt as image (with text fallback). */
+async function handleShareReceipt() {
+  isSharing.value = true;
+  try {
+    const data = buildReceiptData();
+    const fallback = buildReceiptText();
+    await shareReceipt(data, fallback);
+  } finally {
+    isSharing.value = false;
+  }
+}
+
+/** Send receipt as plain text via WhatsApp (legacy fallback). */
+function sendWhatsAppText() {
+  const text = encodeURIComponent(buildReceiptText());
   window.open(`https://wa.me/?text=${text}`, "_blank");
 }
 
@@ -455,11 +498,19 @@ function newSale() {
 
       <div class="mt-8 space-y-3">
         <button
-          class="flex w-full items-center justify-center gap-2 rounded-2xl bg-green-600 py-3.5 font-bold text-white transition-spring"
-          @click="sendWhatsAppReceipt"
+          class="flex w-full items-center justify-center gap-2 rounded-2xl bg-green-600 py-3.5 font-bold text-white transition-spring disabled:opacity-50"
+          :disabled="isSharing"
+          @click="handleShareReceipt"
         >
-          <MessageCircle :size="18" />
-          Enviar recibo por WhatsApp
+          <Share2 :size="18" />
+          {{ isSharing ? "Preparando..." : "Compartir recibo" }}
+        </button>
+        <button
+          class="flex w-full items-center justify-center gap-2 rounded-2xl bg-gray-100 py-3 text-sm font-bold text-gray-600 transition-spring hover:bg-gray-200"
+          @click="sendWhatsAppText"
+        >
+          <MessageCircle :size="16" />
+          Enviar como texto
         </button>
         <button
           class="dark-pill flex w-full items-center justify-center gap-2 rounded-2xl py-3.5 font-bold transition-spring"
