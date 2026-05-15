@@ -204,8 +204,28 @@ salesRoutes.get("/sales", zValidator("query", listSalesQuery), async (c) => {
   }
 
   const rows = await db
-    .select()
+    .select({
+      id: sales.id,
+      businessId: sales.businessId,
+      userId: sales.userId,
+      customerId: sales.customerId,
+      customerName: customers.name,
+      totalUsd: sales.totalUsd,
+      totalBs: sales.totalBs,
+      exchangeRate: sales.exchangeRate,
+      discountPercent: sales.discountPercent,
+      discountAmount: sales.discountAmount,
+      status: sales.status,
+      voidReason: sales.voidReason,
+      notes: sales.notes,
+      totalCostUsd: sales.totalCostUsd,
+      channel: sales.channel,
+      surcharges: sales.surcharges,
+      createdAt: sales.createdAt,
+      updatedAt: sales.updatedAt,
+    })
     .from(sales)
+    .leftJoin(customers, eq(sales.customerId, customers.id))
     .where(and(...conditions))
     .orderBy(desc(sales.createdAt))
     .limit(limit)
