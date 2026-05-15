@@ -28,6 +28,7 @@ import {
   CalendarCheck,
   ChevronDown,
   Wrench,
+  Truck,
 } from "lucide-vue-next";
 import type { Component } from "vue";
 
@@ -52,6 +53,7 @@ const coreItems: NavItem[] = [
 /** Advanced tools - collapsible section. */
 const toolItems: NavItem[] = [
   { to: "/sales/history", icon: History, label: "Historial ventas" },
+  { to: "/suppliers", icon: Truck, label: "Proveedores" },
   { to: "/accounts", icon: Wallet, label: "Cuentas" },
   { to: "/accounts/day-close", icon: CalendarCheck, label: "Cierre de caja" },
   { to: "/reports", icon: BarChart3, label: "Reportes" },

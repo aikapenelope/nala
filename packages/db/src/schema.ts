@@ -740,6 +740,8 @@ export const accountsPayable = pgTable("accounts_payable", {
   businessId: uuid("business_id")
     .notNull()
     .references(() => businesses.id),
+  /** Link to supplier directory (optional for backward compat). */
+  supplierId: uuid("supplier_id").references(() => suppliers.id),
   supplierName: text("supplier_name").notNull(),
   description: text("description"),
   amountUsd: numeric("amount_usd", { precision: 12, scale: 2 }).notNull(),

@@ -1,0 +1,2 @@
+ALTER TABLE "accounts_payable" ADD COLUMN "supplier_id" uuid;--> statement-breakpoint
+ALTER TABLE "accounts_payable" ADD CONSTRAINT "accounts_payable_supplier_id_suppliers_id_fk" FOREIGN KEY ("supplier_id") REFERENCES "public"."suppliers"("id") ON DELETE no action ON UPDATE no action;
