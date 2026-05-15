@@ -210,15 +210,24 @@ export function generateReceiptImage(data: ReceiptData): Blob | null {
 }
 
 /**
- * Share a receipt image via Web Share API.
- * Falls back to opening WhatsApp with text if sharing files is not supported.
+ * Share a receipt via WhatsApp as an image.
+ *
+ * Strategy:
+ * 1. Generate receipt image with Canvas
+ * 2. Try Web Share API with the image file (opens native share sheet)
+ * 3. If Web Share not available, open wa.me with text fallback
+ *
+ * @param data - Receipt data for image generation
+ * @param phone - Optional phone number (with country code) to target WhatsApp directly
+ * @returns "shared" if Web Share succeeded, "fallback" if text was used
  */
 export async function shareReceipt(
   data: ReceiptData,
-  fallbackText: string,
-): Promise<"shared" | "fallback" | "error"> {
+  phone?: string | null,
+): Promise<"shared" | "fallback"> {
   const blob = generateReceiptImage(data);
 
+  // Try Web Share API with image file
   if (blob && canShareFiles()) {
     const file = new File([blob], "recibo.png", { type: "image/png" });
     const shareData = {
@@ -233,14 +242,64 @@ export async function shareReceipt(
         return "shared";
       }
     } catch {
-      // User cancelled or share failed — fall through to fallback
+      // User cancelled or share failed — fall through to WhatsApp text
     }
   }
 
-  // Fallback: open WhatsApp with text
-  const encoded = encodeURIComponent(fallbackText);
-  window.open(`https://wa.me/?text=${encoded}`, "_blank");
+  // Fallback: open WhatsApp with formatted text
+  const text = buildReceiptText(data);
+  const encoded = encodeURIComponent(text);
+  const cleanPhone = phone?.replace(/[^0-9]/g, "") ?? "";
+  const waUrl = cleanPhone
+    ? `https://wa.me/${cleanPhone}?text=${encoded}`
+    : `https://wa.me/?text=${encoded}`;
+  window.open(waUrl, "_blank");
   return "fallback";
+}
+
+/**
+ * Build a formatted plain text receipt for WhatsApp.
+ * Used as fallback when Web Share API is not available.
+ */
+export function buildReceiptText(data: ReceiptData): string {
+  const dateStr = data.date.toLocaleDateString("es-VE", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+  const timeStr = data.date.toLocaleTimeString("es-VE", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
+  const itemLines = data.items
+    .map((i) => `  ${i.name} x${i.quantity} — $${i.lineTotal.toFixed(2)}`)
+    .join("\n");
+
+  const surchargeLines =
+    data.surcharges && data.surcharges.length > 0
+      ? data.surcharges.map((s) => `  ${s.name}: $${s.amount.toFixed(2)}`).join("\n")
+      : "";
+
+  const bsLine =
+    data.totalBs && data.exchangeRate
+      ? `\nBs. ${data.totalBs.toFixed(2)} (tasa ${data.exchangeRate.toFixed(2)})`
+      : "";
+
+  return [
+    `📋 *${data.businessName}*`,
+    `${dateStr} ${timeStr}`,
+    `─────────────────`,
+    itemLines,
+    `─────────────────`,
+    surchargeLines ? `${surchargeLines}\n─────────────────` : "",
+    `*Total: $${data.totalUsd.toFixed(2)}*${bsLine}`,
+    `Pago: ${data.paymentMethod}`,
+    ``,
+    `Gracias por su compra! 🙏`,
+  ]
+    .filter(Boolean)
+    .join("\n");
 }
 
 /** Draw a dashed line on the canvas. */

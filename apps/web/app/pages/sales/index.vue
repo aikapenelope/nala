@@ -256,7 +256,7 @@ function newSale() {
 
 const isSharingPosReceipt = ref(false);
 
-/** Share POS receipt as image. */
+/** Share POS receipt as image via WhatsApp. */
 async function sharePosReceipt() {
   if (!selectedMethod.value) return;
   isSharingPosReceipt.value = true;
@@ -279,14 +279,7 @@ async function sharePosReceipt() {
       date: new Date(),
     };
 
-    const fallback = [
-      `📋 *${data.businessName}*`,
-      data.items.map((i) => `  ${i.name} x${i.quantity} — $${i.lineTotal.toFixed(2)}`).join("\n"),
-      `*Total: $${data.totalUsd.toFixed(2)}*`,
-      `Pago: ${methodLabel}`,
-    ].join("\n");
-
-    await shareReceipt(data, fallback);
+    await shareReceipt(data);
   } finally {
     isSharingPosReceipt.value = false;
   }

@@ -241,8 +241,20 @@ salesRoutes.get("/sales/:id", validateUuidParam, async (c) => {
   }
 
   const items = await db
-    .select()
+    .select({
+      id: saleItems.id,
+      saleId: saleItems.saleId,
+      businessId: saleItems.businessId,
+      productId: saleItems.productId,
+      variantId: saleItems.variantId,
+      quantity: saleItems.quantity,
+      unitPrice: saleItems.unitPrice,
+      discountPercent: saleItems.discountPercent,
+      lineTotal: saleItems.lineTotal,
+      productName: products.name,
+    })
     .from(saleItems)
+    .innerJoin(products, eq(saleItems.productId, products.id))
     .where(eq(saleItems.saleId, id));
 
   const payments = await db
