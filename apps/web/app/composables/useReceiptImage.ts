@@ -215,8 +215,8 @@ export function generateReceiptImage(data: ReceiptData): Blob | null {
  * Strategy (with robust fallback chain):
  * 1. Generate receipt image with Canvas
  * 2. Try Web Share API with the image file (opens native share sheet)
- * 3. If Web Share fails, open wa.me with text fallback
- * 4. If wa.me popup is blocked, copy text to clipboard
+ * 3. If Web Share fails, open WhatsApp with text fallback
+ * 4. If WhatsApp popup is blocked, copy text to clipboard
  *
  * Never throws — always returns a result string.
  *
@@ -251,16 +251,17 @@ export async function shareReceipt(
 
   // Step 2: Try opening WhatsApp with text
   const text = buildReceiptText(data);
-  const cleanPhone = phone?.replace(/[^0-9]/g, "") ?? "";
-  const waUrl = cleanPhone
-    ? `https://wa.me/${cleanPhone}?text=${encodeURIComponent(text)}`
-    : `https://wa.me/?text=${encodeURIComponent(text)}`;
+  const waUrl = buildWhatsAppUrl(text, phone);
 
   try {
-    const win = window.open(waUrl, "_blank");
-    if (win) return "whatsapp";
+    // Use location.href on mobile for more reliable opening (avoids popup blockers)
+    // window.open is unreliable on mobile Safari and Chrome
+    if (import.meta.client) {
+      window.location.href = waUrl;
+      return "whatsapp";
+    }
   } catch {
-    // window.open blocked or failed
+    // Navigation failed
   }
 
   // Step 3: Last resort — copy receipt text to clipboard
@@ -275,8 +276,29 @@ export async function shareReceipt(
 }
 
 /**
+ * Build a WhatsApp URL for sharing text.
+ *
+ * Uses api.whatsapp.com/send (works without phone number) instead of
+ * wa.me (requires phone number to work reliably).
+ */
+function buildWhatsAppUrl(text: string, phone?: string | null): string {
+  const cleanPhone = phone?.replace(/[^0-9]/g, "") ?? "";
+  const encoded = encodeURIComponent(text);
+
+  if (cleanPhone) {
+    return `https://wa.me/${cleanPhone}?text=${encoded}`;
+  }
+  // api.whatsapp.com/send works without a phone number — opens WhatsApp
+  // contact picker. wa.me/?text= without phone is unreliable.
+  return `https://api.whatsapp.com/send?text=${encoded}`;
+}
+
+/**
  * Build a formatted plain text receipt for WhatsApp.
  * Used as fallback when Web Share API is not available.
+ *
+ * Kept simple and short to avoid URL length limits (~2000 chars).
+ * Uses WhatsApp bold (*text*) formatting sparingly.
  */
 export function buildReceiptText(data: ReceiptData): string {
   const dateStr = data.date.toLocaleDateString("es-VE", {
@@ -289,34 +311,41 @@ export function buildReceiptText(data: ReceiptData): string {
     minute: "2-digit",
   });
 
+  // Keep item lines compact to avoid URL length issues
   const itemLines = data.items
-    .map((i) => `  ${i.name} x${i.quantity} — $${i.lineTotal.toFixed(2)}`)
+    .map((i) => `${i.name} x${i.quantity} $${i.lineTotal.toFixed(2)}`)
     .join("\n");
 
   const surchargeLines =
     data.surcharges && data.surcharges.length > 0
-      ? data.surcharges.map((s) => `  ${s.name}: $${s.amount.toFixed(2)}`).join("\n")
+      ? data.surcharges.map((s) => `${s.name}: $${s.amount.toFixed(2)}`).join("\n")
       : "";
 
   const bsLine =
     data.totalBs && data.exchangeRate
-      ? `\nBs. ${data.totalBs.toFixed(2)} (tasa ${data.exchangeRate.toFixed(2)})`
+      ? `Bs.${data.totalBs.toFixed(2)} (${data.exchangeRate.toFixed(2)})`
       : "";
 
-  return [
-    `📋 *${data.businessName}*`,
+  const lines = [
+    `*${data.businessName}*`,
     `${dateStr} ${timeStr}`,
-    `─────────────────`,
+    "",
     itemLines,
-    `─────────────────`,
-    surchargeLines ? `${surchargeLines}\n─────────────────` : "",
-    `*Total: $${data.totalUsd.toFixed(2)}*${bsLine}`,
-    `Pago: ${data.paymentMethod}`,
-    ``,
-    `Gracias por su compra! 🙏`,
-  ]
-    .filter(Boolean)
-    .join("\n");
+  ];
+
+  if (surchargeLines) {
+    lines.push("", surchargeLines);
+  }
+
+  lines.push("", `*Total: $${data.totalUsd.toFixed(2)}*`);
+
+  if (bsLine) {
+    lines.push(bsLine);
+  }
+
+  lines.push(`Pago: ${data.paymentMethod}`);
+
+  return lines.join("\n");
 }
 
 /** Draw a dashed line on the canvas. */
