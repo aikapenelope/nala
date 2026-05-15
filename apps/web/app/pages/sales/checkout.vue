@@ -404,7 +404,13 @@ const isSharing = ref(false);
 async function handleShareReceipt() {
   isSharing.value = true;
   try {
-    await shareReceipt(buildReceiptData());
+    const result = await shareReceipt(buildReceiptData());
+    if (result === "clipboard") {
+      // Show a brief note that text was copied
+      saleError.value = "Recibo copiado al portapapeles. Pegalo en WhatsApp.";
+    } else if (result === "error") {
+      saleError.value = "No se pudo compartir el recibo.";
+    }
   } finally {
     isSharing.value = false;
   }
