@@ -18,8 +18,8 @@
 
 import { calculateLineTotal, calculateSaleTotal } from "@nova/shared";
 import type { PaymentMethod } from "@nova/shared";
-import { ShoppingCart, Minus, Plus, X, Search, PlusCircle, DollarSign, Check, Share2 } from "lucide-vue-next";
-import { shareReceipt } from "~/composables/useReceiptImage";
+import { ShoppingCart, Minus, Plus, X, Search, PlusCircle, DollarSign, Check, Share2, Download } from "lucide-vue-next";
+import { sendReceiptWhatsApp, downloadReceiptImage } from "~/composables/useReceiptImage";
 import type { ReceiptData } from "~/composables/useReceiptImage";
 
 const { isDesktop } = useDevice();
@@ -321,39 +321,42 @@ function newSale() {
   clearCustomer();
 }
 
-const isSharingPosReceipt = ref(false);
+/** Build receipt data from current ticket state. */
+function buildPosReceiptData(): ReceiptData {
+  const methodLabel =
+    paymentMethods.find((m) => m.value === selectedMethod.value)?.label ??
+    (selectedMethod.value ?? "");
 
-/** Share POS receipt as image via WhatsApp. */
-async function sharePosReceipt() {
+  return {
+    businessName: user.value?.businessName ?? "Mi Negocio",
+    items: ticketItems.value.map((item) => ({
+      name: item.name,
+      quantity: item.quantity,
+      unitPrice: item.unitPrice,
+      lineTotal: lineTotal(item),
+    })),
+    subtotal: ticketTotal.value,
+    totalUsd: ticketTotal.value,
+    paymentMethod: methodLabel,
+    date: new Date(),
+  };
+}
+
+/** Send receipt text via WhatsApp. */
+function sendPosReceiptWA() {
   if (!selectedMethod.value) return;
-  isSharingPosReceipt.value = true;
-  try {
-    const methodLabel =
-      paymentMethods.find((m) => m.value === selectedMethod.value)?.label ??
-      (selectedMethod.value ?? "");
+  const ok = sendReceiptWhatsApp(buildPosReceiptData(), selectedCustomerPhone.value);
+  if (!ok) {
+    toast("No se pudo abrir WhatsApp. Intenta descargar el recibo.", "error");
+  }
+}
 
-    const data: ReceiptData = {
-      businessName: user.value?.businessName ?? "Mi Negocio",
-      items: ticketItems.value.map((item) => ({
-        name: item.name,
-        quantity: item.quantity,
-        unitPrice: item.unitPrice,
-        lineTotal: lineTotal(item),
-      })),
-      subtotal: ticketTotal.value,
-      totalUsd: ticketTotal.value,
-      paymentMethod: methodLabel,
-      date: new Date(),
-    };
-
-    const result = await shareReceipt(data, selectedCustomerPhone.value);
-    if (result === "clipboard") {
-      toast("Recibo copiado al portapapeles", "success");
-    } else if (result === "error") {
-      toast("No se pudo compartir el recibo", "error");
-    }
-  } finally {
-    isSharingPosReceipt.value = false;
+/** Download receipt as PNG image. */
+function downloadPosReceipt() {
+  if (!selectedMethod.value) return;
+  const ok = downloadReceiptImage(buildPosReceiptData());
+  if (!ok) {
+    toast("Error generando imagen del recibo", "error");
   }
 }
 
@@ -634,12 +637,18 @@ function goToAdvancedCheckout() {
         <p v-if="selectedCustomerName" class="mt-0.5 text-xs font-medium text-gray-400">{{ selectedCustomerName }}</p>
         <div class="mt-4 flex w-full gap-2">
           <button
-            class="flex flex-1 items-center justify-center gap-1.5 rounded-2xl bg-green-600 py-3 text-sm font-bold text-white transition-spring disabled:opacity-50"
-            :disabled="isSharingPosReceipt"
-            @click="sharePosReceipt"
+            class="flex flex-1 items-center justify-center gap-1.5 rounded-2xl bg-green-600 py-3 text-sm font-bold text-white transition-spring"
+            @click="sendPosReceiptWA"
           >
             <Share2 :size="14" />
-            {{ isSharingPosReceipt ? "..." : selectedCustomerPhone ? "Recibo WA" : "Recibo" }}
+            WhatsApp
+          </button>
+          <button
+            class="flex items-center justify-center gap-1.5 rounded-2xl bg-gray-100 px-4 py-3 text-sm font-bold text-gray-600 transition-spring hover:bg-gray-200"
+            title="Descargar recibo como imagen"
+            @click="downloadPosReceipt"
+          >
+            <Download :size="14" />
           </button>
           <button
             class="dark-pill flex-1 rounded-2xl py-3 text-sm font-bold transition-spring"

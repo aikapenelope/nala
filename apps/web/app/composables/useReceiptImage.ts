@@ -1,13 +1,18 @@
 /**
- * Receipt image generator using Canvas API.
+ * Receipt composable — WhatsApp text + downloadable image.
  *
- * Renders a professional receipt as a PNG image that can be shared
- * via Web Share API (WhatsApp, Instagram, etc.) or downloaded.
+ * Two separate actions (not a fallback chain):
+ * 1. sendReceiptWhatsApp() — opens WhatsApp with formatted text (always works)
+ * 2. downloadReceiptImage() — generates PNG via Canvas and downloads it
  *
- * Design: white background, clean typography, ticket-style layout
- * with dashed separators. Optimized for mobile sharing (2x DPR).
+ * Why not Web Share API?
+ * - Inconsistent across browsers (fails silently on many)
+ * - Requires user gesture context (breaks in async flows)
+ * - File sharing not supported on Firefox, older Chrome
+ * - window.location.href to wa.me navigates away from the app
  *
- * No external dependencies — uses only browser Canvas API.
+ * The text-based WhatsApp approach works on 100% of devices because
+ * it just opens a URL. The image download is a separate explicit action.
  */
 
 export interface ReceiptData {
@@ -27,278 +32,69 @@ export interface ReceiptData {
   date: Date;
 }
 
-/** Whether the browser supports sharing files via Web Share API. */
-export function canShareFiles(): boolean {
-  if (!import.meta.client) return false;
-  return !!navigator.share && !!navigator.canShare;
-}
-
 /**
- * Generate a receipt image as a Blob (PNG).
+ * Send receipt as formatted text via WhatsApp.
  *
- * Uses 2x device pixel ratio for crisp rendering on mobile screens.
- * The receipt is rendered at a fixed width (400px logical) to ensure
- * consistent appearance across devices.
+ * Opens WhatsApp in a new tab/window. Uses window.open (not location.href)
+ * so the user stays in Nova. If popup is blocked, returns false.
+ *
+ * @param data - Receipt content
+ * @param phone - Optional phone number to send directly to a contact
+ * @returns true if WhatsApp was opened, false if blocked
  */
-export function generateReceiptImage(data: ReceiptData): Blob | null {
-  if (!import.meta.client) return null;
-
-  const dpr = 2;
-  const W = 400;
-  const pad = 28;
-  const contentW = W - pad * 2;
-
-  // Pre-calculate height based on content
-  const lineH = 22;
-  const sectionGap = 16;
-  let totalH = pad; // top padding
-
-  // Header: business name + date
-  totalH += 28 + 8 + 18 + sectionGap; // name + gap + date + section gap
-
-  // Separator
-  totalH += 12;
-
-  // Items
-  totalH += data.items.length * lineH + sectionGap;
-
-  // Separator
-  totalH += 12;
-
-  // Surcharges
-  if (data.surcharges && data.surcharges.length > 0) {
-    totalH += data.surcharges.length * lineH + 12 + sectionGap;
-  }
-
-  // Total section
-  totalH += 32 + 8; // total line + gap
-  if (data.totalBs) totalH += 18; // Bs line
-  totalH += sectionGap;
-
-  // Payment method
-  totalH += 18 + sectionGap;
-
-  // Footer
-  totalH += 18 + pad; // thank you + bottom padding
-
-  // Create canvas
-  const canvas = document.createElement("canvas");
-  canvas.width = W * dpr;
-  canvas.height = totalH * dpr;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return null;
-
-  ctx.scale(dpr, dpr);
-
-  // Background
-  ctx.fillStyle = "#FFFFFF";
-  ctx.fillRect(0, 0, W, totalH);
-
-  // Subtle border
-  ctx.strokeStyle = "#E5E7EB";
-  ctx.lineWidth = 1;
-  ctx.strokeRect(0.5, 0.5, W - 1, totalH - 1);
-
-  let y = pad;
-
-  // --- Header ---
-  ctx.fillStyle = "#111827";
-  ctx.font = "bold 22px 'Plus Jakarta Sans', system-ui, sans-serif";
-  ctx.textAlign = "center";
-  ctx.fillText(data.businessName, W / 2, y + 22);
-  y += 28 + 8;
-
-  // Date
-  const dateStr = data.date.toLocaleDateString("es-VE", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
-  const timeStr = data.date.toLocaleTimeString("es-VE", {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-  ctx.fillStyle = "#6B7280";
-  ctx.font = "500 13px 'Plus Jakarta Sans', system-ui, sans-serif";
-  ctx.fillText(`${dateStr} · ${timeStr}`, W / 2, y + 13);
-  y += 18 + sectionGap;
-
-  // --- Dashed separator ---
-  drawDashedLine(ctx, pad, y, W - pad, y);
-  y += 12;
-
-  // --- Items ---
-  ctx.textAlign = "left";
-  for (const item of data.items) {
-    ctx.fillStyle = "#374151";
-    ctx.font = "500 13px 'Plus Jakarta Sans', system-ui, sans-serif";
-    const nameText = `${item.name} x${item.quantity}`;
-    ctx.fillText(truncateText(ctx, nameText, contentW - 70), pad, y + 14);
-
-    ctx.textAlign = "right";
-    ctx.fillStyle = "#111827";
-    ctx.font = "600 13px 'Plus Jakarta Sans', system-ui, sans-serif";
-    ctx.fillText(`$${item.lineTotal.toFixed(2)}`, W - pad, y + 14);
-    ctx.textAlign = "left";
-
-    y += lineH;
-  }
-  y += sectionGap;
-
-  // --- Dashed separator ---
-  drawDashedLine(ctx, pad, y, W - pad, y);
-  y += 12;
-
-  // --- Surcharges ---
-  if (data.surcharges && data.surcharges.length > 0) {
-    for (const s of data.surcharges) {
-      ctx.fillStyle = "#6B7280";
-      ctx.font = "500 12px 'Plus Jakarta Sans', system-ui, sans-serif";
-      ctx.fillText(s.name, pad, y + 14);
-
-      ctx.textAlign = "right";
-      ctx.fillText(`$${s.amount.toFixed(2)}`, W - pad, y + 14);
-      ctx.textAlign = "left";
-
-      y += lineH;
-    }
-
-    drawDashedLine(ctx, pad, y, W - pad, y);
-    y += 12 + sectionGap;
-  }
-
-  // --- Total ---
-  ctx.fillStyle = "#111827";
-  ctx.font = "bold 24px 'Plus Jakarta Sans', system-ui, sans-serif";
-  ctx.textAlign = "center";
-  ctx.fillText(`$${data.totalUsd.toFixed(2)}`, W / 2, y + 24);
-  y += 32 + 8;
-
-  if (data.totalBs && data.exchangeRate) {
-    ctx.fillStyle = "#9CA3AF";
-    ctx.font = "500 12px 'Plus Jakarta Sans', system-ui, sans-serif";
-    ctx.fillText(
-      `Bs. ${data.totalBs.toFixed(2)} (tasa ${data.exchangeRate.toFixed(2)})`,
-      W / 2,
-      y + 12,
-    );
-    y += 18;
-  }
-  y += sectionGap;
-
-  // --- Payment method ---
-  ctx.fillStyle = "#6B7280";
-  ctx.font = "500 12px 'Plus Jakarta Sans', system-ui, sans-serif";
-  ctx.fillText(`Pago: ${data.paymentMethod}`, W / 2, y + 12);
-  y += 18 + sectionGap;
-
-  // --- Footer ---
-  ctx.fillStyle = "#D1D5DB";
-  ctx.font = "500 11px 'Plus Jakarta Sans', system-ui, sans-serif";
-  ctx.fillText("Gracias por su compra", W / 2, y + 11);
-
-  // Convert to blob synchronously via toBlob workaround
-  const dataUrl = canvas.toDataURL("image/png");
-  const byteString = atob(dataUrl.split(",")[1]!);
-  const mimeString = dataUrl.split(",")[0]!.split(":")[1]!.split(";")[0]!;
-  const ab = new ArrayBuffer(byteString.length);
-  const ia = new Uint8Array(ab);
-  for (let i = 0; i < byteString.length; i++) {
-    ia[i] = byteString.charCodeAt(i);
-  }
-  return new Blob([ab], { type: mimeString });
-}
-
-/**
- * Share a receipt via WhatsApp as an image.
- *
- * Strategy (with robust fallback chain):
- * 1. Generate receipt image with Canvas
- * 2. Try Web Share API with the image file (opens native share sheet)
- * 3. If Web Share fails, open WhatsApp with text fallback
- * 4. If WhatsApp popup is blocked, copy text to clipboard
- *
- * Never throws — always returns a result string.
- *
- * @param data - Receipt data for image generation
- * @param phone - Optional phone number (with country code) to target WhatsApp directly
- * @returns "shared" | "whatsapp" | "clipboard" | "error"
- */
-export async function shareReceipt(
+export function sendReceiptWhatsApp(
   data: ReceiptData,
   phone?: string | null,
-): Promise<"shared" | "whatsapp" | "clipboard" | "error"> {
-  // Step 1: Try Web Share API with image file
-  try {
-    const blob = generateReceiptImage(data);
-    if (blob && canShareFiles()) {
-      const file = new File([blob], "recibo.png", { type: "image/png" });
-      const shareData = {
-        title: `Recibo - ${data.businessName}`,
-        text: `Recibo de $${data.totalUsd.toFixed(2)}`,
-        files: [file],
-      };
+): boolean {
+  if (!import.meta.client) return false;
 
-      if (navigator.canShare(shareData)) {
-        await navigator.share(shareData);
-        return "shared";
-      }
-    }
-  } catch {
-    // Web Share failed (user cancelled, not supported, etc.)
-    // Fall through to WhatsApp text
-  }
-
-  // Step 2: Try opening WhatsApp with text
   const text = buildReceiptText(data);
-  const waUrl = buildWhatsAppUrl(text, phone);
-
-  try {
-    // Use location.href on mobile for more reliable opening (avoids popup blockers)
-    // window.open is unreliable on mobile Safari and Chrome
-    if (import.meta.client) {
-      window.location.href = waUrl;
-      return "whatsapp";
-    }
-  } catch {
-    // Navigation failed
-  }
-
-  // Step 3: Last resort — copy receipt text to clipboard
-  try {
-    await navigator.clipboard.writeText(text);
-    return "clipboard";
-  } catch {
-    // Clipboard also failed
-  }
-
-  return "error";
-}
-
-/**
- * Build a WhatsApp URL for sharing text.
- *
- * Uses api.whatsapp.com/send (works without phone number) instead of
- * wa.me (requires phone number to work reliably).
- */
-function buildWhatsAppUrl(text: string, phone?: string | null): string {
-  const cleanPhone = phone?.replace(/[^0-9]/g, "") ?? "";
   const encoded = encodeURIComponent(text);
+  const cleanPhone = phone?.replace(/[^0-9]/g, "") ?? "";
 
-  if (cleanPhone) {
-    return `https://wa.me/${cleanPhone}?text=${encoded}`;
-  }
-  // api.whatsapp.com/send works without a phone number — opens WhatsApp
-  // contact picker. wa.me/?text= without phone is unreliable.
-  return `https://api.whatsapp.com/send?text=${encoded}`;
+  // wa.me/{phone} for direct contact, api.whatsapp.com/send for contact picker
+  const url = cleanPhone
+    ? `https://wa.me/${cleanPhone}?text=${encoded}`
+    : `https://api.whatsapp.com/send?text=${encoded}`;
+
+  const win = window.open(url, "_blank", "noopener,noreferrer");
+  return win !== null;
 }
 
 /**
- * Build a formatted plain text receipt for WhatsApp.
- * Used as fallback when Web Share API is not available.
+ * Generate and download a receipt as PNG image.
  *
- * Kept simple and short to avoid URL length limits (~2000 chars).
- * Uses WhatsApp bold (*text*) formatting sparingly.
+ * Creates the image via Canvas API and triggers a browser download.
+ * The image is NOT stored anywhere — it's generated on demand and
+ * downloaded directly to the user's device.
+ *
+ * @param data - Receipt content
+ * @returns true if download was triggered, false if Canvas failed
+ */
+export function downloadReceiptImage(data: ReceiptData): boolean {
+  if (!import.meta.client) return false;
+
+  const blob = generateReceiptImage(data);
+  if (!blob) return false;
+
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `recibo-${data.date.getTime()}.png`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+
+  // Clean up the object URL after a short delay
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  return true;
+}
+
+/**
+ * Build formatted plain text receipt for WhatsApp.
+ *
+ * Uses WhatsApp markdown: *bold* for emphasis.
+ * Kept compact to stay within URL length limits (~2000 chars).
  */
 export function buildReceiptText(data: ReceiptData): string {
   const dateStr = data.date.toLocaleDateString("es-VE", {
@@ -311,14 +107,15 @@ export function buildReceiptText(data: ReceiptData): string {
     minute: "2-digit",
   });
 
-  // Keep item lines compact to avoid URL length issues
   const itemLines = data.items
     .map((i) => `${i.name} x${i.quantity} $${i.lineTotal.toFixed(2)}`)
     .join("\n");
 
   const surchargeLines =
     data.surcharges && data.surcharges.length > 0
-      ? data.surcharges.map((s) => `${s.name}: $${s.amount.toFixed(2)}`).join("\n")
+      ? data.surcharges
+          .map((s) => `${s.name}: $${s.amount.toFixed(2)}`)
+          .join("\n")
       : "";
 
   const bsLine =
@@ -348,7 +145,164 @@ export function buildReceiptText(data: ReceiptData): string {
   return lines.join("\n");
 }
 
-/** Draw a dashed line on the canvas. */
+// ============================================================
+// Canvas image generator (internal, used by downloadReceiptImage)
+// ============================================================
+
+/**
+ * Generate a receipt image as a Blob (PNG).
+ *
+ * Uses 2x device pixel ratio for crisp rendering on mobile.
+ * Fixed width 400px logical for consistent appearance.
+ */
+function generateReceiptImage(data: ReceiptData): Blob | null {
+  const dpr = 2;
+  const W = 400;
+  const pad = 28;
+  const contentW = W - pad * 2;
+  const lineH = 22;
+  const sectionGap = 16;
+
+  // Pre-calculate height
+  let totalH = pad;
+  totalH += 28 + 8 + 18 + sectionGap; // header
+  totalH += 12; // separator
+  totalH += data.items.length * lineH + sectionGap; // items
+  totalH += 12; // separator
+  if (data.surcharges && data.surcharges.length > 0) {
+    totalH += data.surcharges.length * lineH + 12 + sectionGap;
+  }
+  totalH += 32 + 8; // total
+  if (data.totalBs) totalH += 18;
+  totalH += sectionGap;
+  totalH += 18 + sectionGap; // payment method
+  totalH += 18 + pad; // footer
+
+  const canvas = document.createElement("canvas");
+  canvas.width = W * dpr;
+  canvas.height = totalH * dpr;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return null;
+
+  ctx.scale(dpr, dpr);
+
+  // Background
+  ctx.fillStyle = "#FFFFFF";
+  ctx.fillRect(0, 0, W, totalH);
+
+  // Border
+  ctx.strokeStyle = "#E5E7EB";
+  ctx.lineWidth = 1;
+  ctx.strokeRect(0.5, 0.5, W - 1, totalH - 1);
+
+  let y = pad;
+
+  // Header
+  ctx.fillStyle = "#111827";
+  ctx.font = "bold 22px system-ui, sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText(data.businessName, W / 2, y + 22);
+  y += 28 + 8;
+
+  const dateStr = data.date.toLocaleDateString("es-VE", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+  const timeStr = data.date.toLocaleTimeString("es-VE", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  ctx.fillStyle = "#6B7280";
+  ctx.font = "13px system-ui, sans-serif";
+  ctx.fillText(`${dateStr} · ${timeStr}`, W / 2, y + 13);
+  y += 18 + sectionGap;
+
+  drawDashedLine(ctx, pad, y, W - pad, y);
+  y += 12;
+
+  // Items
+  ctx.textAlign = "left";
+  for (const item of data.items) {
+    ctx.fillStyle = "#374151";
+    ctx.font = "13px system-ui, sans-serif";
+    const nameText = `${item.name} x${item.quantity}`;
+    ctx.fillText(truncateText(ctx, nameText, contentW - 70), pad, y + 14);
+
+    ctx.textAlign = "right";
+    ctx.fillStyle = "#111827";
+    ctx.font = "bold 13px system-ui, sans-serif";
+    ctx.fillText(`$${item.lineTotal.toFixed(2)}`, W - pad, y + 14);
+    ctx.textAlign = "left";
+
+    y += lineH;
+  }
+  y += sectionGap;
+
+  drawDashedLine(ctx, pad, y, W - pad, y);
+  y += 12;
+
+  // Surcharges
+  if (data.surcharges && data.surcharges.length > 0) {
+    for (const s of data.surcharges) {
+      ctx.fillStyle = "#6B7280";
+      ctx.font = "12px system-ui, sans-serif";
+      ctx.fillText(s.name, pad, y + 14);
+
+      ctx.textAlign = "right";
+      ctx.fillText(`$${s.amount.toFixed(2)}`, W - pad, y + 14);
+      ctx.textAlign = "left";
+
+      y += lineH;
+    }
+
+    drawDashedLine(ctx, pad, y, W - pad, y);
+    y += 12 + sectionGap;
+  }
+
+  // Total
+  ctx.fillStyle = "#111827";
+  ctx.font = "bold 24px system-ui, sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText(`$${data.totalUsd.toFixed(2)}`, W / 2, y + 24);
+  y += 32 + 8;
+
+  if (data.totalBs && data.exchangeRate) {
+    ctx.fillStyle = "#9CA3AF";
+    ctx.font = "12px system-ui, sans-serif";
+    ctx.fillText(
+      `Bs. ${data.totalBs.toFixed(2)} (tasa ${data.exchangeRate.toFixed(2)})`,
+      W / 2,
+      y + 12,
+    );
+    y += 18;
+  }
+  y += sectionGap;
+
+  // Payment method
+  ctx.fillStyle = "#6B7280";
+  ctx.font = "12px system-ui, sans-serif";
+  ctx.fillText(`Pago: ${data.paymentMethod}`, W / 2, y + 12);
+  y += 18 + sectionGap;
+
+  // Footer
+  ctx.fillStyle = "#D1D5DB";
+  ctx.font = "11px system-ui, sans-serif";
+  ctx.fillText("Gracias por su compra", W / 2, y + 11);
+
+  // Convert to blob
+  const dataUrl = canvas.toDataURL("image/png");
+  const parts = dataUrl.split(",");
+  if (parts.length < 2 || !parts[1]) return null;
+  const byteString = atob(parts[1]);
+  const ab = new ArrayBuffer(byteString.length);
+  const ia = new Uint8Array(ab);
+  for (let i = 0; i < byteString.length; i++) {
+    ia[i] = byteString.charCodeAt(i);
+  }
+  return new Blob([ab], { type: "image/png" });
+}
+
 function drawDashedLine(
   ctx: CanvasRenderingContext2D,
   x1: number,
@@ -367,7 +321,6 @@ function drawDashedLine(
   ctx.restore();
 }
 
-/** Truncate text to fit within a given width, adding ellipsis. */
 function truncateText(
   ctx: CanvasRenderingContext2D,
   text: string,
@@ -375,7 +328,10 @@ function truncateText(
 ): string {
   if (ctx.measureText(text).width <= maxWidth) return text;
   let truncated = text;
-  while (truncated.length > 0 && ctx.measureText(truncated + "...").width > maxWidth) {
+  while (
+    truncated.length > 0 &&
+    ctx.measureText(truncated + "...").width > maxWidth
+  ) {
     truncated = truncated.slice(0, -1);
   }
   return truncated + "...";
