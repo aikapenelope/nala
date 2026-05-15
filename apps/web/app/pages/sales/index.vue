@@ -193,6 +193,71 @@ const paymentReference = ref("");
 const isSubmitting = ref(false);
 const saleComplete = ref(false);
 
+// ============================================================
+// Optional customer (CRM capture on every sale)
+// ============================================================
+
+interface CustomerOption {
+  id: string;
+  name: string;
+  phone: string | null;
+}
+
+const selectedCustomerId = ref<string | null>(null);
+const selectedCustomerName = ref("");
+const selectedCustomerPhone = ref<string | null>(null);
+const customerQuery = ref("");
+const customerResults = ref<CustomerOption[]>([]);
+const showCustomerDropdown = ref(false);
+const isSearchingCustomers = ref(false);
+let customerSearchTimer: ReturnType<typeof setTimeout> | null = null;
+
+function onCustomerInput() {
+  selectedCustomerId.value = null;
+  selectedCustomerName.value = "";
+  selectedCustomerPhone.value = null;
+  if (customerSearchTimer) clearTimeout(customerSearchTimer);
+
+  const q = customerQuery.value.trim();
+  if (q.length < 2) {
+    customerResults.value = [];
+    showCustomerDropdown.value = false;
+    return;
+  }
+
+  customerSearchTimer = setTimeout(async () => {
+    isSearchingCustomers.value = true;
+    try {
+      const result = await $api<{ customers: CustomerOption[] }>(
+        `/api/customers?search=${encodeURIComponent(q)}&limit=5`,
+      );
+      customerResults.value = result.customers;
+      showCustomerDropdown.value = result.customers.length > 0;
+    } catch {
+      customerResults.value = [];
+    } finally {
+      isSearchingCustomers.value = false;
+    }
+  }, 250);
+}
+
+function selectCustomer(c: CustomerOption) {
+  selectedCustomerId.value = c.id;
+  selectedCustomerName.value = c.name;
+  selectedCustomerPhone.value = c.phone;
+  customerQuery.value = c.name;
+  showCustomerDropdown.value = false;
+}
+
+function clearCustomer() {
+  selectedCustomerId.value = null;
+  selectedCustomerName.value = "";
+  selectedCustomerPhone.value = null;
+  customerQuery.value = "";
+  customerResults.value = [];
+  showCustomerDropdown.value = false;
+}
+
 const paymentMethods: Array<{ value: PaymentMethod; label: string; icon: string; needsRef: boolean }> = [
   { value: "efectivo", label: "Efectivo", icon: "💵", needsRef: false },
   { value: "pago_movil", label: "P. Movil", icon: "📱", needsRef: true },
@@ -233,6 +298,7 @@ async function confirmSale() {
         discountPercent: 0,
         discountAmount: 0,
         channel: "pos",
+        customerId: selectedCustomerId.value || undefined,
       },
     });
 
@@ -252,6 +318,7 @@ function newSale() {
   selectedMethod.value = null;
   paymentReference.value = "";
   saleComplete.value = false;
+  clearCustomer();
 }
 
 const isSharingPosReceipt = ref(false);
@@ -279,7 +346,7 @@ async function sharePosReceipt() {
       date: new Date(),
     };
 
-    await shareReceipt(data);
+    await shareReceipt(data, selectedCustomerPhone.value);
   } finally {
     isSharingPosReceipt.value = false;
   }
@@ -559,6 +626,7 @@ function goToAdvancedCheckout() {
         </div>
         <p class="text-lg font-extrabold text-gradient">Venta registrada</p>
         <p class="mt-1 text-sm font-bold text-gray-500">${{ ticketTotal.toFixed(2) }}</p>
+        <p v-if="selectedCustomerName" class="mt-0.5 text-xs font-medium text-gray-400">{{ selectedCustomerName }}</p>
         <div class="mt-4 flex w-full gap-2">
           <button
             class="flex flex-1 items-center justify-center gap-1.5 rounded-2xl bg-green-600 py-3 text-sm font-bold text-white transition-spring disabled:opacity-50"
@@ -566,7 +634,7 @@ function goToAdvancedCheckout() {
             @click="sharePosReceipt"
           >
             <Share2 :size="14" />
-            {{ isSharingPosReceipt ? "..." : "Recibo" }}
+            {{ isSharingPosReceipt ? "..." : selectedCustomerPhone ? "Recibo WA" : "Recibo" }}
           </button>
           <button
             class="dark-pill flex-1 rounded-2xl py-3 text-sm font-bold transition-spring"
@@ -678,6 +746,46 @@ function goToAdvancedCheckout() {
             placeholder="Referencia de pago"
             class="w-full rounded-xl border border-white/80 bg-white/40 px-3 py-2 text-xs font-medium text-gray-800 outline-none placeholder:text-gray-400 focus:bg-white focus:ring-2 focus:ring-nova-accent/20"
           >
+
+          <!-- Optional customer (CRM capture) -->
+          <div class="relative">
+            <div
+              v-if="selectedCustomerId"
+              class="flex items-center justify-between rounded-xl bg-green-50 px-3 py-2"
+            >
+              <span class="text-xs font-bold text-green-700">{{ selectedCustomerName }}</span>
+              <button
+                class="text-gray-400 hover:text-red-500"
+                @click="clearCustomer"
+              >
+                <X :size="12" />
+              </button>
+            </div>
+            <div v-else>
+              <input
+                v-model="customerQuery"
+                type="text"
+                placeholder="Cliente (opcional)"
+                class="w-full rounded-xl border border-white/80 bg-white/40 px-3 py-2 text-xs font-medium text-gray-800 outline-none placeholder:text-gray-400 focus:bg-white focus:ring-2 focus:ring-nova-accent/20"
+                @input="onCustomerInput"
+                @focus="showCustomerDropdown = customerResults.length > 0"
+              >
+              <div
+                v-if="showCustomerDropdown"
+                class="absolute left-0 right-0 top-full z-10 mt-1 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-lg"
+              >
+                <button
+                  v-for="c in customerResults"
+                  :key="c.id"
+                  class="flex w-full items-center justify-between px-3 py-2 text-left text-xs transition-spring hover:bg-gray-50"
+                  @mousedown.prevent="selectCustomer(c)"
+                >
+                  <span class="font-semibold text-gray-800">{{ c.name }}</span>
+                  <span v-if="c.phone" class="text-gray-400">{{ c.phone }}</span>
+                </button>
+              </div>
+            </div>
+          </div>
 
           <!-- Advanced options link -->
           <button
