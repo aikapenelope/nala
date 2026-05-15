@@ -18,6 +18,7 @@ import {
   FileText,
   Receipt,
   DollarSign,
+  Truck,
 } from "lucide-vue-next";
 import type { Component } from "vue";
 
@@ -60,6 +61,12 @@ const mainItems: MenuItem[] = [
 
 /** Advanced tools - for power users. */
 const toolItems: MenuItem[] = [
+  {
+    to: "/suppliers",
+    icon: Truck,
+    label: "Proveedores",
+    description: "Directorio y deudas",
+  },
   {
     to: "/accounts",
     icon: Wallet,

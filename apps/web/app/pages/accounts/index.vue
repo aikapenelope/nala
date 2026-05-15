@@ -68,12 +68,68 @@ const paymentError = ref("");
 /** Create payable modal. */
 const showCreatePayable = ref(false);
 const newPayable = reactive({
+  supplierId: null as string | null,
   supplierName: "",
   description: "",
   amountUsd: 0,
 });
 const createPayableSubmitting = ref(false);
 const createPayableError = ref("");
+
+// Supplier search for payable creation
+interface SupplierOption {
+  id: string;
+  name: string;
+  phone: string | null;
+}
+const supplierQuery = ref("");
+const supplierResults = ref<SupplierOption[]>([]);
+const isSearchingSuppliers = ref(false);
+const showSupplierDropdown = ref(false);
+let supplierSearchTimer: ReturnType<typeof setTimeout> | null = null;
+
+function onSupplierInput() {
+  newPayable.supplierId = null;
+  newPayable.supplierName = supplierQuery.value;
+  if (supplierSearchTimer) clearTimeout(supplierSearchTimer);
+
+  const q = supplierQuery.value.trim();
+  if (q.length < 2) {
+    supplierResults.value = [];
+    showSupplierDropdown.value = false;
+    return;
+  }
+
+  supplierSearchTimer = setTimeout(async () => {
+    isSearchingSuppliers.value = true;
+    try {
+      const result = await $api<{ suppliers: SupplierOption[] }>(
+        `/api/suppliers?search=${encodeURIComponent(q)}`,
+      );
+      supplierResults.value = result.suppliers;
+      showSupplierDropdown.value = result.suppliers.length > 0;
+    } catch {
+      supplierResults.value = [];
+    } finally {
+      isSearchingSuppliers.value = false;
+    }
+  }, 250);
+}
+
+function selectSupplier(s: SupplierOption) {
+  newPayable.supplierId = s.id;
+  newPayable.supplierName = s.name;
+  supplierQuery.value = s.name;
+  showSupplierDropdown.value = false;
+}
+
+function clearSupplier() {
+  newPayable.supplierId = null;
+  newPayable.supplierName = "";
+  supplierQuery.value = "";
+  supplierResults.value = [];
+  showSupplierDropdown.value = false;
+}
 
 /** Pay payable modal. */
 const showPayPayable = ref(false);
@@ -181,14 +237,14 @@ async function submitCreatePayable() {
     await $api("/api/accounts/payable", {
       method: "POST",
       body: {
+        supplierId: newPayable.supplierId || undefined,
         supplierName: newPayable.supplierName.trim(),
         description: newPayable.description || undefined,
         amountUsd: newPayable.amountUsd,
-        balanceUsd: newPayable.amountUsd,
       },
     });
     showCreatePayable.value = false;
-    newPayable.supplierName = "";
+    clearSupplier();
     newPayable.description = "";
     newPayable.amountUsd = 0;
     await loadAccounts();
@@ -456,13 +512,68 @@ async function submitPayPayable() {
           <div class="space-y-4">
             <div>
               <label class="mb-1.5 block text-[13px] font-bold text-gray-600">Proveedor *</label>
-              <input
-                v-model="newPayable.supplierName"
-                type="text"
-                placeholder="Nombre del proveedor"
-                class="w-full rounded-2xl border border-white bg-white/60 px-4 py-3 text-sm font-semibold text-gray-800 shadow-[inset_0_2px_4px_rgba(0,0,0,0.03)] outline-none transition-spring placeholder:text-gray-400 focus:bg-white focus:ring-[3px] focus:ring-nova-accent/20"
-                autofocus
+
+              <!-- Selected supplier display -->
+              <div
+                v-if="newPayable.supplierId"
+                class="flex items-center justify-between rounded-2xl border border-green-300 bg-green-50 px-4 py-3"
               >
+                <div>
+                  <p class="text-sm font-bold text-gray-800">{{ newPayable.supplierName }}</p>
+                  <p class="text-[11px] font-medium text-green-700">Proveedor seleccionado</p>
+                </div>
+                <button
+                  class="flex h-7 w-7 items-center justify-center rounded-lg text-gray-400 transition-spring hover:bg-red-50 hover:text-red-500"
+                  @click="clearSupplier"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                </button>
+              </div>
+
+              <!-- Supplier search input -->
+              <div v-else class="relative">
+                <input
+                  v-model="supplierQuery"
+                  type="text"
+                  placeholder="Buscar proveedor por nombre..."
+                  class="w-full rounded-2xl border border-white bg-white/60 px-4 py-3 text-sm font-semibold text-gray-800 shadow-[inset_0_2px_4px_rgba(0,0,0,0.03)] outline-none transition-spring placeholder:text-gray-400 focus:bg-white focus:ring-[3px] focus:ring-nova-accent/20"
+                  autofocus
+                  @input="onSupplierInput"
+                  @focus="showSupplierDropdown = supplierResults.length > 0"
+                >
+                <div
+                  v-if="isSearchingSuppliers"
+                  class="absolute right-3 top-1/2 -translate-y-1/2"
+                >
+                  <div class="h-4 w-4 animate-spin rounded-full border-2 border-gray-200 border-t-nova-primary" />
+                </div>
+
+                <!-- Search results dropdown -->
+                <div
+                  v-if="showSupplierDropdown"
+                  class="absolute left-0 right-0 top-full z-10 mt-1 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-lg"
+                >
+                  <button
+                    v-for="s in supplierResults"
+                    :key="s.id"
+                    class="flex w-full items-center justify-between px-4 py-3 text-left transition-spring hover:bg-gray-50"
+                    @mousedown.prevent="selectSupplier(s)"
+                  >
+                    <div>
+                      <p class="text-sm font-semibold text-gray-800">{{ s.name }}</p>
+                      <p v-if="s.phone" class="text-[11px] text-gray-500">{{ s.phone }}</p>
+                    </div>
+                  </button>
+                </div>
+
+                <!-- Hint: can also type a new name -->
+                <p
+                  v-if="supplierQuery.length >= 2 && !isSearchingSuppliers && supplierResults.length === 0"
+                  class="mt-1.5 text-[11px] font-medium text-gray-400"
+                >
+                  No encontrado. Se usara "{{ supplierQuery }}" como nombre.
+                </p>
+              </div>
             </div>
             <div>
               <label class="mb-1.5 block text-[13px] font-bold text-gray-600">Monto ($) *</label>

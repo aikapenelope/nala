@@ -163,7 +163,7 @@ suppliersRoutes.get("/suppliers/:id/account", validateUuidParam, async (c) => {
       ),
     );
 
-  // Pending payables for this supplier
+  // Pending payables for this supplier (prefer FK, fallback to name match)
   const [payableStats] = await db
     .select({
       totalPending: sql<number>`COALESCE(SUM(${accountsPayable.balanceUsd}::numeric), 0)::float`,
@@ -173,7 +173,7 @@ suppliersRoutes.get("/suppliers/:id/account", validateUuidParam, async (c) => {
     .where(
       and(
         eq(accountsPayable.businessId, businessId),
-        eq(accountsPayable.supplierName, supplier.name),
+        sql`(${accountsPayable.supplierId} = ${id} OR (${accountsPayable.supplierId} IS NULL AND ${accountsPayable.supplierName} = ${supplier.name}))`,
         eq(accountsPayable.status, "pending"),
       ),
     );

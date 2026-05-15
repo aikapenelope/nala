@@ -529,6 +529,7 @@ customersRoutes.post(
       .insert(accountsPayable)
       .values({
         businessId,
+        supplierId: data.supplierId,
         supplierName: data.supplierName,
         description: data.description,
         amountUsd: String(data.amountUsd),

@@ -28,6 +28,7 @@ export const recordPaymentSchema = z.object({
 });
 
 export const createAccountPayableSchema = z.object({
+  supplierId: z.string().uuid().optional(),
   supplierName: z.string().min(1).max(200),
   description: z.string().max(500).optional(),
   amountUsd: z.number().min(0.01),
