@@ -7,8 +7,8 @@
  * - POST /api/sales/:id/void
  */
 
-import { Plus, Calendar, Share2 } from "lucide-vue-next";
-import { sendReceiptWhatsApp } from "~/composables/useReceiptImage";
+import { Plus, Calendar, Share2, Download } from "lucide-vue-next";
+import { sendReceiptWhatsApp, downloadReceiptImage } from "~/composables/useReceiptImage";
 import type { ReceiptData } from "~/composables/useReceiptImage";
 
 const { isDesktop } = useDevice();
@@ -26,6 +26,8 @@ interface Sale {
   id: string;
   createdAt: string;
   userId: string;
+  customerId: string | null;
+  customerName: string | null;
   totalUsd: string;
   totalBs: string | null;
   totalCostUsd: string | null;
@@ -138,6 +140,59 @@ async function shareReceipt(saleId: string) {
     };
 
     await sendReceiptWhatsApp(receiptData);
+  } catch {
+    toast("Error generando recibo", "error");
+  }
+}
+
+/**
+ * Download receipt as PNG image.
+ * Fetches sale detail then generates and downloads the image.
+ */
+async function downloadReceipt(saleId: string) {
+  try {
+    const detail = await $api<{
+      sale: {
+        totalUsd: string;
+        totalBs: string | null;
+        exchangeRate: string | null;
+        surcharges: Array<{ name: string; amount: number }> | null;
+        createdAt: string;
+      };
+      items: Array<{
+        productName: string | null;
+        quantity: number;
+        unitPrice: string;
+        lineTotal: string;
+      }>;
+      payments: Array<{ method: string }>;
+    }>(`/api/sales/${saleId}`);
+
+    const receiptData: ReceiptData = {
+      businessName: user.value?.businessName ?? "Mi Negocio",
+      items: detail.items.map((item) => ({
+        name: item.productName ?? "Producto",
+        quantity: item.quantity,
+        unitPrice: Number(item.unitPrice),
+        lineTotal: Number(item.lineTotal),
+      })),
+      subtotal: Number(detail.sale.totalUsd),
+      surcharges: detail.sale.surcharges?.length
+        ? detail.sale.surcharges
+        : undefined,
+      totalUsd: Number(detail.sale.totalUsd),
+      totalBs: detail.sale.totalBs ? Number(detail.sale.totalBs) : undefined,
+      exchangeRate: detail.sale.exchangeRate
+        ? Number(detail.sale.exchangeRate)
+        : undefined,
+      paymentMethod: detail.payments[0]?.method ?? "efectivo",
+      date: new Date(detail.sale.createdAt),
+    };
+
+    const ok = downloadReceiptImage(receiptData);
+    if (!ok) {
+      toast("Error descargando recibo", "error");
+    }
   } catch {
     toast("Error generando recibo", "error");
   }
@@ -277,6 +332,11 @@ async function confirmReason() {
                 Fecha
               </th>
               <th
+                class="px-4 py-3.5 text-[11px] font-bold tracking-wider text-gray-400 uppercase"
+              >
+                Cliente
+              </th>
+              <th
                 class="px-4 py-3.5 text-right text-[11px] font-bold tracking-wider text-gray-400 uppercase"
               >
                 Total
@@ -308,6 +368,9 @@ async function confirmReason() {
             >
               <td class="px-4 py-3.5 font-medium text-gray-700">
                 {{ formatDate(sale.createdAt) }}
+              </td>
+              <td class="px-4 py-3.5 text-sm text-gray-600">
+                {{ sale.customerName ?? "—" }}
               </td>
               <td class="px-4 py-3.5 text-right">
                 <span class="font-bold text-gray-800"
@@ -357,10 +420,17 @@ async function confirmReason() {
                 <div class="flex gap-2">
                   <button
                     v-if="sale.status === 'completed'"
-                    class="rounded-xl bg-nova-primary/10 px-2.5 py-1 text-[11px] font-bold text-nova-primary transition-spring hover:bg-nova-primary/20"
+                    class="rounded-xl bg-green-50 px-2.5 py-1 text-[11px] font-bold text-green-700 transition-spring hover:bg-green-100"
                     @click="shareReceipt(sale.id)"
                   >
-                    <Share2 :size="12" class="inline" /> Recibo
+                    <Share2 :size="12" class="inline" /> WhatsApp
+                  </button>
+                  <button
+                    v-if="sale.status === 'completed'"
+                    class="rounded-xl bg-nova-primary/10 px-2.5 py-1 text-[11px] font-bold text-nova-primary transition-spring hover:bg-nova-primary/20"
+                    @click="downloadReceipt(sale.id)"
+                  >
+                    <Download :size="12" class="inline" /> PNG
                   </button>
                   <button
                     v-if="sale.status === 'completed'"
@@ -404,6 +474,9 @@ async function confirmReason() {
               </p>
               <p class="mt-0.5 text-xs font-medium text-gray-500">
                 {{ formatDate(sale.createdAt) }}
+                <span v-if="sale.customerName" class="ml-1 text-gray-600 font-semibold">
+                  · {{ sale.customerName }}
+                </span>
                 <span v-if="sale.channel" class="ml-1 text-gray-400">
                   · {{ sale.channel }}
                 </span>
@@ -422,10 +495,19 @@ async function confirmReason() {
               </span>
               <button
                 v-if="sale.status === 'completed'"
-                class="rounded-lg bg-nova-primary/10 px-2 py-0.5 text-[10px] font-bold text-nova-primary transition-spring hover:bg-nova-primary/20"
+                class="rounded-lg bg-green-50 px-2 py-0.5 text-[10px] font-bold text-green-700 transition-spring hover:bg-green-100"
+                title="Enviar por WhatsApp"
                 @click="shareReceipt(sale.id)"
               >
                 <Share2 :size="10" class="inline" />
+              </button>
+              <button
+                v-if="sale.status === 'completed'"
+                class="rounded-lg bg-nova-primary/10 px-2 py-0.5 text-[10px] font-bold text-nova-primary transition-spring hover:bg-nova-primary/20"
+                title="Descargar recibo"
+                @click="downloadReceipt(sale.id)"
+              >
+                <Download :size="10" class="inline" />
               </button>
               <button
                 v-if="sale.status === 'completed'"

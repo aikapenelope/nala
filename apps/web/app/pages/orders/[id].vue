@@ -21,10 +21,15 @@ import {
   Phone,
   User,
   MessageSquare,
+  Share2,
+  Download,
 } from "lucide-vue-next";
+import { sendReceiptWhatsApp, downloadReceiptImage } from "~/composables/useReceiptImage";
+import type { ReceiptData } from "~/composables/useReceiptImage";
 
 const route = useRoute();
 const { $api } = useApi();
+const { user } = useNovaAuth();
 const orderId = route.params.id as string;
 
 interface OrderDetail {
@@ -185,6 +190,41 @@ const statusConfig: Record<string, { label: string; color: string }> = {
   delivered: { label: "Entregado", color: "text-blue-600 bg-blue-50" },
   cancelled: { label: "Cancelado", color: "text-gray-500 bg-gray-100" },
 };
+
+/** Build receipt data from order. */
+function buildOrderReceiptData(): ReceiptData | null {
+  if (!order.value) return null;
+  return {
+    businessName: user.value?.businessName ?? "Mi Negocio",
+    items: order.value.items.map((i) => ({
+      name: i.name,
+      quantity: i.quantity,
+      unitPrice: i.price,
+      lineTotal: i.lineTotal,
+    })),
+    subtotal: order.value.subtotal,
+    totalUsd: order.value.total,
+    totalBs: order.value.totalBs ?? undefined,
+    exchangeRate: order.value.exchangeRate ?? undefined,
+    paymentMethod:
+      methodLabels[order.value.paymentMethod] ?? order.value.paymentMethod,
+    date: new Date(order.value.createdAt),
+  };
+}
+
+/** Send order receipt via WhatsApp to the customer. */
+function sendOrderReceiptWA() {
+  const data = buildOrderReceiptData();
+  if (!data) return;
+  sendReceiptWhatsApp(data, order.value?.customerPhone);
+}
+
+/** Download order receipt as PNG. */
+function downloadOrderReceipt() {
+  const data = buildOrderReceiptData();
+  if (!data) return;
+  downloadReceiptImage(data);
+}
 
 onMounted(fetchOrder);
 </script>
@@ -446,6 +486,24 @@ onMounted(fetchOrder);
           <Phone :size="16" />
           Contactar por WhatsApp
         </a>
+
+        <!-- Receipt actions -->
+        <div class="flex gap-2">
+          <button
+            class="flex flex-1 items-center justify-center gap-2 rounded-xl bg-green-50 py-3 text-sm font-bold text-green-700 transition-colors hover:bg-green-100"
+            @click="sendOrderReceiptWA"
+          >
+            <Share2 :size="16" />
+            Enviar recibo
+          </button>
+          <button
+            class="flex flex-1 items-center justify-center gap-2 rounded-xl bg-nova-primary/10 py-3 text-sm font-bold text-nova-primary transition-colors hover:bg-nova-primary/20"
+            @click="downloadOrderReceipt"
+          >
+            <Download :size="16" />
+            Descargar recibo
+          </button>
+        </div>
       </div>
     </template>
 
