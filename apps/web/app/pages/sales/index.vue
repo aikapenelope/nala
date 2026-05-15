@@ -346,7 +346,12 @@ async function sharePosReceipt() {
       date: new Date(),
     };
 
-    await shareReceipt(data, selectedCustomerPhone.value);
+    const result = await shareReceipt(data, selectedCustomerPhone.value);
+    if (result === "clipboard") {
+      toast("Recibo copiado al portapapeles", "success");
+    } else if (result === "error") {
+      toast("No se pudo compartir el recibo", "error");
+    }
   } finally {
     isSharingPosReceipt.value = false;
   }

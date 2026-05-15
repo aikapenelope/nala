@@ -212,49 +212,66 @@ export function generateReceiptImage(data: ReceiptData): Blob | null {
 /**
  * Share a receipt via WhatsApp as an image.
  *
- * Strategy:
+ * Strategy (with robust fallback chain):
  * 1. Generate receipt image with Canvas
  * 2. Try Web Share API with the image file (opens native share sheet)
- * 3. If Web Share not available, open wa.me with text fallback
+ * 3. If Web Share fails, open wa.me with text fallback
+ * 4. If wa.me popup is blocked, copy text to clipboard
+ *
+ * Never throws — always returns a result string.
  *
  * @param data - Receipt data for image generation
  * @param phone - Optional phone number (with country code) to target WhatsApp directly
- * @returns "shared" if Web Share succeeded, "fallback" if text was used
+ * @returns "shared" | "whatsapp" | "clipboard" | "error"
  */
 export async function shareReceipt(
   data: ReceiptData,
   phone?: string | null,
-): Promise<"shared" | "fallback"> {
-  const blob = generateReceiptImage(data);
+): Promise<"shared" | "whatsapp" | "clipboard" | "error"> {
+  // Step 1: Try Web Share API with image file
+  try {
+    const blob = generateReceiptImage(data);
+    if (blob && canShareFiles()) {
+      const file = new File([blob], "recibo.png", { type: "image/png" });
+      const shareData = {
+        title: `Recibo - ${data.businessName}`,
+        text: `Recibo de $${data.totalUsd.toFixed(2)}`,
+        files: [file],
+      };
 
-  // Try Web Share API with image file
-  if (blob && canShareFiles()) {
-    const file = new File([blob], "recibo.png", { type: "image/png" });
-    const shareData = {
-      title: `Recibo - ${data.businessName}`,
-      text: `Recibo de $${data.totalUsd.toFixed(2)}`,
-      files: [file],
-    };
-
-    try {
       if (navigator.canShare(shareData)) {
         await navigator.share(shareData);
         return "shared";
       }
-    } catch {
-      // User cancelled or share failed — fall through to WhatsApp text
     }
+  } catch {
+    // Web Share failed (user cancelled, not supported, etc.)
+    // Fall through to WhatsApp text
   }
 
-  // Fallback: open WhatsApp with formatted text
+  // Step 2: Try opening WhatsApp with text
   const text = buildReceiptText(data);
-  const encoded = encodeURIComponent(text);
   const cleanPhone = phone?.replace(/[^0-9]/g, "") ?? "";
   const waUrl = cleanPhone
-    ? `https://wa.me/${cleanPhone}?text=${encoded}`
-    : `https://wa.me/?text=${encoded}`;
-  window.open(waUrl, "_blank");
-  return "fallback";
+    ? `https://wa.me/${cleanPhone}?text=${encodeURIComponent(text)}`
+    : `https://wa.me/?text=${encodeURIComponent(text)}`;
+
+  try {
+    const win = window.open(waUrl, "_blank");
+    if (win) return "whatsapp";
+  } catch {
+    // window.open blocked or failed
+  }
+
+  // Step 3: Last resort — copy receipt text to clipboard
+  try {
+    await navigator.clipboard.writeText(text);
+    return "clipboard";
+  } catch {
+    // Clipboard also failed
+  }
+
+  return "error";
 }
 
 /**
