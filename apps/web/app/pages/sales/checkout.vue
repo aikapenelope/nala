@@ -20,8 +20,8 @@
 
 import { usdToBs } from "@nova/shared";
 import type { PaymentMethod, SaleChannel } from "@nova/shared";
-import { Check, WifiOff, X, ShoppingCart, Share2 } from "lucide-vue-next";
-import { shareReceipt } from "~/composables/useReceiptImage";
+import { Check, WifiOff, X, ShoppingCart, Share2, Download } from "lucide-vue-next";
+import { sendReceiptWhatsApp, downloadReceiptImage } from "~/composables/useReceiptImage";
 import type { ReceiptData } from "~/composables/useReceiptImage";
 
 const router = useRouter();
@@ -398,21 +398,19 @@ function buildReceiptData(): ReceiptData {
   };
 }
 
-const isSharing = ref(false);
+/** Send receipt text via WhatsApp. */
+function handleSendWhatsApp() {
+  const ok = sendReceiptWhatsApp(buildReceiptData());
+  if (!ok) {
+    saleError.value = "No se pudo abrir WhatsApp. Intenta descargar el recibo.";
+  }
+}
 
-/** Share receipt as image via WhatsApp (with text fallback). */
-async function handleShareReceipt() {
-  isSharing.value = true;
-  try {
-    const result = await shareReceipt(buildReceiptData());
-    if (result === "clipboard") {
-      // Show a brief note that text was copied
-      saleError.value = "Recibo copiado al portapapeles. Pegalo en WhatsApp.";
-    } else if (result === "error") {
-      saleError.value = "No se pudo compartir el recibo.";
-    }
-  } finally {
-    isSharing.value = false;
+/** Download receipt as PNG image. */
+function handleDownloadReceipt() {
+  const ok = downloadReceiptImage(buildReceiptData());
+  if (!ok) {
+    saleError.value = "Error generando imagen del recibo.";
   }
 }
 
@@ -443,12 +441,18 @@ function newSale() {
 
       <div class="mt-8 space-y-3">
         <button
-          class="flex w-full items-center justify-center gap-2 rounded-2xl bg-green-600 py-3.5 font-bold text-white transition-spring disabled:opacity-50"
-          :disabled="isSharing"
-          @click="handleShareReceipt"
+          class="flex w-full items-center justify-center gap-2 rounded-2xl bg-green-600 py-3.5 font-bold text-white transition-spring"
+          @click="handleSendWhatsApp"
         >
           <Share2 :size="18" />
-          {{ isSharing ? "Preparando..." : "Enviar recibo por WhatsApp" }}
+          Enviar recibo por WhatsApp
+        </button>
+        <button
+          class="flex w-full items-center justify-center gap-2 rounded-2xl bg-gray-100 py-3 text-sm font-bold text-gray-600 transition-spring hover:bg-gray-200"
+          @click="handleDownloadReceipt"
+        >
+          <Download :size="16" />
+          Descargar recibo como imagen
         </button>
         <button
           class="dark-pill flex w-full items-center justify-center gap-2 rounded-2xl py-3.5 font-bold transition-spring"

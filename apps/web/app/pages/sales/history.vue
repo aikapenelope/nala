@@ -8,7 +8,7 @@
  */
 
 import { Plus, Calendar, Share2 } from "lucide-vue-next";
-import { shareReceipt as shareReceiptImage } from "~/composables/useReceiptImage";
+import { sendReceiptWhatsApp } from "~/composables/useReceiptImage";
 import type { ReceiptData } from "~/composables/useReceiptImage";
 
 const { isDesktop } = useDevice();
@@ -137,7 +137,7 @@ async function shareReceipt(saleId: string) {
       date: new Date(detail.sale.createdAt),
     };
 
-    await shareReceiptImage(receiptData);
+    await sendReceiptWhatsApp(receiptData);
   } catch {
     toast("Error generando recibo", "error");
   }
