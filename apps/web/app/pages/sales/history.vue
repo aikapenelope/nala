@@ -8,10 +8,13 @@
  */
 
 import { Plus, Calendar, Share2 } from "lucide-vue-next";
+import { shareReceipt as shareReceiptImage } from "~/composables/useReceiptImage";
+import type { ReceiptData } from "~/composables/useReceiptImage";
 
 const { isDesktop } = useDevice();
 const { $api } = useApi();
 const { toast } = useToast();
+const { user } = useNovaAuth();
 
 const dateFilter = ref("");
 const methodFilter = ref<string | null>(null);
@@ -89,35 +92,54 @@ function saleProfit(sale: Sale): number | null {
 }
 
 /**
- * Share receipt via Web Share API (native on mobile) or download as fallback.
- * Uses the existing GET /api/sales/:id/receipt endpoint that returns a PDF.
+ * Share receipt as image via WhatsApp.
+ * Fetches sale detail (items + payments) then uses the unified receipt composable.
  */
 async function shareReceipt(saleId: string) {
   try {
-    const blob = await $api<Blob>(`/api/sales/${saleId}/receipt`, {
-      responseType: "blob" as never,
-    });
+    const detail = await $api<{
+      sale: {
+        totalUsd: string;
+        totalBs: string | null;
+        exchangeRate: string | null;
+        discountPercent: string | null;
+        discountAmount: string | null;
+        surcharges: Array<{ name: string; amount: number }> | null;
+        createdAt: string;
+      };
+      items: Array<{
+        productName: string | null;
+        quantity: number;
+        unitPrice: string;
+        lineTotal: string;
+      }>;
+      payments: Array<{ method: string }>;
+    }>(`/api/sales/${saleId}`);
 
-    // Try Web Share API first (native share sheet on mobile)
-    if (import.meta.client && navigator.share) {
-      const file = new File([blob as unknown as Blob], `recibo-${saleId.slice(0, 8)}.pdf`, {
-        type: "application/pdf",
-      });
-      await navigator.share({
-        title: "Recibo de venta",
-        files: [file],
-      });
-    } else {
-      // Fallback: direct download
-      const url = URL.createObjectURL(blob as unknown as Blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `recibo-${saleId.slice(0, 8)}.pdf`;
-      a.click();
-      URL.revokeObjectURL(url);
-    }
+    const receiptData: ReceiptData = {
+      businessName: user.value?.businessName ?? "Mi Negocio",
+      items: detail.items.map((item) => ({
+        name: item.productName ?? "Producto",
+        quantity: item.quantity,
+        unitPrice: Number(item.unitPrice),
+        lineTotal: Number(item.lineTotal),
+      })),
+      subtotal: Number(detail.sale.totalUsd),
+      surcharges: detail.sale.surcharges?.length
+        ? detail.sale.surcharges
+        : undefined,
+      totalUsd: Number(detail.sale.totalUsd),
+      totalBs: detail.sale.totalBs ? Number(detail.sale.totalBs) : undefined,
+      exchangeRate: detail.sale.exchangeRate
+        ? Number(detail.sale.exchangeRate)
+        : undefined,
+      paymentMethod: detail.payments[0]?.method ?? "efectivo",
+      date: new Date(detail.sale.createdAt),
+    };
+
+    await shareReceiptImage(receiptData);
   } catch {
-    // Non-critical: user can retry
+    toast("Error generando recibo", "error");
   }
 }
 

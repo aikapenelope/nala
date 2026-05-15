@@ -20,7 +20,7 @@
 
 import { usdToBs } from "@nova/shared";
 import type { PaymentMethod, SaleChannel } from "@nova/shared";
-import { Check, WifiOff, X, MessageCircle, ShoppingCart, Share2 } from "lucide-vue-next";
+import { Check, WifiOff, X, ShoppingCart, Share2 } from "lucide-vue-next";
 import { shareReceipt } from "~/composables/useReceiptImage";
 import type { ReceiptData } from "~/composables/useReceiptImage";
 
@@ -372,7 +372,7 @@ async function confirmSale() {
   }
 }
 
-/** Build receipt data for image generation. */
+/** Build receipt data for the unified receipt composable. */
 function buildReceiptData(): ReceiptData {
   const methodLabel =
     paymentMethods.find((m) => m.value === selectedMethod.value)?.label ??
@@ -398,77 +398,16 @@ function buildReceiptData(): ReceiptData {
   };
 }
 
-/** Build plain text fallback for WhatsApp. */
-function buildReceiptText(): string {
-  const businessName = user.value?.businessName ?? "Mi Negocio";
-  const now = new Date();
-  const dateStr = now.toLocaleDateString("es-VE", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
-  const timeStr = now.toLocaleTimeString("es-VE", {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-
-  const itemLines = items.value
-    .map(
-      (item) =>
-        `  ${item.name} x${item.quantity} — $${(item.unitPrice * item.quantity).toFixed(2)}`,
-    )
-    .join("\n");
-
-  const surchargeLines =
-    appliedSurcharges.value.length > 0
-      ? appliedSurcharges.value
-          .map((s) => `  ${s.name}: $${s.amount.toFixed(2)}`)
-          .join("\n")
-      : "";
-
-  const bsLine =
-    exchangeRate.value > 0
-      ? `\nBs. ${totalBs.value.toFixed(2)} (tasa ${exchangeRate.value.toFixed(2)})`
-      : "";
-
-  const methodLabel =
-    paymentMethods.find((m) => m.value === selectedMethod.value)?.label ??
-    selectedMethod.value;
-
-  return [
-    `📋 *${businessName}*`,
-    `${dateStr} ${timeStr}`,
-    `─────────────────`,
-    itemLines,
-    `─────────────────`,
-    surchargeLines ? `${surchargeLines}\n─────────────────` : "",
-    `*Total: $${totalUsd.value.toFixed(2)}*${bsLine}`,
-    `Pago: ${methodLabel}`,
-    ``,
-    `Gracias por su compra! 🙏`,
-  ]
-    .filter(Boolean)
-    .join("\n");
-}
-
 const isSharing = ref(false);
 
-/** Share receipt as image (with text fallback). */
+/** Share receipt as image via WhatsApp (with text fallback). */
 async function handleShareReceipt() {
   isSharing.value = true;
   try {
-    const data = buildReceiptData();
-    const fallback = buildReceiptText();
-    await shareReceipt(data, fallback);
+    await shareReceipt(buildReceiptData());
   } finally {
     isSharing.value = false;
   }
-}
-
-/** Send receipt as plain text via WhatsApp (legacy fallback). */
-function sendWhatsAppText() {
-  const text = encodeURIComponent(buildReceiptText());
-  window.open(`https://wa.me/?text=${text}`, "_blank");
 }
 
 /** Go back to POS screen for next sale. */
@@ -503,14 +442,7 @@ function newSale() {
           @click="handleShareReceipt"
         >
           <Share2 :size="18" />
-          {{ isSharing ? "Preparando..." : "Compartir recibo" }}
-        </button>
-        <button
-          class="flex w-full items-center justify-center gap-2 rounded-2xl bg-gray-100 py-3 text-sm font-bold text-gray-600 transition-spring hover:bg-gray-200"
-          @click="sendWhatsAppText"
-        >
-          <MessageCircle :size="16" />
-          Enviar como texto
+          {{ isSharing ? "Preparando..." : "Enviar recibo por WhatsApp" }}
         </button>
         <button
           class="dark-pill flex w-full items-center justify-center gap-2 rounded-2xl py-3.5 font-bold transition-spring"
