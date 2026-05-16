@@ -5,12 +5,12 @@
  * settings, accounting). Inspired by Loyverse/Square POS passcode.
  *
  * How it works:
- * - On app load, checks GET /api/owner-lock/status to know if lock is enabled
- * - If enabled, sensitive sections show a lock overlay
+ * - On app load, a client plugin calls checkStatus() to fetch lock state
+ * - If enabled, sensitive sections show a lock overlay via OwnerLockGuard
  * - User enters 4-digit PIN -> POST /api/owner-lock/verify
- * - If correct, sections unlock for `UNLOCK_DURATION_MS` (15 minutes)
+ * - If correct, sections unlock for UNLOCK_DURATION_MS (15 minutes)
  * - After timeout, auto-locks again
- * - State is in-memory only (page reload = locked again)
+ * - State uses Nuxt useState (survives client navigation, resets on reload)
  *
  * Usage in pages:
  *   const { isLocked, unlock } = useOwnerLock();
@@ -20,25 +20,31 @@
 /** How long the unlock lasts before auto-locking (15 minutes). */
 const UNLOCK_DURATION_MS = 15 * 60 * 1000;
 
-/** Whether the lock feature is enabled for this business. */
-const lockEnabled = ref<boolean | null>(null);
-
-/** Whether the user has entered the correct PIN (temporary unlock). */
-const unlocked = ref(false);
-
-/** Timestamp when the unlock expires. */
+/** Timer handle for auto-lock (client-side only, not serializable). */
 let unlockTimer: ReturnType<typeof setTimeout> | null = null;
 
 export function useOwnerLock() {
+  /**
+   * Whether the lock feature is enabled for this business.
+   * null = not yet checked, true = enabled, false = disabled.
+   * Uses useState so it survives Nuxt client-side navigation.
+   */
+  const lockEnabled = useState<boolean | null>("owner-lock-enabled", () => null);
+
+  /**
+   * Whether the user has entered the correct PIN (temporary unlock).
+   * Resets to false on page reload (useState re-initializes from server).
+   */
+  const unlocked = useState<boolean>("owner-lock-unlocked", () => false);
+
   const { $api } = useApi();
 
   /**
    * True if the lock is active and the user has NOT entered the PIN.
-   * False if lock is disabled OR user has unlocked.
-   * Null while loading status.
+   * False if lock is disabled OR user has unlocked OR status not yet loaded.
    */
   const isLocked = computed(() => {
-    if (lockEnabled.value === null) return false; // Loading: don't block
+    if (lockEnabled.value === null) return false; // Not yet checked
     if (!lockEnabled.value) return false; // Lock not enabled
     return !unlocked.value;
   });
@@ -46,7 +52,11 @@ export function useOwnerLock() {
   /** True if the lock feature is enabled (regardless of unlock state). */
   const isEnabled = computed(() => lockEnabled.value === true);
 
-  /** Check lock status from the server. Called once on app init. */
+  /**
+   * Check lock status from the server.
+   * Called by the owner-lock plugin on every app initialization,
+   * and by auth/resolve during login flow.
+   */
   async function checkStatus() {
     try {
       const result = await $api<{ enabled: boolean }>(
@@ -87,12 +97,14 @@ export function useOwnerLock() {
     clearTimer();
   }
 
-  /** Reset the auto-lock timer (called on each unlock and user interaction). */
+  /** Reset the auto-lock timer. */
   function resetTimer() {
     clearTimer();
-    unlockTimer = setTimeout(() => {
-      unlocked.value = false;
-    }, UNLOCK_DURATION_MS);
+    if (import.meta.client) {
+      unlockTimer = setTimeout(() => {
+        unlocked.value = false;
+      }, UNLOCK_DURATION_MS);
+    }
   }
 
   function clearTimer() {
@@ -141,27 +153,19 @@ export function useOwnerLock() {
     }
   }
 
-  /** Refresh lock status (e.g., after setup/disable from settings). */
+  /** Refresh lock status from server. */
   async function refresh() {
     await checkStatus();
   }
 
   return {
-    /** True if sensitive sections should be hidden. */
     isLocked: readonly(isLocked),
-    /** True if the lock feature is enabled for this business. */
     isEnabled: readonly(isEnabled),
-    /** Check lock status from server (call on app init). */
     checkStatus,
-    /** Verify PIN and unlock temporarily. */
     unlock,
-    /** Lock again manually. */
     lock,
-    /** Create or change PIN. */
     setupPin,
-    /** Disable PIN (requires current PIN). */
     disablePin,
-    /** Refresh status from server. */
     refresh,
   };
 }
