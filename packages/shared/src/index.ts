@@ -13,3 +13,4 @@ export * from "./sales";
 export * from "./customers";
 export * from "./predictions";
 export * from "./gamification";
+export * from "./timezone";

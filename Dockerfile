@@ -78,6 +78,10 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 ENV PORT=3001
+# Venezuela Standard Time (UTC-4). Defense-in-depth: the application code
+# uses explicit Intl timezone conversions, but setting TZ ensures that any
+# fallback to system-local time (e.g. new Date().getHours()) is correct.
+ENV TZ=America/Caracas
 
 # Copy bundled API (single file from tsup) + external dependencies
 COPY --from=builder --chown=node:node /app/apps/api/dist ./apps/api/dist
@@ -111,6 +115,7 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 ENV PORT=3000
+ENV TZ=America/Caracas
 
 COPY --from=builder --chown=node:node /app/apps/web/.output ./.output
 
