@@ -2,12 +2,12 @@
 /**
  * Owner Lock Guard component.
  *
- * Wraps sensitive content. When the owner lock is active and not
- * unlocked, shows a PIN entry overlay instead of the content.
+ * Wraps sensitive content. Self-initializing: on mount, it checks
+ * the lock status from the API (if not already checked) and shows
+ * the PIN overlay if the lock is active.
  *
- * The lock only applies on the client side. During SSR, content
- * renders normally to avoid hydration mismatches. The client plugin
- * (owner-lock.client.ts) sets the lock state after hydration.
+ * No dependency on plugins, useState, or SSR hydration.
+ * Works purely client-side after mount.
  *
  * Usage:
  *   <OwnerLockGuard message="Ingresa tu clave para ver reportes">
@@ -19,7 +19,6 @@ import { Lock } from "lucide-vue-next";
 
 const props = withDefaults(
   defineProps<{
-    /** Custom message shown on the lock screen. */
     message?: string;
   }>(),
   {
@@ -27,25 +26,26 @@ const props = withDefaults(
   },
 );
 
-const { isLocked, unlock } = useOwnerLock();
+const { isLocked, isLoading, ensureInitialized, unlock } = useOwnerLock();
 
-/**
- * Whether the component has mounted on the client.
- * Lock enforcement only starts after mount to avoid SSR hydration mismatch.
- */
+/** Whether the component has mounted (lock only enforced after mount). */
 const mounted = ref(false);
-onMounted(() => {
+
+onMounted(async () => {
+  await ensureInitialized();
   mounted.value = true;
 });
 
-/** Effective lock state: only active after client mount. */
+/** Show lock overlay only after mount and only if locked. */
 const showLock = computed(() => mounted.value && isLocked.value);
+
+/** Show loading state while checking lock status. */
+const showLoading = computed(() => mounted.value && isLoading.value);
 
 const pin = ref("");
 const error = ref("");
 const isVerifying = ref(false);
 
-/** Handle digit input. Auto-submit when 4 digits entered. */
 function onDigit(digit: string) {
   if (pin.value.length >= 4) return;
   pin.value += digit;
@@ -56,13 +56,11 @@ function onDigit(digit: string) {
   }
 }
 
-/** Remove last digit. */
 function onBackspace() {
   pin.value = pin.value.slice(0, -1);
   error.value = "";
 }
 
-/** Verify the entered PIN. */
 async function verifyPin() {
   if (pin.value.length !== 4) return;
 
@@ -79,26 +77,32 @@ async function verifyPin() {
   isVerifying.value = false;
 }
 
-/** Digit buttons for the PIN pad. */
 const digits = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", "back"];
 </script>
 
 <template>
-  <!-- When not locked (or SSR), render the slot content directly -->
-  <slot v-if="!showLock" />
+  <!-- SSR + before mount: render content normally (no lock enforcement) -->
+  <!-- After mount + not locked: render content -->
+  <slot v-if="!showLock && !showLoading" />
 
-  <!-- When locked on client, show the PIN entry overlay -->
+  <!-- Loading: checking lock status -->
+  <div
+    v-else-if="showLoading"
+    class="flex min-h-[60vh] items-center justify-center"
+  >
+    <div class="h-8 w-8 animate-spin rounded-full border-2 border-gray-200 border-t-nova-primary" />
+  </div>
+
+  <!-- Locked: show PIN entry -->
   <div
     v-else
     class="flex min-h-[60vh] flex-col items-center justify-center px-4"
   >
     <div class="w-full max-w-xs text-center">
-      <!-- Lock icon -->
       <div class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gray-100">
         <Lock :size="28" class="text-gray-400" />
       </div>
 
-      <!-- Message -->
       <p class="mb-2 text-base font-bold text-gray-800">{{ props.message }}</p>
       <p class="mb-6 text-sm text-gray-500">Ingresa tu clave de 4 digitos</p>
 
@@ -109,40 +113,24 @@ const digits = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", "back"];
           :key="i"
           class="h-3.5 w-3.5 rounded-full transition-all duration-200"
           :class="[
-            i <= pin.length
-              ? 'bg-nova-primary scale-110'
-              : 'bg-gray-200',
+            i <= pin.length ? 'bg-nova-primary scale-110' : 'bg-gray-200',
             error && pin.length === 0 ? 'bg-red-200' : '',
           ]"
         />
       </div>
 
-      <!-- Error message -->
-      <p
-        v-if="error"
-        class="mb-4 text-sm font-semibold text-red-500"
-      >
+      <p v-if="error" class="mb-4 text-sm font-semibold text-red-500">
         {{ error }}
       </p>
 
-      <!-- Verifying spinner -->
-      <div
-        v-if="isVerifying"
-        class="mb-4 flex justify-center"
-      >
+      <div v-if="isVerifying" class="mb-4 flex justify-center">
         <div class="h-6 w-6 animate-spin rounded-full border-2 border-gray-200 border-t-nova-primary" />
       </div>
 
       <!-- PIN pad -->
-      <div
-        v-if="!isVerifying"
-        class="mx-auto grid max-w-[240px] grid-cols-3 gap-2"
-      >
+      <div v-if="!isVerifying" class="mx-auto grid max-w-[240px] grid-cols-3 gap-2">
         <template v-for="d in digits" :key="d">
-          <!-- Empty spacer -->
           <div v-if="d === ''" />
-
-          <!-- Backspace button -->
           <button
             v-else-if="d === 'back'"
             class="flex h-14 items-center justify-center rounded-2xl text-gray-500 transition-colors active:bg-gray-100"
@@ -150,8 +138,6 @@ const digits = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", "back"];
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 4H8l-7 8 7 8h13a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z"/><line x1="18" y1="9" x2="12" y2="15"/><line x1="12" y1="9" x2="18" y2="15"/></svg>
           </button>
-
-          <!-- Digit button -->
           <button
             v-else
             class="flex h-14 items-center justify-center rounded-2xl bg-gray-50 text-lg font-bold text-gray-800 transition-colors active:bg-gray-200"
