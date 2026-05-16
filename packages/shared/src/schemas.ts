@@ -4,8 +4,8 @@
 
 import { z } from "zod";
 
-/** Schema for user roles. */
-export const userRoleSchema = z.enum(["owner", "employee"]);
+/** Schema for user roles. Single-user model: always "owner". */
+export const userRoleSchema = z.enum(["owner"]);
 
 /** Schema for business types. */
 export const businessTypeSchema = z.enum([

@@ -17,9 +17,6 @@ import {
   periodChange,
 } from "../predictions";
 import {
-  rankSellers,
-} from "../gamification";
-import {
   calculateAgingColor,
 } from "../customers";
 
@@ -133,19 +130,6 @@ describe("periodChange", () => {
     const result = periodChange(90, 100);
     expect(result.positive).toBe(false);
     expect(result.percent).toBe(10);
-  });
-});
-
-describe("rankSellers", () => {
-  it("ranks by total descending", () => {
-    const sellers = [
-      { userId: "a", name: "A", salesCount: 10, totalUsd: 100 },
-      { userId: "b", name: "B", salesCount: 5, totalUsd: 200 },
-    ];
-    const ranked = rankSellers(sellers);
-    expect(ranked[0].rank).toBe(1);
-    expect(ranked[0].userId).toBe("b");
-    expect(ranked[1].rank).toBe(2);
   });
 });
 
