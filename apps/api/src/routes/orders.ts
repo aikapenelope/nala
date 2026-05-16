@@ -253,6 +253,8 @@ ordersRoutes.patch("/orders/:id/confirm", validateUuidParam, async (c) => {
       }
     }
 
+    const orderTotal = Number(order.total);
+
     // 4. Create sale record (channel: storefront)
     const [sale] = await tx
       .insert(sales)
@@ -286,6 +288,20 @@ ordersRoutes.patch("/orders/:id/confirm", validateUuidParam, async (c) => {
       amountUsd: order.total,
       reference: order.paymentReference,
     });
+
+    // 7. Update customer purchase stats (same logic as POST /sales)
+    if (customerId) {
+      await tx
+        .update(customers)
+        .set({
+          totalPurchases: sql`${customers.totalPurchases} + 1`,
+          totalSpentUsd: sql`${customers.totalSpentUsd}::numeric + ${orderTotal}`,
+          averageTicketUsd: sql`(${customers.totalSpentUsd}::numeric + ${orderTotal}) / (${customers.totalPurchases} + 1)`,
+          lastPurchaseAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(customers.id, customerId));
+    }
   });
 
   logActivity({
