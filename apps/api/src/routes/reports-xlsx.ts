@@ -16,7 +16,7 @@ import {
   products,
   users,
 } from "@nova/db";
-import { todayRangeVET, APP_TIMEZONE } from "@nova/shared";
+import { todayRangeVET, APP_TIMEZONE, todayStringVET } from "@nova/shared";
 import {
   generateDailyExcel,
   generateWeeklyExcel,
@@ -83,7 +83,7 @@ reportsXlsx.get("/reports/weekly/export-xlsx", zValidator("query", periodQuery),
   const bestDay = dailyBreakdown.reduce((best, d) => (d.amount > (best?.amount ?? 0) ? d : best), dailyBreakdown[0]);
   const [topProduct] = await db.select({ name: products.name }).from(saleItems).innerJoin(sales, eq(saleItems.saleId, sales.id)).innerJoin(products, eq(saleItems.productId, products.id)).where(and(bizCond, completedCond, gte(sales.createdAt, start), lte(sales.createdAt, end))).groupBy(products.name).orderBy(desc(sql`SUM(${saleItems.lineTotal}::numeric)`)).limit(1);
 
-  const dateStr = new Date().toISOString().split("T")[0];
+  const dateStr = todayStringVET();
   const buffer = generateWeeklyExcel({ totalSales, totalCount: periodTotals?.totalCount ?? 0, vsPrevPeriod: prevSales > 0 ? Math.round(((totalSales - prevSales) / prevSales) * 100) : 0, dailyBreakdown, bestDay: bestDay?.day ?? null, topProduct: topProduct?.name ?? null }, query.period);
   c.header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
   c.header("Content-Disposition", `attachment; filename="reporte-semanal-${dateStr}.xlsx"`);
@@ -99,7 +99,7 @@ reportsXlsx.get("/reports/sellers/export-xlsx", zValidator("query", periodQuery)
 
   const sellerStats = await db.select({ name: users.name, salesCount: sql<number>`count(*)::int`, total: sql<number>`COALESCE(SUM(${sales.totalUsd}::numeric), 0)::float` }).from(sales).innerJoin(users, eq(sales.userId, users.id)).where(and(eq(sales.businessId, businessId), eq(sales.status, "completed"), gte(sales.createdAt, start), lte(sales.createdAt, end))).groupBy(users.id, users.name).orderBy(desc(sql`SUM(${sales.totalUsd}::numeric)`));
 
-  const dateStr = new Date().toISOString().split("T")[0];
+  const dateStr = todayStringVET();
   const buffer = generateSellersExcel({ sellers: sellerStats.map((s) => ({ name: s.name, sales: s.salesCount, total: Math.round(s.total * 100) / 100, avgTicket: s.salesCount > 0 ? Math.round((s.total / s.salesCount) * 100) / 100 : 0 })) });
   c.header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
   c.header("Content-Disposition", `attachment; filename="vendedores-${dateStr}.xlsx"`);

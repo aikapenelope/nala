@@ -29,6 +29,7 @@ import {
   RefreshCw,
   BarChart3,
 } from "lucide-vue-next";
+import { currentHourVET } from "@nova/shared";
 
 const { user } = useNovaAuth();
 const { $api } = useApi();
@@ -158,14 +159,7 @@ function timeAgo(dateStr: string): string {
 }
 
 const greeting = computed(() => {
-  // Use Intl to get the current hour in Caracas regardless of server/browser TZ.
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/Caracas",
-    hour: "2-digit",
-    hour12: false,
-  }).formatToParts(new Date());
-  const hourPart = parts.find((p) => p.type === "hour");
-  const hour = hourPart ? Number(hourPart.value) : 0;
+  const hour = currentHourVET();
   if (hour < 12) return "Buenos dias";
   if (hour < 18) return "Buenas tardes";
   return "Buenas noches";
