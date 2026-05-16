@@ -229,13 +229,14 @@ onMounted(() => {
   fetchBusinessSettings();
   fetchRate();
   fetchBcvOfficial();
+  initLock();
 });
 
 // ============================================================
 // Owner Lock (PIN security)
 // ============================================================
 
-const { isEnabled: lockEnabled, setupPin, disablePin, refresh: refreshLock } = useOwnerLock();
+const { isEnabled: lockEnabled, setupPin, disablePin, ensureInitialized: initLock } = useOwnerLock();
 const securityExpanded = ref(false);
 const pinInput = ref("");
 const currentPinInput = ref("");
@@ -259,7 +260,6 @@ async function handlePinSetup() {
     toast("Clave de seguridad configurada", "success");
     pinInput.value = "";
     currentPinInput.value = "";
-    await refreshLock();
   } else {
     pinError.value = result.error ?? "Error configurando clave";
   }
@@ -282,7 +282,6 @@ async function handlePinDisable() {
     toast("Clave de seguridad desactivada", "success");
     currentPinInput.value = "";
     pinInput.value = "";
-    await refreshLock();
   } else {
     pinError.value = result.error ?? "Clave incorrecta";
   }
