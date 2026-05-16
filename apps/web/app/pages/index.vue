@@ -154,11 +154,18 @@ function timeAgo(dateStr: string): string {
   if (min < 60) return `Hace ${min}min`;
   const hrs = Math.floor(min / 60);
   if (hrs < 24) return `Hace ${hrs}h`;
-  return new Date(dateStr).toLocaleDateString("es-VE", { day: "numeric", month: "short" });
+  return new Date(dateStr).toLocaleDateString("es-VE", { timeZone: "America/Caracas", day: "numeric", month: "short" });
 }
 
 const greeting = computed(() => {
-  const hour = new Date().getHours();
+  // Use Intl to get the current hour in Caracas regardless of server/browser TZ.
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Caracas",
+    hour: "2-digit",
+    hour12: false,
+  }).formatToParts(new Date());
+  const hourPart = parts.find((p) => p.type === "hour");
+  const hour = hourPart ? Number(hourPart.value) : 0;
   if (hour < 12) return "Buenos dias";
   if (hour < 18) return "Buenas tardes";
   return "Buenas noches";

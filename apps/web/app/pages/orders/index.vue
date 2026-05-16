@@ -89,7 +89,7 @@ function formatDate(dateStr: string): string {
   if (diffMin < 1) return "Ahora";
   if (diffMin < 60) return `Hace ${diffMin}min`;
   if (diffMin < 1440) return `Hace ${Math.floor(diffMin / 60)}h`;
-  return date.toLocaleDateString("es-VE", { day: "numeric", month: "short" });
+  return date.toLocaleDateString("es-VE", { timeZone: "America/Caracas", day: "numeric", month: "short" });
 }
 
 /** Payment method display label. */

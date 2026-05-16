@@ -115,6 +115,7 @@ async function convertToSale(id: string) {
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString("es-VE", {
+    timeZone: "America/Caracas",
     day: "2-digit",
     month: "short",
   });
