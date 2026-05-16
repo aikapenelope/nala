@@ -116,6 +116,7 @@ function reportHeader(title: string, businessName: string): Content {
       },
       {
         text: new Date().toLocaleDateString("es-VE", {
+          timeZone: "America/Caracas",
           year: "numeric",
           month: "long",
           day: "numeric",
@@ -132,7 +133,7 @@ function reportHeader(title: string, businessName: string): Content {
 /** Common footer. */
 function reportFooter(): Content {
   return {
-    text: `Generado por Nova el ${new Date().toLocaleString("es-VE")}`,
+    text: `Generado por Nova el ${new Date().toLocaleString("es-VE", { timeZone: "America/Caracas" })}`,
     fontSize: 8,
     color: "#AAAAAA",
     alignment: "center" as const,
@@ -524,7 +525,7 @@ const PAYMENT_LABELS: Record<string, string> = {
 };
 
 export async function generateReceiptPdf(data: ReceiptData): Promise<ArrayBuffer> {
-  const date = new Date(data.createdAt).toLocaleString("es-VE", { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+  const date = new Date(data.createdAt).toLocaleString("es-VE", { timeZone: "America/Caracas", year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
   const shortId = data.saleId.slice(0, 8).toUpperCase();
   const divider: Content = { text: "\u2500".repeat(50), fontSize: 8, color: "#CCCCCC", alignment: "center" as const, margin: [0, 4, 0, 8] as [number, number, number, number] };
 

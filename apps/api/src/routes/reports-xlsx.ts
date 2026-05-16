@@ -16,6 +16,7 @@ import {
   products,
   users,
 } from "@nova/db";
+import { todayRangeVET, APP_TIMEZONE, todayStringVET } from "@nova/shared";
 import {
   generateDailyExcel,
   generateWeeklyExcel,
@@ -30,17 +31,21 @@ export const reportsXlsx = new Hono<AppEnv>();
 reportsXlsx.get("/reports/daily/export-xlsx", zValidator("query", periodQuery), async (c) => {
   const db = c.get("db");
   const businessId = c.get("businessId");
-  const todayStr = new Date().toISOString().split("T")[0];
-  const todayStart = new Date(`${todayStr}T00:00:00.000Z`);
-  const todayEnd = new Date(`${todayStr}T23:59:59.999Z`);
+  // Day boundaries in VET (America/Caracas).
+  const today = todayRangeVET();
+  const todayStr = today.dateStr;
+  const todayStart = today.start;
+  const todayEnd = today.end;
   const completedCond = eq(sales.status, "completed");
   const bizCond = eq(sales.businessId, businessId);
 
   const [todayTotals] = await db.select({ totalSales: sql<number>`COALESCE(SUM(${sales.totalUsd}::numeric), 0)::float`, totalCount: sql<number>`count(*)::int` }).from(sales).where(and(bizCond, completedCond, gte(sales.createdAt, todayStart), lte(sales.createdAt, todayEnd)));
-  const yesterday = new Date(todayStart); yesterday.setUTCDate(yesterday.getUTCDate() - 1); const yesterdayStr = yesterday.toISOString().split("T")[0];
-  const [yesterdayTotals] = await db.select({ totalSales: sql<number>`COALESCE(SUM(${sales.totalUsd}::numeric), 0)::float` }).from(sales).where(and(bizCond, completedCond, gte(sales.createdAt, new Date(`${yesterdayStr}T00:00:00.000Z`)), lte(sales.createdAt, new Date(`${yesterdayStr}T23:59:59.999Z`))));
-  const lastWeek = new Date(todayStart); lastWeek.setUTCDate(lastWeek.getUTCDate() - 7); const lastWeekStr = lastWeek.toISOString().split("T")[0];
-  const [lastWeekTotals] = await db.select({ totalSales: sql<number>`COALESCE(SUM(${sales.totalUsd}::numeric), 0)::float` }).from(sales).where(and(bizCond, completedCond, gte(sales.createdAt, new Date(`${lastWeekStr}T00:00:00.000Z`)), lte(sales.createdAt, new Date(`${lastWeekStr}T23:59:59.999Z`))));
+  const yesterdayMs = todayStart.getTime() - 24 * 60 * 60 * 1000;
+  const yesterdayStart = new Date(yesterdayMs); const yesterdayEnd = new Date(yesterdayMs + 24 * 60 * 60 * 1000 - 1);
+  const [yesterdayTotals] = await db.select({ totalSales: sql<number>`COALESCE(SUM(${sales.totalUsd}::numeric), 0)::float` }).from(sales).where(and(bizCond, completedCond, gte(sales.createdAt, yesterdayStart), lte(sales.createdAt, yesterdayEnd)));
+  const lastWeekMs = todayStart.getTime() - 7 * 24 * 60 * 60 * 1000;
+  const lastWeekStart = new Date(lastWeekMs); const lastWeekEnd = new Date(lastWeekMs + 24 * 60 * 60 * 1000 - 1);
+  const [lastWeekTotals] = await db.select({ totalSales: sql<number>`COALESCE(SUM(${sales.totalUsd}::numeric), 0)::float` }).from(sales).where(and(bizCond, completedCond, gte(sales.createdAt, lastWeekStart), lte(sales.createdAt, lastWeekEnd)));
 
   const totalSales = todayTotals?.totalSales ?? 0;
   const totalCount = todayTotals?.totalCount ?? 0;
@@ -68,7 +73,7 @@ reportsXlsx.get("/reports/weekly/export-xlsx", zValidator("query", periodQuery),
   const bizCond = eq(sales.businessId, businessId);
 
   const [periodTotals] = await db.select({ totalSales: sql<number>`COALESCE(SUM(${sales.totalUsd}::numeric), 0)::float`, totalCount: sql<number>`count(*)::int` }).from(sales).where(and(bizCond, completedCond, gte(sales.createdAt, start), lte(sales.createdAt, end)));
-  const dailyBreakdown = await db.select({ day: sql<string>`TO_CHAR(${sales.createdAt} AT TIME ZONE 'UTC', 'Dy')`, amount: sql<number>`COALESCE(SUM(${sales.totalUsd}::numeric), 0)::float` }).from(sales).where(and(bizCond, completedCond, gte(sales.createdAt, start), lte(sales.createdAt, end))).groupBy(sql`TO_CHAR(${sales.createdAt} AT TIME ZONE 'UTC', 'Dy')`, sql`DATE(${sales.createdAt})`).orderBy(sql`DATE(${sales.createdAt})`);
+  const dailyBreakdown = await db.select({ day: sql<string>`TO_CHAR(${sales.createdAt} AT TIME ZONE ${APP_TIMEZONE}, 'Dy')`, amount: sql<number>`COALESCE(SUM(${sales.totalUsd}::numeric), 0)::float` }).from(sales).where(and(bizCond, completedCond, gte(sales.createdAt, start), lte(sales.createdAt, end))).groupBy(sql`TO_CHAR(${sales.createdAt} AT TIME ZONE ${APP_TIMEZONE}, 'Dy')`, sql`DATE(${sales.createdAt} AT TIME ZONE ${APP_TIMEZONE})`).orderBy(sql`DATE(${sales.createdAt} AT TIME ZONE ${APP_TIMEZONE})`);
   const periodDays = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
   const prevStart = new Date(start.getTime() - periodDays * 24 * 60 * 60 * 1000);
   const prevEnd = new Date(start.getTime() - 1);
@@ -78,7 +83,7 @@ reportsXlsx.get("/reports/weekly/export-xlsx", zValidator("query", periodQuery),
   const bestDay = dailyBreakdown.reduce((best, d) => (d.amount > (best?.amount ?? 0) ? d : best), dailyBreakdown[0]);
   const [topProduct] = await db.select({ name: products.name }).from(saleItems).innerJoin(sales, eq(saleItems.saleId, sales.id)).innerJoin(products, eq(saleItems.productId, products.id)).where(and(bizCond, completedCond, gte(sales.createdAt, start), lte(sales.createdAt, end))).groupBy(products.name).orderBy(desc(sql`SUM(${saleItems.lineTotal}::numeric)`)).limit(1);
 
-  const dateStr = new Date().toISOString().split("T")[0];
+  const dateStr = todayStringVET();
   const buffer = generateWeeklyExcel({ totalSales, totalCount: periodTotals?.totalCount ?? 0, vsPrevPeriod: prevSales > 0 ? Math.round(((totalSales - prevSales) / prevSales) * 100) : 0, dailyBreakdown, bestDay: bestDay?.day ?? null, topProduct: topProduct?.name ?? null }, query.period);
   c.header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
   c.header("Content-Disposition", `attachment; filename="reporte-semanal-${dateStr}.xlsx"`);
@@ -94,7 +99,7 @@ reportsXlsx.get("/reports/sellers/export-xlsx", zValidator("query", periodQuery)
 
   const sellerStats = await db.select({ name: users.name, salesCount: sql<number>`count(*)::int`, total: sql<number>`COALESCE(SUM(${sales.totalUsd}::numeric), 0)::float` }).from(sales).innerJoin(users, eq(sales.userId, users.id)).where(and(eq(sales.businessId, businessId), eq(sales.status, "completed"), gte(sales.createdAt, start), lte(sales.createdAt, end))).groupBy(users.id, users.name).orderBy(desc(sql`SUM(${sales.totalUsd}::numeric)`));
 
-  const dateStr = new Date().toISOString().split("T")[0];
+  const dateStr = todayStringVET();
   const buffer = generateSellersExcel({ sellers: sellerStats.map((s) => ({ name: s.name, sales: s.salesCount, total: Math.round(s.total * 100) / 100, avgTicket: s.salesCount > 0 ? Math.round((s.total / s.salesCount) * 100) / 100 : 0 })) });
   c.header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
   c.header("Content-Disposition", `attachment; filename="vendedores-${dateStr}.xlsx"`);

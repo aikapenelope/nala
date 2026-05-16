@@ -29,6 +29,7 @@ import {
   createAccountPayableSchema,
   dayCloseSchema,
   calculateCustomerSegments,
+  todayRangeVET,
 } from "@nova/shared";
 import {
   customers,
@@ -623,11 +624,12 @@ customersRoutes.post(
     const db = c.get("db");
     const businessId = c.get("businessId");
 
-    // Use UTC boundaries for today
+    // Day boundaries in VET (America/Caracas) so day-close
+    // captures all sales from the Venezuelan business day.
     const now = new Date();
-    const dateStr = now.toISOString().split("T")[0];
-    const todayStart = new Date(`${dateStr}T00:00:00.000Z`);
-    const todayEnd = new Date(`${dateStr}T23:59:59.999Z`);
+    const todayVET = todayRangeVET(now);
+    const todayStart = todayVET.start;
+    const todayEnd = todayVET.end;
 
     // Get today's completed sales
     const todaySales = await db
@@ -778,8 +780,8 @@ customersRoutes.get("/cash-opening/latest", async (c) => {
   const db = c.get("db");
   const businessId = c.get("businessId");
 
-  const todayStr = new Date().toISOString().split("T")[0];
-  const todayStart = new Date(`${todayStr}T00:00:00.000Z`);
+  const todayVETLatest = todayRangeVET();
+  const todayStart = todayVETLatest.start;
 
   // Check if there's already a day-close for today (business is closed)
   const [todayClose] = await db

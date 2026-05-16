@@ -166,6 +166,7 @@ async function cancelOrder() {
 function formatDateTime(dateStr: string | null): string {
   if (!dateStr) return "-";
   return new Date(dateStr).toLocaleString("es-VE", {
+    timeZone: "America/Caracas",
     day: "numeric",
     month: "short",
     hour: "2-digit",
