@@ -44,6 +44,7 @@ import {
   saleReturns,
   saleReturnItems,
 } from "@nova/db";
+import { dateRangeVET } from "@nova/shared";
 import { getCurrentRate, setCurrentRate } from "../services/exchange-rate";
 import { fetchBcvRates } from "../services/bcv-rates";
 import { generateReceiptPdf } from "../services/pdf-generator";
@@ -172,15 +173,15 @@ salesRoutes.get("/sales", zValidator("query", listSalesQuery), async (c) => {
   }
 
   if (date) {
-    // Use UTC boundaries to avoid timezone issues.
-    // The date string is expected as YYYY-MM-DD.
-    const dayStart = new Date(`${date}T00:00:00.000Z`);
-    const dayEnd = new Date(`${date}T23:59:59.999Z`);
-    if (isNaN(dayStart.getTime())) {
+    // Day boundaries in VET (America/Caracas) so filtering by date
+    // matches the Venezuelan business day, not UTC.
+    try {
+      const { start: dayStart, end: dayEnd } = dateRangeVET(date);
+      conditions.push(gte(sales.createdAt, dayStart));
+      conditions.push(lte(sales.createdAt, dayEnd));
+    } catch {
       return c.json({ error: "Invalid date format. Use YYYY-MM-DD." }, 400);
     }
-    conditions.push(gte(sales.createdAt, dayStart));
-    conditions.push(lte(sales.createdAt, dayEnd));
   }
 
   // Filter by payment method requires a subquery on sale_payments
