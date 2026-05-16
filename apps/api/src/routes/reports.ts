@@ -2,11 +2,11 @@
  * Reports API routes.
  *
  * Data endpoints (this file):
- *   GET /reports/daily, weekly, profitability, inventory, receivable, sellers, financial, alerts
+ *   GET /reports/daily, weekly, profitability, inventory, receivable, financial, alerts
  *
  * Export endpoints (separate modules for maintainability):
  *   reports-pdf.ts   - PDF export (daily, weekly, financial)
- *   reports-xlsx.ts  - Excel export (daily, weekly, sellers, libro de ventas)
+ *   reports-xlsx.ts  - Excel export (daily, weekly)
  *   reports-email.ts - Email with PDF attachment via Resend
  *
  * Shared helpers in reports-helpers.ts (parsePeriodRange, periodQuery).
@@ -24,7 +24,6 @@ import {
   accountsReceivable,
   accountsPayable,
   expenses,
-  users,
 } from "@nova/db";
 import {
   DEAD_STOCK_DAYS,
@@ -194,39 +193,11 @@ reports.get("/reports/daily", zValidator("query", periodQuery), async (c) => {
   const totalProfit =
     Math.round((totalSales - (profitResult?.totalCost ?? 0)) * 100) / 100;
 
-  // Top seller today (employee with highest sales)
-  const topSellerRows = await db
-    .select({
-      name: users.name,
-      total: sql<number>`COALESCE(SUM(${sales.totalUsd}::numeric), 0)::float`,
-    })
-    .from(sales)
-    .innerJoin(users, eq(sales.userId, users.id))
-    .where(
-      and(
-        bizCond,
-        completedCond,
-        gte(sales.createdAt, todayStart),
-        lte(sales.createdAt, todayEnd),
-      ),
-    )
-    .groupBy(users.name)
-    .orderBy(sql`SUM(${sales.totalUsd}::numeric) DESC`)
-    .limit(1);
-
-  const topSeller = topSellerRows[0]
-    ? {
-        name: topSellerRows[0].name,
-        total: Math.round(topSellerRows[0].total * 100) / 100,
-      }
-    : null;
-
   const data = {
     totalSales,
     totalCount,
     avgTicket,
     totalProfit,
-    topSeller,
     vsPreviousDay,
     vsSameDayLastWeek,
     topProducts,

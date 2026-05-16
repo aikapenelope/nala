@@ -175,11 +175,11 @@ definePageMeta({ layout: false });
             <span class="text-2xl">🔐</span>
             <div>
               <h3 class="font-semibold text-gray-900">
-                Multi-empleado con link de acceso
+                Clave de seguridad
               </h3>
               <p class="mt-1 text-sm text-gray-500">
-                Cada empleado recibe su link. Sabes quien vendio que. El dueno
-                controla los accesos desde el panel.
+                Protege reportes y costos con un PIN de 4 digitos. Ideal si
+                otra persona usa tu telefono para vender.
               </p>
             </div>
           </div>
@@ -238,7 +238,7 @@ definePageMeta({ layout: false });
               <span class="text-green-500">✓</span> Productos ilimitados
             </li>
             <li class="flex items-center gap-2">
-              <span class="text-green-500">✓</span> Empleados ilimitados
+              <span class="text-green-500">✓</span> Clave de seguridad (PIN)
             </li>
             <li class="flex items-center gap-2">
               <span class="text-green-500">✓</span> Reportes con IA

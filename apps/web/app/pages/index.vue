@@ -6,7 +6,7 @@
  * 4 insight tiles (seller, product, alerts, margin), CTA.
  *
  * Connected to:
- * - GET /api/reports/daily (sales, profit, topSeller, topProducts, salesByMethod)
+ * - GET /api/reports/daily (sales, profit, topProducts, salesByMethod)
  * - GET /api/reports/weekly (dailyBreakdown for chart)
  * - GET /api/reports/financial (grossMargin)
  * - GET /api/accounts/receivable (totalPending)
@@ -52,7 +52,6 @@ const todayAvgTicket = ref(0);
 const todayProfit = ref(0);
 const trendPercent = ref(0);
 const trendPositive = ref(true);
-const topSeller = ref<{ name: string; total: number } | null>(null);
 const topProduct = ref<{ name: string; quantity: number } | null>(null);
 const topProducts = ref<Array<{ name: string; quantity: number }>>([]);
 const salesByMethod = ref<Record<string, number>>({});
@@ -192,7 +191,6 @@ async function loadDashboard() {
           totalCount: number;
           avgTicket: number;
           totalProfit: number;
-          topSeller: { name: string; total: number } | null;
           vsSameDayLastWeek: number;
           topProducts: Array<{ name: string; quantity: number }>;
           salesByMethod: Record<string, number>;
@@ -236,7 +234,6 @@ async function loadDashboard() {
       todayProfit.value = d.totalProfit;
       trendPercent.value = Math.abs(d.vsSameDayLastWeek);
       trendPositive.value = d.vsSameDayLastWeek >= 0;
-      topSeller.value = d.topSeller;
       topProduct.value = d.topProducts?.[0] ?? null;
       topProducts.value = d.topProducts?.slice(0, 3) ?? [];
       salesByMethod.value = d.salesByMethod ?? {};

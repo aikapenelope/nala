@@ -420,7 +420,7 @@ export const sales = pgTable(
     businessId: uuid("business_id")
       .notNull()
       .references(() => businesses.id),
-    /** Who made the sale (employee PIN or owner). */
+    /** Who registered the sale (always the owner in single-user model). */
     userId: uuid("user_id")
       .notNull()
       .references(() => users.id),

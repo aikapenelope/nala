@@ -18,7 +18,6 @@ export interface NarrativeInput {
     | "product_profitability"
     | "inventory_movement"
     | "receivable_aging"
-    | "sales_by_seller"
     | "financial_summary"
     | "cash_flow_projection";
   data: Record<string, unknown>;
