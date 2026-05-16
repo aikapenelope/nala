@@ -43,7 +43,7 @@ onMounted(() => {
 
       <div class="mt-6 text-center">
         <p class="text-xs text-gray-400">
-          Empleados: pide tu link de acceso al administrador
+          Tu cuenta es personal. Usa el mismo correo en todos tus dispositivos.
         </p>
       </div>
     </div>

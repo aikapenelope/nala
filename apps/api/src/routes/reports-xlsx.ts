@@ -3,7 +3,6 @@
  *
  * GET /reports/daily/export-xlsx     - Daily summary XLSX
  * GET /reports/weekly/export-xlsx    - Weekly summary XLSX
- * GET /reports/sellers/export-xlsx   - Sellers ranking XLSX
  */
 
 import { Hono } from "hono";
