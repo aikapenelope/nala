@@ -5,14 +5,13 @@
  * Wraps sensitive content. When the owner lock is active and not
  * unlocked, shows a PIN entry overlay instead of the content.
  *
- * Usage:
- *   <OwnerLockGuard>
- *     <template #default>...sensitive content...</template>
- *   </OwnerLockGuard>
+ * The lock only applies on the client side. During SSR, content
+ * renders normally to avoid hydration mismatches. The client plugin
+ * (owner-lock.client.ts) sets the lock state after hydration.
  *
- * Or with a custom locked message:
+ * Usage:
  *   <OwnerLockGuard message="Ingresa tu clave para ver reportes">
- *     ...
+ *     ...sensitive content...
  *   </OwnerLockGuard>
  */
 
@@ -29,6 +28,18 @@ const props = withDefaults(
 );
 
 const { isLocked, unlock } = useOwnerLock();
+
+/**
+ * Whether the component has mounted on the client.
+ * Lock enforcement only starts after mount to avoid SSR hydration mismatch.
+ */
+const mounted = ref(false);
+onMounted(() => {
+  mounted.value = true;
+});
+
+/** Effective lock state: only active after client mount. */
+const showLock = computed(() => mounted.value && isLocked.value);
 
 const pin = ref("");
 const error = ref("");
@@ -73,10 +84,10 @@ const digits = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", "back"];
 </script>
 
 <template>
-  <!-- When not locked, render the slot content directly -->
-  <slot v-if="!isLocked" />
+  <!-- When not locked (or SSR), render the slot content directly -->
+  <slot v-if="!showLock" />
 
-  <!-- When locked, show the PIN entry overlay -->
+  <!-- When locked on client, show the PIN entry overlay -->
   <div
     v-else
     class="flex min-h-[60vh] flex-col items-center justify-center px-4"
