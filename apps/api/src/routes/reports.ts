@@ -551,46 +551,6 @@ reports.get("/reports/receivable", async (c) => {
   return c.json({ data, narrative });
 });
 
-/** GET /reports/sellers - Sales by seller ranking. */
-reports.get("/reports/sellers", zValidator("query", periodQuery), async (c) => {
-  const query = c.req.valid("query");
-  const db = c.get("db");
-  const businessId = c.get("businessId");
-  const { start, end } = parsePeriodRange(query.period, query.from, query.to);
-
-  const sellerStats = await db
-    .select({
-      name: users.name,
-      salesCount: sql<number>`count(*)::int`,
-      total: sql<number>`COALESCE(SUM(${sales.totalUsd}::numeric), 0)::float`,
-    })
-    .from(sales)
-    .innerJoin(users, eq(sales.userId, users.id))
-    .where(
-      and(
-        eq(sales.businessId, businessId),
-        eq(sales.status, "completed"),
-        gte(sales.createdAt, start),
-        lte(sales.createdAt, end),
-      ),
-    )
-    .groupBy(users.id, users.name)
-    .orderBy(desc(sql`SUM(${sales.totalUsd}::numeric)`));
-
-  const sellerData = sellerStats.map((s) => ({
-    name: s.name,
-    sales: s.salesCount,
-    total: Math.round(s.total * 100) / 100,
-    avgTicket:
-      s.salesCount > 0 ? Math.round((s.total / s.salesCount) * 100) / 100 : 0,
-  }));
-
-  const data = { sellers: sellerData };
-  const narrative = await generateNarrative({ type: "sales_by_seller", data });
-
-  return c.json({ data, narrative, period: query.period });
-});
-
 /** GET /reports/financial - Simplified P&L. */
 reports.get(
   "/reports/financial",

@@ -138,29 +138,3 @@ export function generateWeeklyExcel(
   return workbookToBuffer(wb);
 }
 
-// ============================================================
-// Sellers Ranking Excel
-// ============================================================
-
-export interface SellersExcelData {
-  sellers: Array<{
-    name: string;
-    sales: number;
-    total: number;
-    avgTicket: number;
-  }>;
-}
-
-export function generateSellersExcel(data: SellersExcelData): ArrayBuffer {
-  const wb = XLSX.utils.book_new();
-
-  const headers = ["Vendedor", "Ventas", "Total (USD)", "Ticket Promedio (USD)"];
-  const rows = data.sellers.map((s) => [s.name, s.sales, s.total, s.avgTicket]);
-  const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
-  autoWidth(ws, headers);
-  XLSX.utils.book_append_sheet(wb, ws, "Vendedores");
-
-  return workbookToBuffer(wb);
-}
-
-

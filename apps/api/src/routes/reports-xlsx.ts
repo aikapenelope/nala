@@ -14,13 +14,11 @@ import {
   saleItems,
   salePayments,
   products,
-  users,
 } from "@nova/db";
 import { todayRangeVET, APP_TIMEZONE, todayStringVET } from "@nova/shared";
 import {
   generateDailyExcel,
   generateWeeklyExcel,
-  generateSellersExcel,
 } from "../services/excel-generator";
 import { periodQuery, parsePeriodRange } from "./reports-helpers";
 import type { AppEnv } from "../types";
@@ -87,22 +85,6 @@ reportsXlsx.get("/reports/weekly/export-xlsx", zValidator("query", periodQuery),
   const buffer = generateWeeklyExcel({ totalSales, totalCount: periodTotals?.totalCount ?? 0, vsPrevPeriod: prevSales > 0 ? Math.round(((totalSales - prevSales) / prevSales) * 100) : 0, dailyBreakdown, bestDay: bestDay?.day ?? null, topProduct: topProduct?.name ?? null }, query.period);
   c.header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
   c.header("Content-Disposition", `attachment; filename="reporte-semanal-${dateStr}.xlsx"`);
-  return c.body(buffer);
-});
-
-/** GET /reports/sellers/export-xlsx */
-reportsXlsx.get("/reports/sellers/export-xlsx", zValidator("query", periodQuery), async (c) => {
-  const query = c.req.valid("query");
-  const db = c.get("db");
-  const businessId = c.get("businessId");
-  const { start, end } = parsePeriodRange(query.period, query.from, query.to);
-
-  const sellerStats = await db.select({ name: users.name, salesCount: sql<number>`count(*)::int`, total: sql<number>`COALESCE(SUM(${sales.totalUsd}::numeric), 0)::float` }).from(sales).innerJoin(users, eq(sales.userId, users.id)).where(and(eq(sales.businessId, businessId), eq(sales.status, "completed"), gte(sales.createdAt, start), lte(sales.createdAt, end))).groupBy(users.id, users.name).orderBy(desc(sql`SUM(${sales.totalUsd}::numeric)`));
-
-  const dateStr = todayStringVET();
-  const buffer = generateSellersExcel({ sellers: sellerStats.map((s) => ({ name: s.name, sales: s.salesCount, total: Math.round(s.total * 100) / 100, avgTicket: s.salesCount > 0 ? Math.round((s.total / s.salesCount) * 100) / 100 : 0 })) });
-  c.header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-  c.header("Content-Disposition", `attachment; filename="vendedores-${dateStr}.xlsx"`);
   return c.body(buffer);
 });
 
