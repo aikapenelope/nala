@@ -16,7 +16,7 @@ import {
   products,
   users,
 } from "@nova/db";
-import { todayRangeVET } from "@nova/shared";
+import { todayRangeVET, APP_TIMEZONE } from "@nova/shared";
 import {
   generateDailyExcel,
   generateWeeklyExcel,
@@ -73,7 +73,7 @@ reportsXlsx.get("/reports/weekly/export-xlsx", zValidator("query", periodQuery),
   const bizCond = eq(sales.businessId, businessId);
 
   const [periodTotals] = await db.select({ totalSales: sql<number>`COALESCE(SUM(${sales.totalUsd}::numeric), 0)::float`, totalCount: sql<number>`count(*)::int` }).from(sales).where(and(bizCond, completedCond, gte(sales.createdAt, start), lte(sales.createdAt, end)));
-  const dailyBreakdown = await db.select({ day: sql<string>`TO_CHAR(${sales.createdAt} AT TIME ZONE 'UTC', 'Dy')`, amount: sql<number>`COALESCE(SUM(${sales.totalUsd}::numeric), 0)::float` }).from(sales).where(and(bizCond, completedCond, gte(sales.createdAt, start), lte(sales.createdAt, end))).groupBy(sql`TO_CHAR(${sales.createdAt} AT TIME ZONE 'UTC', 'Dy')`, sql`DATE(${sales.createdAt})`).orderBy(sql`DATE(${sales.createdAt})`);
+  const dailyBreakdown = await db.select({ day: sql<string>`TO_CHAR(${sales.createdAt} AT TIME ZONE ${APP_TIMEZONE}, 'Dy')`, amount: sql<number>`COALESCE(SUM(${sales.totalUsd}::numeric), 0)::float` }).from(sales).where(and(bizCond, completedCond, gte(sales.createdAt, start), lte(sales.createdAt, end))).groupBy(sql`TO_CHAR(${sales.createdAt} AT TIME ZONE ${APP_TIMEZONE}, 'Dy')`, sql`DATE(${sales.createdAt} AT TIME ZONE ${APP_TIMEZONE})`).orderBy(sql`DATE(${sales.createdAt} AT TIME ZONE ${APP_TIMEZONE})`);
   const periodDays = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
   const prevStart = new Date(start.getTime() - periodDays * 24 * 60 * 60 * 1000);
   const prevEnd = new Date(start.getTime() - 1);

@@ -30,6 +30,7 @@ import {
   DEAD_STOCK_DAYS,
   AGING_THRESHOLDS,
   todayRangeVET,
+  APP_TIMEZONE,
 } from "@nova/shared";
 import { generateNarrative } from "../services/ai-narrative";
 import { periodQuery, parsePeriodRange } from "./reports-helpers";
@@ -266,7 +267,7 @@ reports.get("/reports/weekly", zValidator("query", periodQuery), async (c) => {
   // Daily breakdown
   const dailyBreakdown = await db
     .select({
-      day: sql<string>`TO_CHAR(${sales.createdAt} AT TIME ZONE 'UTC', 'Dy')`,
+      day: sql<string>`TO_CHAR(${sales.createdAt} AT TIME ZONE ${APP_TIMEZONE}, 'Dy')`,
       amount: sql<number>`COALESCE(SUM(${sales.totalUsd}::numeric), 0)::float`,
     })
     .from(sales)
@@ -279,10 +280,10 @@ reports.get("/reports/weekly", zValidator("query", periodQuery), async (c) => {
       ),
     )
     .groupBy(
-      sql`TO_CHAR(${sales.createdAt} AT TIME ZONE 'UTC', 'Dy')`,
-      sql`DATE(${sales.createdAt})`,
+      sql`TO_CHAR(${sales.createdAt} AT TIME ZONE ${APP_TIMEZONE}, 'Dy')`,
+      sql`DATE(${sales.createdAt} AT TIME ZONE ${APP_TIMEZONE})`,
     )
-    .orderBy(sql`DATE(${sales.createdAt})`);
+    .orderBy(sql`DATE(${sales.createdAt} AT TIME ZONE ${APP_TIMEZONE})`);
 
   // Previous period for comparison
   const periodDays = Math.ceil(
@@ -776,15 +777,15 @@ reports.get("/reports/cash-flow", async (c) => {
   // Daily revenue breakdown (last 14 days for trend chart)
   const dailyRevenue = await db
     .select({
-      date: sql<string>`DATE(${sales.createdAt})::text`,
+      date: sql<string>`DATE(${sales.createdAt} AT TIME ZONE ${APP_TIMEZONE})::text`,
       revenue: sql<number>`COALESCE(SUM(${sales.totalUsd}::numeric), 0)::float`,
     })
     .from(sales)
     .where(
       and(bizCond, completedCond, gte(sales.createdAt, fourteenDaysAgo)),
     )
-    .groupBy(sql`DATE(${sales.createdAt})`)
-    .orderBy(sql`DATE(${sales.createdAt})`);
+    .groupBy(sql`DATE(${sales.createdAt} AT TIME ZONE ${APP_TIMEZONE})`)
+    .orderBy(sql`DATE(${sales.createdAt} AT TIME ZONE ${APP_TIMEZONE})`);
 
   // Daily expenses breakdown (last 14 days)
   const dailyExpenses = await db
@@ -1067,7 +1068,7 @@ reports.get("/reports/monthly-trend", async (c) => {
   // Revenue by month (last 12 months)
   const revenueByMonth = await db
     .select({
-      month: sql<string>`TO_CHAR(${sales.createdAt}, 'YYYY-MM')`,
+      month: sql<string>`TO_CHAR(${sales.createdAt} AT TIME ZONE ${APP_TIMEZONE}, 'YYYY-MM')`,
       revenue: sql<number>`COALESCE(SUM(${sales.totalUsd}::numeric), 0)::float`,
     })
     .from(sales)
@@ -1078,13 +1079,13 @@ reports.get("/reports/monthly-trend", async (c) => {
         sql`${sales.createdAt} >= NOW() - INTERVAL '12 months'`,
       ),
     )
-    .groupBy(sql`TO_CHAR(${sales.createdAt}, 'YYYY-MM')`)
-    .orderBy(sql`TO_CHAR(${sales.createdAt}, 'YYYY-MM')`);
+    .groupBy(sql`TO_CHAR(${sales.createdAt} AT TIME ZONE ${APP_TIMEZONE}, 'YYYY-MM')`)
+    .orderBy(sql`TO_CHAR(${sales.createdAt} AT TIME ZONE ${APP_TIMEZONE}, 'YYYY-MM')`);
 
   // Expenses by month (last 12 months)
   const expensesByMonth = await db
     .select({
-      month: sql<string>`TO_CHAR(${expenses.date}, 'YYYY-MM')`,
+      month: sql<string>`TO_CHAR(${expenses.date} AT TIME ZONE ${APP_TIMEZONE}, 'YYYY-MM')`,
       total: sql<number>`COALESCE(SUM(${expenses.total}::numeric), 0)::float`,
     })
     .from(expenses)
@@ -1095,8 +1096,8 @@ reports.get("/reports/monthly-trend", async (c) => {
         sql`${expenses.date} >= NOW() - INTERVAL '12 months'`,
       ),
     )
-    .groupBy(sql`TO_CHAR(${expenses.date}, 'YYYY-MM')`)
-    .orderBy(sql`TO_CHAR(${expenses.date}, 'YYYY-MM')`);
+    .groupBy(sql`TO_CHAR(${expenses.date} AT TIME ZONE ${APP_TIMEZONE}, 'YYYY-MM')`)
+    .orderBy(sql`TO_CHAR(${expenses.date} AT TIME ZONE ${APP_TIMEZONE}, 'YYYY-MM')`);
 
   const expenseMap = new Map(expensesByMonth.map((e) => [e.month, e.total]));
 
@@ -1183,7 +1184,7 @@ reports.get("/reports/customer-stats/:id", validateUuidParam, async (c) => {
   // Monthly spending trend (last 6 months)
   const spendingTrend = await db
     .select({
-      month: sql<string>`TO_CHAR(${sales.createdAt}, 'YYYY-MM')`,
+      month: sql<string>`TO_CHAR(${sales.createdAt} AT TIME ZONE ${APP_TIMEZONE}, 'YYYY-MM')`,
       total: sql<number>`COALESCE(SUM(${sales.totalUsd}::numeric), 0)::float`,
       count: sql<number>`count(*)::int`,
     })
@@ -1196,8 +1197,8 @@ reports.get("/reports/customer-stats/:id", validateUuidParam, async (c) => {
         sql`${sales.createdAt} >= NOW() - INTERVAL '6 months'`,
       ),
     )
-    .groupBy(sql`TO_CHAR(${sales.createdAt}, 'YYYY-MM')`)
-    .orderBy(sql`TO_CHAR(${sales.createdAt}, 'YYYY-MM')`);
+    .groupBy(sql`TO_CHAR(${sales.createdAt} AT TIME ZONE ${APP_TIMEZONE}, 'YYYY-MM')`)
+    .orderBy(sql`TO_CHAR(${sales.createdAt} AT TIME ZONE ${APP_TIMEZONE}, 'YYYY-MM')`);
 
   // Build response matching the frontend CustomerStats interface.
   const totalRevenue = Number(customer.totalSpentUsd);
