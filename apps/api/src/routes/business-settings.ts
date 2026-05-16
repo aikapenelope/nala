@@ -15,7 +15,7 @@ import { eq } from "drizzle-orm";
 import { businesses } from "@nova/db";
 import type { AppEnv } from "../types";
 
-const team = new Hono<AppEnv>();
+const businessSettings = new Hono<AppEnv>();
 
 // ============================================================
 // Business Settings
@@ -39,7 +39,7 @@ const updateSettingsSchema = z.object({
 });
 
 /** GET /settings - Get business settings. */
-team.get("/settings", async (c) => {
+businessSettings.get("/settings", async (c) => {
   const currentUser = c.get("user");
   const db = c.get("db");
 
@@ -60,7 +60,7 @@ team.get("/settings", async (c) => {
 });
 
 /** PATCH /settings - Update business settings. */
-team.patch("/settings", zValidator("json", updateSettingsSchema), async (c) => {
+businessSettings.patch("/settings", zValidator("json", updateSettingsSchema), async (c) => {
   const currentUser = c.get("user");
   const db = c.get("db");
 
@@ -92,4 +92,4 @@ team.patch("/settings", zValidator("json", updateSettingsSchema), async (c) => {
   return c.json({ settings: updated });
 });
 
-export { team };
+export { businessSettings };

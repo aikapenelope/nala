@@ -29,7 +29,7 @@ import { salesRoutes } from "./routes/sales";
 import { customersRoutes } from "./routes/customers";
 import { reports } from "./routes/reports";
 import { accounting } from "./routes/accounting";
-import { team } from "./routes/team";
+import { businessSettings } from "./routes/business-settings";
 import { suppliersRoutes } from "./routes/suppliers";
 import { configRoutes } from "./routes/config";
 import { ordersRoutes } from "./routes/orders";
@@ -221,7 +221,7 @@ api.get("/me", (c) => {
 });
 
 // Business settings
-api.route("/", team);
+api.route("/", businessSettings);
 
 // Inventory routes (products, categories, variants)
 api.route("/", inventory);
