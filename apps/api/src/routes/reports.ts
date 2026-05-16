@@ -790,7 +790,7 @@ reports.get("/reports/cash-flow", async (c) => {
   // Daily expenses breakdown (last 14 days)
   const dailyExpenses = await db
     .select({
-      date: sql<string>`DATE(${expenses.date})::text`,
+      date: sql<string>`DATE(${expenses.date} AT TIME ZONE ${APP_TIMEZONE})::text`,
       amount: sql<number>`COALESCE(SUM(${expenses.total}::numeric), 0)::float`,
     })
     .from(expenses)
@@ -801,8 +801,8 @@ reports.get("/reports/cash-flow", async (c) => {
         gte(expenses.date, fourteenDaysAgo),
       ),
     )
-    .groupBy(sql`DATE(${expenses.date})`)
-    .orderBy(sql`DATE(${expenses.date})`);
+    .groupBy(sql`DATE(${expenses.date} AT TIME ZONE ${APP_TIMEZONE})`)
+    .orderBy(sql`DATE(${expenses.date} AT TIME ZONE ${APP_TIMEZONE})`);
 
   // Projections
   const projectedRevenue7d = Math.round(avgDailyRevenue * 7 * 100) / 100;

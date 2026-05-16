@@ -10,7 +10,7 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { eq, and, sql, gte, lte, desc } from "drizzle-orm";
 import { sales, saleItems, salePayments, products, expenses } from "@nova/db";
-import { todayRangeVET, APP_TIMEZONE } from "@nova/shared";
+import { todayRangeVET, APP_TIMEZONE, todayStringVET } from "@nova/shared";
 import {
   generateDailyPdf,
   generateWeeklyPdf,
@@ -172,7 +172,7 @@ reportsPdf.get(
       .orderBy(desc(sql`SUM(${saleItems.lineTotal}::numeric)`))
       .limit(1);
 
-    const dateStr = new Date().toISOString().split("T")[0];
+    const dateStr = todayStringVET();
     const pdfBuffer = await generateWeeklyPdf(
       {
         totalSales,
@@ -226,7 +226,7 @@ reportsPdf.get(
     const grossProfit = revenue - costOfGoods;
     const netProfit = grossProfit - totalExpenses;
 
-    const dateStr = new Date().toISOString().split("T")[0];
+    const dateStr = todayStringVET();
     const pdfBuffer = await generateFinancialPdf(
       {
         revenue: Math.round(revenue * 100) / 100,
