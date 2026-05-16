@@ -8,9 +8,9 @@
  * Connected to: GET /catalog/:slug (public, no auth)
  */
 
-definePageMeta({ layout: "storefront" });
-
 import { currentDayOfWeekVET } from "@nova/shared";
+
+definePageMeta({ layout: "storefront" });
 
 const config = useRuntimeConfig();
 const storefrontApiBase = config.public.apiBase as string;
