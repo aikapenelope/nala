@@ -22,6 +22,7 @@ import {
   Save,
   RefreshCw,
   Link,
+  Lock,
 } from "lucide-vue-next";
 
 const { $api } = useApi();
@@ -229,6 +230,65 @@ onMounted(() => {
   fetchRate();
   fetchBcvOfficial();
 });
+
+// ============================================================
+// Owner Lock (PIN security)
+// ============================================================
+
+const { isEnabled: lockEnabled, setupPin, disablePin, refresh: refreshLock } = useOwnerLock();
+const securityExpanded = ref(false);
+const pinInput = ref("");
+const currentPinInput = ref("");
+const pinError = ref("");
+const pinSaving = ref(false);
+
+async function handlePinSetup() {
+  if (pinInput.value.length !== 4) {
+    pinError.value = "La clave debe ser de 4 digitos";
+    return;
+  }
+
+  pinSaving.value = true;
+  pinError.value = "";
+
+  const result = lockEnabled.value
+    ? await setupPin(pinInput.value, currentPinInput.value || undefined)
+    : await setupPin(pinInput.value);
+
+  if (result.success) {
+    toast("Clave de seguridad configurada", "success");
+    pinInput.value = "";
+    currentPinInput.value = "";
+    await refreshLock();
+  } else {
+    pinError.value = result.error ?? "Error configurando clave";
+  }
+
+  pinSaving.value = false;
+}
+
+async function handlePinDisable() {
+  if (currentPinInput.value.length !== 4) {
+    pinError.value = "Ingresa tu clave actual";
+    return;
+  }
+
+  pinSaving.value = true;
+  pinError.value = "";
+
+  const result = await disablePin(currentPinInput.value);
+
+  if (result.success) {
+    toast("Clave de seguridad desactivada", "success");
+    currentPinInput.value = "";
+    pinInput.value = "";
+    await refreshLock();
+  } else {
+    pinError.value = result.error ?? "Clave incorrecta";
+  }
+
+  pinSaving.value = false;
+}
 </script>
 
 <template>
@@ -438,6 +498,107 @@ onMounted(() => {
           <p class="text-xs font-medium text-gray-600/70">Metodos de pago, delivery, activar tienda</p>
         </div>
       </NuxtLink>
+
+      <!-- ============================================================ -->
+      <!-- Section: Clave de seguridad -->
+      <!-- ============================================================ -->
+      <div class="overflow-hidden rounded-[20px] border border-white/80 bg-gradient-to-br from-[#FFF7ED] to-[#FED7AA]">
+        <button
+          class="flex w-full items-center gap-4 p-4 text-left"
+          @click="securityExpanded = !securityExpanded"
+        >
+          <div class="dark-pill flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-[14px]">
+            <Lock :size="18" class="text-white" />
+          </div>
+          <div class="flex-1">
+            <p class="text-sm font-bold text-gray-800">Clave de seguridad</p>
+            <p class="text-xs font-medium text-gray-600/70">
+              {{ lockEnabled ? "Activada — reportes y costos protegidos" : "Desactivada — todo visible" }}
+            </p>
+          </div>
+          <ChevronDown
+            :size="18"
+            class="text-gray-400 transition-transform"
+            :class="{ 'rotate-180': securityExpanded }"
+          />
+        </button>
+
+        <div v-if="securityExpanded" class="border-t border-white/50 p-4">
+          <p class="mb-4 text-xs text-gray-600">
+            Protege reportes, contabilidad, costos y cuentas con una clave de 4 digitos.
+            Ideal si otra persona usa tu telefono para vender.
+          </p>
+
+          <!-- Error -->
+          <p v-if="pinError" class="mb-3 text-sm font-semibold text-red-500">{{ pinError }}</p>
+
+          <!-- If lock is NOT enabled: show setup form -->
+          <div v-if="!lockEnabled">
+            <label class="mb-1 block text-xs font-semibold text-gray-500">Nueva clave (4 digitos)</label>
+            <input
+              v-model="pinInput"
+              type="password"
+              inputmode="numeric"
+              pattern="[0-9]*"
+              maxlength="4"
+              placeholder="****"
+              class="mb-3 w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-center text-lg font-bold tracking-[0.5em] text-gray-800 outline-none transition-colors focus:border-nova-primary focus:ring-1 focus:ring-nova-primary/30"
+            >
+            <button
+              :disabled="pinInput.length !== 4 || pinSaving"
+              class="w-full rounded-2xl bg-nova-primary px-4 py-2.5 text-sm font-bold text-white transition-colors hover:bg-nova-primary/90 disabled:opacity-50"
+              @click="handlePinSetup"
+            >
+              {{ pinSaving ? "Guardando..." : "Activar clave" }}
+            </button>
+          </div>
+
+          <!-- If lock IS enabled: show change/disable options -->
+          <div v-else class="space-y-3">
+            <div>
+              <label class="mb-1 block text-xs font-semibold text-gray-500">Clave actual</label>
+              <input
+                v-model="currentPinInput"
+                type="password"
+                inputmode="numeric"
+                pattern="[0-9]*"
+                maxlength="4"
+                placeholder="****"
+                class="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-center text-lg font-bold tracking-[0.5em] text-gray-800 outline-none transition-colors focus:border-nova-primary focus:ring-1 focus:ring-nova-primary/30"
+              >
+            </div>
+            <div>
+              <label class="mb-1 block text-xs font-semibold text-gray-500">Nueva clave (dejar vacio para desactivar)</label>
+              <input
+                v-model="pinInput"
+                type="password"
+                inputmode="numeric"
+                pattern="[0-9]*"
+                maxlength="4"
+                placeholder="****"
+                class="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-center text-lg font-bold tracking-[0.5em] text-gray-800 outline-none transition-colors focus:border-nova-primary focus:ring-1 focus:ring-nova-primary/30"
+              >
+            </div>
+            <div class="flex gap-2">
+              <button
+                v-if="pinInput.length === 4"
+                :disabled="currentPinInput.length !== 4 || pinSaving"
+                class="flex-1 rounded-2xl bg-nova-primary px-4 py-2.5 text-sm font-bold text-white transition-colors hover:bg-nova-primary/90 disabled:opacity-50"
+                @click="handlePinSetup"
+              >
+                {{ pinSaving ? "Guardando..." : "Cambiar clave" }}
+              </button>
+              <button
+                :disabled="currentPinInput.length !== 4 || pinSaving"
+                class="flex-1 rounded-2xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-bold text-red-600 transition-colors hover:bg-red-100 disabled:opacity-50"
+                @click="handlePinDisable"
+              >
+                {{ pinSaving ? "..." : "Desactivar" }}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </template>
