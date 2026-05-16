@@ -29,6 +29,7 @@ import {
 import {
   DEAD_STOCK_DAYS,
   AGING_THRESHOLDS,
+  todayRangeVET,
 } from "@nova/shared";
 import { generateNarrative } from "../services/ai-narrative";
 import { periodQuery, parsePeriodRange } from "./reports-helpers";
@@ -49,23 +50,20 @@ reports.get("/reports/daily", zValidator("query", periodQuery), async (c) => {
   const db = c.get("db");
   const businessId = c.get("businessId");
 
-  const todayStr = new Date().toISOString().split("T")[0];
-  const todayStart = new Date(`${todayStr}T00:00:00.000Z`);
-  const todayEnd = new Date(`${todayStr}T23:59:59.999Z`);
+  // Day boundaries in VET (America/Caracas).
+  const today = todayRangeVET();
+  const todayStart = today.start;
+  const todayEnd = today.end;
 
-  // Yesterday
-  const yesterday = new Date(todayStart);
-  yesterday.setUTCDate(yesterday.getUTCDate() - 1);
-  const yesterdayStr = yesterday.toISOString().split("T")[0];
-  const yesterdayStart = new Date(`${yesterdayStr}T00:00:00.000Z`);
-  const yesterdayEnd = new Date(`${yesterdayStr}T23:59:59.999Z`);
+  // Yesterday in VET: shift today's start back by 1 day.
+  const yesterdayMs = todayStart.getTime() - 24 * 60 * 60 * 1000;
+  const yesterdayStart = new Date(yesterdayMs);
+  const yesterdayEnd = new Date(yesterdayMs + 24 * 60 * 60 * 1000 - 1);
 
-  // Same day last week
-  const lastWeek = new Date(todayStart);
-  lastWeek.setUTCDate(lastWeek.getUTCDate() - 7);
-  const lastWeekStr = lastWeek.toISOString().split("T")[0];
-  const lastWeekStart = new Date(`${lastWeekStr}T00:00:00.000Z`);
-  const lastWeekEnd = new Date(`${lastWeekStr}T23:59:59.999Z`);
+  // Same day last week in VET: shift today's start back by 7 days.
+  const lastWeekMs = todayStart.getTime() - 7 * 24 * 60 * 60 * 1000;
+  const lastWeekStart = new Date(lastWeekMs);
+  const lastWeekEnd = new Date(lastWeekMs + 24 * 60 * 60 * 1000 - 1);
 
   const completedCond = eq(sales.status, "completed");
   const bizCond = eq(sales.businessId, businessId);
