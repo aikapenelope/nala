@@ -98,11 +98,13 @@ export function downloadReceiptImage(data: ReceiptData): boolean {
  */
 export function buildReceiptText(data: ReceiptData): string {
   const dateStr = data.date.toLocaleDateString("es-VE", {
+    timeZone: "America/Caracas",
     day: "numeric",
     month: "short",
     year: "numeric",
   });
   const timeStr = data.date.toLocaleTimeString("es-VE", {
+    timeZone: "America/Caracas",
     hour: "2-digit",
     minute: "2-digit",
   });
@@ -205,11 +207,13 @@ function generateReceiptImage(data: ReceiptData): Blob | null {
   y += 28 + 8;
 
   const dateStr = data.date.toLocaleDateString("es-VE", {
+    timeZone: "America/Caracas",
     day: "numeric",
     month: "short",
     year: "numeric",
   });
   const timeStr = data.date.toLocaleTimeString("es-VE", {
+    timeZone: "America/Caracas",
     hour: "2-digit",
     minute: "2-digit",
   });

@@ -29,6 +29,7 @@ import {
   RefreshCw,
   BarChart3,
 } from "lucide-vue-next";
+import { currentHourVET } from "@nova/shared";
 
 const { user } = useNovaAuth();
 const { $api } = useApi();
@@ -154,11 +155,11 @@ function timeAgo(dateStr: string): string {
   if (min < 60) return `Hace ${min}min`;
   const hrs = Math.floor(min / 60);
   if (hrs < 24) return `Hace ${hrs}h`;
-  return new Date(dateStr).toLocaleDateString("es-VE", { day: "numeric", month: "short" });
+  return new Date(dateStr).toLocaleDateString("es-VE", { timeZone: "America/Caracas", day: "numeric", month: "short" });
 }
 
 const greeting = computed(() => {
-  const hour = new Date().getHours();
+  const hour = currentHourVET();
   if (hour < 12) return "Buenos dias";
   if (hour < 18) return "Buenas tardes";
   return "Buenas noches";

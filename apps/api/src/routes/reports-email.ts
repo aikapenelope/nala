@@ -9,6 +9,7 @@ import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { eq, and, sql, gte, lte, desc } from "drizzle-orm";
 import { sales, saleItems, products, expenses } from "@nova/db";
+import { todayRangeVET, todayStringVET } from "@nova/shared";
 import {
   generateDailyPdf,
   generateWeeklyPdf,
@@ -58,13 +59,14 @@ reportsEmail.post(
     const reportLabel = reportLabels[reportType] ?? reportType;
 
     let pdfBuffer: ArrayBuffer;
-    const dateStr = new Date().toISOString().split("T")[0];
+    const dateStr = todayStringVET();
 
     try {
       if (reportType === "daily") {
-        const todayStr = new Date().toISOString().split("T")[0];
-        const todayStart = new Date(`${todayStr}T00:00:00.000Z`);
-        const todayEnd = new Date(`${todayStr}T23:59:59.999Z`);
+        // Day boundaries in VET (America/Caracas).
+        const todayVET = todayRangeVET();
+        const todayStart = todayVET.start;
+        const todayEnd = todayVET.end;
         const completedCond = eq(sales.status, "completed");
         const bizCond = eq(sales.businessId, businessId);
 

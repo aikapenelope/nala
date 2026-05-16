@@ -20,6 +20,7 @@ import {
   products,
   productAliases,
 } from "@nova/db";
+import { dateRangeVET } from "@nova/shared";
 import {
   extractInvoiceFromImage,
   validateInvoiceMath,
@@ -69,19 +70,21 @@ accounting.get(
     const conditions = [eq(accountingEntries.businessId, businessId)];
 
     if (from) {
-      const fromDate = new Date(`${from}T00:00:00.000Z`);
-      if (isNaN(fromDate.getTime())) {
+      try {
+        const { start: fromDate } = dateRangeVET(from);
+        conditions.push(gte(accountingEntries.date, fromDate));
+      } catch {
         return c.json({ error: "Invalid 'from' date. Use YYYY-MM-DD." }, 400);
       }
-      conditions.push(gte(accountingEntries.date, fromDate));
     }
 
     if (to) {
-      const toDate = new Date(`${to}T23:59:59.999Z`);
-      if (isNaN(toDate.getTime())) {
+      try {
+        const { end: toDate } = dateRangeVET(to);
+        conditions.push(lte(accountingEntries.date, toDate));
+      } catch {
         return c.json({ error: "Invalid 'to' date. Use YYYY-MM-DD." }, 400);
       }
-      conditions.push(lte(accountingEntries.date, toDate));
     }
 
     const entries = await db

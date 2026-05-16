@@ -24,6 +24,7 @@ import {
   salePayments,
   customers,
 } from "@nova/db";
+import { currentDayOfWeekVET, todayRangeVET } from "@nova/shared";
 import { logActivity } from "../utils/audit";
 import { cancelStaleOrdersForBusiness } from "../utils/auto-cancel";
 import { validateUuidParam } from "../middleware/validate-uuid";
@@ -611,13 +612,14 @@ ordersRoutes.get("/store-stats", async (c) => {
   const db = c.get("db");
   const businessId = c.get("businessId");
 
-  // Start of current week (Monday 00:00)
+  // Start of current week (Monday 00:00) in VET (America/Caracas).
   const now = new Date();
-  const dayOfWeek = now.getDay();
+  const dayOfWeek = currentDayOfWeekVET(now); // 0=Sun
   const mondayOffset = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-  const weekStart = new Date(now);
-  weekStart.setDate(now.getDate() - mondayOffset);
-  weekStart.setHours(0, 0, 0, 0);
+  const todayVET = todayRangeVET(now);
+  const weekStart = new Date(
+    todayVET.start.getTime() - mondayOffset * 24 * 60 * 60 * 1000,
+  );
 
   const [weekResult] = await db
     .select({

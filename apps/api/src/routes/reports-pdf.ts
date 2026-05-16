@@ -10,6 +10,7 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { eq, and, sql, gte, lte, desc } from "drizzle-orm";
 import { sales, saleItems, salePayments, products, expenses } from "@nova/db";
+import { todayRangeVET, APP_TIMEZONE, todayStringVET } from "@nova/shared";
 import {
   generateDailyPdf,
   generateWeeklyPdf,
@@ -29,9 +30,11 @@ reportsPdf.get(
     const businessId = c.get("businessId");
     const user = c.get("user");
 
-    const todayStr = new Date().toISOString().split("T")[0];
-    const todayStart = new Date(`${todayStr}T00:00:00.000Z`);
-    const todayEnd = new Date(`${todayStr}T23:59:59.999Z`);
+    // Day boundaries in VET (America/Caracas).
+    const today = todayRangeVET();
+    const todayStr = today.dateStr;
+    const todayStart = today.start;
+    const todayEnd = today.end;
 
     const completedCond = eq(sales.status, "completed");
     const bizCond = eq(sales.businessId, businessId);
@@ -44,21 +47,23 @@ reportsPdf.get(
       .from(sales)
       .where(and(bizCond, completedCond, gte(sales.createdAt, todayStart), lte(sales.createdAt, todayEnd)));
 
-    const yesterday = new Date(todayStart);
-    yesterday.setUTCDate(yesterday.getUTCDate() - 1);
-    const yesterdayStr = yesterday.toISOString().split("T")[0];
+    // Yesterday in VET.
+    const yesterdayMs = todayStart.getTime() - 24 * 60 * 60 * 1000;
+    const yesterdayStart = new Date(yesterdayMs);
+    const yesterdayEnd = new Date(yesterdayMs + 24 * 60 * 60 * 1000 - 1);
     const [yesterdayTotals] = await db
       .select({ totalSales: sql<number>`COALESCE(SUM(${sales.totalUsd}::numeric), 0)::float` })
       .from(sales)
-      .where(and(bizCond, completedCond, gte(sales.createdAt, new Date(`${yesterdayStr}T00:00:00.000Z`)), lte(sales.createdAt, new Date(`${yesterdayStr}T23:59:59.999Z`))));
+      .where(and(bizCond, completedCond, gte(sales.createdAt, yesterdayStart), lte(sales.createdAt, yesterdayEnd)));
 
-    const lastWeek = new Date(todayStart);
-    lastWeek.setUTCDate(lastWeek.getUTCDate() - 7);
-    const lastWeekStr = lastWeek.toISOString().split("T")[0];
+    // Same day last week in VET.
+    const lastWeekMs = todayStart.getTime() - 7 * 24 * 60 * 60 * 1000;
+    const lastWeekStart = new Date(lastWeekMs);
+    const lastWeekEnd = new Date(lastWeekMs + 24 * 60 * 60 * 1000 - 1);
     const [lastWeekTotals] = await db
       .select({ totalSales: sql<number>`COALESCE(SUM(${sales.totalUsd}::numeric), 0)::float` })
       .from(sales)
-      .where(and(bizCond, completedCond, gte(sales.createdAt, new Date(`${lastWeekStr}T00:00:00.000Z`)), lte(sales.createdAt, new Date(`${lastWeekStr}T23:59:59.999Z`))));
+      .where(and(bizCond, completedCond, gte(sales.createdAt, lastWeekStart), lte(sales.createdAt, lastWeekEnd)));
 
     const totalSales = todayTotals?.totalSales ?? 0;
     const totalCount = todayTotals?.totalCount ?? 0;
@@ -136,13 +141,13 @@ reportsPdf.get(
 
     const dailyBreakdown = await db
       .select({
-        day: sql<string>`TO_CHAR(${sales.createdAt} AT TIME ZONE 'UTC', 'Dy')`,
+        day: sql<string>`TO_CHAR(${sales.createdAt} AT TIME ZONE ${APP_TIMEZONE}, 'Dy')`,
         amount: sql<number>`COALESCE(SUM(${sales.totalUsd}::numeric), 0)::float`,
       })
       .from(sales)
       .where(and(bizCond, completedCond, gte(sales.createdAt, start), lte(sales.createdAt, end)))
-      .groupBy(sql`TO_CHAR(${sales.createdAt} AT TIME ZONE 'UTC', 'Dy')`, sql`DATE(${sales.createdAt})`)
-      .orderBy(sql`DATE(${sales.createdAt})`);
+      .groupBy(sql`TO_CHAR(${sales.createdAt} AT TIME ZONE ${APP_TIMEZONE}, 'Dy')`, sql`DATE(${sales.createdAt} AT TIME ZONE ${APP_TIMEZONE})`)
+      .orderBy(sql`DATE(${sales.createdAt} AT TIME ZONE ${APP_TIMEZONE})`);
 
     const periodDays = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
     const prevStart = new Date(start.getTime() - periodDays * 24 * 60 * 60 * 1000);
@@ -167,7 +172,7 @@ reportsPdf.get(
       .orderBy(desc(sql`SUM(${saleItems.lineTotal}::numeric)`))
       .limit(1);
 
-    const dateStr = new Date().toISOString().split("T")[0];
+    const dateStr = todayStringVET();
     const pdfBuffer = await generateWeeklyPdf(
       {
         totalSales,
@@ -221,7 +226,7 @@ reportsPdf.get(
     const grossProfit = revenue - costOfGoods;
     const netProfit = grossProfit - totalExpenses;
 
-    const dateStr = new Date().toISOString().split("T")[0];
+    const dateStr = todayStringVET();
     const pdfBuffer = await generateFinancialPdf(
       {
         revenue: Math.round(revenue * 100) / 100,

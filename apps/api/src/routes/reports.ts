@@ -29,6 +29,8 @@ import {
 import {
   DEAD_STOCK_DAYS,
   AGING_THRESHOLDS,
+  todayRangeVET,
+  APP_TIMEZONE,
 } from "@nova/shared";
 import { generateNarrative } from "../services/ai-narrative";
 import { periodQuery, parsePeriodRange } from "./reports-helpers";
@@ -49,23 +51,20 @@ reports.get("/reports/daily", zValidator("query", periodQuery), async (c) => {
   const db = c.get("db");
   const businessId = c.get("businessId");
 
-  const todayStr = new Date().toISOString().split("T")[0];
-  const todayStart = new Date(`${todayStr}T00:00:00.000Z`);
-  const todayEnd = new Date(`${todayStr}T23:59:59.999Z`);
+  // Day boundaries in VET (America/Caracas).
+  const today = todayRangeVET();
+  const todayStart = today.start;
+  const todayEnd = today.end;
 
-  // Yesterday
-  const yesterday = new Date(todayStart);
-  yesterday.setUTCDate(yesterday.getUTCDate() - 1);
-  const yesterdayStr = yesterday.toISOString().split("T")[0];
-  const yesterdayStart = new Date(`${yesterdayStr}T00:00:00.000Z`);
-  const yesterdayEnd = new Date(`${yesterdayStr}T23:59:59.999Z`);
+  // Yesterday in VET: shift today's start back by 1 day.
+  const yesterdayMs = todayStart.getTime() - 24 * 60 * 60 * 1000;
+  const yesterdayStart = new Date(yesterdayMs);
+  const yesterdayEnd = new Date(yesterdayMs + 24 * 60 * 60 * 1000 - 1);
 
-  // Same day last week
-  const lastWeek = new Date(todayStart);
-  lastWeek.setUTCDate(lastWeek.getUTCDate() - 7);
-  const lastWeekStr = lastWeek.toISOString().split("T")[0];
-  const lastWeekStart = new Date(`${lastWeekStr}T00:00:00.000Z`);
-  const lastWeekEnd = new Date(`${lastWeekStr}T23:59:59.999Z`);
+  // Same day last week in VET: shift today's start back by 7 days.
+  const lastWeekMs = todayStart.getTime() - 7 * 24 * 60 * 60 * 1000;
+  const lastWeekStart = new Date(lastWeekMs);
+  const lastWeekEnd = new Date(lastWeekMs + 24 * 60 * 60 * 1000 - 1);
 
   const completedCond = eq(sales.status, "completed");
   const bizCond = eq(sales.businessId, businessId);
@@ -268,7 +267,7 @@ reports.get("/reports/weekly", zValidator("query", periodQuery), async (c) => {
   // Daily breakdown
   const dailyBreakdown = await db
     .select({
-      day: sql<string>`TO_CHAR(${sales.createdAt} AT TIME ZONE 'UTC', 'Dy')`,
+      day: sql<string>`TO_CHAR(${sales.createdAt} AT TIME ZONE ${APP_TIMEZONE}, 'Dy')`,
       amount: sql<number>`COALESCE(SUM(${sales.totalUsd}::numeric), 0)::float`,
     })
     .from(sales)
@@ -281,10 +280,10 @@ reports.get("/reports/weekly", zValidator("query", periodQuery), async (c) => {
       ),
     )
     .groupBy(
-      sql`TO_CHAR(${sales.createdAt} AT TIME ZONE 'UTC', 'Dy')`,
-      sql`DATE(${sales.createdAt})`,
+      sql`TO_CHAR(${sales.createdAt} AT TIME ZONE ${APP_TIMEZONE}, 'Dy')`,
+      sql`DATE(${sales.createdAt} AT TIME ZONE ${APP_TIMEZONE})`,
     )
-    .orderBy(sql`DATE(${sales.createdAt})`);
+    .orderBy(sql`DATE(${sales.createdAt} AT TIME ZONE ${APP_TIMEZONE})`);
 
   // Previous period for comparison
   const periodDays = Math.ceil(
@@ -778,20 +777,20 @@ reports.get("/reports/cash-flow", async (c) => {
   // Daily revenue breakdown (last 14 days for trend chart)
   const dailyRevenue = await db
     .select({
-      date: sql<string>`DATE(${sales.createdAt})::text`,
+      date: sql<string>`DATE(${sales.createdAt} AT TIME ZONE ${APP_TIMEZONE})::text`,
       revenue: sql<number>`COALESCE(SUM(${sales.totalUsd}::numeric), 0)::float`,
     })
     .from(sales)
     .where(
       and(bizCond, completedCond, gte(sales.createdAt, fourteenDaysAgo)),
     )
-    .groupBy(sql`DATE(${sales.createdAt})`)
-    .orderBy(sql`DATE(${sales.createdAt})`);
+    .groupBy(sql`DATE(${sales.createdAt} AT TIME ZONE ${APP_TIMEZONE})`)
+    .orderBy(sql`DATE(${sales.createdAt} AT TIME ZONE ${APP_TIMEZONE})`);
 
   // Daily expenses breakdown (last 14 days)
   const dailyExpenses = await db
     .select({
-      date: sql<string>`DATE(${expenses.date})::text`,
+      date: sql<string>`DATE(${expenses.date} AT TIME ZONE ${APP_TIMEZONE})::text`,
       amount: sql<number>`COALESCE(SUM(${expenses.total}::numeric), 0)::float`,
     })
     .from(expenses)
@@ -802,8 +801,8 @@ reports.get("/reports/cash-flow", async (c) => {
         gte(expenses.date, fourteenDaysAgo),
       ),
     )
-    .groupBy(sql`DATE(${expenses.date})`)
-    .orderBy(sql`DATE(${expenses.date})`);
+    .groupBy(sql`DATE(${expenses.date} AT TIME ZONE ${APP_TIMEZONE})`)
+    .orderBy(sql`DATE(${expenses.date} AT TIME ZONE ${APP_TIMEZONE})`);
 
   // Projections
   const projectedRevenue7d = Math.round(avgDailyRevenue * 7 * 100) / 100;
@@ -1069,7 +1068,7 @@ reports.get("/reports/monthly-trend", async (c) => {
   // Revenue by month (last 12 months)
   const revenueByMonth = await db
     .select({
-      month: sql<string>`TO_CHAR(${sales.createdAt}, 'YYYY-MM')`,
+      month: sql<string>`TO_CHAR(${sales.createdAt} AT TIME ZONE ${APP_TIMEZONE}, 'YYYY-MM')`,
       revenue: sql<number>`COALESCE(SUM(${sales.totalUsd}::numeric), 0)::float`,
     })
     .from(sales)
@@ -1080,13 +1079,13 @@ reports.get("/reports/monthly-trend", async (c) => {
         sql`${sales.createdAt} >= NOW() - INTERVAL '12 months'`,
       ),
     )
-    .groupBy(sql`TO_CHAR(${sales.createdAt}, 'YYYY-MM')`)
-    .orderBy(sql`TO_CHAR(${sales.createdAt}, 'YYYY-MM')`);
+    .groupBy(sql`TO_CHAR(${sales.createdAt} AT TIME ZONE ${APP_TIMEZONE}, 'YYYY-MM')`)
+    .orderBy(sql`TO_CHAR(${sales.createdAt} AT TIME ZONE ${APP_TIMEZONE}, 'YYYY-MM')`);
 
   // Expenses by month (last 12 months)
   const expensesByMonth = await db
     .select({
-      month: sql<string>`TO_CHAR(${expenses.date}, 'YYYY-MM')`,
+      month: sql<string>`TO_CHAR(${expenses.date} AT TIME ZONE ${APP_TIMEZONE}, 'YYYY-MM')`,
       total: sql<number>`COALESCE(SUM(${expenses.total}::numeric), 0)::float`,
     })
     .from(expenses)
@@ -1097,8 +1096,8 @@ reports.get("/reports/monthly-trend", async (c) => {
         sql`${expenses.date} >= NOW() - INTERVAL '12 months'`,
       ),
     )
-    .groupBy(sql`TO_CHAR(${expenses.date}, 'YYYY-MM')`)
-    .orderBy(sql`TO_CHAR(${expenses.date}, 'YYYY-MM')`);
+    .groupBy(sql`TO_CHAR(${expenses.date} AT TIME ZONE ${APP_TIMEZONE}, 'YYYY-MM')`)
+    .orderBy(sql`TO_CHAR(${expenses.date} AT TIME ZONE ${APP_TIMEZONE}, 'YYYY-MM')`);
 
   const expenseMap = new Map(expensesByMonth.map((e) => [e.month, e.total]));
 
@@ -1185,7 +1184,7 @@ reports.get("/reports/customer-stats/:id", validateUuidParam, async (c) => {
   // Monthly spending trend (last 6 months)
   const spendingTrend = await db
     .select({
-      month: sql<string>`TO_CHAR(${sales.createdAt}, 'YYYY-MM')`,
+      month: sql<string>`TO_CHAR(${sales.createdAt} AT TIME ZONE ${APP_TIMEZONE}, 'YYYY-MM')`,
       total: sql<number>`COALESCE(SUM(${sales.totalUsd}::numeric), 0)::float`,
       count: sql<number>`count(*)::int`,
     })
@@ -1198,8 +1197,8 @@ reports.get("/reports/customer-stats/:id", validateUuidParam, async (c) => {
         sql`${sales.createdAt} >= NOW() - INTERVAL '6 months'`,
       ),
     )
-    .groupBy(sql`TO_CHAR(${sales.createdAt}, 'YYYY-MM')`)
-    .orderBy(sql`TO_CHAR(${sales.createdAt}, 'YYYY-MM')`);
+    .groupBy(sql`TO_CHAR(${sales.createdAt} AT TIME ZONE ${APP_TIMEZONE}, 'YYYY-MM')`)
+    .orderBy(sql`TO_CHAR(${sales.createdAt} AT TIME ZONE ${APP_TIMEZONE}, 'YYYY-MM')`);
 
   // Build response matching the frontend CustomerStats interface.
   const totalRevenue = Number(customer.totalSpentUsd);

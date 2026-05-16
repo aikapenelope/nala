@@ -80,6 +80,7 @@ watch([dateFilter, methodFilter], () => {
 /** Format date for display. */
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleString("es-VE", {
+    timeZone: "America/Caracas",
     day: "2-digit",
     month: "short",
     hour: "2-digit",

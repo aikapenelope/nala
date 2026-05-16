@@ -366,7 +366,7 @@ async function submitPayPayable() {
                 class="mt-0.5 text-[10px] font-semibold"
                 :class="new Date(a.dueDate) <= new Date() ? 'text-red-500' : 'text-gray-400'"
               >
-                Vence: {{ new Date(a.dueDate).toLocaleDateString("es-VE", { day: "numeric", month: "short" }) }}
+                Vence: {{ new Date(a.dueDate).toLocaleDateString("es-VE", { timeZone: "America/Caracas", day: "numeric", month: "short" }) }}
               </p>
             </div>
             <div class="flex flex-shrink-0 gap-2">

@@ -8,6 +8,8 @@
  * Connected to: GET /catalog/:slug (public, no auth)
  */
 
+import { currentDayOfWeekVET } from "@nova/shared";
+
 definePageMeta({ layout: "storefront" });
 
 const config = useRuntimeConfig();
@@ -37,7 +39,7 @@ const dayKeys = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as const;
 const todayHours = computed(() => {
   const hours = storeInfo.value?.businessHours;
   if (!hours) return null;
-  const dayIdx = new Date().getDay();
+  const dayIdx = currentDayOfWeekVET();
   const key = dayKeys[dayIdx] as keyof typeof hours;
   if (!key) return null;
   const day = hours[key];
