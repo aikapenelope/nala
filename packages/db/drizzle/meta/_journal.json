@@ -134,6 +134,13 @@
       "when": 1778804535168,
       "tag": "0018_payable_supplier_fk",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1778900000000,
+      "tag": "0019_owner_lock_pin",
+      "breakpoints": true
     }
   ]
 }

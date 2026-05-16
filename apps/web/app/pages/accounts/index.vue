@@ -291,6 +291,7 @@ async function submitPayPayable() {
 </script>
 
 <template>
+  <OwnerLockGuard message="Ingresa tu clave para ver cuentas">
   <div>
     <div class="mb-4 flex items-center justify-between">
       <h1 class="text-2xl font-extrabold tracking-tight text-gradient">Cuentas</h1>
@@ -659,4 +660,5 @@ async function submitPayPayable() {
       </div>
     </Teleport>
   </div>
+  </OwnerLockGuard>
 </template>

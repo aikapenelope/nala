@@ -30,6 +30,7 @@ import { customersRoutes } from "./routes/customers";
 import { reports } from "./routes/reports";
 import { accounting } from "./routes/accounting";
 import { businessSettings } from "./routes/business-settings";
+import { ownerLock } from "./routes/owner-lock";
 import { suppliersRoutes } from "./routes/suppliers";
 import { configRoutes } from "./routes/config";
 import { ordersRoutes } from "./routes/orders";
@@ -222,6 +223,9 @@ api.get("/me", (c) => {
 
 // Business settings
 api.route("/", businessSettings);
+
+// Owner lock (PIN for sensitive sections)
+api.route("/", ownerLock);
 
 // Inventory routes (products, categories, variants)
 api.route("/", inventory);

@@ -46,6 +46,13 @@ export const businesses = pgTable(
     /** Accountant email for report delivery. */
     accountantEmail: text("accountant_email"),
 
+    /**
+     * Owner lock PIN hash (bcrypt).
+     * When set, sensitive sections (costs, reports, settings) require
+     * PIN entry to view. NULL = lock disabled, all sections visible.
+     */
+    ownerPinHash: text("owner_pin_hash"),
+
     isActive: boolean("is_active").notNull().default(true),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
