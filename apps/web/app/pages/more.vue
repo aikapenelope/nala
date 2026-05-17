@@ -25,11 +25,12 @@ import type { Component } from "vue";
 import { LOCKED_ROUTES } from "~/utils/locked-routes";
 
 const { user } = useNovaAuth();
-const { isLocked, ensureInitialized } = useOwnerLock();
+const { isLocked, isReady, ensureInitialized } = useOwnerLock();
 
 onMounted(() => { ensureInitialized(); });
 
 function isRouteLocked(path: string): boolean {
+  if (!isReady.value) return false;
   return isLocked.value && LOCKED_ROUTES.some(
     (r) => path === r || path.startsWith(r + "/"),
   );

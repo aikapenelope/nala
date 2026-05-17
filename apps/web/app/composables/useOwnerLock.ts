@@ -153,35 +153,46 @@ export function useOwnerLock() {
 
   /**
    * Set up a watcher that auto-redirects to /unlock when the timer
-   * expires and the user is on a protected route. Call once per app.
+   * expires and the user is on a protected route.
+   *
+   * Uses effectScope(true) to create a detached scope that survives
+   * component unmounts. Without this, the watcher dies when the first
+   * protected page unmounts, breaking auto-redirect for the session.
    */
   function setupAutoRedirect() {
     if (!import.meta.client) return;
     if (watcherSetup) return;
     watcherSetup = true;
 
-    const router = useRouter();
-    const route = useRoute();
+    const scope = effectScope(true);
+    scope.run(() => {
+      const router = useRouter();
+      const route = useRoute();
 
-    watch(isLocked, (nowLocked) => {
-      if (!nowLocked) return;
+      watch(isLocked, (nowLocked) => {
+        if (!nowLocked) return;
 
-      const isProtected = LOCKED_ROUTES.some(
-        (r) => route.path === r || route.path.startsWith(r + "/"),
-      );
+        const isProtected = LOCKED_ROUTES.some(
+          (r) => route.path === r || route.path.startsWith(r + "/"),
+        );
 
-      if (isProtected) {
-        router.replace({
-          path: "/unlock",
-          query: { redirect: route.fullPath },
-        });
-      }
+        if (isProtected) {
+          router.replace({
+            path: "/unlock",
+            query: { redirect: route.fullPath },
+          });
+        }
+      });
     });
   }
+
+  /** True once the initial status check has completed. */
+  const isReady = computed(() => statusChecked.value);
 
   return {
     isLocked: readonly(isLocked),
     isEnabled: readonly(isEnabled),
+    isReady: readonly(isReady),
     ensureInitialized,
     unlock,
     lock,
