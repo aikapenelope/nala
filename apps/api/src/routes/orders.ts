@@ -14,7 +14,7 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import { eq, and, desc, sql } from "drizzle-orm";
+import { eq, and, desc, sql, inArray } from "drizzle-orm";
 import {
   orders,
   storeSettings,
@@ -202,7 +202,7 @@ ordersRoutes.patch("/orders/:id/confirm", validateUuidParam, async (c) => {
   const dbProducts = await db
     .select({ id: products.id, cost: products.cost, isService: products.isService })
     .from(products)
-    .where(and(eq(products.businessId, businessId), sql`${products.id} = ANY(${productIds})`));
+    .where(and(eq(products.businessId, businessId), inArray(products.id, productIds)));
   const productCostMap = new Map(dbProducts.map((p) => [p.id, p]));
 
   const totalCostUsd = orderItems.reduce((sum, item) => {
@@ -506,7 +506,7 @@ ordersRoutes.patch(
           .where(
             and(
               eq(products.businessId, businessId),
-              sql`${products.id} = ANY(${itemProductIds})`,
+              inArray(products.id, itemProductIds),
             ),
           );
         const serviceSet = new Set(
