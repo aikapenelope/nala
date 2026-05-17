@@ -19,10 +19,21 @@ import {
   Receipt,
   DollarSign,
   Truck,
+  Lock,
 } from "lucide-vue-next";
 import type { Component } from "vue";
+import { LOCKED_ROUTES } from "~/utils/locked-routes";
 
 const { user } = useNovaAuth();
+const { isLocked, ensureInitialized } = useOwnerLock();
+
+onMounted(() => { ensureInitialized(); });
+
+function isRouteLocked(path: string): boolean {
+  return isLocked.value && LOCKED_ROUTES.some(
+    (r) => path === r || path.startsWith(r + "/"),
+  );
+}
 
 interface MenuItem {
   to: string;
@@ -143,6 +154,7 @@ const toolItems: MenuItem[] = [
           <p class="text-sm font-bold text-gray-800">{{ item.label }}</p>
           <p class="text-[11px] font-medium text-gray-500">{{ item.description }}</p>
         </div>
+        <Lock v-if="isRouteLocked(item.to)" :size="14" class="flex-shrink-0 text-orange-400" />
       </NuxtLink>
     </div>
 
@@ -166,6 +178,7 @@ const toolItems: MenuItem[] = [
           <p class="text-[13px] font-semibold text-gray-700">{{ item.label }}</p>
           <p class="text-[11px] font-medium text-gray-400">{{ item.description }}</p>
         </div>
+        <Lock v-if="isRouteLocked(item.to)" :size="14" class="flex-shrink-0 text-orange-400" />
       </NuxtLink>
     </div>
   </div>

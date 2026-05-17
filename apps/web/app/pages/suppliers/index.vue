@@ -43,7 +43,10 @@ async function fetchSuppliers() {
   }
 }
 
-onMounted(fetchSuppliers);
+onMounted(async () => {
+  await useOwnerLockRedirect();
+  fetchSuppliers();
+});
 
 watch(search, () => {
   fetchSuppliers();

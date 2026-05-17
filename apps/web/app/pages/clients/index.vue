@@ -70,7 +70,8 @@ function onSearchInput() {
   searchTimer = setTimeout(() => fetchCustomers(), 300);
 }
 
-onMounted(() => {
+onMounted(async () => {
+  await useOwnerLockRedirect();
   fetchCustomers();
 });
 
