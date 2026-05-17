@@ -13,3 +13,4 @@ export * from "./sales";
 export * from "./customers";
 export * from "./predictions";
 export * from "./timezone";
+export * from "./storefront-config";

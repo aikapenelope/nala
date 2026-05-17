@@ -1,12 +1,14 @@
 <script setup lang="ts">
 /**
- * Storefront catalog page — premium product grid.
+ * Storefront catalog page — adaptive product grid.
  *
- * Displays the tenant's products with sticky category chips,
- * search bar, info banner, and "add to cart" buttons.
- * Uses real data from GET /catalog/:slug (public, no auth).
+ * Renders different product card layouts based on the business type:
+ * - "visual" (ropa, cosmeticos, electronica): large image, carousel, overlay CTA
+ * - "compact" (bodega, farmacia, ferreteria): small image, dense info, inline CTA
+ * - "list" (peluqueria, distribuidora): horizontal row, text-focused
  *
- * Design adapted from the Modern Multi-Tenant Catalog reference.
+ * The layout is determined by useStorefrontConfig() which reads business.type
+ * from the API and returns the appropriate StorefrontConfig.
  */
 
 import { currentDayOfWeekVET } from "@nova/shared";
@@ -15,13 +17,12 @@ import {
   LayoutGrid,
   Info,
   ShoppingBag,
-  Star,
 } from "lucide-vue-next";
 
 definePageMeta({ layout: "storefront" });
 
-const config = useRuntimeConfig();
-const storefrontApiBase = config.public.apiBase as string;
+const runtimeConfig = useRuntimeConfig();
+const storefrontApiBase = runtimeConfig.public.apiBase as string;
 
 const {
   business,
@@ -37,6 +38,7 @@ const {
   fetchMore,
 } = useStorefront();
 const { addItem } = useCart();
+const { config: sfConfig, isWhatsAppMode } = useStorefrontConfig();
 
 /** Resolve image URL: prepend API base for relative paths from the catalog API. */
 function resolveImageUrl(url: string | null): string | undefined {
@@ -73,9 +75,14 @@ const paymentLabels = computed(() => {
   return methods.map((m) => m.label).join(", ");
 });
 
-/** Filtered products by category and search query. */
+/** Filtered products: by category, search, and out-of-stock config. */
 const filteredProducts = computed(() => {
   let result = products.value;
+
+  // Hide out-of-stock products if config says so
+  if (!sfConfig.value.showOutOfStock) {
+    result = result.filter((p) => p.available);
+  }
 
   if (selectedCategory.value) {
     result = result.filter(
@@ -93,8 +100,28 @@ const filteredProducts = computed(() => {
   return result;
 });
 
-/** Show brief "added" feedback on a product card + haptic vibration. */
-function handleAddToCart(product: (typeof products.value)[number]) {
+/** Grid CSS classes based on config. */
+const gridClasses = computed(() => {
+  if (sfConfig.value.cardLayout === "list") return "flex flex-col gap-3";
+  if (sfConfig.value.gridCols === 1) return "flex flex-col gap-5";
+  return "grid grid-cols-2 gap-x-4 gap-y-7";
+});
+
+/**
+ * Handle add-to-cart or WhatsApp-direct depending on checkout mode.
+ * In WhatsApp mode, opens wa.me with the product pre-filled.
+ * In cart mode, adds to cart with haptic feedback.
+ */
+function handleProductAction(product: (typeof products.value)[number]) {
+  if (isWhatsAppMode.value && business.value?.whatsappNumber) {
+    const phone = business.value.whatsappNumber.replace(/[^0-9]/g, "");
+    const msg = `Hola, me interesa: ${product.name} ($${product.price.toFixed(2)})`;
+    const url = `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
+    if (import.meta.client) window.open(url, "_blank");
+    return;
+  }
+
+  // Cart mode: add to cart
   addItem({
     id: product.id,
     name: product.name,
@@ -103,7 +130,6 @@ function handleAddToCart(product: (typeof products.value)[number]) {
   });
   addedProductId.value = product.id;
 
-  // Haptic feedback on mobile (short vibration)
   if (import.meta.client && navigator.vibrate) {
     navigator.vibrate(50);
   }
@@ -113,30 +139,13 @@ function handleAddToCart(product: (typeof products.value)[number]) {
   }, 1200);
 }
 
-/**
- * Track the currently visible image index per product carousel.
- * Uses a scroll event listener to detect which slide is in view.
- */
-const activeImageIndex = reactive<Record<string, number>>({});
-
-function handleCarouselScroll(event: Event, productId: string, imageCount: number) {
-  const el = event.target as HTMLElement;
-  if (!el || imageCount <= 1) return;
-  const slideWidth = el.scrollWidth / imageCount;
-  const idx = Math.round(el.scrollLeft / slideWidth);
-  activeImageIndex[productId] = idx;
-}
-
 onMounted(() => {
   if (products.value.length === 0) {
     fetchCatalog();
   }
 });
 
-/**
- * Infinite scroll: IntersectionObserver triggers fetchMore when the
- * sentinel element at the bottom of the product grid becomes visible.
- */
+/** Infinite scroll sentinel. */
 const scrollSentinel = ref<HTMLElement | null>(null);
 
 onMounted(() => {
@@ -171,15 +180,12 @@ onMounted(() => {
     <!-- LOADING SKELETON -->
     <!-- ============================================================ -->
     <div v-if="isLoading" class="px-5 pt-5">
-      <!-- Search skeleton -->
       <div class="mb-4">
         <div class="h-12 flex-1 rounded-2xl bg-gray-100 animate-pulse" />
       </div>
-      <!-- Category pills skeleton -->
       <div class="mb-5 flex gap-2.5">
         <div v-for="n in 4" :key="n" class="h-10 w-20 rounded-full bg-gray-100 animate-pulse" />
       </div>
-      <!-- Grid skeleton -->
       <div class="grid grid-cols-2 gap-x-4 gap-y-7">
         <div v-for="n in 4" :key="n" class="flex flex-col">
           <div class="aspect-[4/5] rounded-[24px] bg-gray-100 animate-pulse mb-3" />
@@ -231,18 +237,16 @@ onMounted(() => {
       <!-- NORMAL CATALOG -->
       <!-- ============================================================ -->
       <template v-else>
-        <!-- SEARCH & FILTER BAR -->
+        <!-- SEARCH BAR -->
         <div class="px-5 pb-3">
-          <div class="flex gap-3 items-center">
-            <div class="relative flex-1">
-              <Search class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" :size="18" />
-              <input
-                v-model="searchQuery"
-                type="text"
-                :placeholder="`Buscar en ${business?.name ?? 'tienda'}...`"
-                class="w-full rounded-2xl border-transparent bg-gray-50 py-3.5 pl-11 pr-4 text-sm font-medium text-gray-900 placeholder-gray-400 outline-none transition-all focus:border-gray-200 focus:bg-white focus:ring-4 focus:ring-gray-50"
-              >
-            </div>
+          <div class="relative flex-1">
+            <Search class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" :size="18" />
+            <input
+              v-model="searchQuery"
+              type="text"
+              :placeholder="`Buscar en ${business?.name ?? 'tienda'}...`"
+              class="w-full rounded-2xl border-transparent bg-gray-50 py-3.5 pl-11 pr-4 text-sm font-medium text-gray-900 placeholder-gray-400 outline-none transition-all focus:border-gray-200 focus:bg-white focus:ring-4 focus:ring-gray-50"
+            >
           </div>
         </div>
 
@@ -291,16 +295,13 @@ onMounted(() => {
               <Info :size="14" />
             </div>
             <div class="text-[11px] font-medium leading-relaxed text-gray-500">
-              <!-- Welcome message -->
               <p v-if="storeInfo.welcomeMessage" class="mb-1">
                 <span class="font-semibold text-gray-900">{{ storeInfo.welcomeMessage }}</span>
               </p>
-              <!-- Exchange rate -->
               <p v-if="exchangeRate">
                 <span class="font-semibold text-gray-900">Tasa BCV:</span>
                 Bs. {{ exchangeRate.toFixed(2) }} por $1.
               </p>
-              <!-- Business hours -->
               <p v-if="todayHours" class="flex items-center gap-1">
                 <span
                   class="inline-block h-1.5 w-1.5 rounded-full"
@@ -308,14 +309,11 @@ onMounted(() => {
                 />
                 {{ todayHours.label }}
               </p>
-              <!-- Delivery -->
               <p v-if="storeInfo.deliveryEnabled">
                 Delivery {{ storeInfo.deliveryFee > 0 ? `$${storeInfo.deliveryFee.toFixed(2)}` : "gratis" }}
                 <span v-if="storeInfo.deliveryZones" class="text-gray-400"> · {{ storeInfo.deliveryZones }}</span>
               </p>
-              <!-- Payment methods -->
               <p v-if="paymentLabels">Acepta: {{ paymentLabels }}</p>
-              <!-- Minimum order -->
               <p v-if="storeInfo.minOrderAmount > 0">
                 Pedido min. ${{ storeInfo.minOrderAmount.toFixed(2) }}
               </p>
@@ -350,124 +348,43 @@ onMounted(() => {
           </div>
 
           <!-- ============================================================ -->
-          <!-- PRODUCT GRID -->
+          <!-- PRODUCT GRID (config-driven layout) -->
           <!-- ============================================================ -->
-          <div v-else class="grid grid-cols-2 gap-x-4 gap-y-7">
-            <div
-              v-for="product in filteredProducts"
-              :key="product.id"
-              class="group relative flex flex-col"
-            >
-              <!-- Product image -->
-              <div class="relative mb-3 aspect-[4/5] w-full overflow-hidden rounded-[24px] bg-gray-100">
-                <!-- Multi-image carousel -->
-                <template v-if="product.images && product.images.length > 1">
-                  <div
-                    class="no-scrollbar flex h-full w-full snap-x snap-mandatory overflow-x-auto"
-                    @scroll="handleCarouselScroll($event, product.id, product.images.length)"
-                  >
-                    <div
-                      v-for="img in product.images"
-                      :key="img.id"
-                      class="h-full w-full flex-shrink-0 snap-center"
-                    >
-                      <img
-                        :src="resolveImageUrl(img.url)"
-                        :alt="product.name"
-                        class="h-full w-full object-cover object-center transition-transform duration-700 ease-out group-hover:scale-105"
-                        :loading="img.sortOrder === 0 ? 'eager' : 'lazy'"
-                      >
-                    </div>
-                  </div>
-                  <!-- Dot indicators (active dot tracks scroll position) -->
-                  <div class="absolute bottom-2 left-1/2 flex -translate-x-1/2 gap-1">
-                    <span
-                      v-for="(img, idx) in product.images"
-                      :key="img.id"
-                      class="h-1.5 w-1.5 rounded-full transition-colors"
-                      :class="(activeImageIndex[product.id] ?? 0) === idx ? 'bg-gray-900/70' : 'bg-gray-900/25'"
-                    />
-                  </div>
-                </template>
-                <!-- Single image -->
-                <template v-else-if="product.imageUrl">
-                  <img
-                    :src="resolveImageUrl(product.imageUrl)"
-                    :alt="product.name"
-                    class="h-full w-full object-cover object-center transition-transform duration-700 ease-out group-hover:scale-105"
-                    loading="lazy"
-                  >
-                </template>
-                <!-- No image fallback -->
-                <template v-else>
-                  <div class="flex h-full w-full items-center justify-center text-gray-300">
-                    <ShoppingBag :size="32" />
-                  </div>
-                </template>
+          <div v-else :class="gridClasses">
+            <template v-for="product in filteredProducts" :key="product.id">
+              <!-- Visual card (ropa, cosmeticos, electronica) -->
+              <StorefrontProductCardVisual
+                v-if="sfConfig.cardLayout === 'visual'"
+                :product="product"
+                :config="sfConfig"
+                :exchange-rate="exchangeRate"
+                :is-added="addedProductId === product.id"
+                :resolve-image-url="resolveImageUrl"
+                @add-to-cart="handleProductAction"
+              />
 
-                <!-- Out of stock overlay -->
-                <div
-                  v-if="!product.available"
-                  class="absolute inset-0 flex items-center justify-center bg-white/70"
-                >
-                  <span class="rounded-full bg-red-100 px-3 py-1 text-xs font-bold text-red-600">
-                    Agotado
-                  </span>
-                </div>
+              <!-- Compact card (bodega, farmacia, ferreteria) -->
+              <StorefrontProductCardCompact
+                v-else-if="sfConfig.cardLayout === 'compact'"
+                :product="product"
+                :config="sfConfig"
+                :exchange-rate="exchangeRate"
+                :is-added="addedProductId === product.id"
+                :resolve-image-url="resolveImageUrl"
+                @add-to-cart="handleProductAction"
+              />
 
-                <!-- Add to cart button (bottom-right of image) -->
-                <button
-                  v-if="product.available"
-                  class="absolute bottom-3 right-3 z-10 flex h-[38px] w-[38px] items-center justify-center rounded-[14px] shadow-[0_8px_16px_rgba(0,0,0,0.15)] transition-all active:scale-95"
-                  :class="
-                    addedProductId === product.id
-                      ? 'bg-green-500 text-white'
-                      : 'bg-gray-900/90 text-white backdrop-blur-md hover:bg-black'
-                  "
-                  @click="handleAddToCart(product)"
-                >
-                  <ShoppingBag :size="16" />
-                </button>
-              </div>
-
-              <!-- Product info -->
-              <div class="flex flex-col px-1">
-                <!-- Category -->
-                <p
-                  v-if="product.categoryName"
-                  class="mb-1 flex items-center gap-1.5 text-[10px] font-semibold text-gray-500"
-                >
-                  <Star :size="10" class="text-amber-400" />
-                  {{ product.categoryName }}
-                </p>
-
-                <!-- Name -->
-                <h3 class="mb-0.5 truncate text-[14px] font-bold leading-tight text-gray-900">
-                  {{ product.name }}
-                </h3>
-
-                <!-- Description (truncated) -->
-                <p
-                  v-if="product.description"
-                  class="mb-2 truncate text-[10px] font-medium uppercase tracking-wider text-gray-400"
-                >
-                  {{ product.description }}
-                </p>
-
-                <!-- Price -->
-                <div class="flex flex-col">
-                  <span class="text-[17px] font-bold tracking-tight text-gray-900">
-                    ${{ product.price.toFixed(2) }}
-                  </span>
-                  <span
-                    v-if="exchangeRate"
-                    class="mt-0.5 text-[11px] font-medium text-gray-400"
-                  >
-                    Bs {{ (product.price * exchangeRate).toFixed(2) }}
-                  </span>
-                </div>
-              </div>
-            </div>
+              <!-- List card (peluqueria, distribuidora) -->
+              <StorefrontProductCardList
+                v-else
+                :product="product"
+                :config="sfConfig"
+                :exchange-rate="exchangeRate"
+                :is-added="addedProductId === product.id"
+                :resolve-image-url="resolveImageUrl"
+                @add-to-cart="handleProductAction"
+              />
+            </template>
           </div>
 
           <!-- INFINITE SCROLL SENTINEL -->

@@ -14,9 +14,13 @@ export interface StorefrontProduct {
   description: string | null;
   price: number;
   imageUrl: string | null;
-  images: Array<{ id: string; url: string; sortOrder: number }>;
+  images: ReadonlyArray<{ id: string; url: string; sortOrder: number }>;
   categoryName: string | null;
   available: boolean;
+  sku: string | null;
+  brand: string | null;
+  hasVariants: boolean;
+  isService: boolean;
 }
 
 export interface StorefrontBusiness {
