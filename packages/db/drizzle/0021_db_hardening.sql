@@ -8,7 +8,8 @@
 -- 4. UNIQUE constraints on 1:1 settings tables
 -- 5. Self-referencing FK on accounting_accounts.parent_id
 --
--- All statements use IF NOT EXISTS / DO $$ guards for idempotency.
+-- PostgreSQL 16 compatible: uses DO $$ EXCEPTION blocks instead of
+-- ADD CONSTRAINT IF NOT EXISTS (which requires PG17+).
 
 -- ============================================================
 -- 1. Missing FK constraints
@@ -26,7 +27,7 @@ DO $$ BEGIN
       FOREIGN KEY ("customer_id") REFERENCES "customers"("id")
       ON DELETE SET NULL ON UPDATE NO ACTION;
   END IF;
-END $$;
+END $$;--> statement-breakpoint
 
 -- quotations.customer_id -> customers.id
 DO $$ BEGIN
@@ -40,7 +41,7 @@ DO $$ BEGIN
       FOREIGN KEY ("customer_id") REFERENCES "customers"("id")
       ON DELETE SET NULL ON UPDATE NO ACTION;
   END IF;
-END $$;
+END $$;--> statement-breakpoint
 
 -- day_closes.opening_id -> cash_openings.id
 DO $$ BEGIN
@@ -54,7 +55,7 @@ DO $$ BEGIN
       FOREIGN KEY ("opening_id") REFERENCES "cash_openings"("id")
       ON DELETE SET NULL ON UPDATE NO ACTION;
   END IF;
-END $$;
+END $$;--> statement-breakpoint
 
 -- accounting_accounts.parent_id -> accounting_accounts.id (self-reference)
 DO $$ BEGIN
@@ -68,73 +69,114 @@ DO $$ BEGIN
       FOREIGN KEY ("parent_id") REFERENCES "accounting_accounts"("id")
       ON DELETE SET NULL ON UPDATE NO ACTION;
   END IF;
-END $$;
+END $$;--> statement-breakpoint
 
 -- ============================================================
 -- 2. CHECK constraints for data integrity
+--
+-- PostgreSQL <17 does not support ADD CONSTRAINT IF NOT EXISTS.
+-- Use DO $$ BEGIN ... EXCEPTION WHEN duplicate_object to skip
+-- if the constraint already exists (idempotent).
 -- ============================================================
 
--- Products: stock, price, cost must be non-negative
-ALTER TABLE "products" ADD CONSTRAINT IF NOT EXISTS "chk_products_stock_gte_0"
-  CHECK (stock >= 0);
-ALTER TABLE "products" ADD CONSTRAINT IF NOT EXISTS "chk_products_price_gte_0"
-  CHECK (price::numeric >= 0);
-ALTER TABLE "products" ADD CONSTRAINT IF NOT EXISTS "chk_products_cost_gte_0"
-  CHECK (cost::numeric >= 0);
+-- Products
+DO $$ BEGIN
+  ALTER TABLE "products" ADD CONSTRAINT "chk_products_stock_gte_0" CHECK (stock >= 0);
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;--> statement-breakpoint
 
--- Product variants: same constraints
-ALTER TABLE "product_variants" ADD CONSTRAINT IF NOT EXISTS "chk_variants_stock_gte_0"
-  CHECK (stock >= 0);
-ALTER TABLE "product_variants" ADD CONSTRAINT IF NOT EXISTS "chk_variants_price_gte_0"
-  CHECK (price::numeric >= 0);
-ALTER TABLE "product_variants" ADD CONSTRAINT IF NOT EXISTS "chk_variants_cost_gte_0"
-  CHECK (cost::numeric >= 0);
+DO $$ BEGIN
+  ALTER TABLE "products" ADD CONSTRAINT "chk_products_price_gte_0" CHECK (price::numeric >= 0);
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;--> statement-breakpoint
 
--- Sale items: quantity must be positive
-ALTER TABLE "sale_items" ADD CONSTRAINT IF NOT EXISTS "chk_sale_items_qty_gt_0"
-  CHECK (quantity > 0);
-ALTER TABLE "sale_items" ADD CONSTRAINT IF NOT EXISTS "chk_sale_items_unit_price_gte_0"
-  CHECK (unit_price::numeric >= 0);
+DO $$ BEGIN
+  ALTER TABLE "products" ADD CONSTRAINT "chk_products_cost_gte_0" CHECK (cost::numeric >= 0);
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;--> statement-breakpoint
 
--- Sales: discount percent between 0 and 100
-ALTER TABLE "sales" ADD CONSTRAINT IF NOT EXISTS "chk_sales_discount_pct_range"
-  CHECK (discount_percent::numeric >= 0 AND discount_percent::numeric <= 100);
-ALTER TABLE "sales" ADD CONSTRAINT IF NOT EXISTS "chk_sales_discount_amt_gte_0"
-  CHECK (discount_amount::numeric >= 0);
-ALTER TABLE "sales" ADD CONSTRAINT IF NOT EXISTS "chk_sales_total_gte_0"
-  CHECK (total_usd::numeric >= 0);
+-- Product variants
+DO $$ BEGIN
+  ALTER TABLE "product_variants" ADD CONSTRAINT "chk_variants_stock_gte_0" CHECK (stock >= 0);
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;--> statement-breakpoint
 
--- Orders: total must be non-negative
-ALTER TABLE "orders" ADD CONSTRAINT IF NOT EXISTS "chk_orders_total_gte_0"
-  CHECK (total::numeric >= 0);
-ALTER TABLE "orders" ADD CONSTRAINT IF NOT EXISTS "chk_orders_subtotal_gte_0"
-  CHECK (subtotal::numeric >= 0);
+DO $$ BEGIN
+  ALTER TABLE "product_variants" ADD CONSTRAINT "chk_variants_price_gte_0" CHECK (price::numeric >= 0);
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;--> statement-breakpoint
 
--- Exchange rates: rate must be positive
-ALTER TABLE "exchange_rates" ADD CONSTRAINT IF NOT EXISTS "chk_exchange_rates_bcv_gt_0"
-  CHECK (rate_bcv::numeric > 0);
+DO $$ BEGIN
+  ALTER TABLE "product_variants" ADD CONSTRAINT "chk_variants_cost_gte_0" CHECK (cost::numeric >= 0);
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;--> statement-breakpoint
+
+-- Sale items
+DO $$ BEGIN
+  ALTER TABLE "sale_items" ADD CONSTRAINT "chk_sale_items_qty_gt_0" CHECK (quantity > 0);
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;--> statement-breakpoint
+
+DO $$ BEGIN
+  ALTER TABLE "sale_items" ADD CONSTRAINT "chk_sale_items_unit_price_gte_0" CHECK (unit_price::numeric >= 0);
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;--> statement-breakpoint
+
+-- Sales
+DO $$ BEGIN
+  ALTER TABLE "sales" ADD CONSTRAINT "chk_sales_discount_pct_range"
+    CHECK (discount_percent::numeric >= 0 AND discount_percent::numeric <= 100);
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;--> statement-breakpoint
+
+DO $$ BEGIN
+  ALTER TABLE "sales" ADD CONSTRAINT "chk_sales_discount_amt_gte_0" CHECK (discount_amount::numeric >= 0);
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;--> statement-breakpoint
+
+DO $$ BEGIN
+  ALTER TABLE "sales" ADD CONSTRAINT "chk_sales_total_gte_0" CHECK (total_usd::numeric >= 0);
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;--> statement-breakpoint
+
+-- Orders
+DO $$ BEGIN
+  ALTER TABLE "orders" ADD CONSTRAINT "chk_orders_total_gte_0" CHECK (total::numeric >= 0);
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;--> statement-breakpoint
+
+DO $$ BEGIN
+  ALTER TABLE "orders" ADD CONSTRAINT "chk_orders_subtotal_gte_0" CHECK (subtotal::numeric >= 0);
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;--> statement-breakpoint
+
+-- Exchange rates
+DO $$ BEGIN
+  ALTER TABLE "exchange_rates" ADD CONSTRAINT "chk_exchange_rates_bcv_gt_0" CHECK (rate_bcv::numeric > 0);
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;--> statement-breakpoint
 
 -- ============================================================
 -- 3. Missing indexes for reference lookups
 -- ============================================================
 
 CREATE INDEX IF NOT EXISTS "idx_stock_movements_ref"
-  ON "stock_movements" ("reference_type", "reference_id");
+  ON "stock_movements" ("reference_type", "reference_id");--> statement-breakpoint
 
 CREATE INDEX IF NOT EXISTS "idx_accounting_entries_ref"
-  ON "accounting_entries" ("reference_type", "reference_id");
+  ON "accounting_entries" ("reference_type", "reference_id");--> statement-breakpoint
 
 CREATE INDEX IF NOT EXISTS "idx_accounting_entries_business"
-  ON "accounting_entries" ("business_id");
+  ON "accounting_entries" ("business_id");--> statement-breakpoint
 
 CREATE INDEX IF NOT EXISTS "idx_price_history_product"
-  ON "price_history" ("product_id");
+  ON "price_history" ("product_id");--> statement-breakpoint
 
 CREATE INDEX IF NOT EXISTS "idx_activity_log_business"
-  ON "activity_log" ("business_id");
+  ON "activity_log" ("business_id");--> statement-breakpoint
 
 CREATE INDEX IF NOT EXISTS "idx_activity_log_created"
-  ON "activity_log" ("created_at");
+  ON "activity_log" ("created_at");--> statement-breakpoint
 
 -- ============================================================
 -- 4. UNIQUE constraints on 1:1 settings tables
@@ -149,7 +191,7 @@ DO $$ BEGIN
     CREATE UNIQUE INDEX "idx_store_settings_business_unique"
       ON "store_settings" ("business_id");
   END IF;
-END $$;
+END $$;--> statement-breakpoint
 
 -- notification_preferences: one row per business
 DO $$ BEGIN
