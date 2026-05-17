@@ -1,25 +1,23 @@
 /**
  * Owner Lock composable.
  *
- * PIN-based lock for sensitive sections (reports, accounting, accounts).
+ * PIN-based lock for sensitive sections. Architecture:
+ * - Protected pages call useOwnerLockRedirect() in onMounted()
+ * - A watcher auto-redirects when the 15-min timer expires
+ * - /unlock page shows PIN pad and redirects back on success
  *
- * Architecture: route middleware + dedicated /unlock page.
- * The middleware (owner-lock.global.ts) intercepts navigation to
- * protected routes and redirects to /unlock if the lock is active.
- * The /unlock page shows a PIN pad and redirects back on success.
- *
- * State is module-level refs (client-side only, resets on page reload).
- * The middleware calls ensureInitialized() to fetch lock status from
- * the API before making the redirect decision.
+ * Why onMounted instead of middleware:
+ * useApi() depends on useClerk() which requires Vue component setup
+ * context. Nuxt route middlewares don't have this context, so API
+ * calls fail silently. onMounted runs inside the component where
+ * Clerk is available.
  */
+
+import { LOCKED_ROUTES } from "~/utils/locked-routes";
 
 /** How long the unlock lasts before auto-locking (15 minutes). */
 const UNLOCK_DURATION_MS = 15 * 60 * 1000;
 
-/**
- * Extract a user-friendly error message from a $fetch error.
- * $fetch errors store the API response body in err.data.
- */
 function extractErrorMessage(err: unknown, fallback: string): string {
   const fetchErr = err as { data?: { error?: string }; message?: string };
   return fetchErr?.data?.error ?? fetchErr?.message ?? fallback;
@@ -31,24 +29,24 @@ const lockEnabled = ref(false);
 const unlocked = ref(false);
 let initPromise: Promise<void> | null = null;
 let unlockTimer: ReturnType<typeof setTimeout> | null = null;
+let watcherSetup = false;
 
 export function useOwnerLock() {
   const { $api } = useApi();
 
-  /** True if the lock is active and user has NOT entered the PIN. */
+  /**
+   * Fail-closed: while status is unknown, assume locked.
+   * This prevents a flash of unprotected content before the API responds.
+   * If the API fails, lockEnabled defaults to false (don't block the app).
+   */
   const isLocked = computed(() => {
-    if (!statusChecked.value) return false;
+    if (!statusChecked.value) return true; // Fail-closed
     if (!lockEnabled.value) return false;
     return !unlocked.value;
   });
 
-  /** True if the lock feature is enabled (regardless of unlock state). */
   const isEnabled = computed(() => lockEnabled.value);
 
-  /**
-   * Fetch lock status from the server. Called by the route middleware
-   * and by the settings page. Deduplicates concurrent calls.
-   */
   async function ensureInitialized(): Promise<void> {
     if (statusChecked.value) return;
     if (initPromise) return initPromise;
@@ -61,6 +59,7 @@ export function useOwnerLock() {
         );
         lockEnabled.value = result.enabled;
       } catch {
+        // API failed: assume disabled so we don't permanently block the app
         lockEnabled.value = false;
       } finally {
         statusChecked.value = true;
@@ -71,7 +70,6 @@ export function useOwnerLock() {
     return initPromise;
   }
 
-  /** Verify PIN and unlock. */
   async function unlock(pin: string): Promise<{ success: boolean; error?: string }> {
     try {
       const result = await $api<{ valid: boolean; error?: string }>(
@@ -112,7 +110,10 @@ export function useOwnerLock() {
     }
   }
 
-  /** Set up the lock PIN (create or change). */
+  /**
+   * Set up the lock PIN. After setup, the lock is ACTIVE and LOCKED.
+   * The user must enter the PIN to access protected sections.
+   */
   async function setupPin(
     pin: string,
     currentPin?: string,
@@ -124,15 +125,14 @@ export function useOwnerLock() {
       });
       lockEnabled.value = true;
       statusChecked.value = true;
-      unlocked.value = true;
-      resetTimer();
+      unlocked.value = false; // Lock immediately after setup
+      clearTimer();
       return { success: true };
     } catch (err) {
       return { success: false, error: extractErrorMessage(err, "Error configurando clave") };
     }
   }
 
-  /** Disable the lock (requires current PIN). */
   async function disablePin(
     pin: string,
   ): Promise<{ success: boolean; error?: string }> {
@@ -151,6 +151,34 @@ export function useOwnerLock() {
     }
   }
 
+  /**
+   * Set up a watcher that auto-redirects to /unlock when the timer
+   * expires and the user is on a protected route. Call once per app.
+   */
+  function setupAutoRedirect() {
+    if (!import.meta.client) return;
+    if (watcherSetup) return;
+    watcherSetup = true;
+
+    const router = useRouter();
+    const route = useRoute();
+
+    watch(isLocked, (nowLocked) => {
+      if (!nowLocked) return;
+
+      const isProtected = LOCKED_ROUTES.some(
+        (r) => route.path === r || route.path.startsWith(r + "/"),
+      );
+
+      if (isProtected) {
+        router.replace({
+          path: "/unlock",
+          query: { redirect: route.fullPath },
+        });
+      }
+    });
+  }
+
   return {
     isLocked: readonly(isLocked),
     isEnabled: readonly(isEnabled),
@@ -159,5 +187,29 @@ export function useOwnerLock() {
     lock,
     setupPin,
     disablePin,
+    setupAutoRedirect,
   };
+}
+
+/**
+ * Call in onMounted() of any protected page.
+ * Checks lock status and redirects to /unlock if locked.
+ * Also sets up the auto-redirect watcher for timer expiry.
+ */
+export async function useOwnerLockRedirect() {
+  if (!import.meta.client) return;
+
+  const { isLocked, ensureInitialized, setupAutoRedirect } = useOwnerLock();
+  const route = useRoute();
+  const router = useRouter();
+
+  await ensureInitialized();
+  setupAutoRedirect();
+
+  if (isLocked.value) {
+    router.replace({
+      path: "/unlock",
+      query: { redirect: route.fullPath },
+    });
+  }
 }

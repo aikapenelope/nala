@@ -44,7 +44,10 @@ async function fetchQuotations() {
   }
 }
 
-onMounted(fetchQuotations);
+onMounted(async () => {
+  await useOwnerLockRedirect();
+  fetchQuotations();
+});
 
 /** Create quotation modal. */
 const showCreate = ref(false);

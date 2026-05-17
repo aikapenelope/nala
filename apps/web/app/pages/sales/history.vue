@@ -68,7 +68,8 @@ async function fetchSales() {
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
+  await useOwnerLockRedirect();
   fetchSales();
 });
 
