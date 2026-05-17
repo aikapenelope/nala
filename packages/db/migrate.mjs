@@ -152,12 +152,19 @@ async function bootstrapPushEraDb() {
 }
 
 try {
-  // Ensure required PostgreSQL extensions exist before running migrations.
-  // In production these are created by init.sql at container startup, but
-  // in CI the database is bare. Migrations (0000) depend on pg_trgm for
-  // GIN trigram indexes on product/customer name search.
+  // Ensure required PostgreSQL extensions and functions exist before
+  // running migrations. In production these are created by init.sql at
+  // container startup, but in CI the database is bare.
+  //
+  // Extensions: pg_trgm (fuzzy search indexes), uuid-ossp (UUID generation)
+  // Function: current_business_id() (referenced by RLS policies in migration 0007+)
   await sql`CREATE EXTENSION IF NOT EXISTS "pg_trgm"`;
   await sql`CREATE EXTENSION IF NOT EXISTS "uuid-ossp"`;
+  await sql`
+    CREATE OR REPLACE FUNCTION current_business_id() RETURNS uuid AS $$
+      SELECT NULLIF(current_setting('app.current_business_id', true), '')::uuid;
+    $$ LANGUAGE sql STABLE
+  `;
 
   await bootstrapPushEraDb();
 
