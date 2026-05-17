@@ -23,6 +23,9 @@ import {
   saleItems,
   salePayments,
   customers,
+  stockMovements,
+  accountingAccounts,
+  accountingEntries,
 } from "@nova/db";
 import { currentDayOfWeekVET, todayRangeVET } from "@nova/shared";
 import { logActivity } from "../utils/audit";
@@ -194,12 +197,33 @@ ordersRoutes.patch("/orders/:id/confirm", validateUuidParam, async (c) => {
     lineTotal: number;
   }>;
 
+  // Fetch product costs for totalCostUsd and stock movement logging
+  const productIds = orderItems.map((i) => i.productId);
+  const dbProducts = await db
+    .select({ id: products.id, cost: products.cost, isService: products.isService })
+    .from(products)
+    .where(and(eq(products.businessId, businessId), sql`${products.id} = ANY(${productIds})`));
+  const productCostMap = new Map(dbProducts.map((p) => [p.id, p]));
+
+  const totalCostUsd = orderItems.reduce((sum, item) => {
+    const prod = productCostMap.get(item.productId);
+    return sum + item.quantity * Number(prod?.cost ?? 0);
+  }, 0);
+
   await db.transaction(async (tx) => {
-    // 1. Decrement stock
+    // 1. Decrement stock + update lastSoldAt, track post-decrement stock
+    const stockAfterMap = new Map<string, number>();
     for (const item of orderItems) {
+      const prod = productCostMap.get(item.productId);
+      if (prod?.isService) continue;
+
       const result = await tx
         .update(products)
-        .set({ stock: sql`stock - ${item.quantity}` })
+        .set({
+          stock: sql`stock - ${item.quantity}`,
+          lastSoldAt: new Date(),
+          updatedAt: new Date(),
+        })
         .where(
           and(
             eq(products.id, item.productId),
@@ -207,11 +231,13 @@ ordersRoutes.patch("/orders/:id/confirm", validateUuidParam, async (c) => {
             sql`stock >= ${item.quantity}`,
           ),
         )
-        .returning({ id: products.id });
+        .returning({ id: products.id, stock: products.stock });
 
       if (result.length === 0) {
         throw new Error(`Stock insuficiente para: ${item.name}`);
       }
+
+      stockAfterMap.set(item.productId, result[0].stock);
     }
 
     // 2. Update order status
@@ -255,7 +281,7 @@ ordersRoutes.patch("/orders/:id/confirm", validateUuidParam, async (c) => {
 
     const orderTotal = Number(order.total);
 
-    // 4. Create sale record (channel: storefront)
+    // 4. Create sale record (channel: storefront) with totalCostUsd
     const [sale] = await tx
       .insert(sales)
       .values({
@@ -263,6 +289,7 @@ ordersRoutes.patch("/orders/:id/confirm", validateUuidParam, async (c) => {
         userId: user.id,
         customerId,
         totalUsd: order.total,
+        totalCostUsd: String(Math.round(totalCostUsd * 100) / 100),
         channel: "storefront",
         notes: `Pedido online #${id.slice(0, 8)}`,
       })
@@ -301,6 +328,60 @@ ordersRoutes.patch("/orders/:id/confirm", validateUuidParam, async (c) => {
           updatedAt: new Date(),
         })
         .where(eq(customers.id, customerId));
+    }
+
+    // 8. Log stock movements (audit trail for inventory changes)
+    for (const item of orderItems) {
+      const prod = productCostMap.get(item.productId);
+      if (prod?.isService) continue;
+
+      await tx.insert(stockMovements).values({
+        businessId,
+        productId: item.productId,
+        type: "sale",
+        quantity: -item.quantity,
+        costUnit: String(prod?.cost ?? 0),
+        referenceType: "order",
+        referenceId: id,
+        userId: user.id,
+        qtyAfterTransaction: stockAfterMap.get(item.productId) ?? null,
+      });
+    }
+
+    // 9. Generate accounting entries (revenue recognition)
+    const revenueAccounts = await tx
+      .select()
+      .from(accountingAccounts)
+      .where(
+        and(
+          eq(accountingAccounts.businessId, businessId),
+          eq(accountingAccounts.code, "4101"),
+        ),
+      )
+      .limit(1);
+
+    const cashAccounts = await tx
+      .select()
+      .from(accountingAccounts)
+      .where(
+        and(
+          eq(accountingAccounts.businessId, businessId),
+          eq(accountingAccounts.code, "1101"),
+        ),
+      )
+      .limit(1);
+
+    if (revenueAccounts[0] && cashAccounts[0]) {
+      await tx.insert(accountingEntries).values({
+        businessId,
+        date: new Date(),
+        debitAccountId: cashAccounts[0].id,
+        creditAccountId: revenueAccounts[0].id,
+        amount: order.total,
+        description: `Pedido online #${id.slice(0, 8)}`,
+        referenceType: "sale",
+        referenceId: sale.id,
+      });
     }
   });
 
@@ -371,7 +452,12 @@ const cancelOrderSchema = z.object({
   reason: z.string().min(1).max(500),
 });
 
-/** PATCH /orders/:id/cancel - Cancel an order. */
+/**
+ * PATCH /orders/:id/cancel - Cancel an order.
+ *
+ * If the order was already confirmed (stock decremented), restores
+ * stock and logs reversal stock movements for audit trail.
+ */
 ordersRoutes.patch(
   "/orders/:id/cancel",
   validateUuidParam,
@@ -384,7 +470,7 @@ ordersRoutes.patch(
     const { reason } = c.req.valid("json");
 
     const [order] = await db
-      .select({ id: orders.id, status: orders.status })
+      .select()
       .from(orders)
       .where(and(eq(orders.id, id), eq(orders.businessId, businessId)))
       .limit(1);
@@ -400,22 +486,121 @@ ordersRoutes.patch(
       );
     }
 
-    await db
-      .update(orders)
-      .set({
-        status: "cancelled",
-        cancelledAt: new Date(),
-        cancelReason: reason,
-        updatedAt: new Date(),
-      })
-      .where(eq(orders.id, id));
+    const wasConfirmed = order.status === "confirmed";
+
+    await db.transaction(async (tx) => {
+      // If order was confirmed, stock was already decremented — restore it
+      // and reverse accounting entries.
+      if (wasConfirmed) {
+        const orderItems = order.items as Array<{
+          productId: string;
+          quantity: number;
+          name: string;
+        }>;
+
+        // Fetch product info to skip services (services have no stock)
+        const itemProductIds = orderItems.map((i) => i.productId);
+        const productRows = await tx
+          .select({ id: products.id, isService: products.isService })
+          .from(products)
+          .where(
+            and(
+              eq(products.businessId, businessId),
+              sql`${products.id} = ANY(${itemProductIds})`,
+            ),
+          );
+        const serviceSet = new Set(
+          productRows.filter((p) => p.isService).map((p) => p.id),
+        );
+
+        for (const item of orderItems) {
+          // Skip service products — their stock was never decremented
+          if (serviceSet.has(item.productId)) continue;
+
+          const [restored] = await tx
+            .update(products)
+            .set({
+              stock: sql`${products.stock} + ${item.quantity}`,
+              updatedAt: new Date(),
+            })
+            .where(
+              and(
+                eq(products.id, item.productId),
+                eq(products.businessId, businessId),
+              ),
+            )
+            .returning({ stock: products.stock });
+
+          // Log reversal stock movement
+          await tx.insert(stockMovements).values({
+            businessId,
+            productId: item.productId,
+            type: "void",
+            quantity: item.quantity,
+            referenceType: "order",
+            referenceId: id,
+            notes: `Pedido cancelado: ${reason}`,
+            userId: user.id,
+            qtyAfterTransaction: restored?.stock ?? null,
+          });
+        }
+
+        // Reverse accounting entries created during confirmation.
+        // Insert a mirror entry (swap debit/credit) to zero out the revenue.
+        const revenueAccounts = await tx
+          .select()
+          .from(accountingAccounts)
+          .where(
+            and(
+              eq(accountingAccounts.businessId, businessId),
+              eq(accountingAccounts.code, "4101"),
+            ),
+          )
+          .limit(1);
+
+        const cashAccounts = await tx
+          .select()
+          .from(accountingAccounts)
+          .where(
+            and(
+              eq(accountingAccounts.businessId, businessId),
+              eq(accountingAccounts.code, "1101"),
+            ),
+          )
+          .limit(1);
+
+        if (revenueAccounts[0] && cashAccounts[0]) {
+          await tx.insert(accountingEntries).values({
+            businessId,
+            date: new Date(),
+            debitAccountId: revenueAccounts[0].id,
+            creditAccountId: cashAccounts[0].id,
+            amount: order.total,
+            description: `Anulacion pedido #${id.slice(0, 8)}`,
+            referenceType: "order_cancel",
+            referenceId: id,
+          });
+        }
+      }
+
+      // Update order status
+      await tx
+        .update(orders)
+        .set({
+          status: "cancelled",
+          cancelledAt: new Date(),
+          cancelReason: reason,
+          updatedAt: new Date(),
+        })
+        .where(eq(orders.id, id));
+    });
 
     logActivity({
       db,
       businessId,
       userId: user.id,
       action: "order_cancelled",
-      detail: `Pedido ${id.slice(0, 8)} - ${reason}`,
+      detail: `Pedido ${id.slice(0, 8)} - ${reason}${wasConfirmed ? " (stock restaurado)" : ""}`,
     });
 
     return c.json({ success: true, status: "cancelled" });

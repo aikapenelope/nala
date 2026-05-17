@@ -34,6 +34,7 @@ import { ownerLock } from "./routes/owner-lock";
 import { suppliersRoutes } from "./routes/suppliers";
 import { configRoutes } from "./routes/config";
 import { ordersRoutes } from "./routes/orders";
+import { pushRoutes } from "./routes/push";
 import { authMiddleware } from "./middleware/auth";
 import { tenantMiddleware } from "./middleware/tenant";
 import { publicRateLimit, apiRateLimit } from "./middleware/rate-limit";
@@ -250,6 +251,9 @@ api.route("/", configRoutes);
 
 // Online orders and store settings
 api.route("/", ordersRoutes);
+
+// Push notification subscriptions
+api.route("/", pushRoutes);
 
 app.route("/api", api);
 

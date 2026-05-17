@@ -1247,3 +1247,50 @@ export const storeSettings = pgTable("store_settings", {
     .notNull()
     .defaultNow(),
 });
+
+// ============================================================
+// Push Notification Subscriptions
+// ============================================================
+
+/**
+ * Push subscriptions - Web Push API subscriptions per business.
+ *
+ * Stores the PushSubscription object from the browser so the server
+ * can send push notifications (e.g., new storefront order alerts)
+ * to the business owner's devices.
+ *
+ * A business can have multiple subscriptions (multiple devices/browsers).
+ * The endpoint URL is unique per subscription.
+ */
+export const pushSubscriptions = pgTable(
+  "push_subscriptions",
+  {
+    id: uuid("id")
+      .default(sql`gen_random_uuid()`)
+      .primaryKey(),
+    businessId: uuid("business_id")
+      .notNull()
+      .references(() => businesses.id),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id),
+
+    /** The push endpoint URL (unique per browser subscription). */
+    endpoint: text("endpoint").notNull(),
+
+    /** The full PushSubscription JSON (endpoint + keys). */
+    subscription: jsonb("subscription").notNull(),
+
+    /** User agent string for device identification. */
+    userAgent: text("user_agent"),
+
+    isActive: boolean("is_active").notNull().default(true),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("idx_push_subs_business").on(table.businessId),
+    uniqueIndex("idx_push_subs_endpoint").on(table.endpoint),
+  ],
+);
