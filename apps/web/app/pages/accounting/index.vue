@@ -110,7 +110,7 @@ function exportAndSend() {
 </script>
 
 <template>
-  <OwnerLockGuard message="Ingresa tu clave para ver contabilidad">
+  <SharedOwnerLockGuard message="Ingresa tu clave para ver contabilidad">
   <div class="mx-auto max-w-2xl">
     <h1 class="mb-6 text-xl font-bold text-gray-900">Contabilidad</h1>
 
@@ -348,5 +348,5 @@ function exportAndSend() {
       </NuxtLink>
     </template>
   </div>
-  </OwnerLockGuard>
+  </SharedOwnerLockGuard>
 </template>
