@@ -2,20 +2,15 @@
  * Owner Lock composable.
  *
  * PIN-based lock for sensitive sections (reports, accounting, accounts).
- * Inspired by Loyverse/Square POS passcode pattern.
  *
- * Design: purely client-side state. No SSR, no useState, no hydration.
- * The lock state lives in module-level refs that reset on every page
- * load. Each OwnerLockGuard calls ensureInitialized() on mount to
- * fetch the lock status from the API if not yet done.
+ * Architecture: route middleware + dedicated /unlock page.
+ * The middleware (owner-lock.global.ts) intercepts navigation to
+ * protected routes and redirects to /unlock if the lock is active.
+ * The /unlock page shows a PIN pad and redirects back on success.
  *
- * Flow:
- * 1. Page loads -> all refs are default (statusChecked=false, enabled=false, unlocked=false)
- * 2. OwnerLockGuard mounts -> calls ensureInitialized()
- * 3. ensureInitialized() fetches GET /api/owner-lock/status -> sets enabled=true/false
- * 4. If enabled && !unlocked -> guard shows PIN overlay
- * 5. User enters PIN -> POST /api/owner-lock/verify -> unlocked=true for 15 min
- * 6. Page reload -> back to step 1 (all state resets)
+ * State is module-level refs (client-side only, resets on page reload).
+ * The middleware calls ensureInitialized() to fetch lock status from
+ * the API before making the redirect decision.
  */
 
 /** How long the unlock lasts before auto-locking (15 minutes). */
@@ -23,14 +18,14 @@ const UNLOCK_DURATION_MS = 15 * 60 * 1000;
 
 /**
  * Extract a user-friendly error message from a $fetch error.
- * $fetch errors have the API response body in err.data.
+ * $fetch errors store the API response body in err.data.
  */
 function extractErrorMessage(err: unknown, fallback: string): string {
   const fetchErr = err as { data?: { error?: string }; message?: string };
   return fetchErr?.data?.error ?? fetchErr?.message ?? fallback;
 }
 
-// Module-level state: resets on every full page load (no SSR persistence).
+// Module-level state: resets on every full page load.
 const statusChecked = ref(false);
 const lockEnabled = ref(false);
 const unlocked = ref(false);
@@ -42,27 +37,20 @@ export function useOwnerLock() {
 
   /** True if the lock is active and user has NOT entered the PIN. */
   const isLocked = computed(() => {
-    if (!statusChecked.value) return false; // Not yet checked, don't block
-    if (!lockEnabled.value) return false;   // Lock not enabled
+    if (!statusChecked.value) return false;
+    if (!lockEnabled.value) return false;
     return !unlocked.value;
   });
 
   /** True if the lock feature is enabled (regardless of unlock state). */
   const isEnabled = computed(() => lockEnabled.value);
 
-  /** True while the initial status check is in progress. */
-  const isLoading = computed(() => !statusChecked.value);
-
   /**
-   * Ensure the lock status has been fetched from the server.
-   * Safe to call multiple times -- only fetches once.
-   * Called by OwnerLockGuard on mount and by settings page.
+   * Fetch lock status from the server. Called by the route middleware
+   * and by the settings page. Deduplicates concurrent calls.
    */
   async function ensureInitialized(): Promise<void> {
-    // Already checked
     if (statusChecked.value) return;
-
-    // Already fetching (dedup concurrent calls from multiple guards)
     if (initPromise) return initPromise;
 
     initPromise = (async () => {
@@ -83,7 +71,7 @@ export function useOwnerLock() {
     return initPromise;
   }
 
-  /** Verify PIN and unlock if correct. */
+  /** Verify PIN and unlock. */
   async function unlock(pin: string): Promise<{ success: boolean; error?: string }> {
     try {
       const result = await $api<{ valid: boolean; error?: string }>(
@@ -103,7 +91,6 @@ export function useOwnerLock() {
     }
   }
 
-  /** Lock again manually. */
   function lock() {
     unlocked.value = false;
     clearTimer();
@@ -111,9 +98,11 @@ export function useOwnerLock() {
 
   function resetTimer() {
     clearTimer();
-    unlockTimer = setTimeout(() => {
-      unlocked.value = false;
-    }, UNLOCK_DURATION_MS);
+    if (import.meta.client) {
+      unlockTimer = setTimeout(() => {
+        unlocked.value = false;
+      }, UNLOCK_DURATION_MS);
+    }
   }
 
   function clearTimer() {
@@ -165,7 +154,6 @@ export function useOwnerLock() {
   return {
     isLocked: readonly(isLocked),
     isEnabled: readonly(isEnabled),
-    isLoading: readonly(isLoading),
     ensureInitialized,
     unlock,
     lock,

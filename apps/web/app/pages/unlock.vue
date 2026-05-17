@@ -1,50 +1,35 @@
 <script setup lang="ts">
 /**
- * Owner Lock Guard component.
+ * Unlock page — PIN entry for Owner Lock.
  *
- * Wraps sensitive content. Self-initializing: on mount, it checks
- * the lock status from the API (if not already checked) and shows
- * the PIN overlay if the lock is active.
+ * Shown when the user tries to access a locked route (reports,
+ * accounting, accounts). After entering the correct PIN, redirects
+ * back to the original page.
  *
- * No dependency on plugins, useState, or SSR hydration.
- * Works purely client-side after mount.
- *
- * Usage:
- *   <OwnerLockGuard message="Ingresa tu clave para ver reportes">
- *     ...sensitive content...
- *   </OwnerLockGuard>
+ * This is a standalone page, not a component wrapper. This avoids
+ * all the issues with component naming, SSR hydration, fragments,
+ * and page transitions that plagued the previous approach.
  */
 
-import { Lock } from "lucide-vue-next";
+import { Lock, ArrowLeft } from "lucide-vue-next";
 
-const props = withDefaults(
-  defineProps<{
-    message?: string;
-  }>(),
-  {
-    message: "Contenido protegido",
-  },
-);
+const route = useRoute();
+const router = useRouter();
+const { unlock, isLocked, ensureInitialized } = useOwnerLock();
 
-const { isLocked, isLoading, ensureInitialized, unlock } = useOwnerLock();
-
-/** Whether the component has mounted (lock only enforced after mount). */
-const mounted = ref(false);
-
-onMounted(async () => {
-  await ensureInitialized();
-  mounted.value = true;
-});
-
-/** Show lock overlay only after mount and only if locked. */
-const showLock = computed(() => mounted.value && isLocked.value);
-
-/** Show loading state while checking lock status. */
-const showLoading = computed(() => mounted.value && isLoading.value);
+const redirectTo = computed(() => (route.query.redirect as string) || "/");
 
 const pin = ref("");
 const error = ref("");
 const isVerifying = ref(false);
+
+/** If lock is not enabled or already unlocked, redirect immediately. */
+onMounted(async () => {
+  await ensureInitialized();
+  if (!isLocked.value) {
+    router.replace(redirectTo.value);
+  }
+});
 
 function onDigit(digit: string) {
   if (pin.value.length >= 4) return;
@@ -69,7 +54,10 @@ async function verifyPin() {
 
   const result = await unlock(pin.value);
 
-  if (!result.success) {
+  if (result.success) {
+    // Redirect back to the original page
+    router.replace(redirectTo.value);
+  } else {
     error.value = result.error ?? "Clave incorrecta";
     pin.value = "";
   }
@@ -81,29 +69,23 @@ const digits = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", "back"];
 </script>
 
 <template>
-  <!-- SSR + before mount: render content normally (no lock enforcement) -->
-  <!-- After mount + not locked: render content -->
-  <slot v-if="!showLock && !showLoading" />
-
-  <!-- Loading: checking lock status -->
-  <div
-    v-else-if="showLoading"
-    class="flex min-h-[60vh] items-center justify-center"
-  >
-    <div class="h-8 w-8 animate-spin rounded-full border-2 border-gray-200 border-t-nova-primary" />
-  </div>
-
-  <!-- Locked: show PIN entry -->
-  <div
-    v-else
-    class="flex min-h-[60vh] flex-col items-center justify-center px-4"
-  >
+  <div class="flex min-h-[80vh] flex-col items-center justify-center px-4">
     <div class="w-full max-w-xs text-center">
+      <!-- Back button -->
+      <button
+        class="mb-6 flex items-center gap-1 text-sm font-medium text-gray-400 transition-colors hover:text-gray-600"
+        @click="router.back()"
+      >
+        <ArrowLeft :size="16" />
+        Volver
+      </button>
+
+      <!-- Lock icon -->
       <div class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gray-100">
         <Lock :size="28" class="text-gray-400" />
       </div>
 
-      <p class="mb-2 text-base font-bold text-gray-800">{{ props.message }}</p>
+      <p class="mb-2 text-base font-bold text-gray-800">Contenido protegido</p>
       <p class="mb-6 text-sm text-gray-500">Ingresa tu clave de 4 digitos</p>
 
       <!-- PIN dots -->
@@ -119,10 +101,12 @@ const digits = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", "back"];
         />
       </div>
 
+      <!-- Error -->
       <p v-if="error" class="mb-4 text-sm font-semibold text-red-500">
         {{ error }}
       </p>
 
+      <!-- Verifying -->
       <div v-if="isVerifying" class="mb-4 flex justify-center">
         <div class="h-6 w-6 animate-spin rounded-full border-2 border-gray-200 border-t-nova-primary" />
       </div>

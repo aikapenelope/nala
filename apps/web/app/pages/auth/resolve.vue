@@ -14,7 +14,6 @@ definePageMeta({ layout: false });
 
 const router = useRouter();
 const { resolveUser, isAuthenticated, fullLogout } = useNovaAuth();
-const { ensureInitialized: initOwnerLock } = useOwnerLock();
 
 const error = ref("");
 const isResolving = ref(true);
@@ -57,8 +56,6 @@ async function resolve() {
     const result = await resolveUser();
 
     if (result.status === "ok") {
-      // Check owner lock status before navigating to dashboard.
-      await initOwnerLock();
       router.replace("/");
       return;
     }
