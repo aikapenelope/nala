@@ -36,7 +36,7 @@ const {
   fetchCatalog,
   fetchMore,
 } = useStorefront();
-const { addItem, itemCount, subtotal } = useCart();
+const { addItem } = useCart();
 
 /** Resolve image URL: prepend API base for relative paths from the catalog API. */
 function resolveImageUrl(url: string | null): string | undefined {
