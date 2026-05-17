@@ -209,7 +209,6 @@ async function exportExcel() {
 </script>
 
 <template>
-  <SharedOwnerLockGuard message="Ingresa tu clave para ver reportes">
   <div>
     <div class="mb-5 flex items-center justify-between">
       <h1 class="text-2xl font-extrabold tracking-tight text-gradient">Reportes</h1>
@@ -453,5 +452,4 @@ async function exportExcel() {
       </template>
     </div>
   </div>
-  </SharedOwnerLockGuard>
 </template>
