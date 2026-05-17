@@ -425,7 +425,7 @@ export const sales = pgTable(
       .notNull()
       .references(() => users.id),
     /** Optional customer for fiado or CRM tracking. */
-    customerId: uuid("customer_id").references(() => customers.id),
+    customerId: uuid("customer_id").references(() => customers.id, { onDelete: "set null" }),
 
     /** Total in USD (sum of items after discounts). */
     totalUsd: numeric("total_usd", { precision: 12, scale: 2 }).notNull(),
@@ -617,7 +617,7 @@ export const quotations = pgTable("quotations", {
   userId: uuid("user_id")
     .notNull()
     .references(() => users.id),
-  customerId: uuid("customer_id").references(() => customers.id),
+  customerId: uuid("customer_id").references(() => customers.id, { onDelete: "set null" }),
 
   totalUsd: numeric("total_usd", { precision: 12, scale: 2 }).notNull(),
   /** Items stored as JSON for simplicity (quotations are temporary). */
@@ -778,7 +778,7 @@ export const dayCloses = pgTable("day_closes", {
     .notNull()
     .references(() => users.id),
   /** Opening ID this close corresponds to (null for legacy closes). */
-  openingId: uuid("opening_id").references(() => cashOpenings.id),
+  openingId: uuid("opening_id").references(() => cashOpenings.id, { onDelete: "set null" }),
   date: timestamp("date", { withTimezone: true }).notNull(),
   cashCounted: numeric("cash_counted", { precision: 12, scale: 2 }).notNull(),
   cashExpected: numeric("cash_expected", { precision: 12, scale: 2 }).notNull(),
