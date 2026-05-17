@@ -89,6 +89,10 @@ catalog.get("/:slug", async (c) => {
       categoryId: products.categoryId,
       imageUrl: products.imageUrl,
       lastSoldAt: products.lastSoldAt,
+      sku: products.sku,
+      brand: products.brand,
+      hasVariants: products.hasVariants,
+      isService: products.isService,
     })
     .from(products)
     .where(
@@ -149,8 +153,12 @@ catalog.get("/:slug", async (c) => {
       imageUrl: p.imageUrl ? `/images/products/${p.id}` : null,
       images: [] as Array<{ id: string; url: string; sortOrder: number }>,
       categoryName: p.categoryId ? (categoryMap.get(p.categoryId) ?? null) : null,
-      available: p.stock > 0,
+      available: p.stock > 0 || p.isService,
       semaphore,
+      sku: p.sku,
+      brand: p.brand,
+      hasVariants: p.hasVariants,
+      isService: p.isService,
     };
   });
 
