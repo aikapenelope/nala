@@ -41,6 +41,7 @@ const customer = ref<CustomerDetail | null>(null);
 const stats = ref<CustomerStats | null>(null);
 
 onMounted(async () => {
+  await useOwnerLockRedirect();
   try {
     const [custResult, statsResult] = await Promise.all([
       $api<{ customer: CustomerDetail }>(
