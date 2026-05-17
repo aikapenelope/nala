@@ -1,10 +1,12 @@
 <script setup lang="ts">
 /**
- * Storefront cart page.
+ * Storefront cart page — premium design.
  *
  * Shows cart items with quantity controls, subtotal,
  * and a button to proceed to checkout.
  */
+
+import { ArrowLeft, ShoppingBag, X, Minus, Plus, Trash2 } from "lucide-vue-next";
 
 definePageMeta({ layout: "storefront" });
 
@@ -41,50 +43,22 @@ const meetsMinimum = computed(() => {
 </script>
 
 <template>
-  <div>
+  <div class="px-5 pt-2">
     <!-- Back link -->
     <NuxtLink
       to="/tienda"
-      class="mb-4 inline-flex items-center gap-1 text-sm font-medium text-gray-500 hover:text-gray-700"
+      class="mb-4 inline-flex items-center gap-1.5 text-sm font-medium text-gray-500 hover:text-gray-900 transition-colors"
     >
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        width="16"
-        height="16"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="2"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-      >
-        <path d="m12 19-7-7 7-7" />
-        <path d="M19 12H5" />
-      </svg>
+      <ArrowLeft :size="16" />
       Seguir comprando
     </NuxtLink>
 
-    <h1 class="mb-5 text-xl font-bold text-gray-900 dark:text-white">Tu carrito</h1>
+    <h1 class="mb-5 text-xl font-bold tracking-tight text-gray-900">Tu carrito</h1>
 
     <!-- Empty cart -->
     <div v-if="itemCount === 0" class="py-16 text-center">
       <div class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gray-100">
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="28"
-          height="28"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="1.5"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          class="text-gray-400"
-        >
-          <circle cx="8" cy="21" r="1" />
-          <circle cx="19" cy="21" r="1" />
-          <path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12" />
-        </svg>
+        <ShoppingBag :size="28" class="text-gray-400" />
       </div>
       <p class="text-base font-medium text-gray-600">Tu carrito esta vacio</p>
       <p class="mt-1 text-sm text-gray-400">
@@ -92,7 +66,7 @@ const meetsMinimum = computed(() => {
       </p>
       <NuxtLink
         to="/tienda"
-        class="mt-5 inline-block rounded-xl bg-gray-900 px-6 py-2.5 text-sm font-semibold text-white"
+        class="mt-5 inline-block rounded-2xl bg-gray-900 px-6 py-3 text-sm font-bold text-white shadow-md transition-transform active:scale-95"
       >
         Ver catalogo
       </NuxtLink>
@@ -104,12 +78,10 @@ const meetsMinimum = computed(() => {
         <div
           v-for="item in items"
           :key="item.productId"
-          class="flex gap-3 rounded-2xl border border-white/60 bg-white/70 p-3 shadow-sm backdrop-blur-md dark:border-gray-800/60 dark:bg-gray-900/70"
+          class="flex gap-3 rounded-2xl border border-gray-100 bg-white p-3 shadow-sm"
         >
           <!-- Product image -->
-          <div
-            class="h-16 w-16 flex-shrink-0 overflow-hidden rounded-xl bg-gray-100"
-          >
+          <div class="h-20 w-20 flex-shrink-0 overflow-hidden rounded-[16px] bg-gray-100">
             <img
               v-if="item.imageUrl"
               :src="resolveImageUrl(item.imageUrl)"
@@ -120,83 +92,55 @@ const meetsMinimum = computed(() => {
               v-else
               class="flex h-full w-full items-center justify-center text-gray-300"
             >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="1.5"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <path d="m7.5 4.27 9 5.15" />
-                <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" />
-                <path d="m3.3 7 8.7 5 8.7-5" />
-                <path d="M12 22V12" />
-              </svg>
+              <ShoppingBag :size="20" />
             </div>
           </div>
 
           <!-- Item details -->
           <div class="flex min-w-0 flex-1 flex-col justify-between">
             <div class="flex items-start justify-between gap-2">
-              <p class="text-sm font-semibold leading-tight text-gray-900 dark:text-white">
+              <p class="text-sm font-bold leading-tight text-gray-900">
                 {{ item.name }}
               </p>
               <button
-                class="flex-shrink-0 text-gray-400 hover:text-red-500"
+                class="flex-shrink-0 rounded-lg p-1 text-gray-400 hover:bg-red-50 hover:text-red-500 transition-colors"
                 aria-label="Eliminar"
                 @click="removeItem(item.productId)"
               >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                >
-                  <path d="M18 6 6 18" />
-                  <path d="m6 6 12 12" />
-                </svg>
+                <X :size="16" />
               </button>
             </div>
 
-            <div class="mt-1 flex items-center justify-between">
+            <div class="mt-1.5 flex items-center justify-between">
               <!-- Quantity controls -->
-              <div class="flex items-center gap-2">
+              <div class="flex items-center gap-1.5">
                 <button
-                  class="flex h-7 w-7 items-center justify-center rounded-lg bg-gray-100 text-sm font-bold text-gray-700 hover:bg-gray-200"
+                  class="flex h-8 w-8 items-center justify-center rounded-xl bg-gray-50 border border-gray-100 text-gray-700 hover:bg-gray-100 transition-colors"
                   @click="updateQuantity(item.productId, item.quantity - 1)"
                 >
-                  -
+                  <Minus :size="14" />
                 </button>
-                <span class="min-w-[20px] text-center text-sm font-bold text-gray-900">
+                <span class="min-w-[28px] text-center text-sm font-bold text-gray-900">
                   {{ item.quantity }}
                 </span>
                 <button
-                  class="flex h-7 w-7 items-center justify-center rounded-lg bg-gray-100 text-sm font-bold text-gray-700 hover:bg-gray-200"
+                  class="flex h-8 w-8 items-center justify-center rounded-xl bg-gray-50 border border-gray-100 text-gray-700 hover:bg-gray-100 transition-colors"
                   @click="updateQuantity(item.productId, item.quantity + 1)"
                 >
-                  +
+                  <Plus :size="14" />
                 </button>
               </div>
 
               <!-- Line total -->
               <div class="text-right">
-                <p class="text-sm font-bold text-gray-900">
+                <p class="text-[15px] font-bold tracking-tight text-gray-900">
                   ${{ (item.price * item.quantity).toFixed(2) }}
                 </p>
                 <p
                   v-if="exchangeRate"
                   class="text-[11px] font-medium text-gray-400"
                 >
-                  Bs. {{ (item.price * item.quantity * exchangeRate).toFixed(2) }}
+                  Bs {{ (item.price * item.quantity * exchangeRate).toFixed(2) }}
                 </p>
               </div>
             </div>
@@ -206,20 +150,21 @@ const meetsMinimum = computed(() => {
 
       <!-- Clear cart -->
       <button
-        class="mt-4 text-xs font-medium text-gray-400 underline hover:text-gray-600"
+        class="mt-4 flex items-center gap-1.5 text-xs font-medium text-gray-400 hover:text-red-500 transition-colors"
         @click="clear"
       >
+        <Trash2 :size="12" />
         Vaciar carrito
       </button>
 
       <!-- Summary -->
-      <div class="mt-6 space-y-2 rounded-2xl border border-white/60 bg-white/70 p-4 backdrop-blur-md dark:border-gray-800/60 dark:bg-gray-900/70">
+      <div class="mt-6 space-y-2.5 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
         <div class="flex justify-between text-sm text-gray-600">
-          <span>Subtotal ({{ itemCount }} items)</span>
+          <span>Subtotal ({{ itemCount }} {{ itemCount === 1 ? "item" : "items" }})</span>
           <div class="text-right">
             <span class="font-semibold">${{ subtotal.toFixed(2) }}</span>
             <p v-if="exchangeRate" class="text-[11px] text-gray-400">
-              Bs. {{ (subtotal * exchangeRate).toFixed(2) }}
+              Bs {{ (subtotal * exchangeRate).toFixed(2) }}
             </p>
           </div>
         </div>
@@ -232,13 +177,13 @@ const meetsMinimum = computed(() => {
             {{ deliveryFee > 0 ? `$${deliveryFee.toFixed(2)}` : "Gratis" }}
           </span>
         </div>
-        <div class="border-t border-gray-100 pt-2">
-          <div class="flex justify-between text-base font-bold text-gray-900 dark:text-white">
+        <div class="border-t border-gray-100 pt-2.5">
+          <div class="flex justify-between text-base font-bold text-gray-900">
             <span>Total</span>
             <div class="text-right">
-              <span>${{ total.toFixed(2) }}</span>
+              <span class="text-lg">${{ total.toFixed(2) }}</span>
               <p v-if="exchangeRate" class="text-xs font-medium text-gray-400">
-                Bs. {{ (total * exchangeRate).toFixed(2) }}
+                Bs {{ (total * exchangeRate).toFixed(2) }}
               </p>
             </div>
           </div>
@@ -256,11 +201,11 @@ const meetsMinimum = computed(() => {
       <!-- Checkout button -->
       <NuxtLink
         to="/tienda/checkout"
-        class="mt-4 block w-full rounded-xl py-3.5 text-center text-sm font-bold transition-colors"
+        class="mt-4 block w-full rounded-2xl py-3.5 text-center text-sm font-bold transition-all active:scale-[0.98]"
         :class="
           meetsMinimum
-            ? 'bg-gray-900 text-white hover:bg-gray-800 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-200'
-            : 'pointer-events-none bg-gray-200 text-gray-400 dark:bg-gray-800 dark:text-gray-600'
+            ? 'bg-gray-900 text-white shadow-md hover:bg-gray-800'
+            : 'pointer-events-none bg-gray-200 text-gray-400'
         "
       >
         Continuar al pago
