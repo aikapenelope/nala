@@ -49,7 +49,12 @@ jobs:
       - name: Lint
         run: npx turbo lint
 
-      - name: Migrate database
+      - name: Migrate database (production path — validates migration SQL)
+        run: cd packages/db && node migrate.mjs
+        env:
+          DATABASE_URL: postgresql://nova:test@localhost:5432/nova_test
+
+      - name: Sync schema (drizzle-kit push for any drift)
         run: cd packages/db && npx drizzle-kit push
         env:
           DATABASE_URL: postgresql://nova:test@localhost:5432/nova_test
