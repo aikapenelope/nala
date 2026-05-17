@@ -59,10 +59,16 @@ pushRoutes.post(
     const user = c.get("user");
     const userAgent = c.req.header("user-agent") ?? null;
 
-    // Upsert: delete existing subscription for this endpoint, then insert
+    // Upsert: delete existing subscription for this endpoint, then insert.
+    // Scoped to businessId to prevent cross-tenant subscription hijacking.
     await db
       .delete(pushSubscriptions)
-      .where(eq(pushSubscriptions.endpoint, subscription.endpoint));
+      .where(
+        and(
+          eq(pushSubscriptions.endpoint, subscription.endpoint),
+          eq(pushSubscriptions.businessId, businessId),
+        ),
+      );
 
     await db.insert(pushSubscriptions).values({
       businessId,

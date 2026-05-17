@@ -490,6 +490,7 @@ ordersRoutes.patch(
 
     await db.transaction(async (tx) => {
       // If order was confirmed, stock was already decremented — restore it
+      // and reverse accounting entries.
       if (wasConfirmed) {
         const orderItems = order.items as Array<{
           productId: string;
@@ -497,7 +498,25 @@ ordersRoutes.patch(
           name: string;
         }>;
 
+        // Fetch product info to skip services (services have no stock)
+        const itemProductIds = orderItems.map((i) => i.productId);
+        const productRows = await tx
+          .select({ id: products.id, isService: products.isService })
+          .from(products)
+          .where(
+            and(
+              eq(products.businessId, businessId),
+              sql`${products.id} = ANY(${itemProductIds})`,
+            ),
+          );
+        const serviceSet = new Set(
+          productRows.filter((p) => p.isService).map((p) => p.id),
+        );
+
         for (const item of orderItems) {
+          // Skip service products — their stock was never decremented
+          if (serviceSet.has(item.productId)) continue;
+
           const [restored] = await tx
             .update(products)
             .set({
@@ -523,6 +542,43 @@ ordersRoutes.patch(
             notes: `Pedido cancelado: ${reason}`,
             userId: user.id,
             qtyAfterTransaction: restored?.stock ?? null,
+          });
+        }
+
+        // Reverse accounting entries created during confirmation.
+        // Insert a mirror entry (swap debit/credit) to zero out the revenue.
+        const revenueAccounts = await tx
+          .select()
+          .from(accountingAccounts)
+          .where(
+            and(
+              eq(accountingAccounts.businessId, businessId),
+              eq(accountingAccounts.code, "4101"),
+            ),
+          )
+          .limit(1);
+
+        const cashAccounts = await tx
+          .select()
+          .from(accountingAccounts)
+          .where(
+            and(
+              eq(accountingAccounts.businessId, businessId),
+              eq(accountingAccounts.code, "1101"),
+            ),
+          )
+          .limit(1);
+
+        if (revenueAccounts[0] && cashAccounts[0]) {
+          await tx.insert(accountingEntries).values({
+            businessId,
+            date: new Date(),
+            debitAccountId: revenueAccounts[0].id,
+            creditAccountId: cashAccounts[0].id,
+            amount: order.total,
+            description: `Anulacion pedido #${id.slice(0, 8)}`,
+            referenceType: "order_cancel",
+            referenceId: id,
           });
         }
       }
