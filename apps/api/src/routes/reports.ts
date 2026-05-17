@@ -1060,6 +1060,8 @@ reports.get("/reports/customer-stats/:id", validateUuidParam, async (c) => {
   const db = c.get("db");
   const businessId = c.get("businessId");
 
+  try {
+
   // Verify customer exists
   const [customer] = await db
     .select()
@@ -1161,6 +1163,12 @@ reports.get("/reports/customer-stats/:id", validateUuidParam, async (c) => {
     },
     recentSales,
   });
+
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Error loading customer stats";
+    console.error(`[customer-stats] ${customerId}: ${message}`, err instanceof Error ? err.stack : "");
+    return c.json({ error: message }, 500);
+  }
 });
 
 // ============================================================
