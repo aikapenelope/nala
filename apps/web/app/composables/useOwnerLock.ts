@@ -30,6 +30,7 @@ const unlocked = ref(false);
 let initPromise: Promise<void> | null = null;
 let unlockTimer: ReturnType<typeof setTimeout> | null = null;
 let watcherSetup = false;
+let activeScope: ReturnType<typeof effectScope> | null = null;
 
 export function useOwnerLock() {
   const { $api } = useApi();
@@ -164,8 +165,10 @@ export function useOwnerLock() {
     if (watcherSetup) return;
     watcherSetup = true;
 
-    const scope = effectScope(true);
-    scope.run(() => {
+    // Stop previous scope if it exists (handles Vite HMR re-evaluation)
+    activeScope?.stop();
+    activeScope = effectScope(true);
+    activeScope.run(() => {
       const router = useRouter();
       const route = useRoute();
 
