@@ -36,6 +36,8 @@ export default defineNuxtConfig({
     workbox: {
       navigateFallback: "/",
       globPatterns: ["**/*.{js,css,html,png,svg,ico}"],
+      // Import push notification handler into the service worker
+      importScripts: ["/push-sw.js"],
     },
     devOptions: {
       enabled: false,

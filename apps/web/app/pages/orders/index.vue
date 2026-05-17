@@ -8,11 +8,30 @@
  * Connected to: GET /api/orders?status=...
  */
 
-import { Clock, CheckCircle, Truck, XCircle, RefreshCw, Volume2, VolumeX } from "lucide-vue-next";
+import { Clock, CheckCircle, Truck, XCircle, RefreshCw, Volume2, VolumeX, Bell, BellOff } from "lucide-vue-next";
 
 const { $api } = useApi();
 const { muted, toggleMute, playNotification } = useOrderSound();
 const { toast } = useToast();
+const {
+  isSupported: pushSupported,
+  isSubscribed: pushSubscribed,
+  isLoading: pushLoading,
+  subscribe: pushSubscribe,
+  unsubscribe: pushUnsubscribe,
+} = usePushNotifications();
+
+/** Toggle push notification subscription. */
+async function togglePush() {
+  if (pushSubscribed.value) {
+    const ok = await pushUnsubscribe();
+    if (ok) toast("Notificaciones push desactivadas");
+  } else {
+    const ok = await pushSubscribe();
+    if (ok) toast("Notificaciones push activadas");
+    else toast("No se pudieron activar las notificaciones");
+  }
+}
 
 interface OrderRow {
   id: string;
@@ -157,6 +176,19 @@ watch(activeTab, () => {
         </p>
       </div>
       <div class="flex items-center gap-2">
+        <!-- Push notification toggle -->
+        <button
+          v-if="pushSupported"
+          class="flex items-center gap-1 rounded-xl bg-white/70 px-2.5 py-2 text-xs font-medium shadow-sm hover:bg-white disabled:opacity-50"
+          :class="pushSubscribed ? 'text-green-600' : 'text-gray-400'"
+          :title="pushSubscribed ? 'Desactivar notificaciones push' : 'Activar notificaciones push'"
+          :disabled="pushLoading"
+          @click="togglePush"
+        >
+          <Bell v-if="pushSubscribed" :size="13" />
+          <BellOff v-else :size="13" />
+        </button>
+        <!-- Sound toggle -->
         <button
           class="flex items-center gap-1 rounded-xl bg-white/70 px-2.5 py-2 text-xs font-medium shadow-sm hover:bg-white"
           :class="muted ? 'text-gray-400' : 'text-gray-600'"

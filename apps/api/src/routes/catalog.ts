@@ -22,6 +22,7 @@ import { uploadPaymentProof, isStorageConfigured } from "../services/storage";
 import { getCurrentRate } from "../services/exchange-rate";
 import { logActivity } from "../utils/audit";
 import { uploadRateLimit } from "../middleware/rate-limit";
+import { notifyNewOrder } from "../services/push-notifications";
 
 export const catalog = new Hono();
 
@@ -531,6 +532,15 @@ catalog.post(
       userId: business.id, // Use businessId as actor for public orders
       action: "order_created",
       detail: `Pedido online ${orderId.slice(0, 8)} - ${data.customerName} - $${serverTotal.toFixed(2)}`,
+    });
+
+    // Send push notification to business owner (fire-and-forget)
+    notifyNewOrder(db, business.id, {
+      customerName: data.customerName,
+      total: serverTotal,
+      orderId,
+    }).catch(() => {
+      // Push is best-effort, don't block the order response
     });
 
     // Build WhatsApp link with order summary (using server-validated items)
