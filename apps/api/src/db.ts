@@ -134,6 +134,7 @@ export async function applyRlsPolicies(): Promise<void> {
     { table: "sale_returns", column: "business_id" },
     // sale_return_items: no business_id — isolated via sale_returns FK + RLS
     { table: "product_images", column: "business_id" },
+    { table: "push_subscriptions", column: "business_id" },
   ];
 
   const skipped: string[] = [];

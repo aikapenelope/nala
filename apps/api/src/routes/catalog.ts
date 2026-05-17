@@ -14,12 +14,11 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { eq, and, desc, inArray, sql } from "drizzle-orm";
-import { businesses, products, productImages, categories, storeSettings, orders } from "@nova/db";
+import { businesses, products, productImages, categories, storeSettings, orders, exchangeRates } from "@nova/db";
 import { calculateStockSemaphore } from "@nova/shared";
 import { tryGetDb } from "../db";
 import { getRedis } from "../redis";
 import { uploadPaymentProof, isStorageConfigured } from "../services/storage";
-import { getCurrentRate } from "../services/exchange-rate";
 import { logActivity } from "../utils/audit";
 import { uploadRateLimit } from "../middleware/rate-limit";
 import { notifyNewOrder } from "../services/push-notifications";
@@ -188,11 +187,26 @@ catalog.get("/:slug", async (c) => {
     }
   }
 
-  // Fetch exchange rate for Bs display (non-blocking, optional)
+  // Fetch exchange rate for Bs display (non-blocking, optional).
+  // The catalog runs without RLS tenant context, but exchange_rates has
+  // RLS enabled. We use a transaction to pin set_config + the query to
+  // the same pooled connection, with transaction-local scope (true) so
+  // the variable auto-reverts on commit — no manual cleanup needed.
   let exchangeRate: number | null = null;
   try {
-    const rate = await getCurrentRate(business.id);
-    exchangeRate = rate.rateBcv;
+    const rate = await db.transaction(async (tx) => {
+      await tx.execute(
+        sql`SELECT set_config('app.current_business_id', ${business.id}, true)`,
+      );
+      const [latest] = await tx
+        .select({ rateBcv: exchangeRates.rateBcv })
+        .from(exchangeRates)
+        .where(eq(exchangeRates.businessId, business.id))
+        .orderBy(desc(exchangeRates.date))
+        .limit(1);
+      return latest ?? null;
+    });
+    exchangeRate = rate ? Number(rate.rateBcv) : null;
   } catch {
     // Rate not configured -- that's fine, just don't show Bs prices
   }
