@@ -152,6 +152,13 @@ async function bootstrapPushEraDb() {
 }
 
 try {
+  // Ensure required PostgreSQL extensions exist before running migrations.
+  // In production these are created by init.sql at container startup, but
+  // in CI the database is bare. Migrations (0000) depend on pg_trgm for
+  // GIN trigram indexes on product/customer name search.
+  await sql`CREATE EXTENSION IF NOT EXISTS "pg_trgm"`;
+  await sql`CREATE EXTENSION IF NOT EXISTS "uuid-ossp"`;
+
   await bootstrapPushEraDb();
 
   const db = drizzle(sql);
