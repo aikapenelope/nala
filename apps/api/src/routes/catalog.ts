@@ -188,13 +188,24 @@ catalog.get("/:slug", async (c) => {
     }
   }
 
-  // Fetch exchange rate for Bs display (non-blocking, optional)
+  // Fetch exchange rate for Bs display (non-blocking, optional).
+  // The catalog runs without RLS tenant context, but exchange_rates has
+  // RLS enabled. Temporarily set the business context for this query,
+  // then clear it immediately after.
   let exchangeRate: number | null = null;
   try {
+    await db.execute(
+      sql`SELECT set_config('app.current_business_id', ${business.id}, false)`,
+    );
     const rate = await getCurrentRate(business.id);
     exchangeRate = rate.rateBcv;
   } catch {
     // Rate not configured -- that's fine, just don't show Bs prices
+  } finally {
+    // Clear the RLS context so the pooled connection doesn't leak it
+    db.execute(
+      sql`SELECT set_config('app.current_business_id', '', false)`,
+    ).catch(() => {});
   }
 
   const responseData = {
