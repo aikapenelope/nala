@@ -12,7 +12,6 @@
 import { currentDayOfWeekVET } from "@nova/shared";
 import {
   Search,
-  SlidersHorizontal,
   LayoutGrid,
   Info,
   ShoppingBag,
@@ -114,6 +113,20 @@ function handleAddToCart(product: (typeof products.value)[number]) {
   }, 1200);
 }
 
+/**
+ * Track the currently visible image index per product carousel.
+ * Uses a scroll event listener to detect which slide is in view.
+ */
+const activeImageIndex = reactive<Record<string, number>>({});
+
+function handleCarouselScroll(event: Event, productId: string, imageCount: number) {
+  const el = event.target as HTMLElement;
+  if (!el || imageCount <= 1) return;
+  const slideWidth = el.scrollWidth / imageCount;
+  const idx = Math.round(el.scrollLeft / slideWidth);
+  activeImageIndex[productId] = idx;
+}
+
 onMounted(() => {
   if (products.value.length === 0) {
     fetchCatalog();
@@ -159,9 +172,8 @@ onMounted(() => {
     <!-- ============================================================ -->
     <div v-if="isLoading" class="px-5 pt-5">
       <!-- Search skeleton -->
-      <div class="mb-4 flex gap-3">
+      <div class="mb-4">
         <div class="h-12 flex-1 rounded-2xl bg-gray-100 animate-pulse" />
-        <div class="h-12 w-12 rounded-2xl bg-gray-100 animate-pulse" />
       </div>
       <!-- Category pills skeleton -->
       <div class="mb-5 flex gap-2.5">
@@ -231,9 +243,6 @@ onMounted(() => {
                 class="w-full rounded-2xl border-transparent bg-gray-50 py-3.5 pl-11 pr-4 text-sm font-medium text-gray-900 placeholder-gray-400 outline-none transition-all focus:border-gray-200 focus:bg-white focus:ring-4 focus:ring-gray-50"
               >
             </div>
-            <button class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gray-900 text-white shadow-md transition-transform active:scale-95">
-              <SlidersHorizontal :size="18" />
-            </button>
           </div>
         </div>
 
@@ -353,7 +362,10 @@ onMounted(() => {
               <div class="relative mb-3 aspect-[4/5] w-full overflow-hidden rounded-[24px] bg-gray-100">
                 <!-- Multi-image carousel -->
                 <template v-if="product.images && product.images.length > 1">
-                  <div class="no-scrollbar flex h-full w-full snap-x snap-mandatory overflow-x-auto">
+                  <div
+                    class="no-scrollbar flex h-full w-full snap-x snap-mandatory overflow-x-auto"
+                    @scroll="handleCarouselScroll($event, product.id, product.images.length)"
+                  >
                     <div
                       v-for="img in product.images"
                       :key="img.id"
@@ -367,13 +379,13 @@ onMounted(() => {
                       >
                     </div>
                   </div>
-                  <!-- Dot indicators -->
+                  <!-- Dot indicators (active dot tracks scroll position) -->
                   <div class="absolute bottom-2 left-1/2 flex -translate-x-1/2 gap-1">
                     <span
                       v-for="(img, idx) in product.images"
                       :key="img.id"
-                      class="h-1.5 w-1.5 rounded-full"
-                      :class="idx === 0 ? 'bg-gray-900/70' : 'bg-gray-900/25'"
+                      class="h-1.5 w-1.5 rounded-full transition-colors"
+                      :class="(activeImageIndex[product.id] ?? 0) === idx ? 'bg-gray-900/70' : 'bg-gray-900/25'"
                     />
                   </div>
                 </template>

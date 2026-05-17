@@ -12,13 +12,12 @@
 
 import {
   LayoutGrid,
-  Heart,
   ShoppingCart,
   Receipt,
-  User,
   MessageCircle,
 } from "lucide-vue-next";
 
+const config = useRuntimeConfig();
 const { tenantSlug } = useTenant();
 const { business } = useStorefront();
 const { itemCount } = useCart();
@@ -29,10 +28,11 @@ const route = useRoute();
 /** Display name: business name when loaded, generic fallback otherwise. */
 const storeName = computed(() => business.value?.name ?? "Tienda");
 
-/** Subdomain display. */
+/** Subdomain display — uses tenantDomain from runtime config. */
 const storeUrl = computed(() => {
   if (!tenantSlug.value) return null;
-  return `${tenantSlug.value}.novaincs.com`;
+  const host = (config.public.tenantDomain as string) || "novaincs.com";
+  return `${tenantSlug.value}.${host}`;
 });
 
 /** WhatsApp link for the business. */
@@ -43,13 +43,15 @@ const whatsappLink = computed(() => {
   return `https://wa.me/${clean}`;
 });
 
-/** Bottom nav items. */
+/**
+ * Bottom nav items — only routes that exist in the storefront.
+ * Catalog, Cart (elevated center), and Order tracking.
+ * "Guardados" and "Perfil" are omitted because those pages don't exist yet.
+ */
 const navItems = computed(() => [
   { to: "/tienda", icon: LayoutGrid, label: "Catalogo", match: "/tienda" },
-  { to: "/tienda/cart", icon: Heart, label: "Guardados", match: "/tienda/saved" },
   { to: "/tienda/cart", icon: ShoppingCart, label: "Carrito", isCart: true, match: "/tienda/cart" },
-  { to: "/tienda/checkout", icon: Receipt, label: "Pedidos", match: "/tienda/order" },
-  { to: "/tienda", icon: User, label: "Perfil", match: "/tienda/profile" },
+  { to: "/tienda/checkout", icon: Receipt, label: "Pedir", match: "/tienda/checkout" },
 ]);
 
 function isActive(match: string): boolean {
