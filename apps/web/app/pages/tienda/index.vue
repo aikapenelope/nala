@@ -118,6 +118,10 @@ function handleProductAction(product: (typeof products.value)[number]) {
     const msg = `Hola, me interesa: ${product.name} ($${product.price.toFixed(2)})`;
     const url = `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
     if (import.meta.client) window.open(url, "_blank");
+
+    // Visual feedback + prevent duplicate taps (same pattern as cart mode)
+    addedProductId.value = product.id;
+    setTimeout(() => { addedProductId.value = null; }, 1200);
     return;
   }
 
