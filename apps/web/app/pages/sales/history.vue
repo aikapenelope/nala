@@ -307,11 +307,12 @@ const selectedReturnItems = computed(() =>
   returnItems.value.filter((item) => item.returnQty > 0),
 );
 
-/** Total refund amount. */
+/** Total refund amount (proportional to lineTotal, accounts for discounts). */
 const returnTotal = computed(() => {
   return selectedReturnItems.value.reduce((sum, item) => {
-    const unitPrice = Number(item.unitPrice);
-    return sum + unitPrice * item.returnQty;
+    // Use lineTotal / quantity to get the effective per-unit price after discount
+    const effectiveUnitPrice = Number(item.lineTotal) / item.quantity;
+    return sum + effectiveUnitPrice * item.returnQty;
   }, 0);
 });
 

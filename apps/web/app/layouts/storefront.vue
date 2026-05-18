@@ -211,8 +211,9 @@ onMounted(() => {
           <span class="text-[10px] font-semibold">Pedir</span>
         </NuxtLink>
 
-        <!-- Pedir -->
+        <!-- Pedir (only when WhatsApp is shown, to keep 5 items) -->
         <NuxtLink
+          v-if="whatsappLink"
           to="/tienda/checkout"
           class="flex flex-col items-center gap-0.5 transition-colors"
           :class="isActive('/tienda/checkout') ? 'text-gray-900 dark:text-white' : 'text-gray-400 dark:text-gray-500'"
