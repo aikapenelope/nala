@@ -20,6 +20,7 @@ import { tryGetDb } from "../db";
 import { getRedis } from "../redis";
 import { uploadPaymentProof, isStorageConfigured } from "../services/storage";
 import { logActivity } from "../utils/audit";
+import { PriceError, StockError, MinOrderError } from "../utils/errors";
 import { uploadRateLimit } from "../middleware/rate-limit";
 import { notifyNewOrder } from "../services/push-notifications";
 
@@ -453,11 +454,11 @@ catalog.post(
         }
 
         if (priceErrors.length > 0) {
-          throw new Error(JSON.stringify({ priceErrors }));
+          throw new PriceError(priceErrors);
         }
 
         if (stockErrors.length > 0) {
-          throw new Error(JSON.stringify({ stockErrors }));
+          throw new StockError(stockErrors.join("; "));
         }
 
         // Recalculate totals server-side using DB prices (prevents client manipulation)
@@ -470,9 +471,9 @@ catalog.post(
         // Enforce minimum order amount
         const minOrder = Number(settings.minOrderAmount);
         if (minOrder > 0 && total < minOrder) {
-          throw new Error(JSON.stringify({
-            minOrderError: `Monto minimo de pedido: $${minOrder.toFixed(2)}`,
-          }));
+          throw new MinOrderError(
+            `Monto minimo de pedido: $${minOrder.toFixed(2)}`,
+          );
         }
 
         // Build server-validated items snapshot with DB prices
@@ -511,32 +512,20 @@ catalog.post(
       serverTotal = result.total;
       serverItems = result.validatedItems;
     } catch (err) {
-      // Handle validation errors thrown from inside the transaction
-      if (err instanceof Error && err.message.startsWith("{")) {
-        try {
-          const parsed = JSON.parse(err.message) as {
-            stockErrors?: string[];
-            priceErrors?: string[];
-            minOrderError?: string;
-          };
-          if (parsed.priceErrors) {
-            return c.json(
-              { error: "Precio incorrecto", details: parsed.priceErrors },
-              409,
-            );
-          }
-          if (parsed.stockErrors) {
-            return c.json(
-              { error: "Stock insuficiente", details: parsed.stockErrors },
-              409,
-            );
-          }
-          if (parsed.minOrderError) {
-            return c.json({ error: parsed.minOrderError }, 400);
-          }
-        } catch {
-          // Not a validation error, rethrow
-        }
+      if (err instanceof PriceError) {
+        return c.json(
+          { error: "Precio incorrecto", details: err.details },
+          409,
+        );
+      }
+      if (err instanceof StockError) {
+        return c.json(
+          { error: "Stock insuficiente", details: [err.message] },
+          409,
+        );
+      }
+      if (err instanceof MinOrderError) {
+        return c.json({ error: err.message }, 400);
       }
       throw err;
     }

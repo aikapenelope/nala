@@ -38,7 +38,26 @@ setInterval(() => {
   }
 }, 5 * 60 * 1000).unref();
 
-/** Check rate limit using Redis INCR + EXPIRE. */
+/**
+ * Lua script for atomic rate limiting.
+ *
+ * Performs INCR + conditional EXPIRE in a single atomic operation.
+ * This prevents the race condition where the process dies between
+ * INCR and EXPIRE, leaving a key without TTL (memory leak in Redis).
+ *
+ * KEYS[1] = rate limit key
+ * ARGV[1] = window duration in seconds
+ * Returns: current count after increment
+ */
+const RATE_LIMIT_LUA = `
+local count = redis.call('INCR', KEYS[1])
+if count == 1 then
+  redis.call('EXPIRE', KEYS[1], ARGV[1])
+end
+return count
+`;
+
+/** Check rate limit using atomic Redis Lua script. */
 async function checkRedis(
   key: string,
   config: RateLimitConfig,
@@ -49,10 +68,12 @@ async function checkRedis(
   }
 
   try {
-    const count = await redis.incr(key);
-    if (count === 1) {
-      await redis.expire(key, config.windowSeconds);
-    }
+    const count = (await redis.eval(
+      RATE_LIMIT_LUA,
+      1,
+      key,
+      String(config.windowSeconds),
+    )) as number;
     const remaining = Math.max(0, config.max - count);
     return { allowed: count <= config.max, remaining };
   } catch {

@@ -49,6 +49,7 @@ import { getCurrentRate, setCurrentRate } from "../services/exchange-rate";
 import { fetchBcvRates } from "../services/bcv-rates";
 import { generateReceiptPdf } from "../services/pdf-generator";
 import { handleDbError } from "../utils/db-errors";
+import { ValidationError, UserError } from "../utils/errors";
 import { validateUuidParam } from "../middleware/validate-uuid";
 import type { AppEnv } from "../types";
 
@@ -843,6 +844,14 @@ salesRoutes.post("/sales/quick", async (c) => {
         reference: data.reference ?? null,
       });
 
+      // Log activity (quick sales were missing from audit trail)
+      await db.insert(activityLog).values({
+        businessId,
+        userId: user.id,
+        action: "sale_created",
+        detail: `Venta rapida $${totalUsd} (${data.method})`,
+      });
+
       return c.json(
         {
           sale: {
@@ -1085,9 +1094,7 @@ salesRoutes.post(
           .limit(1);
 
         if (!sale) {
-          throw new Error(
-            JSON.stringify({ userError: "Venta no encontrada o ya anulada" }),
-          );
+          throw new UserError("Venta no encontrada o ya anulada", 404);
         }
 
         // Fetch all sale items for this sale
@@ -1152,7 +1159,7 @@ salesRoutes.post(
         }
 
         if (errors.length > 0) {
-          throw new Error(JSON.stringify({ validationErrors: errors }));
+          throw new ValidationError(errors);
         }
 
         const totalRefund = validatedItems.reduce(
@@ -1234,24 +1241,14 @@ salesRoutes.post(
         };
       });
     } catch (err) {
-      if (err instanceof Error && err.message.startsWith("{")) {
-        try {
-          const parsed = JSON.parse(err.message) as {
-            userError?: string;
-            validationErrors?: string[];
-          };
-          if (parsed.userError) {
-            return c.json({ error: parsed.userError }, 404);
-          }
-          if (parsed.validationErrors) {
-            return c.json(
-              { error: "Error de validacion", details: parsed.validationErrors },
-              400,
-            );
-          }
-        } catch {
-          // Not a validation error
-        }
+      if (err instanceof UserError) {
+        return c.json({ error: err.message }, err.status);
+      }
+      if (err instanceof ValidationError) {
+        return c.json(
+          { error: "Error de validacion", details: err.details },
+          400,
+        );
       }
       const dbErr = handleDbError(err);
       if (dbErr) return c.json({ error: dbErr.message }, dbErr.status);
