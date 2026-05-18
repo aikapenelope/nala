@@ -30,6 +30,9 @@ const UUID_REGEX =
 /**
  * Stream an image from MinIO to the browser with caching headers.
  * Shared by both the primary and specific image endpoints.
+ *
+ * Sets Content-Length when available (required by iOS Safari for
+ * reliable image rendering in <img> tags).
  */
 async function streamImage(c: Context, storageKey: string) {
   const result = await getProductImageStream(storageKey);
@@ -41,13 +44,19 @@ async function streamImage(c: Context, storageKey: string) {
   if (result.etag) {
     const ifNoneMatch = c.req.header("If-None-Match");
     if (ifNoneMatch && ifNoneMatch === result.etag) {
-      return c.body(null, 304);
+      return new Response(null, { status: 304 });
     }
     c.header("ETag", result.etag);
   }
 
   c.header("Content-Type", result.contentType);
   c.header("Cache-Control", "public, max-age=3600, must-revalidate");
+
+  // Content-Length is critical for iOS Safari — without it, images
+  // from streaming responses may not render in <img> tags.
+  if (result.contentLength) {
+    c.header("Content-Length", String(result.contentLength));
+  }
 
   return c.body(result.body);
 }
