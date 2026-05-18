@@ -37,7 +37,7 @@ function handleScroll(event: Event) {
 </script>
 
 <template>
-  <div class="group flex flex-col overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm transition-all hover:shadow-md">
+  <div class="group flex flex-col overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm transition-all hover:shadow-md dark:border-gray-800 dark:bg-gray-900" :class="{ 'animate-[cartBounce_0.4s_ease-out]': isAdded }">
     <!-- Image (links to product detail) -->
     <NuxtLink :to="`/tienda/product/${product.id}`" class="relative aspect-square w-full overflow-hidden bg-gray-50">
       <!-- Multi-image carousel -->
@@ -88,9 +88,9 @@ function handleScroll(event: Event) {
       <!-- Out of stock overlay -->
       <div
         v-if="!product.available"
-        class="absolute inset-0 flex items-center justify-center bg-white/80 backdrop-blur-[2px]"
+        class="absolute inset-0 flex items-center justify-center bg-white/80 backdrop-blur-[2px] dark:bg-gray-900/80"
       >
-        <span class="rounded-full bg-red-50 px-4 py-1.5 text-xs font-bold text-red-600 ring-1 ring-red-100">
+        <span class="rounded-full bg-red-50 px-4 py-1.5 text-xs font-bold text-red-600 ring-1 ring-red-100 dark:bg-red-900/30 dark:text-red-400 dark:ring-red-800">
           Agotado
         </span>
       </div>
@@ -107,7 +107,7 @@ function handleScroll(event: Event) {
       </p>
 
       <!-- Name -->
-      <h3 class="text-sm font-bold leading-tight text-gray-900">
+      <h3 class="text-sm font-bold leading-tight text-gray-900 dark:text-white">
         {{ product.name }}
       </h3>
 
@@ -122,7 +122,7 @@ function handleScroll(event: Event) {
       <!-- Price -->
       <div class="mt-auto pt-2">
         <div class="flex items-baseline gap-1.5">
-          <span class="text-lg font-bold tracking-tight text-gray-900">
+          <span class="text-lg font-bold tracking-tight text-gray-900 dark:text-white">
             ${{ product.price.toFixed(2) }}
           </span>
           <span
@@ -141,7 +141,7 @@ function handleScroll(event: Event) {
         :class="
           isAdded
             ? 'bg-green-500 text-white'
-            : 'bg-gray-900 text-white hover:bg-gray-800'
+            : 'bg-gray-900 text-white hover:bg-gray-800 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-100'
         "
         @click="emit('addToCart', product)"
       >
@@ -149,6 +149,23 @@ function handleScroll(event: Event) {
         <Plus v-else :size="14" />
         {{ isAdded ? "Agregado" : "Agregar" }}
       </button>
+
+      <!-- Out of stock: disabled button -->
+      <div
+        v-else
+        class="mt-3 flex h-10 w-full items-center justify-center rounded-xl bg-gray-100 text-xs font-bold text-gray-400 dark:bg-gray-800 dark:text-gray-500"
+      >
+        Agotado
+      </div>
     </div>
   </div>
 </template>
+
+<style scoped>
+@keyframes cartBounce {
+  0% { transform: scale(1); }
+  30% { transform: scale(0.95); }
+  60% { transform: scale(1.02); }
+  100% { transform: scale(1); }
+}
+</style>
