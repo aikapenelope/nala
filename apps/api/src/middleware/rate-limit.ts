@@ -136,6 +136,35 @@ export async function uploadRateLimit(c: Context, next: Next) {
 }
 
 /**
+ * Strict rate limiting for PIN verification endpoints.
+ * 5 attempts per minute per IP to prevent brute-force attacks.
+ * A 4-digit PIN has only 10,000 combinations; without this limit,
+ * an attacker could exhaust all possibilities in ~3 minutes.
+ */
+export async function pinVerifyRateLimit(c: Context, next: Next) {
+  const ip =
+    c.req.header("x-forwarded-for")?.split(",")[0]?.trim() ??
+    c.req.header("x-real-ip") ??
+    "unknown";
+
+  const config: RateLimitConfig = { max: 5, windowSeconds: 60 };
+  const key = `rl:pin:${ip}`;
+  const { allowed, remaining } = await checkRedis(key, config);
+
+  c.header("X-RateLimit-Limit", String(config.max));
+  c.header("X-RateLimit-Remaining", String(remaining));
+
+  if (!allowed) {
+    return c.json(
+      { error: "Demasiados intentos. Espera un minuto." },
+      429,
+    );
+  }
+
+  await next();
+}
+
+/**
  * Rate limiting middleware for authenticated API endpoints.
  * Limits by user ID. Applies stricter limits to write operations.
  */
