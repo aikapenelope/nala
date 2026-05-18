@@ -20,7 +20,6 @@ export function useStorefrontSeo(options: StorefrontSeoOptions = {}) {
   const { tenantSlug } = useTenant();
   const config = useRuntimeConfig();
   const tenantDomain = config.public.tenantDomain as string;
-  const apiBase = config.public.apiBase as string;
 
   const pageTitle = computed(() => {
     const base = business.value?.name ?? "Tienda";
@@ -40,13 +39,17 @@ export function useStorefrontSeo(options: StorefrontSeoOptions = {}) {
   });
 
   /**
-   * OG image: use the store's first product image if available,
-   * otherwise fall back to a generic Nala branding image.
-   * WhatsApp renders og:image as a large preview card.
+   * OG image for WhatsApp/social link previews.
+   *
+   * Uses a static image from the web app's public folder.
+   * Recommended: 1200x630px PNG/JPG with Nala branding.
+   * Replace /og-storefront.png with a real branded image.
+   *
+   * To upload: place the image at apps/web/public/og-storefront.png
+   * It will be served at https://yourdomain.com/og-storefront.png
    */
   const ogImage = computed(() => {
-    // Generic Nala OG image (always works, no per-tenant setup needed)
-    return `${apiBase}/images/og-default.png`;
+    return `${canonicalUrl.value}/og-storefront.png`;
   });
 
   useHead(
