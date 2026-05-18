@@ -1,108 +1,130 @@
 # Nala: Roadmap + Analisis de producto — Mayo 2026
 
 > Fuente unica de verdad. Reemplaza docs 45, 46, 47 y todos los anteriores.
-> Actualizado: 18 mayo 2026 post-sesion completa (PRs #316-#323).
+> Actualizado: 18 mayo 2026 post-sesion 2 completa (PRs #316-#332).
 
 ---
 
-## Change log — Sesion 18 mayo 2026 (PRs #316-#323)
+## Change log — Sesion 2: 17-18 mayo 2026 (PRs #316-#332)
 
-| PR | Tipo | Descripcion |
-|----|------|-------------|
-| #316 | feat+fix | Stock audit trail para pedidos storefront + push notifications |
-| #317 | fix | DB hardening: RLS push_subscriptions, FK constraints, CHECK constraints, indexes |
-| #318 | feat | Storefront premium UI redesign (layout, catalogo, carrito) |
-| #319 | feat | Storefront adaptativo por tipo de negocio (cards, WhatsApp checkout) |
-| #320 | fix | Migracion 0021 compatibilidad PG16 + CI migration verification |
-| #321 | fix | Order confirm/cancel crash (inArray), pg_trgm extension, customer-stats error handling |
-| #323 | refactor | Simplificar tipos de negocio de 11 a 4 (tienda, moda, servicios, otro) |
+### Resumen ejecutivo
 
-### Detalle: Stock audit trail + push notifications (#316)
+- Corregidos 5 bugs criticos (stock audit, order confirm crash, migration PG16, image loading)
+- DB hardening completo (FK, CHECK, indexes, RLS)
+- Storefront rediseñado de cero (premium UI, adaptativo, luego simplificado a universal)
+- Landing page profesional nueva
+- Tipos de negocio simplificados de 11 a 4
+- Push notifications implementadas
+- Pagina de detalle de producto nueva
+- Dark mode en storefront
+- WhatsApp integrado en navbar
 
-Bugs corregidos en el flujo storefront -> confirmar pedido:
-- `PATCH /orders/:id/confirm` no registraba `stock_movements` (auditoria rota)
-- Cancelar pedido confirmado no restauraba stock
-- Faltaba `lastSoldAt`, `totalCostUsd`, asientos contables en confirm
+### PRs en orden cronologico
 
-Push notifications:
-- Tabla `push_subscriptions` (migracion 0020)
-- Servicio `web-push` con VAPID
-- Trigger fire-and-forget al crear pedido en storefront
-- Service worker handler + composable `usePushNotifications`
-- Toggle en pagina de pedidos
+| PR | Fecha | Tipo | Descripcion |
+|----|-------|------|-------------|
+| #316 | 17 may | feat+fix | Stock audit trail + push notifications para pedidos storefront |
+| #317 | 17 may | fix | DB hardening: RLS, FK constraints, CHECK constraints, indexes |
+| #318 | 17 may | feat | Storefront premium UI redesign (layout, catalogo, carrito) |
+| #319 | 17 may | feat | Storefront adaptativo por tipo de negocio |
+| #320 | 17 may | fix | Migracion 0021 PG16 compat + CI migration verification |
+| #321 | 17 may | fix | Order confirm crash (inArray) + pg_trgm + customer-stats |
+| #323 | 18 may | refactor | Simplificar tipos de negocio de 11 a 4 |
+| #324 | 18 may | docs | Changelog, roadmap, README actualizados |
+| #325 | 18 may | feat | Landing page premium (primera version) |
+| #326 | 18 may | fix | Landing full-width (quitar bordes) |
+| #327 | 18 may | feat | Landing profesional (quitar artefactos decorativos) |
+| #328 | 18 may | refactor | Storefront universal (eliminar config-driven cards) |
+| #329 | 18 may | feat | Storefront UX: cards mejorados, pagina Info, OG tags |
+| #330 | 18 may | feat | Pagina detalle producto, imagenes clickeables, 4-tab navbar |
+| #331 | 18 may | feat | WhatsApp center en navbar, dark mode toggle |
+| #332 | 18 may | fix | Content-Length en imagenes para iOS Safari (pendiente merge) |
 
-### Detalle: DB hardening (#317)
+---
 
-Auditoria profunda de la base de datos. Hallazgos y fixes:
-- RLS faltante en `push_subscriptions`
-- FK constraints faltantes: `sales.customerId`, `quotations.customerId`, `dayCloses.openingId`, `accountingAccounts.parentId`
-- CHECK constraints: stock >= 0, price >= 0, quantity > 0, discount 0-100
-- Indexes: `stock_movements(ref_type, ref_id)`, `accounting_entries(ref_type, ref_id)`, etc.
-- UNIQUE constraints en `store_settings.businessId`, `notification_preferences.businessId`
-- Fix exchange-rate RLS bypass en catalogo publico (transaccion para pinear conexion)
+### Detalle: Bugs criticos corregidos
 
-### Detalle: Storefront premium UI (#318)
+**Order confirm crash (#321)**
+- `sql` template con `ANY(${array})` no funciona con drizzle-orm
+- Fix: reemplazar con `inArray()` (2 instancias en orders.ts)
+- Causa: error mio al escribir el query en PR #316
 
-Rediseno completo del storefront publico:
-- Header: nombre del negocio + indicador online + WhatsApp + carrito
-- Bottom nav fijo: Catalogo, Carrito (elevado), Pedir
-- Catalogo: busqueda, category chips sticky, info banner, grid 4:5
-- Carrito: thumbnails grandes, controles +/-, resumen limpio
-- CSS: utilidad `no-scrollbar` para pills horizontales
-
-### Detalle: Storefront adaptativo (#319 + #323)
-
-El storefront adapta su UI segun el tipo de negocio:
-
-**4 tipos simplificados (antes eran 11):**
-
-| Tipo | Target | Storefront | POS categories |
-|------|--------|-----------|---------------|
-| tienda | Bodega, mini-market | Compact, WhatsApp | Abarrotes, Lacteos, Bebidas, Limpieza, Snacks |
-| moda | Ropa, cosmeticos | Visual, carousel, carrito | Ropa mujer/hombre, Calzado, Accesorios, Cosmeticos |
-| servicios | Peluqueria, barberia | Compact 1-col, WhatsApp | Cortes, Coloracion, Tratamientos, Unas, Maquillaje |
-| otro | Todo lo demas | Visual, carrito | General |
-
-Arquitectura:
-- `StorefrontConfig` en `@nova/shared` con 4 perfiles nombrados
-- `useStorefrontConfig()` composable que lee `business.type`
-- 2 componentes de card: `ProductCardVisual` + `ProductCardCompact`
-- Modo WhatsApp: CTA abre wa.me con producto pre-llenado
-- Legacy types (bodega, ropa, peluqueria, etc.) mapeados al perfil mas cercano
-
-**Lo que NO cambia por tipo (igual para todos, como Treinta.co):**
-- POS (interfaz de vender) — excepto los tabs de categorias
-- Dashboard
-- Inventario
-- Reportes
-- Configuracion
-
-### Detalle: Fixes de deploy (#320, #321)
-
-Migracion 0021 fallaba en produccion (PG16):
-- `ADD CONSTRAINT IF NOT EXISTS` es sintaxis PG17+
+**Migration PG16 (#320)**
+- `ADD CONSTRAINT IF NOT EXISTS` es sintaxis PG17+, produccion usa PG16
 - Fix: `DO $$ BEGIN ... EXCEPTION WHEN duplicate_object` (PG16 compatible)
-- CI: `migrate.mjs` ahora corre ANTES de `drizzle-kit push` (valida SQL real)
-- `migrate.mjs` crea extensiones (`pg_trgm`, `uuid-ossp`) y funcion `current_business_id()` antes de migraciones
+- CI ahora ejecuta `migrate.mjs` antes de `drizzle-kit push`
+- `migrate.mjs` crea extensiones y funciones antes de migraciones
 
-Order confirm crasheaba con "Internal Server Error":
-- Bug: `sql` template con `ANY(${array})` no funciona con drizzle-orm
-- Fix: reemplazar con `inArray()` de drizzle-orm (2 instancias en orders.ts)
+**Image loading iOS (#332)**
+- iOS Safari no renderiza imagenes de streaming responses sin `Content-Length`
+- Fix: incluir `ContentLength` de S3 en el header de respuesta
+- Tambien fix: 304 response usa `new Response()` en vez de `c.body(null)`
+
+**Stock audit trail (#316)**
+- Confirmar pedido no registraba `stock_movements`
+- Cancelar pedido confirmado no restauraba stock
+- Faltaba `lastSoldAt`, `totalCostUsd`, asientos contables
+
+**DB hardening (#317)**
+- RLS faltante en `push_subscriptions`
+- FK constraints: sales.customerId, quotations.customerId, dayCloses.openingId
+- CHECK constraints: stock >= 0, price >= 0, quantity > 0, discount 0-100
+- Indexes: stock_movements ref, accounting_entries ref, activity_log
+- UNIQUE: store_settings.businessId, notification_preferences.businessId
 
 ---
 
-## Change log — Sesion anterior (PRs #265-#275)
+### Detalle: Storefront (evolucion completa)
 
-| PR | Tipo | Descripcion |
-|----|------|-------------|
-| #265 | fix | RLS crash: validar columnas antes de aplicar policies |
-| #266 | fix | Image upload: bucket nunca se creaba, agregar initStorage() |
-| #267 | fix | Image proxy: mover a ruta publica sin auth |
-| #268 | fix | CORP header: secureHeaders() bloqueaba img cross-origin |
-| #272 | feat | Multi-imagen backend: tabla product_images, 4 endpoints, proxy por ID |
-| #273 | feat | Multi-imagen frontend: galeria en inventario + carousel en storefront |
-| #274 | merge | Merge de #272 (backend multi-imagen) |
-| #275 | feat | Simplificar ventas: quick sale endpoint + POS inline checkout |
+1. **PR #318**: Rediseno premium (header, bottom nav, cards 4:5, info banner)
+2. **PR #319**: Adaptativo por tipo (3 cards, 4 configs, WhatsApp mode)
+3. **PR #323**: Simplificado a 4 tipos (tienda, moda, servicios, otro)
+4. **PR #328**: Simplificado a universal (1 card, 1 config, 1 checkout)
+5. **PR #329**: UX mejorado (boton grande, descripcion, pagina Info)
+6. **PR #330**: Detalle de producto (imagen full, galeria, compartir)
+7. **PR #331**: WhatsApp center en navbar + dark mode
+
+**Estado final del storefront:**
+- Un solo layout universal para todos los tipos de negocio
+- Card con imagen cuadrada, descripcion, boton "Agregar" full-width
+- Imagen clickeable -> pagina de detalle con galeria + descripcion completa
+- Navbar: Catalogo, Info, WhatsApp (centro elevado verde), Carrito, Pedir
+- Dark mode toggle en header
+- Pagina Info con ubicacion, horarios, metodos de pago, delivery, contacto
+- OG tags para WhatsApp link previews
+
+---
+
+### Detalle: Landing page
+
+- Rediseno completo de la landing (antes era generica, ahora es premium)
+- Hero con gradiente animado + circulos CSS flotantes
+- 3 value props (POS, inventario, storefront)
+- Seccion "La venta genera el dato" con pasos visuales
+- Grid de 4 features
+- 3 testimoniales (Carlos/bodega, Maria/mini-market, Cafeteria)
+- Pricing (Gratis, Pro $9/mes, Enterprise)
+- Tabla comparativa (Nala vs Cuaderno vs Excel vs ERP)
+- CTA final con gradiente
+- Full-width, sin bordes decorativos
+
+---
+
+### Detalle: Tipos de negocio simplificados
+
+**De 11 a 4 tipos:**
+- tienda (bodega, mini-market)
+- moda (ropa, cosmeticos, accesorios)
+- servicios (peluqueria, barberia, profesionales)
+- otro (electronica, alimentos, cualquier otro)
+
+**Eliminados como opciones de onboarding:**
+- farmacia, ferreteria, libreria, autopartes, distribuidora (miles de SKUs, fuera de scope)
+
+**Backward compatible:** tipos legacy siguen funcionando para negocios existentes.
+
+**El tipo solo afecta:** categorias del POS (tabs de arriba al vender).
+**El storefront es identico para todos.**
 
 ---
 
@@ -110,128 +132,141 @@ Order confirm crasheaba con "Internal Server Error":
 
 | Metrica | Valor |
 |---------|-------|
-| LOC | ~35,000 |
+| LOC | ~36,000 |
 | Tablas | 35 |
 | Migraciones | 22 (0000-0021) |
-| Paginas frontend | 35 |
-| Componentes | 13 |
+| Paginas frontend | 38 |
+| Componentes | 12 |
 | Composables | 17 |
 | Tests | 14 archivos |
 | CI | GitHub Actions (migrate + typecheck + lint + test + build) |
-| PRs | #79-#323 |
+| PRs totales | #79-#332 |
 
-### Que funciona
+---
 
-- POS con categorias por tipo de negocio, barcode scanner, checkout inline, venta rapida
-- Dashboard con 10 API calls en paralelo, pull-to-refresh, skeleton loading
-- Inventario con semaforo, prediccion de agotamiento, multi-imagen (5 fotos)
-- Storefront PWA adaptativo por tipo de negocio (visual/compact, cart/WhatsApp)
+## Que funciona hoy
+
+### Core (lo que el usuario usa todos los dias)
+- POS con categorias por tipo, barcode scanner, checkout inline, venta rapida
+- Dashboard con KPIs, grafico semanal, pedidos pendientes, cobros
+- Inventario con semaforo, prediccion, multi-imagen (5 fotos)
+- Storefront PWA universal con detalle de producto, carrito, checkout
 - Push notifications para pedidos nuevos
-- OCR de facturas (GPT-4o-mini vision)
-- Cierre/apertura de caja
-- Cuentas por cobrar con cobro por WhatsApp
-- Reportes en 3 tabs + export Excel
+- Pedidos con confirmacion rapida + sonido + push
+- Clientes + fiado con cobro por WhatsApp
 - Tasa BCV manual + auto-fetch
-- Pedidos online con confirmacion rapida + sonido + push
 - Owner lock (PIN para secciones sensibles)
-- DB hardening: FK constraints, CHECK constraints, indexes, RLS completo
+- Dark mode en storefront
+
+### Automatico (funciona sin que el usuario lo vea)
+- Asientos contables en cada venta
+- Stock movements con qty_after_transaction
+- Prediccion de agotamiento
+- Deteccion de anomalias
+- Auto-cancel pedidos stale (24h)
+- RLS multi-tenant completo
+- CHECK constraints en DB
+- FK constraints con ON DELETE SET NULL
 
 ---
 
-## Tipos de negocio
+## Roadmap: Proximos pasos
 
-### Modelo (inspirado en Treinta.co)
-
-Un producto universal con 4 tipos que afectan solo:
-1. Categorias pre-configuradas en onboarding (tabs del POS)
-2. Layout del storefront (visual vs compact)
-3. Modo de checkout del storefront (carrito vs WhatsApp directo)
-
-### Los 4 tipos
-
-**Tienda** — Bodega, mini-market, tienda de barrio
-- POS: Abarrotes, Lacteos, Bebidas, Limpieza, Cuidado personal, Snacks
-- Storefront: cards compactos, WhatsApp directo, oculta agotados
-
-**Moda** — Ropa, cosmeticos, accesorios, calzado
-- POS: Ropa mujer/hombre, Calzado, Accesorios, Cosmeticos
-- Storefront: cards visuales 4:5, carousel de fotos, carrito completo
-
-**Servicios** — Peluqueria, barberia, profesionales
-- POS: Cortes, Coloracion, Tratamientos, Unas, Maquillaje
-- Storefront: cards compactos 1 columna, WhatsApp directo, oculta agotados
-
-**Otro** — Electronica, alimentos, cualquier otro
-- POS: General, Otros
-- Storefront: cards visuales, carrito completo
-
-### Fuera de scope
-
-Farmacias, ferreterias, librerias, autopartes, distribuidoras — tienen miles de SKUs y necesitan features especializados (lotes, vencimientos, multi-almacen). Esos clientes necesitan Fina o Profit Plus.
-
----
-
-## Como funcionan las ventas hoy
-
-### Modo 1: Venta con producto (POS)
+### Inmediato (siguiente sesion)
 
 ```
-Tab "Vender" → Grilla de productos (filtrada por categoria) → Toca producto
-→ Se agrega al ticket → Selecciona metodo de pago → "Confirmar venta"
+Critico (deploy):
+  - Mergear PR #332 (image Content-Length) ............. 1 min
+  - Verificar que deploy pasa en Coolify ............... 5 min
+  - Verificar imagenes en iOS Safari ................... 5 min
+
+UX:
+  - Boton "Compartir catalogo" por WhatsApp ............ 2 horas
+  - Tutorial interactivo en POS (primer uso) ........... 4 horas
+  - Crear imagen OG (1200x630px) para WhatsApp ......... 30 min
 ```
 
-**3 taps.** Las categorias (tabs arriba) cambian segun el tipo de negocio elegido en onboarding.
-
-### Modo 2: Venta rapida (sin producto)
+### Semana siguiente
 
 ```
-Boton verde "$ Rapida" → Modal: monto + descripcion + metodo de pago → "Registrar"
+Performance:
+  - Image optimization (resize on upload, serve thumbnails) .. 1 dia
+  - WebP conversion al subir ................................ 4 horas
+  - CDN (Cloudflare) para imagenes .......................... 2 horas
+
+UX:
+  - Simplificar onboarding (menos pasos) .................... 1 dia
+  - UI de devolucion parcial ................................ 1 dia
+  - Recibo compartible por WhatsApp ......................... 2 horas
 ```
 
-### Modo 3: Tienda online (storefront)
+### Mes siguiente
 
 ```
-Cliente abre tu-negocio.novaincs.com → Catalogo adaptado al tipo de negocio
-→ Agrega al carrito (moda) o toca "Pedir" por WhatsApp (tienda)
-→ Pedido llega al dashboard del vendedor
+Crecimiento:
+  - TWA wrapper para Play Store ............................. 2 dias
+  - Personalizacion storefront (logo, colores) .............. 2 dias
+  - Boton "Compartir recibo" en historial ................... 2 horas
+
+Infraestructura:
+  - Service Worker cache para imagenes (offline) ............ 1 dia
+  - Blur placeholder (blurhash) al subir imagenes ........... 1 dia
+  - Monitoring/alertas (uptime, error rate) ................. 1 dia
 ```
 
----
-
-## Posicionamiento vs competencia
-
-| Producto | Target | Precio | Nala compite? |
-|----------|--------|--------|---------------|
-| Cuaderno / Excel | Todos | $0 | Si — Nala es el upgrade |
-| WhatsApp Business | Todos | $0 | Si — Nala agrega POS + inventario |
-| Treinta | Pequeno-mediano | $40-80k COP/mes | Si — mismo target, Nala tiene storefront real |
-| Fina | Mediano-grande | $50-100/mes | No — Fina va a facturacion fiscal |
-| Profit Plus | Grande | $100-300/mes | No — ERP completo |
-
----
-
-## Orden de ejecucion recomendado (siguiente sesion)
+### Futuro (no priorizado)
 
 ```
-Inmediato:
-  - Boton "Compartir catalogo" por WhatsApp ......... 2 horas
-  - Tutorial interactivo en POS (primer uso) ........ 4 horas
-  - UI de devolucion parcial ........................ 1 dia
-
-Siguiente semana:
-  - Simplificar onboarding (menos pasos) ............ 1 dia
-  - Consistencia visual en paginas secundarias ....... 3 horas
-  - Personalizacion storefront (logo, colores) ...... 2 dias
-
-Futuro:
-  - TWA wrapper para Play Store ..................... 2 dias
-  - WhatsApp Business API ........................... 2 semanas
+- WhatsApp Business API (recibir pedidos por chat)
+- Facturacion electronica (SENIAT)
+- Multi-usuario (Clerk Organizations)
+- App nativa Play Store (TWA)
+- Integraciones (MercadoPago, Stripe)
 ```
 
 ---
 
-## Docs deprecados
+## Notas tecnicas importantes
 
-Todos los docs anteriores (01-47, PRODUCTION-ROADMAP, AUTH-*) son historicos.
+### Imagen OG para WhatsApp
 
-**Fuente de verdad: este archivo (docs/48-roadmap-analisis-producto.md).**
+Para que los links del storefront se vean bien al compartir por WhatsApp:
+1. Crear imagen de 1200x630px (PNG o JPG)
+2. Colocarla en `apps/web/public/og-storefront.png`
+3. El SEO composable ya apunta a esa ruta
+4. WhatsApp la mostrara como preview grande
+
+Recomendacion: usar una captura del hero de la landing o una imagen con el logo de Nala + "Tienda en linea".
+
+### PWA y links de WhatsApp
+
+Los links compartidos por WhatsApp siempre abren el navegador, no la PWA instalada. Esto es una limitacion del sistema operativo (Android/iOS). La unica forma de que un link abra la app es publicar como TWA en Play Store con Digital Asset Links verificados.
+
+### Tipos de negocio y categorias
+
+El tipo de negocio se elige en onboarding y NO se puede cambiar despues (no hay UI ni endpoint). Solo afecta las categorias pre-configuradas del POS. El storefront es identico para todos.
+
+---
+
+## Docs del proyecto
+
+| Doc | Contenido |
+|-----|-----------|
+| Este archivo (48) | Roadmap, changelog, estado del sistema |
+| [49 - Storefront](docs/49-storefront-por-tipo-de-negocio.md) | Arquitectura del storefront adaptativo (historico) |
+| [43 - Buyer persona](docs/43-product-focus-buyer-persona.md) | Cliente target, posicionamiento |
+| [41 - Personalizacion](docs/41-storefront-personalization-roadmap.md) | Roadmap de branding (futuro) |
+
+---
+
+## Change log — Sesion 1: 14 mayo 2026 (PRs #265-#275)
+
+| PR | Tipo | Descripcion |
+|----|------|-------------|
+| #265 | fix | RLS crash: validar columnas antes de aplicar policies |
+| #266 | fix | Image upload: bucket nunca se creaba |
+| #267 | fix | Image proxy: mover a ruta publica sin auth |
+| #268 | fix | CORP header: secureHeaders() bloqueaba img cross-origin |
+| #272 | feat | Multi-imagen backend: tabla product_images, 4 endpoints |
+| #273 | feat | Multi-imagen frontend: galeria + carousel |
+| #275 | feat | Simplificar ventas: quick sale + POS inline checkout |
