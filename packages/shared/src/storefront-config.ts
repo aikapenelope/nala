@@ -9,8 +9,6 @@
  * appropriate profile so existing businesses keep working.
  */
 
-import type { BusinessType } from "./types";
-
 /** Product card layout variant. */
 export type CardLayout = "visual" | "compact";
 
