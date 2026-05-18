@@ -27,6 +27,7 @@ import { z } from "zod";
 import { eq } from "drizzle-orm";
 import { businesses } from "@nova/db";
 import bcrypt from "bcryptjs";
+import { pinVerifyRateLimit } from "../middleware/rate-limit";
 import type { AppEnv } from "../types";
 
 const ownerLock = new Hono<AppEnv>();
@@ -126,6 +127,7 @@ const verifySchema = z.object({
 
 ownerLock.post(
   "/owner-lock/verify",
+  pinVerifyRateLimit,
   zValidator("json", verifySchema),
   async (c) => {
     const { pin } = c.req.valid("json");

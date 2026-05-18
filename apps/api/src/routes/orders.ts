@@ -24,11 +24,11 @@ import {
   salePayments,
   customers,
   stockMovements,
-  accountingAccounts,
-  accountingEntries,
 } from "@nova/db";
 import { currentDayOfWeekVET, todayRangeVET } from "@nova/shared";
 import { logActivity } from "../utils/audit";
+import { createRevenueEntry, createReversalEntry } from "../utils/accounting";
+import { incrementCustomerStats } from "../utils/customer-stats";
 import { cancelStaleOrdersForBusiness } from "../utils/auto-cancel";
 import { validateUuidParam } from "../middleware/validate-uuid";
 import { getProofUrl, isStorageConfigured } from "../services/storage";
@@ -316,18 +316,9 @@ ordersRoutes.patch("/orders/:id/confirm", validateUuidParam, async (c) => {
       reference: order.paymentReference,
     });
 
-    // 7. Update customer purchase stats (same logic as POST /sales)
+    // 7. Update customer purchase stats (shared helper)
     if (customerId) {
-      await tx
-        .update(customers)
-        .set({
-          totalPurchases: sql`${customers.totalPurchases} + 1`,
-          totalSpentUsd: sql`${customers.totalSpentUsd}::numeric + ${orderTotal}`,
-          averageTicketUsd: sql`(${customers.totalSpentUsd}::numeric + ${orderTotal}) / (${customers.totalPurchases} + 1)`,
-          lastPurchaseAt: new Date(),
-          updatedAt: new Date(),
-        })
-        .where(eq(customers.id, customerId));
+      await incrementCustomerStats(tx, customerId, orderTotal);
     }
 
     // 8. Log stock movements (audit trail for inventory changes)
@@ -349,46 +340,14 @@ ordersRoutes.patch("/orders/:id/confirm", validateUuidParam, async (c) => {
     }
 
     // 9. Generate accounting entries (revenue recognition)
-    const revenueAccounts = await tx
-      .select()
-      .from(accountingAccounts)
-      .where(
-        and(
-          eq(accountingAccounts.businessId, businessId),
-          eq(accountingAccounts.code, "4101"),
-        ),
-      )
-      .limit(1);
-
-    const cashAccounts = await tx
-      .select()
-      .from(accountingAccounts)
-      .where(
-        and(
-          eq(accountingAccounts.businessId, businessId),
-          eq(accountingAccounts.code, "1101"),
-        ),
-      )
-      .limit(1);
-
-    if (revenueAccounts[0] && cashAccounts[0]) {
-      await tx.insert(accountingEntries).values({
-        businessId,
-        date: new Date(),
-        debitAccountId: cashAccounts[0].id,
-        creditAccountId: revenueAccounts[0].id,
-        amount: order.total,
-        description: `Pedido online #${id.slice(0, 8)}`,
-        referenceType: "sale",
-        referenceId: sale.id,
-      });
-    } else {
-      console.warn(
-        `[orders] Accounting entry skipped for order ${id.slice(0, 8)}: ` +
-          `missing accounts (4101: ${!!revenueAccounts[0]}, 1101: ${!!cashAccounts[0]}). ` +
-          `Run onboarding to create default accounts.`,
-      );
-    }
+    await createRevenueEntry(
+      tx,
+      businessId,
+      order.total,
+      `Pedido online #${id.slice(0, 8)}`,
+      "sale",
+      sale.id,
+    );
   });
 
   logActivity({
@@ -552,41 +511,14 @@ ordersRoutes.patch(
         }
 
         // Reverse accounting entries created during confirmation.
-        // Insert a mirror entry (swap debit/credit) to zero out the revenue.
-        const revenueAccounts = await tx
-          .select()
-          .from(accountingAccounts)
-          .where(
-            and(
-              eq(accountingAccounts.businessId, businessId),
-              eq(accountingAccounts.code, "4101"),
-            ),
-          )
-          .limit(1);
-
-        const cashAccounts = await tx
-          .select()
-          .from(accountingAccounts)
-          .where(
-            and(
-              eq(accountingAccounts.businessId, businessId),
-              eq(accountingAccounts.code, "1101"),
-            ),
-          )
-          .limit(1);
-
-        if (revenueAccounts[0] && cashAccounts[0]) {
-          await tx.insert(accountingEntries).values({
-            businessId,
-            date: new Date(),
-            debitAccountId: revenueAccounts[0].id,
-            creditAccountId: cashAccounts[0].id,
-            amount: order.total,
-            description: `Anulacion pedido #${id.slice(0, 8)}`,
-            referenceType: "order_cancel",
-            referenceId: id,
-          });
-        }
+        await createReversalEntry(
+          tx,
+          businessId,
+          order.total,
+          `Anulacion pedido #${id.slice(0, 8)}`,
+          "order_cancel",
+          id,
+        );
       }
 
       // Update order status
