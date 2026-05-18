@@ -702,23 +702,24 @@ salesRoutes.post("/sales", zValidator("json", createSaleSchema), async (c) => {
         detail: `Sale $${totalUsd} (${data.items.length} items)`,
       });
 
-      // Log stock movements inside the transaction for consistency.
-      for (const item of data.items) {
-        const product = productMap.get(item.productId);
-        if (product?.isService) continue;
-
-        await tx.insert(stockMovements).values({
+      // Batch insert stock movements (single INSERT instead of N queries).
+      const movementValues = data.items
+        .filter((item) => !productMap.get(item.productId)?.isService)
+        .map((item) => ({
           businessId,
           productId: item.productId,
           variantId: item.variantId,
-          type: "sale",
+          type: "sale" as const,
           quantity: -item.quantity,
-          costUnit: String(product?.cost ?? 0),
-          referenceType: "sale",
+          costUnit: String(productMap.get(item.productId)?.cost ?? 0),
+          referenceType: "sale" as const,
           referenceId: sale.id,
           userId: user.id,
           qtyAfterTransaction: stockAfterMap.get(item.productId) ?? null,
-        });
+        }));
+
+      if (movementValues.length > 0) {
+        await tx.insert(stockMovements).values(movementValues);
       }
 
       return sale;

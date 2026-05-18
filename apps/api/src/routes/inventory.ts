@@ -52,6 +52,7 @@ import {
   isEnhanceConfigured,
 } from "../services/image-enhance";
 import { processProductImage } from "../services/image-processing";
+import { isValidImageBuffer } from "../utils/magic-bytes";
 import type { AppEnv } from "../types";
 
 const inventory = new Hono<AppEnv>();
@@ -894,6 +895,15 @@ inventory.post("/products/:id/image", validateUuidParam, async (c) => {
 
   const arrayBuffer = await file.arrayBuffer();
   const rawBuffer = Buffer.from(arrayBuffer);
+
+  // Defense-in-depth: validate actual file content (magic bytes) regardless
+  // of the Content-Type header, which is client-supplied and spoofable.
+  if (!isValidImageBuffer(rawBuffer)) {
+    return c.json(
+      { error: "Archivo no es una imagen valida. Solo JPEG, PNG o WebP." },
+      400,
+    );
+  }
 
   // Optimize image: convert to WebP, resize to max 1200px, strip metadata.
   // Falls back to original if processing fails (e.g., corrupt image).

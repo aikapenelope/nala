@@ -43,6 +43,13 @@ if (isEnhanceConfigured) {
 /** Maximum input file size for enhancement (10MB). */
 const MAX_ENHANCE_SIZE = 10 * 1024 * 1024;
 
+/**
+ * Timeout for the fal.ai enhancement call (milliseconds).
+ * Set to 25s — below the global 30s request timeout so we can
+ * return a clear error message instead of a generic timeout.
+ */
+const ENHANCE_TIMEOUT_MS = 25_000;
+
 /** WebP quality for the final enhanced output. */
 const ENHANCED_WEBP_QUALITY = 85;
 
@@ -83,17 +90,32 @@ export async function enhanceProductImage(
   }
 
   try {
-    // Step 1: Call BiRefNet for background removal.
+    // Step 1: Call BiRefNet for background removal with timeout.
     // Uses the public image URL so fal.ai can fetch it directly.
-    const result = await fal.subscribe("fal-ai/birefnet", {
-      input: {
-        image_url: publicImageUrl,
-        model: "General Use (Light)",
-        operating_resolution: "1024x1024",
-        output_format: "png",
-        refine_foreground: true,
-      },
-    });
+    // AbortController ensures we don't hang past the global 30s timeout.
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), ENHANCE_TIMEOUT_MS);
+
+    let result;
+    try {
+      result = await fal.subscribe("fal-ai/birefnet", {
+        input: {
+          image_url: publicImageUrl,
+          model: "General Use (Light)",
+          operating_resolution: "1024x1024",
+          output_format: "png",
+          refine_foreground: true,
+        },
+      });
+    } finally {
+      clearTimeout(timeoutId);
+    }
+
+    // Check if aborted
+    if (controller.signal.aborted) {
+      console.error("[image-enhance] Timeout: fal.ai took longer than 25s");
+      return null;
+    }
 
     const outputUrl = result.data?.image?.url;
     if (!outputUrl) {
@@ -102,7 +124,7 @@ export async function enhanceProductImage(
     }
 
     // Step 2: Download the background-removed PNG from fal.ai CDN.
-    const response = await fetch(outputUrl);
+    const response = await fetch(outputUrl, { signal: controller.signal });
     if (!response.ok) {
       console.error("[image-enhance] Failed to download result:", response.status);
       return null;

@@ -37,9 +37,14 @@ import { reportsPdf } from "./reports-pdf";
 import { reportsXlsx } from "./reports-xlsx";
 import { reportsEmail } from "./reports-email";
 import { validateUuidParam } from "../middleware/validate-uuid";
+import { reportCache } from "../middleware/report-cache";
 import type { AppEnv } from "../types";
 
 const reports = new Hono<AppEnv>();
+
+// Cache all report GET endpoints (60s TTL, per-business, per-query).
+// Placed before route definitions so it applies to all reports.
+reports.use("/reports/*", reportCache);
 
 // ============================================================
 // Reports
