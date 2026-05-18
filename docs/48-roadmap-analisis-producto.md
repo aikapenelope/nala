@@ -182,47 +182,61 @@ Critico (deploy):
 
 UX:
   - Boton "Compartir catalogo" por WhatsApp ............ 2 horas
-  - Tutorial interactivo en POS (primer uso) ........... 4 horas
+    (window.open con wa.me + link del catalogo, no navigator.share)
   - Crear imagen OG (1200x630px) para WhatsApp ......... 30 min
 ```
 
 ### Semana siguiente
 
 ```
-Performance:
-  - Image optimization (resize on upload, serve thumbnails) .. 1 dia
-  - WebP conversion al subir ................................ 4 horas
-  - CDN (Cloudflare) para imagenes .......................... 2 horas
+Personalizacion storefront (logo + color):
+  - Migracion: brand_color + logo_url en store_settings ......... 30 min
+  - API: extender PATCH /store-settings + upload logo ........... 2 horas
+  - Dashboard: seccion "Apariencia" con color picker + upload ... 4 horas
+  - Storefront: CSS variable --store-accent + logo en header .... 2 horas
+  - Total: ~1 dia. No rompe nada existente (campos opcionales)
 
-UX:
-  - Simplificar onboarding (menos pasos) .................... 1 dia
-  - UI de devolucion parcial ................................ 1 dia
-  - Recibo compartible por WhatsApp ......................... 2 horas
+Performance imagenes:
+  - Image resize on upload (thumbnail 400px + full) ............. 4 horas
+  - WebP conversion al subir .................................... 2 horas
+  - CDN (Cloudflare) para imagenes .............................. 2 horas
 ```
 
 ### Mes siguiente
 
 ```
-Crecimiento:
-  - TWA wrapper para Play Store ............................. 2 dias
-  - Personalizacion storefront (logo, colores) .............. 2 dias
-  - Boton "Compartir recibo" en historial ................... 2 horas
+UX:
+  - Tutorial interactivo en POS (primer uso) .................... 4 horas
+  - Simplificar onboarding (menos pasos) ........................ 1 dia
+  - UI de devolucion parcial .................................... 1 dia
+
+Performance:
+  - Blurhash placeholders (opcional, baja prioridad) ............ 1 dia
+    Genera hash al subir, guarda en DB, decodifica en canvas.
+    Solo se nota en conexiones lentas. No afecta nada existente.
 
 Infraestructura:
-  - Service Worker cache para imagenes (offline) ............ 1 dia
-  - Blur placeholder (blurhash) al subir imagenes ........... 1 dia
-  - Monitoring/alertas (uptime, error rate) ................. 1 dia
+  - Monitoring/alertas (UptimeRobot o similar) .................. 2 horas
 ```
 
-### Futuro (no priorizado)
+### Descartado (fuera de scope)
 
-```
-- WhatsApp Business API (recibir pedidos por chat)
-- Facturacion electronica (SENIAT)
-- Multi-usuario (Clerk Organizations)
-- App nativa Play Store (TWA)
-- Integraciones (MercadoPago, Stripe)
-```
+Los siguientes items estan fuera del scope de Nala. Son features de productos
+mas grandes (Fina, Profit Plus, Shopify) que no aplican al target de Nala
+(comerciante pequeno, 20-200 productos, informal):
+
+- ~~WhatsApp Business API~~ (costo por mensaje, requiere Meta Business verification)
+- ~~Facturacion electronica SENIAT~~ (Nala es para negocios informales)
+- ~~Multi-usuario / Clerk Organizations~~ (single-user model es suficiente)
+- ~~App nativa Play Store / TWA~~ (la PWA funciona bien, Play Store no es prioridad)
+- ~~Integraciones MercadoPago / Stripe~~ (pagos manuales son la norma en Venezuela)
+
+### Notas tecnicas sobre items descartados
+
+**Service Worker cache para imagenes:** Descartado por fragilidad. Los problemas
+de cache stale, overflow, y debugging no justifican el beneficio marginal.
+Las imagenes ya tienen `Cache-Control: public, max-age=3600` que el browser
+cachea nativamente sin necesidad de SW custom.
 
 ---
 
