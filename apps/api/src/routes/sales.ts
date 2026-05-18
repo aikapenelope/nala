@@ -36,8 +36,6 @@ import {
   quotations,
   accountsReceivable,
   activityLog,
-  accountingEntries,
-  accountingAccounts,
   customers,
   users,
   stockMovements,
@@ -50,6 +48,8 @@ import { fetchBcvRates } from "../services/bcv-rates";
 import { generateReceiptPdf } from "../services/pdf-generator";
 import { handleDbError } from "../utils/db-errors";
 import { ValidationError, UserError } from "../utils/errors";
+import { createRevenueEntry } from "../utils/accounting";
+import { incrementCustomerStats, decrementCustomerStats } from "../utils/customer-stats";
 import { validateUuidParam } from "../middleware/validate-uuid";
 import type { AppEnv } from "../types";
 
@@ -667,7 +667,7 @@ salesRoutes.post("/sales", zValidator("json", createSaleSchema), async (c) => {
           dueDate: data.fiadoDueDate ? new Date(data.fiadoDueDate) : undefined,
         });
 
-        // Update customer balance
+        // Update customer balance + purchase stats in one atomic UPDATE
         await tx
           .update(customers)
           .set({
@@ -681,59 +681,18 @@ salesRoutes.post("/sales", zValidator("json", createSaleSchema), async (c) => {
           .where(eq(customers.id, data.customerId));
       } else if (data.customerId) {
         // Non-fiado sale with customer: update purchase stats only
-        await tx
-          .update(customers)
-          .set({
-            totalPurchases: sql`${customers.totalPurchases} + 1`,
-            totalSpentUsd: sql`${customers.totalSpentUsd}::numeric + ${totalUsd}`,
-            averageTicketUsd: sql`(${customers.totalSpentUsd}::numeric + ${totalUsd}) / (${customers.totalPurchases} + 1)`,
-            lastPurchaseAt: new Date(),
-            updatedAt: new Date(),
-          })
-          .where(eq(customers.id, data.customerId));
+        await incrementCustomerStats(tx, data.customerId, totalUsd);
       }
 
       // Generate accounting entries (revenue)
-      const revenueAccounts = await tx
-        .select()
-        .from(accountingAccounts)
-        .where(
-          and(
-            eq(accountingAccounts.businessId, businessId),
-            eq(accountingAccounts.code, "4101"),
-          ),
-        )
-        .limit(1);
-
-      const cashAccounts = await tx
-        .select()
-        .from(accountingAccounts)
-        .where(
-          and(
-            eq(accountingAccounts.businessId, businessId),
-            eq(accountingAccounts.code, "1101"),
-          ),
-        )
-        .limit(1);
-
-      if (revenueAccounts[0] && cashAccounts[0]) {
-        await tx.insert(accountingEntries).values({
-          businessId,
-          date: new Date(),
-          debitAccountId: cashAccounts[0].id,
-          creditAccountId: revenueAccounts[0].id,
-          amount: String(totalUsd),
-          description: `Venta #${sale.id.slice(0, 8)}`,
-          referenceType: "sale",
-          referenceId: sale.id,
-        });
-      } else {
-        console.warn(
-          `[sales] Accounting entry skipped for sale ${sale.id.slice(0, 8)}: ` +
-            `missing accounts (4101: ${!!revenueAccounts[0]}, 1101: ${!!cashAccounts[0]}). ` +
-            `Run onboarding to create default accounts.`,
-        );
-      }
+      await createRevenueEntry(
+        tx,
+        businessId,
+        String(totalUsd),
+        `Venta #${sale.id.slice(0, 8)}`,
+        "sale",
+        sale.id,
+      );
 
       // Log activity
       await tx.insert(activityLog).values({
@@ -951,7 +910,9 @@ salesRoutes.post(
           });
         }
 
-        // Reverse fiado: restore customer balance and cancel accounts_receivable
+        // Reverse fiado + customer stats in a single atomic update.
+        // Previously these were two separate UPDATEs which could leave
+        // the customer in an inconsistent state if one failed.
         if (sale.customerId) {
           const fiadoPayments = await tx
             .select()
@@ -969,15 +930,6 @@ salesRoutes.post(
           );
 
           if (fiadoTotal > 0) {
-            // Subtract fiado amount from customer balance
-            await tx
-              .update(customers)
-              .set({
-                balanceUsd: sql`GREATEST(${customers.balanceUsd}::numeric - ${fiadoTotal}, 0)`,
-                updatedAt: new Date(),
-              })
-              .where(eq(customers.id, sale.customerId));
-
             // Cancel the accounts_receivable record for this sale
             await tx
               .update(accountsReceivable)
@@ -993,19 +945,9 @@ salesRoutes.post(
               );
           }
 
-          // Reverse customer purchase stats
+          // Single atomic UPDATE: reverse balance (if fiado) + purchase stats
           const saleTotal = Number(sale.totalUsd);
-          await tx
-            .update(customers)
-            .set({
-              totalPurchases: sql`GREATEST(${customers.totalPurchases} - 1, 0)`,
-              totalSpentUsd: sql`GREATEST(${customers.totalSpentUsd}::numeric - ${saleTotal}, 0)`,
-              averageTicketUsd: sql`CASE WHEN ${customers.totalPurchases} > 1
-              THEN (${customers.totalSpentUsd}::numeric - ${saleTotal}) / (${customers.totalPurchases} - 1)
-              ELSE 0 END`,
-              updatedAt: new Date(),
-            })
-            .where(eq(customers.id, sale.customerId));
+          await decrementCustomerStats(tx, sale.customerId, saleTotal, fiadoTotal);
         }
 
         // Mark sale as voided

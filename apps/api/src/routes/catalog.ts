@@ -21,7 +21,7 @@ import { getRedis } from "../redis";
 import { uploadPaymentProof, isStorageConfigured } from "../services/storage";
 import { logActivity } from "../utils/audit";
 import { PriceError, StockError, MinOrderError } from "../utils/errors";
-import { uploadRateLimit } from "../middleware/rate-limit";
+import { publicRateLimit, uploadRateLimit } from "../middleware/rate-limit";
 import { notifyNewOrder } from "../services/push-notifications";
 
 export const catalog = new Hono();
@@ -349,6 +349,7 @@ const createOrderSchema = z.object({
  */
 catalog.post(
   "/:slug/orders",
+  publicRateLimit,
   zValidator("json", createOrderSchema),
   async (c) => {
     const slug = c.req.param("slug");
