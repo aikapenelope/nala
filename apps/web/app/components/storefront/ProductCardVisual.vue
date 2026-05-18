@@ -38,8 +38,8 @@ function handleScroll(event: Event) {
 
 <template>
   <div class="group flex flex-col overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm transition-all hover:shadow-md">
-    <!-- Image -->
-    <div class="relative aspect-square w-full overflow-hidden bg-gray-50">
+    <!-- Image (links to product detail) -->
+    <NuxtLink :to="`/tienda/product/${product.id}`" class="relative aspect-square w-full overflow-hidden bg-gray-50">
       <!-- Multi-image carousel -->
       <template v-if="product.images && product.images.length > 1">
         <div
@@ -94,7 +94,7 @@ function handleScroll(event: Event) {
           Agotado
         </span>
       </div>
-    </div>
+    </NuxtLink>
 
     <!-- Product info -->
     <div class="flex flex-1 flex-col p-3">
