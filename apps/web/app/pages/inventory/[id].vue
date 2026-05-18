@@ -13,7 +13,7 @@
  * - GET /api/categories (load category options)
  */
 
-import { ChevronDown } from "lucide-vue-next";
+import { ChevronDown, Sparkles } from "lucide-vue-next";
 
 const route = useRoute();
 const router = useRouter();
@@ -230,6 +230,33 @@ async function deleteImage(imageId: string) {
     });
   } catch {
     // Non-critical
+  }
+}
+
+/** Enhance image: remove background + white background (AI). */
+const enhancingImageId = ref<string | null>(null);
+
+async function enhanceImage(imageId: string) {
+  if (!productId.value || enhancingImageId.value) return;
+  enhancingImageId.value = imageId;
+
+  try {
+    const result = await $api<{
+      success: boolean;
+      image: { id: string; url: string; width: number; height: number };
+    }>(`/api/products/${productId.value}/images/${imageId}/enhance`, {
+      method: "POST",
+    });
+
+    // Update the gallery entry with the new URL (add cache-buster)
+    const img = imageGallery.value.find((i) => i.id === imageId);
+    if (img && result.image) {
+      img.url = `${result.image.url}?t=${Date.now()}`;
+    }
+  } catch {
+    // Enhancement failed — image stays as-is
+  } finally {
+    enhancingImageId.value = null;
   }
 }
 
@@ -473,6 +500,23 @@ async function submitForm() {
                 >
                   x
                 </button>
+                <!-- Enhance button (AI background removal) -->
+                <button
+                  v-if="isEditing && enhancingImageId !== img.id"
+                  type="button"
+                  class="absolute -bottom-1.5 -right-1.5 hidden h-5 w-5 items-center justify-center rounded-full bg-amber-500 text-white shadow-sm group-hover:flex"
+                  title="Mejorar foto (fondo blanco)"
+                  @click="enhanceImage(img.id)"
+                >
+                  <Sparkles :size="10" />
+                </button>
+                <!-- Enhancing spinner -->
+                <div
+                  v-if="enhancingImageId === img.id"
+                  class="absolute inset-0 flex items-center justify-center rounded-xl bg-white/80"
+                >
+                  <div class="h-5 w-5 animate-spin rounded-full border-2 border-amber-500 border-t-transparent" />
+                </div>
               </div>
 
               <!-- Pending preview (for new products) -->
