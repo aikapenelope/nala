@@ -154,18 +154,18 @@ onMounted(() => {
     <!-- ============================================================ -->
     <div v-if="isLoading" class="px-5 pt-5">
       <div class="mb-4">
-        <div class="h-12 flex-1 rounded-2xl bg-gray-100 animate-pulse" />
+        <div class="h-12 flex-1 rounded-2xl bg-gray-100 animate-pulse dark:bg-gray-800" />
       </div>
       <div class="mb-5 flex gap-2.5">
-        <div v-for="n in 4" :key="n" class="h-10 w-20 rounded-full bg-gray-100 animate-pulse" />
+        <div v-for="n in 4" :key="n" class="h-10 w-20 rounded-full bg-gray-100 animate-pulse dark:bg-gray-800" />
       </div>
       <div class="grid grid-cols-2 gap-x-4 gap-y-7">
-        <div v-for="n in 4" :key="n" class="flex flex-col">
-          <div class="aspect-[4/5] rounded-[24px] bg-gray-100 animate-pulse mb-3" />
+        <div v-for="n in 6" :key="n" class="flex flex-col">
+          <div class="aspect-[4/5] rounded-[24px] bg-gray-100 animate-pulse mb-3 dark:bg-gray-800" />
           <div class="space-y-2 px-1">
-            <div class="h-3 w-16 rounded bg-gray-100 animate-pulse" />
-            <div class="h-4 w-28 rounded bg-gray-100 animate-pulse" />
-            <div class="h-5 w-20 rounded bg-gray-100 animate-pulse" />
+            <div class="h-3 w-16 rounded bg-gray-100 animate-pulse dark:bg-gray-800" />
+            <div class="h-4 w-28 rounded bg-gray-100 animate-pulse dark:bg-gray-800" />
+            <div class="h-5 w-20 rounded bg-gray-100 animate-pulse dark:bg-gray-800" />
           </div>
         </div>
       </div>
@@ -258,7 +258,7 @@ onMounted(() => {
         </div>
 
         <!-- SCROLLABLE CONTENT -->
-        <div class="bg-[#FAFAFA] px-5 pt-5">
+        <div class="bg-[#FAFAFA] px-5 pt-5 dark:bg-gray-900/50">
           <!-- INFO BANNER -->
           <div
             v-if="storeInfo && (storeInfo.welcomeMessage || todayHours || exchangeRate || storeInfo.deliveryEnabled)"
