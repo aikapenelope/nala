@@ -21,6 +21,7 @@ import { Sentry } from "./instrument";
 import { bodyLimit } from "hono/body-limit";
 import { timeout } from "hono/timeout";
 import { structuredLogger } from "./middleware/structured-logger";
+import { metricsMiddleware, metricsEndpoint } from "./metrics";
 import { health } from "./routes/health";
 import { catalog } from "./routes/catalog";
 import { images } from "./routes/images";
@@ -177,6 +178,12 @@ app.use("*", timeout(30_000));
 app.use("*", structuredLogger);
 
 // ---------------------------------------------------------------------------
+// Metrics: count requests and measure latency for Prometheus
+// ---------------------------------------------------------------------------
+
+app.use("*", metricsMiddleware);
+
+// ---------------------------------------------------------------------------
 // CORS
 // ---------------------------------------------------------------------------
 
@@ -213,6 +220,7 @@ app.use(
 // ---------------------------------------------------------------------------
 
 app.route("/health", health);
+app.get("/metrics", metricsEndpoint);
 app.use("/catalog/*", publicRateLimit);
 app.route("/catalog", catalog);
 app.use("/images/*", publicRateLimit);
