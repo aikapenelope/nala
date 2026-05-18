@@ -386,6 +386,7 @@ export async function getProductImageStream(
 ): Promise<{
   body: ReadableStream;
   contentType: string;
+  contentLength: number | null;
   etag: string | null;
 } | null> {
   if (!isStorageConfigured || !keyOrUrl) {
@@ -437,6 +438,7 @@ export async function getProductImageStream(
     return {
       body: response.Body.transformToWebStream() as ReadableStream,
       contentType,
+      contentLength: response.ContentLength ?? null,
       etag: response.ETag ?? null,
     };
   } catch {
