@@ -726,6 +726,12 @@ salesRoutes.post("/sales", zValidator("json", createSaleSchema), async (c) => {
           referenceType: "sale",
           referenceId: sale.id,
         });
+      } else {
+        console.warn(
+          `[sales] Accounting entry skipped for sale ${sale.id.slice(0, 8)}: ` +
+            `missing accounts (4101: ${!!revenueAccounts[0]}, 1101: ${!!cashAccounts[0]}). ` +
+            `Run onboarding to create default accounts.`,
+        );
       }
 
       // Log activity
