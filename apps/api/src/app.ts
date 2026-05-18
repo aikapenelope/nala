@@ -49,13 +49,20 @@ export const app = new Hono();
 app.onError((err, c) => {
   const method = c.req.method;
   const path = c.req.path;
+  const requestId = (c.var as Record<string, unknown>).requestId as string ?? "unknown";
   const message = err instanceof Error ? err.message : "Unknown error";
   const stack = err instanceof Error ? err.stack : undefined;
 
-  console.error(`[ERROR] ${method} ${path}: ${message}`);
-  if (stack) {
-    console.error(stack);
-  }
+  // Structured error log with requestId for correlation
+  const errorEntry = {
+    level: "error",
+    method,
+    path,
+    requestId,
+    error: message,
+    ...(stack && { stack }),
+  };
+  process.stderr.write(JSON.stringify(errorEntry) + "\n");
 
   // Don't leak internal details in production
   const isDev = process.env.NODE_ENV === "development";
@@ -63,6 +70,7 @@ app.onError((err, c) => {
   return c.json(
     {
       error: isDev ? message : "Internal server error",
+      requestId,
       path,
       ...(isDev && { stack }),
     },
