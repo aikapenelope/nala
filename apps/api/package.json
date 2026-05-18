@@ -21,6 +21,7 @@
     "@hono/zod-validator": "^0.5.0",
     "@nova/db": "*",
     "@nova/shared": "*",
+    "@sentry/node": "^10.53.1",
     "bcryptjs": "^3.0.3",
     "hono": "^4.7.10",
     "ioredis": "^5.10.1",
