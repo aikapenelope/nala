@@ -21,6 +21,7 @@ import { getRedis } from "../redis";
 import { uploadPaymentProof, isStorageConfigured } from "../services/storage";
 import { logActivity } from "../utils/audit";
 import { PriceError, StockError, MinOrderError } from "../utils/errors";
+import { isValidImageBuffer } from "../utils/magic-bytes";
 import { publicRateLimit, uploadRateLimit } from "../middleware/rate-limit";
 import { notifyNewOrder } from "../services/push-notifications";
 
@@ -677,6 +678,14 @@ catalog.post("/:slug/orders/:id/proof", uploadRateLimit, async (c) => {
   // Read file into buffer
   const arrayBuffer = await file.arrayBuffer();
   const buffer = Buffer.from(arrayBuffer);
+
+  // Defense-in-depth: validate magic bytes before upload
+  if (!isValidImageBuffer(buffer)) {
+    return c.json(
+      { error: "Archivo no es una imagen valida. Solo JPEG, PNG o WebP." },
+      400,
+    );
+  }
 
   try {
     // Upload to MinIO
