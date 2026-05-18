@@ -23,6 +23,7 @@ import { sendReceiptWhatsApp, downloadReceiptImage } from "~/composables/useRece
 import type { ReceiptData } from "~/composables/useReceiptImage";
 
 const { isDesktop } = useDevice();
+const { isActive: tutorialActive, activeStep, progress: tutorialProgress, maybeStart: startTutorial, next: tutorialNext, finish: tutorialFinish } = usePosTutorial();
 const { $api, apiBase } = useApi();
 const { toast } = useToast();
 const { user } = useNovaAuth();
@@ -69,6 +70,8 @@ onMounted(async () => {
     ]);
     categories.value = catResult.categories;
     gridProducts.value = prodResult.products;
+    // Start tutorial after products are loaded (first visit only)
+    nextTick(() => startTutorial());
   } catch (err) {
     const message = err instanceof Error ? err.message : "Error cargando productos";
     loadError.value = message;
@@ -570,6 +573,7 @@ function goToAdvancedCheckout() {
       <!-- Product grid -->
       <div
         v-else
+        data-tutorial="product-grid"
         class="grid gap-2.5"
         :class="isDesktop ? 'grid-cols-4' : 'grid-cols-2 sm:grid-cols-3'"
       >
@@ -736,7 +740,7 @@ function goToAdvancedCheckout() {
           </div>
 
           <!-- Payment method pills -->
-          <div class="flex flex-wrap gap-1.5 justify-center">
+          <div data-tutorial="payment-methods" class="flex flex-wrap gap-1.5 justify-center">
             <button
               v-for="method in paymentMethods"
               :key="method.value"
@@ -812,6 +816,7 @@ function goToAdvancedCheckout() {
 
           <!-- Confirm button -->
           <button
+            data-tutorial="confirm-btn"
             class="w-full rounded-2xl py-3.5 text-[15px] font-extrabold tracking-wide transition-spring disabled:opacity-50"
             :class="canConfirm ? 'dark-pill' : 'bg-gray-200 text-gray-400'"
             :disabled="!canConfirm || isSubmitting"
@@ -942,5 +947,14 @@ function goToAdvancedCheckout() {
         </div>
       </div>
     </Teleport>
+
+    <!-- POS Tutorial overlay (first visit only) -->
+    <SharedPosTutorial
+      :is-active="tutorialActive"
+      :step="activeStep"
+      :progress="tutorialProgress"
+      @next="tutorialNext"
+      @skip="tutorialFinish"
+    />
   </div>
 </template>
