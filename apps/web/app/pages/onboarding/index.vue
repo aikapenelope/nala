@@ -2,11 +2,16 @@
 /**
  * Onboarding flow after Clerk registration.
  *
- * Step 1: "What type of business do you have?" (visual selector)
- * Step 2: Business name + owner name
- * Step 3: Done - Nova pre-configures categories and accounts
+ * Simplified to 2 screens:
+ * 1. Business info: type + name + slug + owner name (single form)
+ * 2. First product (optional): name + price — skip to go straight to POS
  *
- * Connected to: POST /onboarding
+ * Philosophy: "Nombre del negocio + primer producto = listo"
+ *
+ * Connected to:
+ * - POST /onboarding (create business)
+ * - POST /api/products (create first product, optional)
+ * - GET /onboarding/check-slug/:slug (availability check)
  */
 
 import type { BusinessType } from "@nova/shared";
@@ -41,8 +46,12 @@ onMounted(() => {
   }
 });
 
-const step = ref(1);
-const businessType = ref<BusinessType | null>(null);
+// ============================================================
+// Step 1: Business info (type + name + slug + owner)
+// ============================================================
+
+const step = ref<"business" | "product" | "done">("business");
+const businessType = ref<BusinessType>("tienda");
 const businessName = ref("");
 const businessSlug = ref("");
 const ownerName = ref("");
@@ -58,19 +67,13 @@ const tenantDomain = config.public.tenantDomain as string;
 const businessTypes: Array<{
   value: BusinessType;
   label: string;
-  description: string;
   icon: string;
 }> = [
-  { value: "tienda", label: "Tienda", description: "Bodega, mini-market, tienda de barrio", icon: "store" },
-  { value: "moda", label: "Moda", description: "Ropa, cosmeticos, accesorios, calzado", icon: "shirt" },
-  { value: "servicios", label: "Servicios", description: "Peluqueria, barberia, profesionales", icon: "scissors" },
-  { value: "otro", label: "Otro", description: "Electronica, alimentos, cualquier otro", icon: "building" },
+  { value: "tienda", label: "Tienda", icon: "🏪" },
+  { value: "moda", label: "Moda", icon: "👗" },
+  { value: "servicios", label: "Servicios", icon: "✂️" },
+  { value: "otro", label: "Otro", icon: "🏢" },
 ];
-
-function selectType(type: BusinessType) {
-  businessType.value = type;
-  step.value = 2;
-}
 
 /** Generate a URL-friendly slug from a business name. */
 function slugify(name: string): string {
@@ -86,7 +89,7 @@ function slugify(name: string): string {
 /** Auto-generate slug when business name changes. */
 watch(businessName, (name) => {
   businessSlug.value = slugify(name);
-  slugAvailable.value = null; // reset availability check
+  slugAvailable.value = null;
 });
 
 /** Check slug availability (debounced). */
@@ -111,7 +114,7 @@ watch(businessSlug, (slug) => {
   }, 500);
 });
 
-/** Validate step 2 fields. */
+/** Validate business form. */
 const canSubmit = computed(() => {
   return (
     businessName.value.trim().length > 0 &&
@@ -123,7 +126,7 @@ const canSubmit = computed(() => {
 });
 
 async function createBusiness() {
-  if (!businessType.value || !canSubmit.value) return;
+  if (!canSubmit.value) return;
 
   isSubmitting.value = true;
   error.value = "";
@@ -151,7 +154,7 @@ async function createBusiness() {
       businessSlug: null,
     });
 
-    step.value = 3;
+    step.value = "product";
   } catch (err) {
     const fetchError = err as {
       data?: { error?: string; businessId?: string };
@@ -175,78 +178,103 @@ async function createBusiness() {
   }
 }
 
-/** Navigate to dashboard after onboarding. */
-function goToDashboard() {
-  router.push("/");
+// ============================================================
+// Step 2: First product (optional)
+// ============================================================
+
+const productName = ref("");
+const productPrice = ref<number | null>(null);
+const isCreatingProduct = ref(false);
+
+async function createFirstProduct() {
+  if (!productName.value.trim() || !productPrice.value || productPrice.value <= 0) return;
+  isCreatingProduct.value = true;
+
+  try {
+    await $api("/api/products", {
+      method: "POST",
+      body: {
+        name: productName.value.trim(),
+        price: productPrice.value,
+        stock: 999,
+      },
+    });
+    step.value = "done";
+  } catch {
+    // If product creation fails, still let them proceed
+    step.value = "done";
+  } finally {
+    isCreatingProduct.value = false;
+  }
+}
+
+function skipProduct() {
+  step.value = "done";
+}
+
+/** Navigate to POS after onboarding. */
+function goToPOS() {
+  router.push("/sales");
 }
 </script>
 
 <template>
   <div class="flex min-h-screen items-center justify-center bg-gray-50 px-4">
-    <div class="w-full max-w-lg">
-      <!-- Step 1: Business type -->
-      <div v-if="step === 1" class="text-center">
-        <h1 class="text-2xl font-bold text-gray-900">Bienvenido a Nova</h1>
-        <p class="mt-2 text-gray-500">Que tipo de negocio tienes?</p>
-
-        <div class="mt-8 grid grid-cols-2 gap-3">
-          <button
-            v-for="bt in businessTypes"
-            :key="bt.value"
-            class="flex flex-col items-center gap-2 rounded-2xl border-2 p-5 transition-all"
-            :class="
-              businessType === bt.value
-                ? 'border-nova-primary bg-blue-50 shadow-md'
-                : 'border-gray-200 bg-white hover:border-gray-300'
-            "
-            @click="selectType(bt.value)"
-          >
-            <span class="text-3xl">{{ bt.icon }}</span>
-            <span class="text-sm font-bold text-gray-800">{{ bt.label }}</span>
-            <span class="text-[11px] font-medium text-gray-400 text-center leading-tight">{{ bt.description }}</span>
-          </button>
+    <div class="w-full max-w-md">
+      <!-- Step 1: Business info (single screen) -->
+      <div v-if="step === 'business'">
+        <div class="text-center">
+          <h1 class="text-2xl font-extrabold text-gray-900">Crea tu negocio</h1>
+          <p class="mt-1 text-sm text-gray-500">Solo necesitas nombre y tipo. 30 segundos.</p>
         </div>
-      </div>
 
-      <!-- Step 2: Business name + owner info -->
-      <div v-else-if="step === 2" class="text-center">
-        <h1 class="text-2xl font-bold text-gray-900">Configura tu negocio</h1>
-        <p class="mt-2 text-gray-500">
-          Estos datos se usan para recibos y acceso
-        </p>
-
-        <div class="mt-8 space-y-4">
+        <div class="mt-6 space-y-4">
+          <!-- Business type (compact pills) -->
           <div>
-            <label class="mb-1 block text-left text-sm text-gray-600">
-              Nombre del negocio
-            </label>
+            <label class="mb-2 block text-xs font-medium text-gray-500">Tipo de negocio</label>
+            <div class="flex gap-2">
+              <button
+                v-for="bt in businessTypes"
+                :key="bt.value"
+                class="flex-1 rounded-xl border-2 px-2 py-2.5 text-center transition-all"
+                :class="
+                  businessType === bt.value
+                    ? 'border-gray-900 bg-gray-900 text-white shadow-md'
+                    : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                "
+                @click="businessType = bt.value"
+              >
+                <span class="block text-lg">{{ bt.icon }}</span>
+                <span class="block text-[11px] font-bold">{{ bt.label }}</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Business name -->
+          <div>
+            <label class="mb-1 block text-xs font-medium text-gray-500">Nombre del negocio</label>
             <input
               v-model="businessName"
               type="text"
               placeholder="Ej: Bodega Don Pedro"
-              class="w-full rounded-xl border border-gray-300 px-4 py-3 text-lg focus:border-nova-primary focus:outline-none focus:ring-2 focus:ring-nova-primary/20"
+              class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm font-medium focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/10"
               autofocus
-            />
+            >
           </div>
 
-          <div>
-            <label class="mb-1 block text-left text-sm text-gray-600">
-              URL de tu negocio
-            </label>
+          <!-- Slug (auto-generated, editable) -->
+          <div v-if="businessSlug">
             <div class="flex items-center gap-0">
               <input
                 v-model="businessSlug"
                 type="text"
-                placeholder="bodega-don-pedro"
-                class="w-full rounded-l-xl border border-r-0 border-gray-300 px-4 py-3 text-sm focus:border-nova-primary focus:outline-none focus:ring-2 focus:ring-nova-primary/20"
-              />
-              <span
-                class="whitespace-nowrap rounded-r-xl border border-gray-300 bg-gray-50 px-3 py-3 text-xs text-gray-400"
+                class="w-full rounded-l-xl border border-r-0 border-gray-300 px-3 py-2.5 text-xs font-medium focus:border-gray-900 focus:outline-none"
               >
+              <span class="whitespace-nowrap rounded-r-xl border border-gray-300 bg-gray-50 px-2.5 py-2.5 text-[11px] text-gray-400">
                 .{{ tenantDomain }}
               </span>
             </div>
-            <p class="mt-1 text-left text-xs text-gray-400">
+            <p class="mt-1 text-[11px] text-gray-400">
               <template v-if="slugChecking">Verificando...</template>
               <template v-else-if="slugAvailable === true">
                 <span class="text-green-600">Disponible</span>
@@ -254,69 +282,99 @@ function goToDashboard() {
               <template v-else-if="slugAvailable === false">
                 <span class="text-red-500">No disponible, elige otro</span>
               </template>
-              <template v-else> Tus clientes veran esta URL </template>
+              <template v-else>URL de tu tienda online</template>
             </p>
           </div>
 
+          <!-- Owner name -->
           <div>
-            <label class="mb-1 block text-left text-sm text-gray-600">
-              Tu nombre
-            </label>
+            <label class="mb-1 block text-xs font-medium text-gray-500">Tu nombre</label>
             <input
               v-model="ownerName"
               type="text"
               placeholder="Ej: Pedro Rodriguez"
-              class="w-full rounded-xl border border-gray-300 px-4 py-3 focus:border-nova-primary focus:outline-none focus:ring-2 focus:ring-nova-primary/20"
-            />
+              class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm font-medium focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/10"
+            >
           </div>
 
-          <p v-if="error" class="text-sm text-red-500">{{ error }}</p>
+          <p v-if="error" class="text-xs text-red-500">{{ error }}</p>
 
-          <div class="flex gap-3 pt-2">
-            <button
-              class="flex-1 rounded-xl border border-gray-300 py-3 text-sm font-medium text-gray-700"
-              @click="step = 1"
-            >
-              Atras
-            </button>
-            <button
-              class="flex-1 rounded-xl bg-nova-primary py-3 text-sm font-medium text-white disabled:opacity-50"
-              :disabled="!canSubmit"
-              @click="createBusiness"
-            >
-              {{ isSubmitting ? "Creando..." : "Crear negocio" }}
-            </button>
-          </div>
+          <!-- Submit -->
+          <button
+            class="w-full rounded-xl bg-gray-900 py-3.5 text-sm font-bold text-white transition-colors hover:bg-gray-800 disabled:opacity-50"
+            :disabled="!canSubmit"
+            @click="createBusiness"
+          >
+            {{ isSubmitting ? "Creando..." : "Continuar" }}
+          </button>
+        </div>
+      </div>
+
+      <!-- Step 2: First product (optional) -->
+      <div v-else-if="step === 'product'" class="text-center">
+        <h1 class="text-2xl font-extrabold text-gray-900">Agrega tu primer producto</h1>
+        <p class="mt-1 text-sm text-gray-500">Opcional. Puedes agregar mas despues.</p>
+
+        <div class="mt-6 space-y-4">
+          <input
+            v-model="productName"
+            type="text"
+            placeholder="Nombre del producto"
+            class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm font-medium focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/10"
+            autofocus
+          >
+          <input
+            v-model.number="productPrice"
+            type="number"
+            step="0.01"
+            min="0"
+            placeholder="Precio ($)"
+            class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm font-medium focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/10"
+          >
+
+          <button
+            class="w-full rounded-xl bg-gray-900 py-3.5 text-sm font-bold text-white transition-colors hover:bg-gray-800 disabled:opacity-50"
+            :disabled="!productName.trim() || !productPrice || productPrice <= 0 || isCreatingProduct"
+            @click="createFirstProduct"
+          >
+            {{ isCreatingProduct ? "Creando..." : "Crear producto" }}
+          </button>
+
+          <button
+            class="w-full py-2 text-xs font-medium text-gray-400 hover:text-gray-600"
+            @click="skipProduct"
+          >
+            Saltar, lo hago despues
+          </button>
         </div>
       </div>
 
       <!-- Step 3: Done -->
       <div v-else class="text-center">
         <div class="mb-4 text-5xl">✓</div>
-        <h1 class="text-2xl font-bold text-gray-900">Listo!</h1>
-        <p class="mt-2 text-gray-500">
-          {{ businessName }} esta configurado. Nova pre-configuro categorias y
-          cuentas contables para tu tipo de negocio.
+        <h1 class="text-2xl font-extrabold text-gray-900">Listo!</h1>
+        <p class="mt-2 text-sm text-gray-500">
+          {{ businessName }} esta configurado. Ya puedes vender.
         </p>
 
         <div
           v-if="businessSlug"
           class="mx-auto mt-4 max-w-sm rounded-xl border border-gray-200 bg-gray-50 p-4"
         >
-          <p class="text-xs text-gray-500">Tu URL publica</p>
-          <p class="mt-1 text-sm font-medium text-nova-primary">
+          <p class="text-xs text-gray-500">Tu tienda online</p>
+          <p class="mt-1 text-sm font-bold text-gray-900">
             {{ businessSlug }}.{{ tenantDomain }}
           </p>
-          <p class="mt-1 text-xs text-gray-400">
-            Comparte este link con tus clientes para que vean tu catalogo
+          <p class="mt-1 text-[11px] text-gray-400">
+            Comparte este link con tus clientes
           </p>
         </div>
 
         <button
-          class="mt-8 inline-block rounded-xl bg-nova-primary px-8 py-3 font-medium text-white"
-          @click="goToDashboard"
+          class="mt-8 w-full rounded-xl bg-gray-900 py-3.5 text-sm font-bold text-white transition-colors hover:bg-gray-800"
+          @click="goToPOS"
         >
-          Ir al dashboard
+          Ir a vender
         </button>
       </div>
     </div>

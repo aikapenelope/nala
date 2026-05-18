@@ -7,7 +7,7 @@
  * - POST /api/sales/:id/void
  */
 
-import { Plus, Calendar, Share2, Download } from "lucide-vue-next";
+import { Plus, Calendar, Share2, Download, RotateCcw, Minus } from "lucide-vue-next";
 import { sendReceiptWhatsApp, downloadReceiptImage } from "~/composables/useReceiptImage";
 import type { ReceiptData } from "~/composables/useReceiptImage";
 
@@ -245,6 +245,114 @@ async function confirmReason() {
   voidingSaleId.value = null;
   voidReason.value = "";
 }
+
+// ============================================================
+// Partial return flow
+// ============================================================
+
+interface ReturnableItem {
+  id: string;
+  productName: string;
+  quantity: number;
+  unitPrice: string;
+  lineTotal: string;
+  /** How many the user wants to return (editable). */
+  returnQty: number;
+}
+
+const showReturnModal = ref(false);
+const returnSaleId = ref<string | null>(null);
+const returnItems = ref<ReturnableItem[]>([]);
+const returnReason = ref("");
+const returnLoading = ref(false);
+const returnSubmitting = ref(false);
+const returnError = ref("");
+
+/** Open return modal: fetch sale items. */
+async function openReturn(saleId: string) {
+  returnSaleId.value = saleId;
+  returnReason.value = "";
+  returnError.value = "";
+  returnLoading.value = true;
+  showReturnModal.value = true;
+
+  try {
+    const detail = await $api<{
+      items: Array<{
+        id: string;
+        productName: string | null;
+        quantity: number;
+        unitPrice: string;
+        lineTotal: string;
+      }>;
+    }>(`/api/sales/${saleId}`);
+
+    returnItems.value = detail.items.map((item) => ({
+      id: item.id,
+      productName: item.productName ?? "Producto",
+      quantity: item.quantity,
+      unitPrice: item.unitPrice,
+      lineTotal: item.lineTotal,
+      returnQty: 0,
+    }));
+  } catch {
+    returnError.value = "Error cargando items de la venta";
+  } finally {
+    returnLoading.value = false;
+  }
+}
+
+/** Items selected for return. */
+const selectedReturnItems = computed(() =>
+  returnItems.value.filter((item) => item.returnQty > 0),
+);
+
+/** Total refund amount. */
+const returnTotal = computed(() => {
+  return selectedReturnItems.value.reduce((sum, item) => {
+    const unitPrice = Number(item.unitPrice);
+    return sum + unitPrice * item.returnQty;
+  }, 0);
+});
+
+const canSubmitReturn = computed(() => {
+  return selectedReturnItems.value.length > 0 && returnReason.value.trim().length > 0;
+});
+
+function adjustReturnQty(item: ReturnableItem, delta: number) {
+  const newQty = item.returnQty + delta;
+  if (newQty < 0 || newQty > item.quantity) return;
+  item.returnQty = newQty;
+}
+
+/** Submit partial return. */
+async function submitReturn() {
+  if (!canSubmitReturn.value || !returnSaleId.value) return;
+  returnSubmitting.value = true;
+  returnError.value = "";
+
+  try {
+    await $api(`/api/sales/${returnSaleId.value}/return`, {
+      method: "POST",
+      body: {
+        reason: returnReason.value.trim(),
+        items: selectedReturnItems.value.map((item) => ({
+          saleItemId: item.id,
+          quantity: item.returnQty,
+        })),
+      },
+    });
+
+    showReturnModal.value = false;
+    toast(`Devolucion procesada: $${returnTotal.value.toFixed(2)}`);
+    fetchSales(); // Refresh list
+  } catch (err) {
+    const fetchError = err as { data?: { error?: string; details?: string[] } };
+    returnError.value = fetchError.data?.details?.join(", ") ?? fetchError.data?.error ?? "Error al procesar devolucion";
+  } finally {
+    returnSubmitting.value = false;
+  }
+}
 </script>
 
 <template>
@@ -436,6 +544,13 @@ async function confirmReason() {
                   </button>
                   <button
                     v-if="sale.status === 'completed'"
+                    class="rounded-xl bg-amber-50 px-2.5 py-1 text-[11px] font-bold text-amber-700 transition-spring hover:bg-amber-100"
+                    @click="openReturn(sale.id)"
+                  >
+                    <RotateCcw :size="12" class="inline" /> Devolver
+                  </button>
+                  <button
+                    v-if="sale.status === 'completed'"
                     class="rounded-xl bg-red-50 px-2.5 py-1 text-[11px] font-bold text-red-600 transition-spring hover:bg-red-100"
                     @click="requestVoid(sale.id)"
                   >
@@ -513,6 +628,13 @@ async function confirmReason() {
               </button>
               <button
                 v-if="sale.status === 'completed'"
+                class="rounded-lg bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700 transition-spring hover:bg-amber-100"
+                @click="openReturn(sale.id)"
+              >
+                <RotateCcw :size="10" class="inline" />
+              </button>
+              <button
+                v-if="sale.status === 'completed'"
                 class="rounded-lg bg-red-50 px-2 py-0.5 text-[10px] font-bold text-red-500 transition-spring hover:bg-red-100"
                 @click="requestVoid(sale.id)"
               >
@@ -587,6 +709,115 @@ async function confirmReason() {
               @click="confirmReason"
             >
               Continuar
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- Partial return modal -->
+    <Teleport to="body">
+      <div
+        v-if="showReturnModal"
+        class="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm"
+        @click.self="showReturnModal = false"
+      >
+        <div class="glass-strong w-full max-w-md rounded-t-[32px] sm:rounded-[32px] p-6 shadow-[0_30px_60px_-15px_rgba(0,0,0,0.2)] max-h-[85vh] overflow-y-auto">
+          <h3 class="mb-1 text-xl font-extrabold tracking-tight text-gradient">
+            Devolucion parcial
+          </h3>
+          <p class="mb-4 text-[13px] font-medium text-gray-500">
+            Selecciona los items y cantidades a devolver
+          </p>
+
+          <!-- Loading -->
+          <div v-if="returnLoading" class="py-8 text-center text-gray-400">
+            <div class="mx-auto mb-2 h-6 w-6 animate-spin rounded-full border-2 border-gray-200 border-t-nova-primary" />
+            Cargando items...
+          </div>
+
+          <!-- Items list -->
+          <div v-else-if="returnItems.length > 0" class="space-y-2">
+            <div
+              v-for="item in returnItems"
+              :key="item.id"
+              class="flex items-center justify-between rounded-xl border border-gray-100 bg-white/60 p-3"
+            >
+              <div class="min-w-0 flex-1">
+                <p class="truncate text-sm font-semibold text-gray-800">{{ item.productName }}</p>
+                <p class="text-xs text-gray-400">
+                  {{ item.quantity }} x ${{ Number(item.unitPrice).toFixed(2) }}
+                </p>
+              </div>
+              <div class="flex items-center gap-2">
+                <button
+                  class="flex h-7 w-7 items-center justify-center rounded-lg bg-gray-100 text-gray-500 transition-spring hover:bg-gray-200"
+                  :disabled="item.returnQty <= 0"
+                  @click="adjustReturnQty(item, -1)"
+                >
+                  <Minus :size="12" />
+                </button>
+                <span
+                  class="min-w-[24px] text-center text-sm font-bold"
+                  :class="item.returnQty > 0 ? 'text-amber-700' : 'text-gray-300'"
+                >
+                  {{ item.returnQty }}
+                </span>
+                <button
+                  class="flex h-7 w-7 items-center justify-center rounded-lg bg-gray-100 text-gray-500 transition-spring hover:bg-gray-200"
+                  :disabled="item.returnQty >= item.quantity"
+                  @click="adjustReturnQty(item, 1)"
+                >
+                  <Plus :size="12" />
+                </button>
+              </div>
+            </div>
+
+            <!-- Refund total -->
+            <div v-if="returnTotal > 0" class="mt-3 text-center">
+              <p class="text-xs font-medium text-gray-500">Reembolso</p>
+              <p class="text-xl font-extrabold text-amber-700">${{ returnTotal.toFixed(2) }}</p>
+            </div>
+
+            <!-- Reason -->
+            <div class="mt-3">
+              <input
+                v-model="returnReason"
+                type="text"
+                placeholder="Motivo de la devolucion"
+                class="w-full rounded-xl border border-gray-200 bg-white/60 px-4 py-2.5 text-sm font-medium text-gray-800 outline-none placeholder:text-gray-400 focus:border-gray-400 focus:ring-2 focus:ring-gray-900/5"
+              >
+            </div>
+
+            <!-- Error -->
+            <p v-if="returnError" class="mt-2 text-xs text-red-500">{{ returnError }}</p>
+
+            <!-- Actions -->
+            <div class="mt-4 flex gap-3">
+              <button
+                class="glass flex-1 rounded-2xl py-3 text-sm font-bold text-gray-700 transition-spring"
+                @click="showReturnModal = false"
+              >
+                Cancelar
+              </button>
+              <button
+                class="flex-1 rounded-2xl bg-amber-600 py-3 text-sm font-bold text-white transition-spring disabled:opacity-50"
+                :disabled="!canSubmitReturn || returnSubmitting"
+                @click="submitReturn"
+              >
+                {{ returnSubmitting ? "Procesando..." : "Confirmar devolucion" }}
+              </button>
+            </div>
+          </div>
+
+          <!-- Error loading -->
+          <div v-else-if="returnError" class="py-6 text-center">
+            <p class="text-sm text-red-500">{{ returnError }}</p>
+            <button
+              class="mt-3 text-xs font-bold text-gray-500"
+              @click="showReturnModal = false"
+            >
+              Cerrar
             </button>
           </div>
         </div>
