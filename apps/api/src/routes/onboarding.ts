@@ -68,19 +68,13 @@ const onboardingSchema = z.object({
 
 /**
  * Pre-configured categories per business type.
+ *
+ * New primary types: tienda, moda, servicios, otro.
+ * Legacy types kept for backward compatibility with existing businesses.
  */
 const CATEGORIES_BY_TYPE: Record<string, string[]> = {
-  ferreteria: [
-    "Herramientas manuales",
-    "Herramientas eléctricas",
-    "Tornillería",
-    "Pinturas",
-    "Plomería",
-    "Electricidad",
-    "Cerrajería",
-    "Otros",
-  ],
-  bodega: [
+  // --- Primary types (shown in onboarding) ---
+  tienda: [
     "Abarrotes",
     "Lácteos",
     "Bebidas",
@@ -89,74 +83,35 @@ const CATEGORIES_BY_TYPE: Record<string, string[]> = {
     "Snacks",
     "Otros",
   ],
-  ropa: [
+  moda: [
     "Ropa de mujer",
     "Ropa de hombre",
-    "Ropa de niños",
     "Calzado",
     "Accesorios",
-    "Ropa interior",
+    "Cosméticos",
     "Otros",
   ],
-  autopartes: [
-    "Motor",
-    "Frenos",
-    "Suspensión",
-    "Eléctrico",
-    "Filtros",
-    "Aceites y lubricantes",
-    "Accesorios",
-    "Otros",
-  ],
-  peluqueria: [
+  servicios: [
     "Cortes",
     "Coloración",
     "Tratamientos",
-    "Productos capilares",
     "Uñas",
     "Maquillaje",
     "Otros",
   ],
-  farmacia: [
-    "Medicamentos",
-    "Vitaminas",
-    "Cuidado personal",
-    "Bebés",
-    "Primeros auxilios",
-    "Otros",
-  ],
-  electronica: [
-    "Celulares",
-    "Accesorios",
-    "Computación",
-    "Audio",
-    "Cables y conectores",
-    "Otros",
-  ],
-  libreria: [
-    "Cuadernos",
-    "Útiles escolares",
-    "Papelería",
-    "Arte",
-    "Oficina",
-    "Otros",
-  ],
-  cosmeticos: [
-    "Maquillaje",
-    "Cuidado facial",
-    "Cuidado corporal",
-    "Fragancias",
-    "Cabello",
-    "Otros",
-  ],
-  distribuidora: [
-    "Alimentos",
-    "Bebidas",
-    "Limpieza",
-    "Cuidado personal",
-    "Otros",
-  ],
   otro: ["General", "Otros"],
+
+  // --- Legacy types (backward compat, not shown in onboarding) ---
+  ferreteria: ["Herramientas", "Tornillería", "Pinturas", "Plomería", "Electricidad", "Otros"],
+  bodega: ["Abarrotes", "Lácteos", "Bebidas", "Limpieza", "Cuidado personal", "Snacks", "Otros"],
+  ropa: ["Ropa de mujer", "Ropa de hombre", "Calzado", "Accesorios", "Ropa interior", "Otros"],
+  autopartes: ["Motor", "Frenos", "Suspensión", "Eléctrico", "Filtros", "Accesorios", "Otros"],
+  peluqueria: ["Cortes", "Coloración", "Tratamientos", "Uñas", "Maquillaje", "Otros"],
+  farmacia: ["Medicamentos", "Vitaminas", "Cuidado personal", "Bebés", "Otros"],
+  electronica: ["Celulares", "Accesorios", "Computación", "Audio", "Otros"],
+  libreria: ["Cuadernos", "Útiles escolares", "Papelería", "Arte", "Otros"],
+  cosmeticos: ["Maquillaje", "Cuidado facial", "Cuidado corporal", "Fragancias", "Otros"],
+  distribuidora: ["Alimentos", "Bebidas", "Limpieza", "Cuidado personal", "Otros"],
 };
 
 /**

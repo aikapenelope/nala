@@ -7,8 +7,14 @@ import { z } from "zod";
 /** Schema for user roles. Single-user model: always "owner". */
 export const userRoleSchema = z.enum(["owner"]);
 
-/** Schema for business types. */
+/** Schema for business types (new + legacy for backward compat). */
 export const businessTypeSchema = z.enum([
+  // Primary types (shown in onboarding)
+  "tienda",
+  "moda",
+  "servicios",
+  "otro",
+  // Legacy types (accepted for existing businesses)
   "ferreteria",
   "bodega",
   "ropa",
@@ -19,7 +25,6 @@ export const businessTypeSchema = z.enum([
   "libreria",
   "cosmeticos",
   "distribuidora",
-  "otro",
 ]);
 
 /** Schema for payment methods. */
