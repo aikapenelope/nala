@@ -28,6 +28,7 @@ import {
   Wallet,
   RefreshCw,
   BarChart3,
+  Globe,
 } from "lucide-vue-next";
 import { currentHourVET } from "@nova/shared";
 
@@ -100,6 +101,11 @@ const dueToday = ref<DueReceivable[]>([]);
 
 /** Sync status. */
 const syncStatus = ref<"online" | "offline" | "syncing">("online");
+
+/** Store online status. */
+const storeOnline = ref<boolean | null>(null);
+const storeOrdersWeek = ref(0);
+const storeRevenueWeek = ref(0);
 
 /** Pending orders for quick action. */
 interface PendingOrder {
@@ -184,6 +190,8 @@ async function loadDashboard() {
       cashFlowResult,
       ordersResult,
       recentSalesResult,
+      storeSettingsResult,
+      storeStatsResult,
     ] = await Promise.allSettled([
       $api<{
         data: {
@@ -224,6 +232,10 @@ async function loadDashboard() {
       $api<{ sales: Array<{ id: string; totalUsd: string; channel: string; createdAt: string }> }>(
         "/api/sales?limit=5",
       ),
+
+      $api<{ settings: { storeEnabled: boolean } }>("/api/store-settings"),
+
+      $api<{ stats: { ordersThisWeek: number; revenueThisWeek: number; pendingOrders: number } }>("/api/store-stats"),
     ]);
 
     if (dailyResult.status === "fulfilled") {
@@ -295,6 +307,15 @@ async function loadDashboard() {
         });
       }
       activityFeed.value = feed;
+    }
+
+    if (storeSettingsResult.status === "fulfilled") {
+      storeOnline.value = storeSettingsResult.value.settings.storeEnabled;
+    }
+
+    if (storeStatsResult.status === "fulfilled") {
+      storeOrdersWeek.value = storeStatsResult.value.stats.ordersThisWeek;
+      storeRevenueWeek.value = storeStatsResult.value.stats.revenueThisWeek;
     }
   } catch (err) {
     const message =
@@ -582,6 +603,37 @@ function openRateEditor() {
       >
         <DollarSign :size="18" />
         Nueva venta
+      </NuxtLink>
+
+      <!-- STORE ONLINE STATUS -->
+      <NuxtLink
+        v-if="storeOnline !== null"
+        to="/store"
+        class="mt-2.5 flex items-center gap-3 rounded-[18px] border border-white/80 p-3.5 transition-spring"
+        :class="storeOnline ? 'bg-gradient-to-r from-green-50/80 to-emerald-50/60' : 'bg-gradient-to-r from-gray-50 to-gray-100'"
+      >
+        <div
+          class="flex h-9 w-9 items-center justify-center rounded-xl"
+          :class="storeOnline ? 'bg-green-100' : 'bg-gray-200'"
+        >
+          <Globe :size="16" :class="storeOnline ? 'text-green-600' : 'text-gray-400'" />
+        </div>
+        <div class="flex-1 min-w-0">
+          <p class="text-[12px] font-bold text-gray-800">
+            Tienda {{ storeOnline ? "activa" : "desactivada" }}
+          </p>
+          <p v-if="storeOnline && (storeOrdersWeek > 0 || storeRevenueWeek > 0)" class="text-[10px] font-medium text-gray-500">
+            {{ storeOrdersWeek }} pedido{{ storeOrdersWeek !== 1 ? "s" : "" }} esta semana
+            <span v-if="storeRevenueWeek > 0"> · ${{ storeRevenueWeek.toFixed(0) }}</span>
+          </p>
+          <p v-else-if="!storeOnline" class="text-[10px] font-medium text-gray-400">
+            Tus clientes no pueden hacer pedidos
+          </p>
+        </div>
+        <span
+          class="h-2 w-2 rounded-full"
+          :class="storeOnline ? 'bg-green-500 animate-pulse' : 'bg-gray-300'"
+        />
       </NuxtLink>
 
       <!-- ============================================================ -->
