@@ -13,7 +13,7 @@
 import {
   LayoutGrid,
   ShoppingCart,
-  Receipt,
+  Info,
   MessageCircle,
 } from "lucide-vue-next";
 
@@ -51,7 +51,7 @@ const whatsappLink = computed(() => {
 const navItems = computed(() => [
   { to: "/tienda", icon: LayoutGrid, label: "Catalogo", match: "/tienda" },
   { to: "/tienda/cart", icon: ShoppingCart, label: "Carrito", isCart: true, match: "/tienda/cart" },
-  { to: "/tienda/checkout", icon: Receipt, label: "Pedir", match: "/tienda/checkout" },
+  { to: "/tienda/info", icon: Info, label: "Info", match: "/tienda/info" },
 ]);
 
 function isActive(match: string): boolean {

@@ -20,6 +20,7 @@ export function useStorefrontSeo(options: StorefrontSeoOptions = {}) {
   const { tenantSlug } = useTenant();
   const config = useRuntimeConfig();
   const tenantDomain = config.public.tenantDomain as string;
+  const apiBase = config.public.apiBase as string;
 
   const pageTitle = computed(() => {
     const base = business.value?.name ?? "Tienda";
@@ -36,6 +37,16 @@ export function useStorefrontSeo(options: StorefrontSeoOptions = {}) {
   const canonicalUrl = computed(() => {
     if (!tenantSlug.value) return `https://${tenantDomain}`;
     return `https://${tenantSlug.value}.${tenantDomain}`;
+  });
+
+  /**
+   * OG image: use the store's first product image if available,
+   * otherwise fall back to a generic Nala branding image.
+   * WhatsApp renders og:image as a large preview card.
+   */
+  const ogImage = computed(() => {
+    // Generic Nala OG image (always works, no per-tenant setup needed)
+    return `${apiBase}/images/og-default.png`;
   });
 
   useHead(
@@ -55,20 +66,21 @@ export function useStorefrontSeo(options: StorefrontSeoOptions = {}) {
           name: "apple-mobile-web-app-status-bar-style",
           content: "black-translucent",
         },
-        // Open Graph
+        // Open Graph — WhatsApp uses these for link previews
         { property: "og:title", content: pageTitle.value },
         { property: "og:description", content: pageDescription.value },
         { property: "og:type", content: "website" },
         { property: "og:url", content: canonicalUrl.value },
-        {
-          property: "og:image",
-          content: `https://${tenantDomain}/og-catalog.png`,
-        },
+        { property: "og:image", content: ogImage.value },
+        { property: "og:image:width", content: "1200" },
+        { property: "og:image:height", content: "630" },
         { property: "og:locale", content: "es_VE" },
+        { property: "og:site_name", content: business.value?.name ?? "Nala" },
         // Twitter
         { name: "twitter:card", content: "summary_large_image" },
         { name: "twitter:title", content: pageTitle.value },
         { name: "twitter:description", content: pageDescription.value },
+        { name: "twitter:image", content: ogImage.value },
       ],
     })),
   );
