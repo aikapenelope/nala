@@ -1,14 +1,10 @@
 <script setup lang="ts">
 /**
- * Storefront catalog page — adaptive product grid.
+ * Storefront catalog page — universal product grid.
  *
- * Renders different product card layouts based on the business type:
- * - "visual" (ropa, cosmeticos, electronica): large image, carousel, overlay CTA
- * - "compact" (bodega, farmacia, ferreteria): small image, dense info, inline CTA
- * - "list" (peluqueria, distribuidora): horizontal row, text-focused
- *
- * The layout is determined by useStorefrontConfig() which reads business.type
- * from the API and returns the appropriate StorefrontConfig.
+ * Single layout for all business types: visual cards with carousel,
+ * cart checkout, 2-column grid. Following Treinta.co's model:
+ * one product, one UI, for everyone.
  */
 
 import { currentDayOfWeekVET } from "@nova/shared";
@@ -38,7 +34,7 @@ const {
   fetchMore,
 } = useStorefront();
 const { addItem } = useCart();
-const { config: sfConfig, isWhatsAppMode } = useStorefrontConfig();
+const { config: sfConfig } = useStorefrontConfig();
 
 /** Resolve image URL: prepend API base for relative paths from the catalog API. */
 function resolveImageUrl(url: string | null): string | undefined {
@@ -75,14 +71,9 @@ const paymentLabels = computed(() => {
   return methods.map((m) => m.label).join(", ");
 });
 
-/** Filtered products: by category, search, and out-of-stock config. */
+/** Filtered products: by category and search query. */
 const filteredProducts = computed(() => {
   let result = products.value;
-
-  // Hide out-of-stock products if config says so
-  if (!sfConfig.value.showOutOfStock) {
-    result = result.filter((p) => p.available);
-  }
 
   if (selectedCategory.value) {
     result = result.filter(
@@ -100,31 +91,10 @@ const filteredProducts = computed(() => {
   return result;
 });
 
-/** Grid CSS classes based on config. */
-const gridClasses = computed(() => {
-  if (sfConfig.value.gridCols === 1) return "flex flex-col gap-3";
-  return "grid grid-cols-2 gap-x-4 gap-y-7";
-});
-
 /**
- * Handle add-to-cart or WhatsApp-direct depending on checkout mode.
- * In WhatsApp mode, opens wa.me with the product pre-filled.
- * In cart mode, adds to cart with haptic feedback.
+ * Add to cart with haptic feedback.
  */
-function handleProductAction(product: (typeof products.value)[number]) {
-  if (isWhatsAppMode.value && business.value?.whatsappNumber) {
-    const phone = business.value.whatsappNumber.replace(/[^0-9]/g, "");
-    const msg = `Hola, me interesa: ${product.name} ($${product.price.toFixed(2)})`;
-    const url = `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
-    if (import.meta.client) window.open(url, "_blank");
-
-    // Visual feedback + prevent duplicate taps (same pattern as cart mode)
-    addedProductId.value = product.id;
-    setTimeout(() => { addedProductId.value = null; }, 1200);
-    return;
-  }
-
-  // Cart mode: add to cart
+function handleAddToCart(product: (typeof products.value)[number]) {
   addItem({
     id: product.id,
     name: product.name,
@@ -350,33 +320,18 @@ onMounted(() => {
             </button>
           </div>
 
-          <!-- ============================================================ -->
-          <!-- PRODUCT GRID (config-driven layout) -->
-          <!-- ============================================================ -->
-          <div v-else :class="gridClasses">
-            <template v-for="product in filteredProducts" :key="product.id">
-              <!-- Visual card (moda, otro) -->
-              <StorefrontProductCardVisual
-                v-if="sfConfig.cardLayout === 'visual'"
-                :product="product"
-                :config="sfConfig"
-                :exchange-rate="exchangeRate"
-                :is-added="addedProductId === product.id"
-                :resolve-image-url="resolveImageUrl"
-                @add-to-cart="handleProductAction"
-              />
-
-              <!-- Compact card (tienda, servicios) -->
-              <StorefrontProductCardCompact
-                v-else
-                :product="product"
-                :config="sfConfig"
-                :exchange-rate="exchangeRate"
-                :is-added="addedProductId === product.id"
-                :resolve-image-url="resolveImageUrl"
-                @add-to-cart="handleProductAction"
-              />
-            </template>
+          <!-- PRODUCT GRID (universal visual layout) -->
+          <div v-else class="grid grid-cols-2 gap-x-4 gap-y-7">
+            <StorefrontProductCardVisual
+              v-for="product in filteredProducts"
+              :key="product.id"
+              :product="product"
+              :config="sfConfig"
+              :exchange-rate="exchangeRate"
+              :is-added="addedProductId === product.id"
+              :resolve-image-url="resolveImageUrl"
+              @add-to-cart="handleAddToCart"
+            />
           </div>
 
           <!-- INFINITE SCROLL SENTINEL -->
