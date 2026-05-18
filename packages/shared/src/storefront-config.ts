@@ -34,7 +34,7 @@ const UNIVERSAL_CONFIG: StorefrontConfig = {
   showCarousel: true,
   showSku: false,
   showBrand: false,
-  showDescription: false,
+  showDescription: true,
   ctaText: "Agregar",
   checkoutMode: "cart",
   showOutOfStock: true,
