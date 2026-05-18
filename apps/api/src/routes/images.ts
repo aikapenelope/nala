@@ -50,7 +50,9 @@ async function streamImage(c: Context, storageKey: string) {
   }
 
   c.header("Content-Type", result.contentType);
-  c.header("Cache-Control", "public, max-age=3600, must-revalidate");
+  // 24-hour cache with ETag revalidation. Images are optimized WebP on upload
+  // and only change when explicitly re-uploaded (new ETag triggers revalidation).
+  c.header("Cache-Control", "public, max-age=86400, must-revalidate");
 
   // Content-Length is critical for iOS Safari — without it, images
   // from streaming responses may not render in <img> tags.

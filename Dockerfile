@@ -71,11 +71,15 @@ RUN npx turbo build --filter=@nova/web
 FROM node:${NODE_VERSION} AS api
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    openssl ca-certificates curl \
+    openssl ca-certificates curl libjemalloc2 \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
+# Use jemalloc as memory allocator. Required by sharp (libvips) on glibc Linux
+# to prevent memory fragmentation in long-running, multi-threaded processes.
+# See: https://sharp.pixelplumbing.com/install#linux-memory-allocator
+ENV LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libjemalloc.so.2
 ENV NODE_ENV=production
 ENV PORT=3001
 # Venezuela Standard Time (UTC-4). Defense-in-depth: the application code

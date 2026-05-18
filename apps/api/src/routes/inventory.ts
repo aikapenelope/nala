@@ -47,6 +47,7 @@ import {
   deleteProductImage,
   isStorageConfigured,
 } from "../services/storage";
+import { processProductImage } from "../services/image-processing";
 import type { AppEnv } from "../types";
 
 const inventory = new Hono<AppEnv>();
@@ -888,7 +889,21 @@ inventory.post("/products/:id/image", validateUuidParam, async (c) => {
   }
 
   const arrayBuffer = await file.arrayBuffer();
-  const buffer = Buffer.from(arrayBuffer);
+  const rawBuffer = Buffer.from(arrayBuffer);
+
+  // Optimize image: convert to WebP, resize to max 1200px, strip metadata.
+  // Falls back to original if processing fails (e.g., corrupt image).
+  const processed = await processProductImage(rawBuffer);
+  const uploadBuffer = processed ? processed.buffer : rawBuffer;
+  const uploadContentType = processed ? processed.contentType : file.type;
+
+  if (processed) {
+    console.log(
+      `[image-upload] Optimized: ${processed.originalSize} → ${processed.processedSize} bytes ` +
+        `(${Math.round((1 - processed.processedSize / processed.originalSize) * 100)}% reduction, ` +
+        `${processed.width}x${processed.height}px)`,
+    );
+  }
 
   // Generate a unique image ID for the storage key
   const imageId = crypto.randomUUID();
@@ -899,8 +914,8 @@ inventory.post("/products/:id/image", validateUuidParam, async (c) => {
       businessId,
       productId,
       imageId,
-      buffer,
-      file.type,
+      uploadBuffer,
+      uploadContentType,
     );
 
     // Create the product_images record
