@@ -1,11 +1,97 @@
 # Nala: Roadmap + Analisis de producto — Mayo 2026
 
 > Fuente unica de verdad. Reemplaza docs 45, 46, 47 y todos los anteriores.
-> Actualizado: 14 mayo 2026 post-sesion completa (PRs #265-#275).
+> Actualizado: 18 mayo 2026 post-sesion completa (PRs #316-#323).
 
 ---
 
-## Change log de esta sesion
+## Change log — Sesion 18 mayo 2026 (PRs #316-#323)
+
+| PR | Tipo | Descripcion |
+|----|------|-------------|
+| #316 | feat+fix | Stock audit trail para pedidos storefront + push notifications |
+| #317 | fix | DB hardening: RLS push_subscriptions, FK constraints, CHECK constraints, indexes |
+| #318 | feat | Storefront premium UI redesign (layout, catalogo, carrito) |
+| #319 | feat | Storefront adaptativo por tipo de negocio (cards, WhatsApp checkout) |
+| #320 | fix | Migracion 0021 compatibilidad PG16 + CI migration verification |
+| #321 | fix | Order confirm/cancel crash (inArray), pg_trgm extension, customer-stats error handling |
+| #323 | refactor | Simplificar tipos de negocio de 11 a 4 (tienda, moda, servicios, otro) |
+
+### Detalle: Stock audit trail + push notifications (#316)
+
+Bugs corregidos en el flujo storefront -> confirmar pedido:
+- `PATCH /orders/:id/confirm` no registraba `stock_movements` (auditoria rota)
+- Cancelar pedido confirmado no restauraba stock
+- Faltaba `lastSoldAt`, `totalCostUsd`, asientos contables en confirm
+
+Push notifications:
+- Tabla `push_subscriptions` (migracion 0020)
+- Servicio `web-push` con VAPID
+- Trigger fire-and-forget al crear pedido en storefront
+- Service worker handler + composable `usePushNotifications`
+- Toggle en pagina de pedidos
+
+### Detalle: DB hardening (#317)
+
+Auditoria profunda de la base de datos. Hallazgos y fixes:
+- RLS faltante en `push_subscriptions`
+- FK constraints faltantes: `sales.customerId`, `quotations.customerId`, `dayCloses.openingId`, `accountingAccounts.parentId`
+- CHECK constraints: stock >= 0, price >= 0, quantity > 0, discount 0-100
+- Indexes: `stock_movements(ref_type, ref_id)`, `accounting_entries(ref_type, ref_id)`, etc.
+- UNIQUE constraints en `store_settings.businessId`, `notification_preferences.businessId`
+- Fix exchange-rate RLS bypass en catalogo publico (transaccion para pinear conexion)
+
+### Detalle: Storefront premium UI (#318)
+
+Rediseno completo del storefront publico:
+- Header: nombre del negocio + indicador online + WhatsApp + carrito
+- Bottom nav fijo: Catalogo, Carrito (elevado), Pedir
+- Catalogo: busqueda, category chips sticky, info banner, grid 4:5
+- Carrito: thumbnails grandes, controles +/-, resumen limpio
+- CSS: utilidad `no-scrollbar` para pills horizontales
+
+### Detalle: Storefront adaptativo (#319 + #323)
+
+El storefront adapta su UI segun el tipo de negocio:
+
+**4 tipos simplificados (antes eran 11):**
+
+| Tipo | Target | Storefront | POS categories |
+|------|--------|-----------|---------------|
+| tienda | Bodega, mini-market | Compact, WhatsApp | Abarrotes, Lacteos, Bebidas, Limpieza, Snacks |
+| moda | Ropa, cosmeticos | Visual, carousel, carrito | Ropa mujer/hombre, Calzado, Accesorios, Cosmeticos |
+| servicios | Peluqueria, barberia | Compact 1-col, WhatsApp | Cortes, Coloracion, Tratamientos, Unas, Maquillaje |
+| otro | Todo lo demas | Visual, carrito | General |
+
+Arquitectura:
+- `StorefrontConfig` en `@nova/shared` con 4 perfiles nombrados
+- `useStorefrontConfig()` composable que lee `business.type`
+- 2 componentes de card: `ProductCardVisual` + `ProductCardCompact`
+- Modo WhatsApp: CTA abre wa.me con producto pre-llenado
+- Legacy types (bodega, ropa, peluqueria, etc.) mapeados al perfil mas cercano
+
+**Lo que NO cambia por tipo (igual para todos, como Treinta.co):**
+- POS (interfaz de vender) — excepto los tabs de categorias
+- Dashboard
+- Inventario
+- Reportes
+- Configuracion
+
+### Detalle: Fixes de deploy (#320, #321)
+
+Migracion 0021 fallaba en produccion (PG16):
+- `ADD CONSTRAINT IF NOT EXISTS` es sintaxis PG17+
+- Fix: `DO $$ BEGIN ... EXCEPTION WHEN duplicate_object` (PG16 compatible)
+- CI: `migrate.mjs` ahora corre ANTES de `drizzle-kit push` (valida SQL real)
+- `migrate.mjs` crea extensiones (`pg_trgm`, `uuid-ossp`) y funcion `current_business_id()` antes de migraciones
+
+Order confirm crasheaba con "Internal Server Error":
+- Bug: `sql` template con `ANY(${array})` no funciona con drizzle-orm
+- Fix: reemplazar con `inArray()` de drizzle-orm (2 instancias en orders.ts)
+
+---
+
+## Change log — Sesion anterior (PRs #265-#275)
 
 | PR | Tipo | Descripcion |
 |----|------|-------------|
@@ -18,63 +104,70 @@
 | #274 | merge | Merge de #272 (backend multi-imagen) |
 | #275 | feat | Simplificar ventas: quick sale endpoint + POS inline checkout |
 
-### Detalle tecnico de los fixes de imagenes (#265-#268)
-
-El cuadro azul con "?" en el inventario tenia 4 capas de problemas:
-
-1. **Bucket nunca se creaba** — `ensureBucket()` existia pero nunca se llamaba desde `index.ts`
-2. **Proxy detras de auth** — `<img>` tags no envian Authorization headers
-3. **CORP header** — `secureHeaders()` ponia `Cross-Origin-Resource-Policy: same-origin`, bloqueando imagenes cross-origin
-4. **Solucion CORP** — `c.header()` y `c.res.headers.set()` no sobreescribian porque `secureHeaders()` ejecuta post-next (LIFO). Solucion: registrar `secureHeaders({ crossOriginResourcePolicy: "cross-origin" })` scoped a `/images/*` ANTES del global
-
-### Detalle del multi-imagen (#272-#274)
-
-- Nueva tabla `product_images` (1:N con products, max 5, sort_order)
-- Endpoints: upload, list, delete, reorder
-- Proxy: `/images/products/:productId` (principal) + `/images/products/:productId/:imageId` (especifica)
-- Storefront: carousel CSS snap con swipe + dot indicators
-- Inventario: grid de thumbnails con upload, delete, badge "1ra"
-- Migracion automatica de `products.image_url` existente a `product_images`
-
-### Detalle de simplificacion de ventas (#275)
-
-- Nuevo endpoint `POST /api/sales/quick` — venta por monto sin producto
-- POS rediseñado: metodos de pago inline en el ticket, confirmar sin navegar
-- Boton "$ Rapida" para ventas sin producto (modal)
-- Checkout avanzado (`/sales/checkout`) sigue existiendo para fiado, recargos, IGTF
-
 ---
 
 ## Estado actual del sistema
 
 | Metrica | Valor |
 |---------|-------|
-| LOC | ~32,000 |
-| Tablas | 34 |
-| Migraciones | 17 |
+| LOC | ~35,000 |
+| Tablas | 35 |
+| Migraciones | 22 (0000-0021) |
 | Paginas frontend | 35 |
-| Componentes | 11 |
-| Composables | 13 |
+| Componentes | 13 |
+| Composables | 17 |
 | Tests | 14 archivos |
-| CI | GitHub Actions (turbo typecheck + lint + test + build) |
-| PRs | #79-#275 |
+| CI | GitHub Actions (migrate + typecheck + lint + test + build) |
+| PRs | #79-#323 |
 
 ### Que funciona
 
-- POS con categorias, barcode scanner, creacion rapida, checkout inline, venta rapida
+- POS con categorias por tipo de negocio, barcode scanner, checkout inline, venta rapida
 - Dashboard con 10 API calls en paralelo, pull-to-refresh, skeleton loading
-- Inventario con semaforo, prediccion de agotamiento, multi-imagen (5 fotos), lista/grid
-- Storefront PWA con checkout, carousel de imagenes, infinite scroll, IGTF
+- Inventario con semaforo, prediccion de agotamiento, multi-imagen (5 fotos)
+- Storefront PWA adaptativo por tipo de negocio (visual/compact, cart/WhatsApp)
+- Push notifications para pedidos nuevos
 - OCR de facturas (GPT-4o-mini vision)
 - Cierre/apertura de caja
 - Cuentas por cobrar con cobro por WhatsApp
 - Reportes en 3 tabs + export Excel
 - Tasa BCV manual + auto-fetch
-- Pedidos online con confirmacion rapida + sonido
-- Toast notifications
-- Devolucion parcial (API, falta UI)
-- Proxy de imagenes publico con CORP cross-origin
-- Command palette (Cmd+K)
+- Pedidos online con confirmacion rapida + sonido + push
+- Owner lock (PIN para secciones sensibles)
+- DB hardening: FK constraints, CHECK constraints, indexes, RLS completo
+
+---
+
+## Tipos de negocio
+
+### Modelo (inspirado en Treinta.co)
+
+Un producto universal con 4 tipos que afectan solo:
+1. Categorias pre-configuradas en onboarding (tabs del POS)
+2. Layout del storefront (visual vs compact)
+3. Modo de checkout del storefront (carrito vs WhatsApp directo)
+
+### Los 4 tipos
+
+**Tienda** — Bodega, mini-market, tienda de barrio
+- POS: Abarrotes, Lacteos, Bebidas, Limpieza, Cuidado personal, Snacks
+- Storefront: cards compactos, WhatsApp directo, oculta agotados
+
+**Moda** — Ropa, cosmeticos, accesorios, calzado
+- POS: Ropa mujer/hombre, Calzado, Accesorios, Cosmeticos
+- Storefront: cards visuales 4:5, carousel de fotos, carrito completo
+
+**Servicios** — Peluqueria, barberia, profesionales
+- POS: Cortes, Coloracion, Tratamientos, Unas, Maquillaje
+- Storefront: cards compactos 1 columna, WhatsApp directo, oculta agotados
+
+**Otro** — Electronica, alimentos, cualquier otro
+- POS: General, Otros
+- Storefront: cards visuales, carrito completo
+
+### Fuera de scope
+
+Farmacias, ferreterias, librerias, autopartes, distribuidoras — tienen miles de SKUs y necesitan features especializados (lotes, vencimientos, multi-almacen). Esos clientes necesitan Fina o Profit Plus.
 
 ---
 
@@ -83,19 +176,11 @@ El cuadro azul con "?" en el inventario tenia 4 capas de problemas:
 ### Modo 1: Venta con producto (POS)
 
 ```
-Tab "Vender" → Grilla de productos → Toca producto → Se agrega al ticket
-→ Selecciona metodo de pago (inline) → "Confirmar venta"
+Tab "Vender" → Grilla de productos (filtrada por categoria) → Toca producto
+→ Se agrega al ticket → Selecciona metodo de pago → "Confirmar venta"
 ```
 
-**3 taps.** El producto se busca por:
-- **Nombre**: escribes en el buscador y aparece
-- **Categoria**: tabs arriba filtran la grilla
-- **Codigo de barras**: el boton de camara abre el scanner, detecta el codigo, y agrega el producto automaticamente al ticket
-- **Barcode gun**: si tienes un lector USB, escribes en el campo de busqueda y al dar Enter se agrega automaticamente
-
-El ticket muestra los items con +/- para cantidad. Abajo aparecen los metodos de pago como pills (Efectivo, P. Movil, Binance, Zelle, Transfer.). Tocas uno, confirmas, listo.
-
-Para opciones avanzadas (fiado, recargos, IGTF, split payment) hay un link "Fiado, recargos, IGTF →" que lleva al checkout completo.
+**3 taps.** Las categorias (tabs arriba) cambian segun el tipo de negocio elegido en onboarding.
 
 ### Modo 2: Venta rapida (sin producto)
 
@@ -103,204 +188,44 @@ Para opciones avanzadas (fiado, recargos, IGTF, split payment) hay un link "Fiad
 Boton verde "$ Rapida" → Modal: monto + descripcion + metodo de pago → "Registrar"
 ```
 
-**3 taps.** No necesitas tener productos en inventario. Solo pones cuanto te pagaron y como. Util para servicios, ventas informales, o cuando no tienes el producto cargado.
-
 ### Modo 3: Tienda online (storefront)
 
 ```
-Cliente abre tu-negocio.novaincs.com → Catalogo con carousel → Agrega al carrito
-→ Checkout con datos + metodo de pago → Pedido llega a tu dashboard
+Cliente abre tu-negocio.novaincs.com → Catalogo adaptado al tipo de negocio
+→ Agrega al carrito (moda) o toca "Pedir" por WhatsApp (tienda)
+→ Pedido llega al dashboard del vendedor
 ```
 
-El dueno confirma el pedido desde `/orders` con un tap.
+---
 
-### Lo que NO esta automatizado
+## Posicionamiento vs competencia
 
-- No hay integracion con pasarelas de pago (Stripe, MercadoPago). Los pagos se registran manualmente.
-- No hay facturacion electronica (SENIAT/ISLR).
-- No hay conexion con WhatsApp Business API. Los mensajes son via `wa.me` links (el usuario abre WhatsApp manualmente).
+| Producto | Target | Precio | Nala compite? |
+|----------|--------|--------|---------------|
+| Cuaderno / Excel | Todos | $0 | Si — Nala es el upgrade |
+| WhatsApp Business | Todos | $0 | Si — Nala agrega POS + inventario |
+| Treinta | Pequeno-mediano | $40-80k COP/mes | Si — mismo target, Nala tiene storefront real |
+| Fina | Mediano-grande | $50-100/mes | No — Fina va a facturacion fiscal |
+| Profit Plus | Grande | $100-300/mes | No — ERP completo |
 
 ---
 
-## Treinta vs Nala: Analisis de enfoque
-
-### Que es Treinta realmente
-
-Treinta **no es un sistema de ventas**. Es un **registro de flujo de caja** con inventario opcional. Su core es:
-
-1. **Registrar que entro dinero** — tocas "+", pones monto, metodo de pago, listo
-2. **Registrar que salio dinero** — gastos, deudas
-3. **Ver cuanto gane hoy** — balance diario
-
-El inventario, el catalogo virtual, y el "POS" son features secundarios que se construyeron encima de ese core. La prueba: puedes usar Treinta sin crear un solo producto. Solo registras ventas por monto.
-
-### El catalogo virtual de Treinta
-
-Treinta tiene un "catalogo virtual" que es basicamente una pagina web con tus productos que puedes compartir por WhatsApp. Pero segun las reviews del App Store:
-
-> "La aplicacion tiene problemas para generar el catalogo virtual"
-> "Estamos trabajando en la reestructuracion del catalogo virtual"
-
-Es un feature que no funciona bien y que Treinta misma reconoce que esta en reconstruccion. No es su fortaleza.
-
-### Donde Treinta gana
-
-- **Simplicidad brutal**: registrar una venta es 2 taps
-- **No requiere setup**: no necesitas crear productos para empezar
-- **Mobile-first**: diseñada para el celular del bodeguero
-- **7 millones de usuarios**: efecto de red, confianza
-
-### Donde Nala ya gana sobre Treinta
-
-| Feature | Treinta | Nala |
-|---------|---------|------|
-| Multi-imagen por producto | 1 foto | 5 fotos con galeria |
-| Storefront PWA | Catalogo basico (roto segun reviews) | PWA completa con checkout, carousel, pedidos |
-| OCR de facturas | No | Si (GPT-4o-mini) |
-| Tasa BCV automatica | No | Si |
-| IGTF automatico | No | Si |
-| Semaforo de stock | Alertas basicas | Semaforo visual + prediccion de agotamiento |
-| Devolucion parcial | No | Si (API) |
-| Cierre de caja | No | Si |
-| Subdominio por tenant | No | Si (slug.novaincs.com) |
-| Codigo abierto | No | Si |
-
-### Donde Treinta gana sobre Nala
-
-| Feature | Treinta | Nala |
-|---------|---------|------|
-| Venta sin producto | Core del producto | Recien agregado (PR #275) |
-| Recargas telefonicas | Si | No |
-| Facturacion electronica | Si (Pro) | No |
-| App nativa (Play Store) | Si | PWA (no en store) |
-| Onboarding | 30 segundos | Requiere Clerk signup |
-| Multi-idioma | Si | Solo español |
-| Soporte en español | Si (chat) | No |
-
----
-
-## Que nos falta como producto
-
-### Critico: Lo que impide que alguien use Nala hoy
-
-1. **Onboarding demasiado largo** — Clerk signup + crear negocio + configurar. Treinta: descargas, pones nombre, listo. Nala necesita un onboarding de 60 segundos maximo.
-
-2. **No hay app en Play Store** — La PWA funciona pero la gente busca en la tienda. Sin presencia en Play Store, no existes para el 90% del mercado. Se puede empaquetar la PWA con TWA (Trusted Web Activity) o Capacitor.
-
-3. **El POS no se entiende sin explicacion** — Tu confusion lo demuestra. Un usuario nuevo no sabe que tiene que tocar un producto de la grilla para venderlo. Necesita un tutorial interactivo o un flujo mas obvio (boton grande "Registrar venta" en el centro).
-
-### Importante: Lo que nos diferenciaria
-
-4. **Compartir catalogo por WhatsApp** — Treinta lo tiene (roto). Nala tiene el storefront pero no tiene un boton "Compartir mi catalogo" que genere un link bonito para WhatsApp. Esto es trivial de implementar pero es el feature #1 que piden los usuarios de Treinta.
-
-5. **Notificaciones push de pedidos** — El sonido existe pero no hay push notifications. Cuando un cliente hace un pedido, el dueno deberia recibir una notificacion en el celular aunque la app este cerrada.
-
-6. **Recibo PDF bonito** — El endpoint existe pero no hay boton visible. Un recibo compartible por WhatsApp con el logo del negocio es diferenciador.
-
-### Nice to have: Lo que nos haria premium
-
-7. **WhatsApp Business API** — Recibir pedidos por chat, enviar confirmaciones automaticas, catalogo por WhatsApp. Requiere Meta Business verification. Es el holy grail para PyMEs latinas.
-
-8. **Facturacion electronica** — Requerido legalmente en Colombia, Mexico, y eventualmente Venezuela. Treinta lo tiene en Pro.
-
-9. **App nativa en Play Store** — TWA wrapper de la PWA. Cuesta 25 USD la cuenta de Google Play.
-
----
-
-## Que hace Nova por detras (y por que ya es mas complejo que Treinta)
-
-Nova parece simple por fuera pero por detras hace mucho mas que Treinta. Esto es lo que pasa automaticamente cuando registras una venta:
-
-### Al confirmar una venta (POST /api/sales)
-
-1. **Valida stock** — verifica que cada producto tiene suficiente inventario
-2. **Descuenta stock** — resta la cantidad vendida de cada producto
-3. **Registra movimiento de stock** — crea un registro en `stock_movements` con tipo "sale" para auditoria
-4. **Calcula costo** — suma el costo de los productos vendidos para calcular ganancia
-5. **Aplica tasa BCV** — convierte el total a bolivares automaticamente
-6. **Registra pagos** — soporta pagos divididos (parte efectivo, parte pago movil)
-7. **Si es fiado** — crea cuenta por cobrar automatica, actualiza balance del cliente, valida limite de credito
-8. **Genera asientos contables** — debito/credito automatico en el plan de cuentas
-9. **Registra actividad** — log de auditoria con quien hizo la venta y cuando
-10. **Todo en transaccion atomica** — si algo falla, nada se guarda (no queda data inconsistente)
-
-### Al anular una venta (POST /api/sales/:id/void)
-
-1. **Restaura stock** de cada producto
-2. **Revierte cuenta por cobrar** si era fiado
-3. **Revierte balance del cliente**
-4. **Revierte asientos contables**
-5. **Registra movimiento de stock** tipo "void"
-6. **Requiere razon** obligatoria
-
-### Al hacer devolucion parcial (POST /api/sales/:id/return)
-
-1. **Restaura stock** solo de los items devueltos
-2. **Calcula reembolso** proporcional
-3. **Registra movimiento** tipo "credit_note"
-
-### Reportes automaticos
-
-- **Ventas del dia** con ganancia, costo, margen
-- **Top productos** por cantidad y por ingreso
-- **Ventas por metodo de pago** (donut chart)
-- **Ventas por canal** (POS, WhatsApp, delivery, online)
-- **Prediccion de agotamiento** por producto (dias restantes basado en velocidad de venta)
-- **Semaforo de stock** (verde/amarillo/rojo/gris) calculado en tiempo real
-- **Export a Excel** de reportes e inventario
-
-### Lo que Treinta NO hace
-
-| Feature | Nova | Treinta |
-|---------|------|---------|
-| Transaccion atomica (rollback si falla) | Si | No |
-| Asientos contables automaticos | Si | No |
-| Prediccion de agotamiento | Si | No |
-| Devolucion parcial | Si | No |
-| Validacion de limite de credito | Si | No |
-| Movimientos de stock auditables | Si | No |
-| Tasa BCV automatica | Si | No |
-| IGTF automatico | Si | No |
-| OCR de facturas | Si | No |
-| Storefront PWA con checkout | Si | Catalogo basico (roto) |
-| Multi-imagen con carousel | Si | 1 foto |
-| Subdominio por tenant | Si | No |
-
-### Conclusion
-
-Nova ya es significativamente mas complejo que Treinta en el backend. Lo que falta no es complejidad — es **pulir la experiencia de usuario** para que toda esa complejidad sea invisible. El usuario deberia sentir que es tan simple como Treinta, pero con superpoderes por detras.
-
-Las cosas que mas impacto tendrian:
-1. **Mostrar errores en vez de pantallas vacias** (fix en este PR)
-2. **Tutorial de primer uso** en el POS
-3. **Boton compartir catalogo** por WhatsApp
-4. **App en Play Store** (TWA wrapper)
-
----
-
-## Orden de ejecucion recomendado
+## Orden de ejecucion recomendado (siguiente sesion)
 
 ```
-Inmediato (esta semana):
+Inmediato:
   - Boton "Compartir catalogo" por WhatsApp ......... 2 horas
-  - Boton "Compartir recibo" en historial ........... 2 horas
   - Tutorial interactivo en POS (primer uso) ........ 4 horas
   - UI de devolucion parcial ........................ 1 dia
 
 Siguiente semana:
   - Simplificar onboarding (menos pasos) ............ 1 dia
-  - Push notifications para pedidos ................. 1 dia
   - Consistencia visual en paginas secundarias ....... 3 horas
-  - Ocultar paginas sin uso (cotizaciones, etc) ...... 1 hora
-
-Semana 3-4:
-  - TWA wrapper para Play Store ..................... 2 dias
   - Personalizacion storefront (logo, colores) ...... 2 dias
-  - Multi-usuario (Clerk Organizations) ............. 3 dias
 
 Futuro:
+  - TWA wrapper para Play Store ..................... 2 dias
   - WhatsApp Business API ........................... 2 semanas
-  - Facturacion electronica ......................... 2 semanas
 ```
 
 ---

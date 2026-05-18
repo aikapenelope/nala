@@ -22,11 +22,22 @@ El vendedor nunca "llena un sistema". Vende, y el sistema se organiza solo. Cada
 
 ## Para quien es
 
-**Carlos (80%)** -- Bodega, panaderia, tienda de ropa, peluqueria, cafeteria, licoreria. 20-200 productos. Solo el o con 1-2 ayudantes. Android gama media. Hoy usa cuaderno o Excel.
+**Carlos (80%)** -- Bodega, tienda de barrio, mini-market, peluqueria. 20-200 productos. Solo el o con 1-2 ayudantes. Android gama media. Hoy usa cuaderno o Excel.
 
-**Maria (15%)** -- Mini-market, tienda de repuestos, distribuidora pequena. 200-500 productos. 2-5 personas. Necesita reportes, import Excel, OCR.
+**Maria (15%)** -- Tienda de ropa, cosmeticos, accesorios. 200-500 productos. 2-5 personas. Necesita fotos bonitas, carrito online, reportes.
 
-**Fuera de scope** -- Farmacias grandes, ferreterias con 5000+ SKUs, negocios que necesitan facturacion fiscal SENIAT. Esos necesitan Profit Plus, Valery, o Fina.
+**Fuera de scope** -- Farmacias, ferreterias, librerias (miles de SKUs). Negocios que necesitan facturacion fiscal SENIAT. Esos necesitan Profit Plus, Valery, o Fina.
+
+### Tipos de negocio
+
+Al crear tu cuenta, eliges uno de 4 tipos. Esto configura las categorias del POS y como se ve tu tienda online:
+
+| Tipo | Para quien | POS (categorias) | Tienda online |
+|------|-----------|-------------------|---------------|
+| **Tienda** | Bodega, mini-market | Abarrotes, Lacteos, Bebidas, Limpieza, Snacks | Compacto, pedido por WhatsApp |
+| **Moda** | Ropa, cosmeticos, accesorios | Ropa mujer/hombre, Calzado, Accesorios | Visual con fotos grandes, carrito |
+| **Servicios** | Peluqueria, barberia | Cortes, Coloracion, Tratamientos, Unas | Lista, reserva por WhatsApp |
+| **Otro** | Cualquier otro | General | Visual con carrito |
 
 ---
 
@@ -62,9 +73,10 @@ El vendedor nunca "llena un sistema". Vende, y el sistema se organiza solo. Cada
 ### Tienda online (storefront PWA)
 
 - Cada negocio tiene su URL: `tunegocio.novaincs.com`
+- **Adaptativo por tipo de negocio**: cards visuales (moda) o compactos (tienda), carrito o WhatsApp directo
 - Catalogo con precios en USD y Bs (tasa BCV en tiempo real)
-- Filtro por categorias
-- Carrito persistente (localStorage por tenant)
+- Filtro por categorias (sticky horizontal pills)
+- Carrito persistente (localStorage por tenant) o pedido directo por WhatsApp
 - Checkout con datos del cliente (nombre, telefono, nota)
 - Metodos de pago configurados por el vendedor con instrucciones (banco, telefono, CI)
 - Upload de comprobante de pago (imagen, MinIO)
@@ -72,21 +84,20 @@ El vendedor nunca "llena un sistema". Vende, y el sistema se organiza solo. Cada
 - Monto minimo de pedido
 - IGTF informativo (3%) cuando el metodo de pago es en divisas
 - Validacion de precios server-side (previene manipulacion de precios por el cliente)
-- Paginacion del catalogo (limit/offset, default 100, max 500)
+- Paginacion del catalogo con infinite scroll
 - PWA installable con manifest dinamico por tenant
-- Dark mode
 - SEO optimizado (Open Graph, Twitter Cards)
 - Auto-cancel de pedidos pendientes despues de 24 horas
 
 ### Pedidos online
 
 - Lista de pedidos con tabs por estado: pendiente, confirmado, entregado, cancelado
-- Polling cada 30 segundos para nuevos pedidos
-- Sonido de notificacion configurable (mute/unmute)
+- **Push notifications** nativas cuando llega un pedido nuevo
+- Polling cada 30 segundos + sonido de notificacion configurable
 - Badge de pedidos pendientes en la navegacion
-- Confirmar pedido (decrementa stock atomicamente)
+- Confirmar pedido (decrementa stock atomicamente, crea venta, registra movimientos)
 - Entregar pedido
-- Cancelar pedido con razon
+- Cancelar pedido con razon (restaura stock si estaba confirmado)
 - Link WhatsApp pre-armado para contactar al cliente
 
 ### Clientes y fiado
@@ -255,8 +266,10 @@ npm run dev
 
 | Doc | Contenido |
 |-----|-----------|
-| [44 - Roadmap](docs/44-nala-pyme-roadmap-tentativo.md) | Roadmap de producto, fases completadas y pendientes |
+| [48 - Roadmap](docs/48-roadmap-analisis-producto.md) | Roadmap de producto, changelog, estado del sistema |
+| [49 - Storefront por tipo](docs/49-storefront-por-tipo-de-negocio.md) | Como el storefront se adapta por tipo de negocio |
 | [43 - Buyer persona](docs/43-product-focus-buyer-persona.md) | Cliente target, posicionamiento, limites |
+| [41 - Personalizacion](docs/41-storefront-personalization-roadmap.md) | Roadmap de branding (colores, logo, temas) |
 
 ## Licencia
 
