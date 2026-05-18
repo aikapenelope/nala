@@ -382,6 +382,12 @@ ordersRoutes.patch("/orders/:id/confirm", validateUuidParam, async (c) => {
         referenceType: "sale",
         referenceId: sale.id,
       });
+    } else {
+      console.warn(
+        `[orders] Accounting entry skipped for order ${id.slice(0, 8)}: ` +
+          `missing accounts (4101: ${!!revenueAccounts[0]}, 1101: ${!!cashAccounts[0]}). ` +
+          `Run onboarding to create default accounts.`,
+      );
     }
   });
 
