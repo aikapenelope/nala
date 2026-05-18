@@ -30,8 +30,8 @@ definePageMeta({ layout: false });
 </script>
 
 <template>
-  <div class="min-h-screen bg-[#eda58d] font-sans text-[#161616]">
-    <main class="mx-auto w-full bg-white lg:w-[80vw] lg:max-w-[1280px]">
+  <div class="min-h-screen bg-white font-sans text-[#161616]">
+    <main class="w-full">
 
       <!-- ============================================================ -->
       <!-- HERO -->
@@ -222,7 +222,7 @@ definePageMeta({ layout: false });
     <!-- ============================================================ -->
     <!-- FEATURES GRID -->
     <!-- ============================================================ -->
-    <section class="mx-auto w-full bg-white px-5 py-20 lg:w-[80vw] lg:max-w-[1280px] lg:px-20 lg:py-24">
+    <section class="w-full bg-white px-5 py-20 lg:px-20 lg:py-24">
       <div class="mx-auto max-w-[880px] text-center">
         <div class="mx-auto mb-4 inline-flex rounded-full border border-[#f0c7bd] px-3 py-1 text-[11px] font-semibold text-[#d68172]">Lo esencial para vender mejor</div>
         <h2 class="text-[44px] font-semibold leading-[.92] tracking-[-0.065em] text-[#ff321f] md:text-[68px]">Todo lo que antes estaba regado, ahora se organiza solo.</h2>
@@ -256,7 +256,7 @@ definePageMeta({ layout: false });
     <!-- ============================================================ -->
     <!-- TESTIMONIALS -->
     <!-- ============================================================ -->
-    <section class="mx-auto w-full bg-[#fff8f5] px-5 py-20 lg:w-[80vw] lg:max-w-[1280px] lg:px-20 lg:py-24">
+    <section class="w-full bg-[#fff8f5] px-5 py-20 lg:px-20 lg:py-24">
       <div class="grid items-end gap-8 md:grid-cols-[1fr_1.25fr]">
         <div>
           <div class="mb-4 inline-flex rounded-full border border-[#f0c7bd] px-3 py-1 text-[11px] font-semibold text-[#d68172]">Historias reales</div>
@@ -305,7 +305,7 @@ definePageMeta({ layout: false });
     <!-- ============================================================ -->
     <!-- PRICING -->
     <!-- ============================================================ -->
-    <section class="mx-auto w-full bg-white px-5 py-20 lg:w-[80vw] lg:max-w-[1280px] lg:px-20 lg:py-24">
+    <section class="w-full bg-white px-5 py-20 lg:px-20 lg:py-24">
       <div class="mx-auto max-w-[780px] text-center">
         <div class="mx-auto mb-4 inline-flex rounded-full border border-[#f0c7bd] px-3 py-1 text-[11px] font-semibold text-[#d68172]">Planes simples</div>
         <h2 class="text-[44px] font-semibold leading-[.92] tracking-[-0.065em] text-[#ff321f] md:text-[64px]">Empieza gratis. Crece cuando tu negocio lo pida.</h2>
@@ -353,7 +353,7 @@ definePageMeta({ layout: false });
     <!-- ============================================================ -->
     <!-- COMPARISON TABLE -->
     <!-- ============================================================ -->
-    <section class="mx-auto w-full bg-[#fff8f5] px-5 py-20 lg:w-[80vw] lg:max-w-[1280px] lg:px-20 lg:py-24">
+    <section class="w-full bg-[#fff8f5] px-5 py-20 lg:px-20 lg:py-24">
       <div class="mx-auto max-w-[780px] text-center">
         <div class="mx-auto mb-4 inline-flex rounded-full border border-[#f0c7bd] px-3 py-1 text-[11px] font-semibold text-[#d68172]">Comparacion</div>
         <h2 class="text-[44px] font-semibold leading-[.92] tracking-[-0.065em] text-[#ff321f] md:text-[64px]">Ni cuaderno, ni Excel, ni ERP complicado.</h2>
@@ -390,7 +390,7 @@ definePageMeta({ layout: false });
     <!-- ============================================================ -->
     <!-- FINAL CTA -->
     <!-- ============================================================ -->
-    <section class="mx-auto w-full px-5 pb-16 lg:w-[80vw] lg:max-w-[1280px] lg:px-0">
+    <section class="w-full px-5 pb-16 lg:px-0">
       <div class="hero-gradient soft-noise relative overflow-hidden rounded-none px-6 py-20 text-center text-white lg:px-20 lg:py-28">
         <div class="relative z-10 mx-auto max-w-[760px]">
           <div class="mx-auto mb-5 inline-flex rounded-full border border-white/45 bg-white/10 px-4 py-2 text-[11px] font-semibold text-white">Sin riesgo · Sin configuracion complicada</div>
