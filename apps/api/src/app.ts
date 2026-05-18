@@ -17,6 +17,7 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { secureHeaders } from "hono/secure-headers";
+import { Sentry } from "./instrument";
 import { bodyLimit } from "hono/body-limit";
 import { timeout } from "hono/timeout";
 import { structuredLogger } from "./middleware/structured-logger";
@@ -52,6 +53,11 @@ app.onError((err, c) => {
   const requestId = (c.var as Record<string, unknown>).requestId as string ?? "unknown";
   const message = err instanceof Error ? err.message : "Unknown error";
   const stack = err instanceof Error ? err.stack : undefined;
+
+  // Send to Bugsink (non-blocking)
+  Sentry.captureException(err, {
+    tags: { requestId, method, path },
+  });
 
   // Structured error log with requestId for correlation
   const errorEntry = {

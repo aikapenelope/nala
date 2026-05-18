@@ -17,6 +17,7 @@
  * 4. Exit cleanly
  */
 
+import "./instrument"; // Must be first — initializes Sentry/Bugsink before other imports
 import { serve } from "@hono/node-server";
 import { config } from "./config"; // Validates env vars on import
 import { app } from "./app";
