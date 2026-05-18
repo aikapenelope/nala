@@ -47,6 +47,10 @@ import {
   deleteProductImage,
   isStorageConfigured,
 } from "../services/storage";
+import {
+  enhanceProductImage,
+  isEnhanceConfigured,
+} from "../services/image-enhance";
 import { processProductImage } from "../services/image-processing";
 import type { AppEnv } from "../types";
 
@@ -1134,6 +1138,120 @@ inventory.patch(
     }
 
     return c.json({ success: true });
+  },
+);
+
+// ============================================================
+// Image Enhancement (background removal + white background)
+// ============================================================
+
+/**
+ * POST /products/:productId/images/:imageId/enhance
+ *
+ * Premium feature: removes the image background using AI (fal.ai BiRefNet)
+ * and replaces it with a clean white background for professional catalog look.
+ *
+ * The enhanced image replaces the original in MinIO storage.
+ * Requires FAL_KEY environment variable to be configured.
+ */
+inventory.post(
+  "/products/:productId/images/:imageId/enhance",
+  async (c) => {
+    const productId = c.req.param("productId");
+    const imageId = c.req.param("imageId");
+    const db = c.get("db");
+    const businessId = c.get("businessId");
+
+    // Validate UUIDs
+    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!UUID_RE.test(productId) || !UUID_RE.test(imageId)) {
+      return c.json({ error: "ID invalido" }, 400);
+    }
+
+    if (!isEnhanceConfigured) {
+      return c.json({ error: "Servicio de mejora de imagenes no configurado" }, 503);
+    }
+
+    if (!isStorageConfigured) {
+      return c.json({ error: "Almacenamiento no configurado" }, 503);
+    }
+
+    // Verify the image belongs to this business
+    const [image] = await db
+      .select({ storageKey: productImages.storageKey })
+      .from(productImages)
+      .where(
+        and(
+          eq(productImages.id, imageId),
+          eq(productImages.productId, productId),
+          eq(productImages.businessId, businessId),
+        ),
+      )
+      .limit(1);
+
+    if (!image) {
+      return c.json({ error: "Imagen no encontrada" }, 404);
+    }
+
+    // Construct the public URL for fal.ai to fetch the image.
+    // Uses API_PUBLIC_URL env var (e.g., https://nova-api.aikalabs.cc).
+    const apiPublicUrl = process.env.API_PUBLIC_URL ?? process.env.NUXT_PUBLIC_API_BASE ?? "";
+    if (!apiPublicUrl) {
+      return c.json({ error: "API_PUBLIC_URL no configurado" }, 503);
+    }
+
+    const publicImageUrl = `${apiPublicUrl}/images/products/${productId}/${imageId}`;
+
+    // Fetch the current image from MinIO to pass as buffer
+    const { getProductImageStream } = await import("../services/storage");
+    const stream = await getProductImageStream(image.storageKey);
+    if (!stream) {
+      return c.json({ error: "No se pudo leer la imagen original" }, 500);
+    }
+
+    // Read the stream into a buffer
+    const reader = stream.body.getReader();
+    const chunks: Uint8Array[] = [];
+    let done = false;
+    while (!done) {
+      const { value, done: readerDone } = await reader.read();
+      if (value) chunks.push(value);
+      done = readerDone;
+    }
+    const imageBuffer = Buffer.concat(chunks);
+
+    // Enhance the image (background removal + white background)
+    const enhanced = await enhanceProductImage(imageBuffer, publicImageUrl);
+    if (!enhanced) {
+      return c.json({ error: "No se pudo mejorar la imagen. Intenta de nuevo." }, 500);
+    }
+
+    // Upload the enhanced image, replacing the original
+    try {
+      const { uploadProductImage: upload } = await import("../services/storage");
+      await upload(
+        businessId,
+        productId,
+        imageId,
+        enhanced.buffer,
+        enhanced.contentType,
+      );
+
+      return c.json({
+        success: true,
+        image: {
+          id: imageId,
+          width: enhanced.width,
+          height: enhanced.height,
+          url: `/images/products/${productId}/${imageId}`,
+        },
+        message: "Imagen mejorada exitosamente",
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Error guardando imagen";
+      console.error(`[image-enhance] Upload failed: ${message}`);
+      return c.json({ error: "Error guardando la imagen mejorada" }, 500);
+    }
   },
 );
 
