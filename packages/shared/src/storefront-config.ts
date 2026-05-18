@@ -1,21 +1,18 @@
 /**
  * Storefront configuration per business type.
  *
- * Defines how the public storefront adapts its UI based on the
- * business vertical (bodega, ropa, ferreteria, etc.).
+ * Simplified to 3 profiles that cover all business verticals:
+ * - "visual" (moda): large images, carousel, cart checkout
+ * - "compact" (tienda, servicios, otro): dense info, WhatsApp or cart
  *
- * The catalog page reads business.type from the API and uses
- * these defaults to decide: card layout, CTA text, checkout mode,
- * which product fields to show, and sort order.
- *
- * Business owners can override these defaults from /store settings
- * (future: storefront_config column in store_settings).
+ * Legacy types (bodega, ropa, peluqueria, etc.) are mapped to the
+ * appropriate profile so existing businesses keep working.
  */
 
 import type { BusinessType } from "./types";
 
 /** Product card layout variant. */
-export type CardLayout = "visual" | "compact" | "list";
+export type CardLayout = "visual" | "compact";
 
 /** Checkout flow mode. */
 export type CheckoutMode = "cart" | "whatsapp";
@@ -41,11 +38,53 @@ export interface StorefrontConfig {
   /** Grid columns on mobile (1 or 2). */
   gridCols: 1 | 2;
   /** Product image aspect ratio CSS class. */
-  imageAspect: "aspect-[4/5]" | "aspect-square" | "aspect-video";
+  imageAspect: "aspect-[4/5]" | "aspect-square";
 }
 
-/** Default config used as base for all business types. */
-const BASE_CONFIG: StorefrontConfig = {
+/** Config profile for "tienda" (bodega, mini-market, tienda de barrio). */
+const TIENDA_CONFIG: StorefrontConfig = {
+  cardLayout: "compact",
+  showCarousel: false,
+  showSku: false,
+  showBrand: false,
+  showDescription: false,
+  ctaText: "Pedir",
+  checkoutMode: "whatsapp",
+  showOutOfStock: false,
+  gridCols: 2,
+  imageAspect: "aspect-square",
+};
+
+/** Config profile for "moda" (ropa, cosmeticos, accesorios). */
+const MODA_CONFIG: StorefrontConfig = {
+  cardLayout: "visual",
+  showCarousel: true,
+  showSku: false,
+  showBrand: true,
+  showDescription: true,
+  ctaText: "Agregar",
+  checkoutMode: "cart",
+  showOutOfStock: true,
+  gridCols: 2,
+  imageAspect: "aspect-[4/5]",
+};
+
+/** Config profile for "servicios" (peluqueria, barberia, profesionales). */
+const SERVICIOS_CONFIG: StorefrontConfig = {
+  cardLayout: "compact",
+  showCarousel: false,
+  showSku: false,
+  showBrand: false,
+  showDescription: true,
+  ctaText: "Reservar",
+  checkoutMode: "whatsapp",
+  showOutOfStock: false,
+  gridCols: 1,
+  imageAspect: "aspect-square",
+};
+
+/** Config profile for "otro" (default, everything else). */
+const OTRO_CONFIG: StorefrontConfig = {
   cardLayout: "visual",
   showCarousel: true,
   showSku: false,
@@ -59,110 +98,38 @@ const BASE_CONFIG: StorefrontConfig = {
 };
 
 /**
- * Storefront config overrides per business type.
+ * Map every business type (new + legacy) to a config profile.
  *
- * Only the fields that differ from BASE_CONFIG are specified.
- * The composable merges these with the base to produce the final config.
+ * Legacy types are mapped to the closest new profile so existing
+ * businesses get a reasonable storefront without any migration.
  */
-const OVERRIDES: Partial<Record<BusinessType, Partial<StorefrontConfig>>> = {
-  bodega: {
-    cardLayout: "compact",
-    showCarousel: false,
-    ctaText: "Pedir",
-    checkoutMode: "whatsapp",
-    showOutOfStock: false,
-    imageAspect: "aspect-square",
-  },
-  ropa: {
-    cardLayout: "visual",
-    showCarousel: true,
-    showDescription: true,
-    ctaText: "Agregar",
-    checkoutMode: "cart",
-    imageAspect: "aspect-[4/5]",
-  },
-  ferreteria: {
-    cardLayout: "compact",
-    showSku: true,
-    showBrand: true,
-    ctaText: "Consultar",
-    checkoutMode: "whatsapp",
-    imageAspect: "aspect-square",
-  },
-  autopartes: {
-    cardLayout: "compact",
-    showSku: true,
-    showBrand: true,
-    ctaText: "Consultar",
-    checkoutMode: "whatsapp",
-    imageAspect: "aspect-square",
-  },
-  peluqueria: {
-    cardLayout: "list",
-    showCarousel: false,
-    showDescription: true,
-    ctaText: "Reservar",
-    checkoutMode: "whatsapp",
-    showOutOfStock: false,
-    gridCols: 1,
-    imageAspect: "aspect-square",
-  },
-  farmacia: {
-    cardLayout: "compact",
-    showCarousel: false,
-    showBrand: true,
-    ctaText: "Pedir",
-    checkoutMode: "whatsapp",
-    showOutOfStock: false,
-    imageAspect: "aspect-square",
-  },
-  electronica: {
-    cardLayout: "visual",
-    showCarousel: true,
-    showBrand: true,
-    ctaText: "Agregar",
-    checkoutMode: "cart",
-    imageAspect: "aspect-[4/5]",
-  },
-  libreria: {
-    cardLayout: "compact",
-    showCarousel: false,
-    ctaText: "Agregar",
-    checkoutMode: "cart",
-    imageAspect: "aspect-square",
-  },
-  cosmeticos: {
-    cardLayout: "visual",
-    showCarousel: true,
-    showBrand: true,
-    showDescription: true,
-    ctaText: "Agregar",
-    checkoutMode: "cart",
-    imageAspect: "aspect-[4/5]",
-  },
-  distribuidora: {
-    cardLayout: "list",
-    showCarousel: false,
-    showSku: true,
-    ctaText: "Cotizar",
-    checkoutMode: "whatsapp",
-    gridCols: 1,
-    imageAspect: "aspect-square",
-  },
-  otro: {
-    // Uses BASE_CONFIG as-is
-  },
+const TYPE_TO_CONFIG: Record<string, StorefrontConfig> = {
+  // Primary types
+  tienda: TIENDA_CONFIG,
+  moda: MODA_CONFIG,
+  servicios: SERVICIOS_CONFIG,
+  otro: OTRO_CONFIG,
+
+  // Legacy -> mapped to closest profile
+  bodega: TIENDA_CONFIG,
+  farmacia: TIENDA_CONFIG,
+  distribuidora: TIENDA_CONFIG,
+  ferreteria: TIENDA_CONFIG,
+  libreria: TIENDA_CONFIG,
+  autopartes: TIENDA_CONFIG,
+  ropa: MODA_CONFIG,
+  cosmeticos: MODA_CONFIG,
+  peluqueria: SERVICIOS_CONFIG,
+  electronica: OTRO_CONFIG,
 };
 
 /**
  * Get the storefront configuration for a business type.
  *
- * Merges the base config with type-specific overrides.
- * Returns the full BASE_CONFIG if the type is unknown.
+ * Returns the mapped config profile, or OTRO_CONFIG if unknown.
  */
 export function getStorefrontConfig(
   businessType: string | null | undefined,
 ): StorefrontConfig {
-  const overrides = OVERRIDES[(businessType ?? "otro") as BusinessType] ?? {};
-  return { ...BASE_CONFIG, ...overrides };
+  return TYPE_TO_CONFIG[businessType ?? "otro"] ?? OTRO_CONFIG;
 }

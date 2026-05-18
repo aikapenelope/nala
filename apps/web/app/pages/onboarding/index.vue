@@ -54,23 +54,17 @@ const error = ref("");
 const config = useRuntimeConfig();
 const tenantDomain = config.public.tenantDomain as string;
 
-/** Business type options with visual labels. */
+/** Business type options — simplified to 4 core types. */
 const businessTypes: Array<{
   value: BusinessType;
   label: string;
+  description: string;
   icon: string;
 }> = [
-  { value: "ferreteria", label: "Ferreteria", icon: "wrench" },
-  { value: "bodega", label: "Bodega", icon: "store" },
-  { value: "ropa", label: "Tienda de ropa", icon: "shirt" },
-  { value: "autopartes", label: "Autopartes", icon: "car" },
-  { value: "peluqueria", label: "Peluqueria", icon: "scissors" },
-  { value: "farmacia", label: "Farmacia", icon: "pill" },
-  { value: "electronica", label: "Electronica", icon: "monitor" },
-  { value: "libreria", label: "Libreria", icon: "book" },
-  { value: "cosmeticos", label: "Cosmeticos", icon: "sparkles" },
-  { value: "distribuidora", label: "Distribuidora", icon: "truck" },
-  { value: "otro", label: "Otro", icon: "building" },
+  { value: "tienda", label: "Tienda", description: "Bodega, mini-market, tienda de barrio", icon: "store" },
+  { value: "moda", label: "Moda", description: "Ropa, cosmeticos, accesorios, calzado", icon: "shirt" },
+  { value: "servicios", label: "Servicios", description: "Peluqueria, barberia, profesionales", icon: "scissors" },
+  { value: "otro", label: "Otro", description: "Electronica, alimentos, cualquier otro", icon: "building" },
 ];
 
 function selectType(type: BusinessType) {
@@ -195,22 +189,21 @@ function goToDashboard() {
         <h1 class="text-2xl font-bold text-gray-900">Bienvenido a Nova</h1>
         <p class="mt-2 text-gray-500">Que tipo de negocio tienes?</p>
 
-        <div class="mt-8 grid grid-cols-3 gap-3">
+        <div class="mt-8 grid grid-cols-2 gap-3">
           <button
             v-for="bt in businessTypes"
             :key="bt.value"
-            class="flex flex-col items-center gap-2 rounded-xl border-2 p-4 transition-colors"
+            class="flex flex-col items-center gap-2 rounded-2xl border-2 p-5 transition-all"
             :class="
               businessType === bt.value
-                ? 'border-nova-primary bg-blue-50'
+                ? 'border-nova-primary bg-blue-50 shadow-md'
                 : 'border-gray-200 bg-white hover:border-gray-300'
             "
             @click="selectType(bt.value)"
           >
-            <span class="text-2xl">{{ bt.icon }}</span>
-            <span class="text-xs font-medium text-gray-700">{{
-              bt.label
-            }}</span>
+            <span class="text-3xl">{{ bt.icon }}</span>
+            <span class="text-sm font-bold text-gray-800">{{ bt.label }}</span>
+            <span class="text-[11px] font-medium text-gray-400 text-center leading-tight">{{ bt.description }}</span>
           </button>
         </div>
       </div>

@@ -102,8 +102,7 @@ const filteredProducts = computed(() => {
 
 /** Grid CSS classes based on config. */
 const gridClasses = computed(() => {
-  if (sfConfig.value.cardLayout === "list") return "flex flex-col gap-3";
-  if (sfConfig.value.gridCols === 1) return "flex flex-col gap-5";
+  if (sfConfig.value.gridCols === 1) return "flex flex-col gap-3";
   return "grid grid-cols-2 gap-x-4 gap-y-7";
 });
 
@@ -356,7 +355,7 @@ onMounted(() => {
           <!-- ============================================================ -->
           <div v-else :class="gridClasses">
             <template v-for="product in filteredProducts" :key="product.id">
-              <!-- Visual card (ropa, cosmeticos, electronica) -->
+              <!-- Visual card (moda, otro) -->
               <StorefrontProductCardVisual
                 v-if="sfConfig.cardLayout === 'visual'"
                 :product="product"
@@ -367,19 +366,8 @@ onMounted(() => {
                 @add-to-cart="handleProductAction"
               />
 
-              <!-- Compact card (bodega, farmacia, ferreteria) -->
+              <!-- Compact card (tienda, servicios) -->
               <StorefrontProductCardCompact
-                v-else-if="sfConfig.cardLayout === 'compact'"
-                :product="product"
-                :config="sfConfig"
-                :exchange-rate="exchangeRate"
-                :is-added="addedProductId === product.id"
-                :resolve-image-url="resolveImageUrl"
-                @add-to-cart="handleProductAction"
-              />
-
-              <!-- List card (peluqueria, distribuidora) -->
-              <StorefrontProductCardList
                 v-else
                 :product="product"
                 :config="sfConfig"
