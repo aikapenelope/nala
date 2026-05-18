@@ -226,15 +226,15 @@ onMounted(() => {
         <!-- CATEGORY CHIPS (sticky) -->
         <div
           v-if="categories.length > 0"
-          class="sticky top-0 z-20 border-b border-gray-100 bg-white py-3 pl-5 shadow-[0_4px_20px_-10px_rgba(0,0,0,0.05)]"
+          class="sticky top-0 z-20 border-b border-gray-100 bg-white py-3 pl-5 shadow-[0_4px_20px_-10px_rgba(0,0,0,0.05)] dark:border-gray-800 dark:bg-gray-950"
         >
           <div class="no-scrollbar flex gap-2.5 overflow-x-auto pr-5 pb-1">
             <button
               class="flex shrink-0 items-center gap-2 rounded-full px-5 py-2.5 text-[13px] font-semibold tracking-wide transition-colors"
               :class="
                 selectedCategory === null
-                  ? 'bg-gray-900 text-white'
-                  : 'border border-gray-100 bg-gray-50 text-gray-600 hover:bg-gray-100'
+                  ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900'
+                  : 'border border-gray-100 bg-gray-50 text-gray-600 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300'
               "
               @click="selectedCategory = null"
             >
@@ -247,8 +247,8 @@ onMounted(() => {
               class="flex shrink-0 items-center gap-2 rounded-full px-5 py-2.5 text-[13px] font-medium transition-colors"
               :class="
                 selectedCategory === cat.name
-                  ? 'bg-gray-900 text-white'
-                  : 'border border-gray-100 bg-gray-50 text-gray-600 hover:bg-gray-100'
+                  ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900'
+                  : 'border border-gray-100 bg-gray-50 text-gray-600 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300'
               "
               @click="selectedCategory = cat.name"
             >
