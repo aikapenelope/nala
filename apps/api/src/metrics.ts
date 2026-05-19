@@ -64,36 +64,12 @@ export const httpRequestDuration = new Histogram({
   registers: [metricsRegistry],
 });
 
-/**
- * Application errors counter (includes "silent" errors).
- *
- * Captures errors that are HANDLED (not 500) but still indicate problems:
- * - validation: bad input from client (400)
- * - auth: authentication/authorization failures (401/403)
- * - not_found: resource doesn't exist (404)
- * - conflict: stock insufficient, duplicate, etc. (409)
- * - db: database errors caught and returned as 4xx/5xx
- * - timeout: external service timeout (503)
- * - unknown: unclassified errors
- *
- * This metric reveals problems that logs alone might miss because
- * they're "expected" errors that don't trigger alerts by default.
- * A spike in "conflict" errors might mean a product is overselling.
- * A spike in "timeout" errors means an external service is degraded.
- */
-export const appErrorsTotal = new Counter({
-  name: "app_errors_total",
-  help: "Application errors by type (includes handled/silent errors)",
-  labelNames: ["method", "path", "error_type"] as const,
-  registers: [metricsRegistry],
-});
-
 // ---------------------------------------------------------------------------
 // Middleware: measures every request
 // ---------------------------------------------------------------------------
 
 /**
- * Metrics middleware — records request count, duration, and error classification.
+ * Metrics middleware — records request count and duration.
  *
  * Place AFTER the logger middleware and BEFORE route definitions.
  * Uses `c.req.routePath` when available (matched route pattern like "/api/sales/:id")
@@ -109,25 +85,10 @@ export async function metricsMiddleware(c: Context, next: Next) {
   // to prevent label explosion from dynamic segments (UUIDs, etc.)
   const path = c.req.routePath || c.req.path;
   const method = c.req.method;
-  const status = c.res.status;
+  const status = String(c.res.status);
 
-  httpRequestsTotal.inc({ method, path, status: String(status) });
+  httpRequestsTotal.inc({ method, path, status });
   httpRequestDuration.observe({ method, path }, duration);
-
-  // Classify and count application errors (including "silent" ones)
-  if (status >= 400) {
-    let errorType: string;
-    if (status === 400) errorType = "validation";
-    else if (status === 401 || status === 403) errorType = "auth";
-    else if (status === 404) errorType = "not_found";
-    else if (status === 409) errorType = "conflict";
-    else if (status === 429) errorType = "rate_limit";
-    else if (status === 503) errorType = "timeout";
-    else if (status >= 500) errorType = "server";
-    else errorType = "client";
-
-    appErrorsTotal.inc({ method, path, error_type: errorType });
-  }
 }
 
 // ---------------------------------------------------------------------------
