@@ -172,7 +172,10 @@ const greeting = computed(() => {
   return "Buenas noches";
 });
 
-/** Load all dashboard data in parallel. */
+/**
+ * Load all dashboard data via the consolidated endpoint.
+ * Single API call replaces 12 parallel calls — server handles parallelism.
+ */
 let loadInProgress = false;
 async function loadDashboard() {
   if (loadInProgress) return;
@@ -181,168 +184,121 @@ async function loadDashboard() {
   loadError.value = "";
 
   try {
-    const [
-      dailyResult,
-      weeklyResult,
-      financialResult,
-      receivableResult,
-      inventoryResult,
-      alertsResult,
-      rateResult,
-      cashFlowResult,
-      ordersResult,
-      recentSalesResult,
-      storeSettingsResult,
-      storeStatsResult,
-    ] = await Promise.allSettled([
-      $api<{
-        data: {
-          totalSales: number;
-          totalCount: number;
-          avgTicket: number;
-          totalProfit: number;
-          vsSameDayLastWeek: number;
-          topProducts: Array<{ name: string; quantity: number }>;
-          salesByMethod: Record<string, number>;
-        };
-      }>("/api/reports/daily"),
+    const data = await $api<{
+      today: {
+        totalSales: number;
+        totalCount: number;
+        avgTicket: number;
+        totalProfit: number;
+        vsSameDayLastWeek: number;
+        topProducts: Array<{ name: string; quantity: number }>;
+        salesByMethod: Record<string, number>;
+      } | null;
+      weekly: { dailyBreakdown: Array<{ day: string; amount: number }> } | null;
+      financial: { grossMargin: number } | null;
+      receivable: { totalPending: number; accounts: DueReceivable[] } | null;
+      inventory: { lowStock: number; criticalStock: number } | null;
+      alerts: SmartAlert[];
+      cashFlow: { projection7d: { net: number } } | null;
+      exchangeRate: { rateBcv: number; rateEur: number | null } | null;
+      orders: { pending: PendingOrder[]; pendingCount: number } | null;
+      recentSales: Array<{ id: string; totalUsd: string; channel: string; createdAt: string }>;
+      store: { enabled: boolean; ordersThisWeek: number; revenueThisWeek: number } | null;
+    }>("/api/dashboard");
 
-      $api<{
-        data: { dailyBreakdown: Array<{ day: string; amount: number }> };
-      }>("/api/reports/weekly?period=week"),
-
-      $api<{
-        data: { grossMargin: number };
-      }>("/api/reports/financial?period=month"),
-
-      $api<{ accounts: DueReceivable[]; totalPending: number }>("/api/accounts/receivable"),
-
-      $api<{ data: { lowStock: number; criticalStock: number } }>(
-        "/api/reports/inventory",
-      ),
-
-      $api<{ alerts: SmartAlert[] }>("/api/reports/alerts"),
-
-      $api<{ rateBcv: number; rateEur: number | null }>("/api/exchange-rate"),
-
-      $api<{ data: { projection7d: { net: number } } }>(
-        "/api/reports/cash-flow",
-      ),
-
-      $api<{ orders: PendingOrder[]; pendingCount: number }>("/api/orders?status=pending&limit=5"),
-
-      $api<{ sales: Array<{ id: string; totalUsd: string; channel: string; createdAt: string }> }>(
-        "/api/sales?limit=5",
-      ),
-
-      $api<{ settings: { storeEnabled: boolean } }>("/api/store-settings"),
-
-      $api<{ stats: { ordersThisWeek: number; revenueThisWeek: number; pendingOrders: number } }>("/api/store-stats"),
-    ]);
-
-    if (dailyResult.status === "fulfilled") {
-      const d = dailyResult.value.data;
-      todaySales.value = d.totalSales;
-      todayCount.value = d.totalCount;
-      todayAvgTicket.value = d.avgTicket;
-      todayProfit.value = d.totalProfit;
-      trendPercent.value = Math.abs(d.vsSameDayLastWeek);
-      trendPositive.value = d.vsSameDayLastWeek >= 0;
-      topProduct.value = d.topProducts?.[0] ?? null;
-      topProducts.value = d.topProducts?.slice(0, 3) ?? [];
-      salesByMethod.value = d.salesByMethod ?? {};
+    // Daily sales
+    if (data.today) {
+      todaySales.value = data.today.totalSales;
+      todayCount.value = data.today.totalCount;
+      todayAvgTicket.value = data.today.avgTicket;
+      todayProfit.value = data.today.totalProfit;
+      trendPercent.value = Math.abs(data.today.vsSameDayLastWeek);
+      trendPositive.value = data.today.vsSameDayLastWeek >= 0;
+      topProduct.value = data.today.topProducts?.[0] ?? null;
+      topProducts.value = data.today.topProducts?.slice(0, 3) ?? [];
+      salesByMethod.value = data.today.salesByMethod ?? {};
     }
 
-    if (weeklyResult.status === "fulfilled") {
-      weeklyDays.value = weeklyResult.value.data.dailyBreakdown;
+    // Weekly chart
+    if (data.weekly) {
+      weeklyDays.value = data.weekly.dailyBreakdown;
     }
 
-    if (financialResult.status === "fulfilled") {
-      grossMargin.value = financialResult.value.data.grossMargin;
+    // Financial
+    if (data.financial) {
+      grossMargin.value = data.financial.grossMargin;
     }
 
-    if (receivableResult.status === "fulfilled") {
-      receivableTotal.value = receivableResult.value.totalPending;
+    // Receivables
+    if (data.receivable) {
+      receivableTotal.value = data.receivable.totalPending;
 
-      // Show receivables that need attention:
-      // 1. Past due date (overdue)
-      // 2. No due date but older than 15 days (needs reminder)
-      // Sorted by age (oldest first) — these are the most urgent to collect.
       const today = new Date();
       const fifteenDaysAgo = new Date(today);
       fifteenDaysAgo.setDate(fifteenDaysAgo.getDate() - 15);
       today.setHours(23, 59, 59, 999);
 
-      dueToday.value = (receivableResult.value.accounts ?? [])
+      dueToday.value = (data.receivable.accounts ?? [])
         .filter((a) => {
           if (a.dueDate && new Date(a.dueDate) <= today) return true;
-          // No due date but created >15 days ago — needs a reminder
           if (!a.dueDate && a.createdAt && new Date(a.createdAt) <= fifteenDaysAgo) return true;
           return false;
         })
         .slice(0, 5);
     }
 
-    if (inventoryResult.status === "fulfilled") {
-      const inv = inventoryResult.value.data;
-      lowStockCount.value = (inv.lowStock ?? 0) + (inv.criticalStock ?? 0);
+    // Inventory
+    if (data.inventory) {
+      lowStockCount.value = (data.inventory.lowStock ?? 0) + (data.inventory.criticalStock ?? 0);
     }
 
-    if (alertsResult.status === "fulfilled") {
-      dashboardAlerts.value = alertsResult.value.alerts.slice(0, 5);
+    // Alerts
+    dashboardAlerts.value = (data.alerts ?? []).slice(0, 5);
+
+    // Exchange rate
+    if (data.exchangeRate) {
+      exchangeRate.value = data.exchangeRate.rateBcv;
+      euroRate.value = data.exchangeRate.rateEur;
     }
 
-    if (rateResult.status === "fulfilled") {
-      exchangeRate.value = rateResult.value.rateBcv;
-      euroRate.value = rateResult.value.rateEur;
+    // Cash flow
+    if (data.cashFlow) {
+      cashFlow7d.value = data.cashFlow.projection7d.net;
     }
 
-    if (cashFlowResult.status === "fulfilled") {
-      cashFlow7d.value = cashFlowResult.value.data.projection7d.net;
+    // Pending orders
+    if (data.orders) {
+      pendingOrders.value = data.orders.pending.slice(0, 5);
     }
 
-    // Pending orders for quick action
-    if (ordersResult.status === "fulfilled") {
-      pendingOrders.value = ordersResult.value.orders.slice(0, 5);
+    // Activity feed (from recent sales + pending orders)
+    const feed: FeedItem[] = [];
+    for (const order of pendingOrders.value.slice(0, 2)) {
+      feed.push({
+        id: `order-${order.id}`,
+        icon: "📦",
+        text: `Pedido de ${order.customerName} $${order.total.toFixed(2)}`,
+        time: timeAgo(order.createdAt),
+        to: "/orders",
+      });
     }
-
-    // Build activity feed from recent sales + pending orders
-    if (recentSalesResult.status === "fulfilled") {
-      const feed: FeedItem[] = [];
-
-      // Add pending orders to feed (most actionable items first)
-      for (const order of pendingOrders.value.slice(0, 2)) {
-        feed.push({
-          id: `order-${order.id}`,
-          icon: "📦",
-          text: `Pedido de ${order.customerName} $${order.total.toFixed(2)}`,
-          time: timeAgo(order.createdAt),
-          to: "/orders",
-        });
-      }
-
-      // Add recent sales
-      for (const sale of recentSalesResult.value.sales.slice(0, 5)) {
-        const channelLabel = sale.channel === "pos" ? "POS" : sale.channel === "online" ? "Online" : sale.channel;
-        feed.push({
-          id: `sale-${sale.id}`,
-          icon: "💰",
-          text: `Venta ${channelLabel} $${Number(sale.totalUsd).toFixed(2)}`,
-          time: timeAgo(sale.createdAt),
-          to: `/sales/history`,
-        });
-      }
-
-      activityFeed.value = feed.slice(0, 7);
+    for (const sale of data.recentSales.slice(0, 5)) {
+      const channelLabel = sale.channel === "pos" ? "POS" : sale.channel === "online" ? "Online" : sale.channel;
+      feed.push({
+        id: `sale-${sale.id}`,
+        icon: "💰",
+        text: `Venta ${channelLabel} $${Number(sale.totalUsd).toFixed(2)}`,
+        time: timeAgo(sale.createdAt),
+        to: `/sales/history`,
+      });
     }
+    activityFeed.value = feed.slice(0, 7);
 
-    if (storeSettingsResult.status === "fulfilled") {
-      storeOnline.value = storeSettingsResult.value.settings.storeEnabled;
-    }
-
-    if (storeStatsResult.status === "fulfilled") {
-      storeOrdersWeek.value = storeStatsResult.value.stats.ordersThisWeek;
-      storeRevenueWeek.value = storeStatsResult.value.stats.revenueThisWeek;
+    // Store
+    if (data.store) {
+      storeOnline.value = data.store.enabled;
+      storeOrdersWeek.value = data.store.ordersThisWeek;
+      storeRevenueWeek.value = data.store.revenueThisWeek;
     }
   } catch (err) {
     const message =
