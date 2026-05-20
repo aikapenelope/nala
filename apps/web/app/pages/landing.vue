@@ -78,8 +78,16 @@ definePageMeta({ layout: false });
           >
             Empezar gratis <ArrowRight :size="18" />
           </NuxtLink>
-          <span class="text-sm font-medium text-white/60">Sin tarjeta. Listo en 2 minutos.</span>
+          <a
+            href="https://demo.novaincs.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="inline-flex h-14 items-center rounded-2xl border border-white/40 bg-white/10 px-8 text-base font-semibold text-white backdrop-blur-sm transition-all hover:bg-white/20"
+          >
+            Ver tienda de ejemplo
+          </a>
         </div>
+        <span class="mt-4 text-sm font-medium text-white/60">Sin tarjeta. Listo en 2 minutos.</span>
       </div>
 
       <!-- Scroll indicator -->
@@ -387,9 +395,14 @@ definePageMeta({ layout: false });
           <NuxtLink to="/auth/signup" class="inline-flex h-14 items-center gap-2 rounded-2xl bg-white px-8 text-base font-bold text-[#ff321f] shadow-[0_20px_50px_rgba(0,0,0,.15)] transition-all hover:scale-105">
             Empieza ahora <ArrowRight :size="18" />
           </NuxtLink>
-          <NuxtLink to="/auth/login" class="inline-flex h-14 items-center rounded-2xl border border-white/40 bg-white/10 px-8 text-base font-semibold backdrop-blur-sm transition-all hover:bg-white/20">
-            Ver demo
-          </NuxtLink>
+          <a
+            href="https://demo.novaincs.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="inline-flex h-14 items-center rounded-2xl border border-white/40 bg-white/10 px-8 text-base font-semibold backdrop-blur-sm transition-all hover:bg-white/20"
+          >
+            Ver tienda de ejemplo
+          </a>
         </div>
         <div class="mt-8 flex items-center justify-center gap-2 text-sm font-medium text-white/70">
           <ShieldCheck :size="18" /> Garantia sin riesgo: prueba Nala antes de pagar.
@@ -401,9 +414,40 @@ definePageMeta({ layout: false });
     <!-- FOOTER -->
     <!-- ============================================================ -->
     <footer class="border-t border-gray-100 bg-white py-10">
-      <div class="mx-auto max-w-6xl px-6 text-center">
-        <p class="text-sm font-medium text-gray-400">Nala — POS + Tienda Online para comerciantes</p>
-        <p class="mt-1 text-sm text-gray-300">Hecho en Venezuela para Venezuela</p>
+      <div class="mx-auto max-w-6xl px-6">
+        <div class="flex flex-col items-center gap-6 sm:flex-row sm:justify-between">
+          <div class="text-center sm:text-left">
+            <p class="text-sm font-bold text-gray-900">Nala</p>
+            <p class="mt-1 text-xs text-gray-400">POS + Tienda Online para comerciantes</p>
+          </div>
+          <div class="flex flex-wrap items-center justify-center gap-4 text-xs font-medium text-gray-500">
+            <a
+              href="https://wa.me/584121234567"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="hover:text-gray-900 transition-colors"
+            >
+              WhatsApp
+            </a>
+            <a
+              href="https://instagram.com/novaincs"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="hover:text-gray-900 transition-colors"
+            >
+              Instagram
+            </a>
+            <a
+              href="mailto:hola@novaincs.com"
+              class="hover:text-gray-900 transition-colors"
+            >
+              hola@novaincs.com
+            </a>
+          </div>
+        </div>
+        <p class="mt-6 text-center text-[11px] text-gray-300">
+          Hecho en Venezuela para Venezuela
+        </p>
       </div>
     </footer>
   </div>
