@@ -617,6 +617,58 @@ function openRateEditor() {
         Nueva venta
       </NuxtLink>
 
+      <!-- FINANCIAL INSIGHTS: Margin + Cash Flow + Payment Mix -->
+      <div
+        v-if="grossMargin > 0 || cashFlow7d !== 0 || Object.keys(salesByMethod).length > 0"
+        class="mt-2.5 grid grid-cols-2 gap-2"
+      >
+        <!-- Gross Margin -->
+        <div
+          v-if="grossMargin > 0"
+          class="card-premium flex items-center gap-2.5 p-3"
+        >
+          <TrendingUp :size="14" class="flex-shrink-0 text-emerald-600" />
+          <div class="min-w-0">
+            <p class="text-[11px] font-bold text-gray-800">{{ grossMargin.toFixed(0) }}% margen</p>
+            <p class="text-[10px] font-medium text-gray-400">Bruto este mes</p>
+          </div>
+        </div>
+
+        <!-- Cash Flow 7d -->
+        <NuxtLink
+          v-if="cashFlow7d !== 0"
+          to="/reports"
+          class="card-premium flex items-center gap-2.5 p-3 transition-spring"
+        >
+          <component
+            :is="cashFlow7d >= 0 ? TrendingUp : TrendingDown"
+            :size="14"
+            :class="cashFlow7d >= 0 ? 'text-green-600' : 'text-red-500'"
+            class="flex-shrink-0"
+          />
+          <div class="min-w-0">
+            <p class="text-[11px] font-bold text-gray-800">
+              {{ cashFlow7d >= 0 ? '+' : '' }}${{ cashFlow7d.toFixed(0) }}
+            </p>
+            <p class="text-[10px] font-medium text-gray-400">Flujo 7 dias</p>
+          </div>
+        </NuxtLink>
+      </div>
+
+      <!-- PAYMENT METHODS (mini breakdown) -->
+      <div
+        v-if="Object.keys(salesByMethod).length > 0 && todayCount > 0"
+        class="mt-2 flex flex-wrap gap-1.5 px-0.5"
+      >
+        <span
+          v-for="(amount, method) in salesByMethod"
+          :key="method"
+          class="rounded-lg bg-white/60 px-2 py-1 text-[10px] font-semibold text-gray-600"
+        >
+          {{ methodLabel[method as string] ?? method }} ${{ Number(amount).toFixed(0) }}
+        </span>
+      </div>
+
       <!-- STORE ONLINE STATUS -->
       <NuxtLink
         v-if="storeOnline !== null"
