@@ -206,8 +206,6 @@ async function exportExcel() {
     isExporting.value = false;
   }
 }
-// Owner Lock: redirect to /unlock if PIN is active
-
 </script>
 
 <template>
