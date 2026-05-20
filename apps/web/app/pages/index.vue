@@ -168,11 +168,19 @@ const greeting = computed(() => {
 /**
  * Load all dashboard data via the consolidated endpoint.
  * Single API call replaces 12 parallel calls — server handles parallelism.
+ *
+ * Uses AbortController to cancel in-flight requests when the component
+ * deactivates (KeepAlive) or unmounts, preventing stale state updates
+ * and the loadInProgress deadlock that occurred when the layout destroyed
+ * the slot mid-fetch.
  */
-let loadInProgress = false;
+let abortController: AbortController | null = null;
 async function loadDashboard() {
-  if (loadInProgress) return;
-  loadInProgress = true;
+  // Cancel any in-flight request before starting a new one
+  abortController?.abort();
+  abortController = new AbortController();
+  const { signal } = abortController;
+
   isLoading.value = true;
   loadError.value = "";
 
@@ -197,7 +205,7 @@ async function loadDashboard() {
       orders: { pending: PendingOrder[]; pendingCount: number } | null;
       recentSales: Array<{ id: string; totalUsd: string; channel: string; createdAt: string }>;
       store: { enabled: boolean; ordersThisWeek: number; revenueThisWeek: number } | null;
-    }>("/api/dashboard");
+    }>("/api/dashboard", { signal });
 
     // Daily sales
     if (data.today) {
@@ -294,13 +302,17 @@ async function loadDashboard() {
       storeRevenueWeek.value = data.store.revenueThisWeek;
     }
   } catch (err) {
+    // Aborted requests are intentional — don't show errors for them
+    if (signal.aborted) return;
     const message =
       err instanceof Error ? err.message : "Error cargando dashboard";
     loadError.value = message;
   } finally {
-    isLoading.value = false;
-    loadInProgress = false;
-    lastUpdatedAt.value = new Date();
+    // Only update state if this request wasn't aborted (replaced by a newer one)
+    if (!signal.aborted) {
+      isLoading.value = false;
+      lastUpdatedAt.value = new Date();
+    }
   }
 }
 
@@ -355,6 +367,16 @@ onMounted(() => {
   loadDashboard();
   refreshOnboarding();
   checkOpenStatus();
+});
+
+/**
+ * KeepAlive deactivation: cancel any in-flight request.
+ * Prevents state updates after the component is hidden, and ensures
+ * loadDashboard() can be called cleanly on next activation.
+ */
+onDeactivated(() => {
+  abortController?.abort();
+  abortController = null;
 });
 
 /**
