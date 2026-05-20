@@ -10,7 +10,7 @@
  * or whatever source they trust.
  */
 
-import { desc, eq } from "drizzle-orm";
+import { desc, eq, sql } from "drizzle-orm";
 import { exchangeRates } from "@nova/db";
 import { getRedis } from "../redis";
 import { tryGetDb } from "../db";
@@ -138,11 +138,20 @@ export async function setCurrentRate(
 
   const db = tryGetDb();
   if (db) {
+    // UPSERT: if a rate already exists for this business+day, update it.
+    // The unique index idx_exchange_rates_business_day enforces one rate per day.
     await db.insert(exchangeRates).values({
       businessId,
       date: now,
       rateBcv: String(rateBcv),
       rateParallel: rateEur ? String(rateEur) : null,
+    }).onConflictDoUpdate({
+      target: [exchangeRates.businessId, exchangeRates.date],
+      set: {
+        rateBcv: sql`EXCLUDED.rate_bcv`,
+        rateParallel: sql`EXCLUDED.rate_parallel`,
+      },
+      where: sql`DATE(${exchangeRates.date}) = DATE(EXCLUDED.date)`,
     });
   }
 

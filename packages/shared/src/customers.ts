@@ -4,6 +4,7 @@
 
 import { z } from "zod";
 import { CLIENT_AT_RISK_DAYS, CLIENT_INACTIVE_DAYS, AGING_THRESHOLDS } from "./constants";
+import { paymentMethodSchema } from "./schemas";
 
 export type CustomerSegment = "vip" | "frequent" | "at_risk" | "new" | "with_debt" | "inactive";
 export type AgingColor = "green" | "yellow" | "red";
@@ -63,7 +64,7 @@ export const updateCustomerSchema = createCustomerSchema.partial();
 
 export const recordPaymentSchema = z.object({
   amountUsd: z.number().min(0.01),
-  method: z.string(),
+  method: paymentMethodSchema,
   reference: z.string().max(100).optional(),
   notes: z.string().max(500).optional(),
 });

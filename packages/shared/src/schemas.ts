@@ -27,9 +27,10 @@ export const businessTypeSchema = z.enum([
   "distribuidora",
 ]);
 
-/** Schema for payment methods. */
+/** Schema for payment methods accepted across the platform. */
 export const paymentMethodSchema = z.enum([
   "efectivo",
+  "efectivo_usd",
   "pago_movil",
   "binance",
   "zinli",
@@ -37,6 +38,8 @@ export const paymentMethodSchema = z.enum([
   "zelle",
   "fiado",
 ]);
+
+
 
 /** Schema for health check response. */
 export const healthCheckResponseSchema = z.object({
