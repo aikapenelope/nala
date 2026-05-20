@@ -5,6 +5,9 @@
  * Single layout for all business types: visual cards with carousel,
  * cart checkout, 2-column grid. Following Treinta.co's model:
  * one product, one UI, for everyone.
+ *
+ * Uses SSR data fetching via useStorefrontData() — the catalog is fetched
+ * on the server and sent with the HTML, eliminating the client-side waterfall.
  */
 
 import { currentDayOfWeekVET } from "@nova/shared";
@@ -20,6 +23,7 @@ definePageMeta({ layout: "storefront" });
 const runtimeConfig = useRuntimeConfig();
 const storefrontApiBase = runtimeConfig.public.apiBase as string;
 
+// SSR-compatible data fetching — runs on server, hydrates on client
 const {
   business,
   products,
@@ -27,12 +31,14 @@ const {
   storeInfo,
   exchangeRate,
   isLoading,
-  isLoadingMore,
   hasMore,
   error,
-  fetchCatalog,
-  fetchMore,
-} = useStorefront();
+  refresh: fetchCatalog,
+} = useStorefrontData();
+
+// Client-side pagination for infinite scroll
+const { isLoadingMore, fetchMore } = useStorefrontPagination();
+
 const { addItem } = useCart();
 const { config: sfConfig } = useStorefrontConfig();
 
@@ -112,11 +118,8 @@ function handleAddToCart(product: (typeof products.value)[number]) {
   }, 1200);
 }
 
-onMounted(() => {
-  if (products.value.length === 0) {
-    fetchCatalog();
-  }
-});
+// Note: data fetching is handled by useStorefrontData() via useAsyncData.
+// No onMounted fetch needed — SSR delivers data with the HTML payload.
 
 /** Infinite scroll sentinel. */
 const scrollSentinel = ref<HTMLElement | null>(null);
@@ -178,7 +181,7 @@ onMounted(() => {
       <p class="text-base font-medium text-gray-600 dark:text-gray-400">{{ error }}</p>
       <button
         class="mt-4 rounded-2xl bg-gray-900 px-6 py-3 text-sm font-semibold text-white shadow-md active:scale-95 transition-transform dark:bg-white dark:text-gray-900"
-        @click="fetchCatalog"
+        @click="() => fetchCatalog()"
       >
         Reintentar
       </button>

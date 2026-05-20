@@ -1,11 +1,12 @@
 /**
  * Storefront data composable.
  *
- * Fetches catalog (products + business info) and store settings
- * from the public API for the current tenant slug.
+ * Provides shared reactive state for the storefront catalog.
+ * Data is fetched via `useStorefrontData()` (SSR-compatible with useAsyncData)
+ * and stored in global useState so all components share the same data.
  *
  * Usage:
- *   const { business, products, categories, storeInfo, isLoading, error, refresh } = useStorefront();
+ *   const { business, products, categories, storeInfo, isLoading, error } = useStorefront();
  */
 
 export interface StorefrontProduct {
@@ -67,7 +68,27 @@ export interface StoreInfo {
 /** Page size for paginated catalog requests. */
 const CATALOG_PAGE_SIZE = 50;
 
-export function useStorefront() {
+/** Response shape from the catalog API. */
+export interface CatalogResponse {
+  business: StorefrontBusiness;
+  categories: StorefrontCategory[];
+  products: StorefrontProduct[];
+  exchangeRate: number | null;
+  pagination?: { total: number; limit: number; offset: number; hasMore: boolean };
+}
+
+/**
+ * SSR-compatible data fetching for the storefront catalog.
+ *
+ * Uses `useAsyncData` so the fetch runs on the server during SSR and the
+ * result is serialized into the HTML payload — the client hydrates instantly
+ * without a second network request.
+ *
+ * Call this once in the catalog page (`tienda/index.vue`). The data is
+ * stored in shared `useState` refs so other components (layout, cart, etc.)
+ * can access it via `useStorefront()`.
+ */
+export function useStorefrontData() {
   const config = useRuntimeConfig();
   const apiBase = config.public.apiBase as string;
   const { tenantSlug } = useTenant();
@@ -86,57 +107,80 @@ export function useStorefront() {
   );
   const storeInfo = useState<StoreInfo | null>("storefront-info", () => null);
   const exchangeRate = useState<number | null>("storefront-rate", () => null);
-  const isLoading = ref(false);
-  const isLoadingMore = ref(false);
-  const hasMore = ref(false);
-  const error = ref<string | null>(null);
+  const hasMore = useState<boolean>("storefront-has-more", () => false);
+  const currentOffset = useState<number>("storefront-offset", () => 0);
 
-  /** Current pagination offset (tracks how many products have been loaded). */
-  let currentOffset = 0;
+  const { status, error, refresh } = useAsyncData(
+    `storefront-catalog-${tenantSlug.value}`,
+    async () => {
+      if (!tenantSlug.value) return null;
 
-  /** Fetch the first page of catalog data from the public API. */
-  async function fetchCatalog() {
-    if (!tenantSlug.value) {
-      error.value = "No se detecto la tienda.";
-      return;
-    }
-
-    isLoading.value = true;
-    error.value = null;
-    currentOffset = 0;
-
-    try {
       const [catalogData, storeData] = await Promise.all([
-        $fetch<{
-          business: StorefrontBusiness;
-          categories: StorefrontCategory[];
-          products: StorefrontProduct[];
-          exchangeRate: number | null;
-          pagination?: { total: number; limit: number; offset: number; hasMore: boolean };
-        }>(`${apiBase}/catalog/${tenantSlug.value}?limit=${CATALOG_PAGE_SIZE}&offset=0`),
-        $fetch<StoreInfo>(`${apiBase}/catalog/${tenantSlug.value}/store-info`).catch(
-          () => null,
+        $fetch<CatalogResponse>(
+          `${apiBase}/catalog/${tenantSlug.value}?limit=${CATALOG_PAGE_SIZE}&offset=0`,
         ),
+        $fetch<StoreInfo>(
+          `${apiBase}/catalog/${tenantSlug.value}/store-info`,
+        ).catch(() => null),
       ]);
 
+      // Populate shared state
       business.value = catalogData.business;
       products.value = catalogData.products;
       categories.value = catalogData.categories;
       exchangeRate.value = catalogData.exchangeRate;
       storeInfo.value = storeData;
       hasMore.value = catalogData.pagination?.hasMore ?? false;
-      currentOffset = catalogData.products.length;
-    } catch {
-      error.value = "No se pudo cargar la tienda. Verifica el enlace.";
-    } finally {
-      isLoading.value = false;
-    }
-  }
+      currentOffset.value = catalogData.products.length;
 
-  /**
-   * Fetch the next page of products and append to the existing list.
-   * Returns false if there are no more products to load.
-   */
+      return catalogData;
+    },
+    {
+      // Only fetch if we have a tenant and data isn't already loaded
+      immediate: !!tenantSlug.value && products.value.length === 0,
+      // Use cached data for 60s on client-side navigations (SWR pattern)
+      getCachedData(key, nuxtApp) {
+        const cached = nuxtApp.payload.data[key] || nuxtApp.static.data[key];
+        if (!cached) return undefined;
+        return cached as CatalogResponse;
+      },
+    },
+  );
+
+  const isLoading = computed(() => status.value === "pending");
+  const errorMessage = computed(() =>
+    error.value ? "No se pudo cargar la tienda. Verifica el enlace." : null,
+  );
+
+  return {
+    business: readonly(business),
+    products: readonly(products),
+    categories: readonly(categories),
+    storeInfo: readonly(storeInfo),
+    exchangeRate: readonly(exchangeRate),
+    hasMore: readonly(hasMore),
+    isLoading,
+    error: errorMessage,
+    refresh,
+  };
+}
+
+/**
+ * Fetch the next page of products (client-side only, for infinite scroll).
+ *
+ * Appends products to the shared state. Not SSR-compatible by design
+ * since pagination beyond page 1 is always triggered by user interaction.
+ */
+export function useStorefrontPagination() {
+  const config = useRuntimeConfig();
+  const apiBase = config.public.apiBase as string;
+  const { tenantSlug } = useTenant();
+
+  const products = useState<StorefrontProduct[]>("storefront-products");
+  const hasMore = useState<boolean>("storefront-has-more");
+  const currentOffset = useState<number>("storefront-offset");
+  const isLoadingMore = ref(false);
+
   async function fetchMore(): Promise<boolean> {
     if (!tenantSlug.value || !hasMore.value || isLoadingMore.value) {
       return false;
@@ -148,13 +192,11 @@ export function useStorefront() {
       const catalogData = await $fetch<{
         products: StorefrontProduct[];
         pagination?: { total: number; limit: number; offset: number; hasMore: boolean };
-      }>(`${apiBase}/catalog/${tenantSlug.value}?limit=${CATALOG_PAGE_SIZE}&offset=${currentOffset}`);
+      }>(`${apiBase}/catalog/${tenantSlug.value}?limit=${CATALOG_PAGE_SIZE}&offset=${currentOffset.value}`);
 
-      // Append new products (use a writable copy via useState)
-      const currentProducts = useState<StorefrontProduct[]>("storefront-products");
-      currentProducts.value = [...currentProducts.value, ...catalogData.products];
+      products.value = [...products.value, ...catalogData.products];
       hasMore.value = catalogData.pagination?.hasMore ?? false;
-      currentOffset += catalogData.products.length;
+      currentOffset.value += catalogData.products.length;
 
       return hasMore.value;
     } catch {
@@ -165,10 +207,33 @@ export function useStorefront() {
     }
   }
 
-  /** Refresh all storefront data (resets pagination). */
-  async function refresh() {
-    await fetchCatalog();
-  }
+  return {
+    isLoadingMore: readonly(isLoadingMore),
+    fetchMore,
+  };
+}
+
+/**
+ * Read-only access to storefront shared state.
+ *
+ * Use this in components that only need to read the data (layout, cart,
+ * checkout, info, product detail). Does NOT trigger any fetching.
+ */
+export function useStorefront() {
+  const business = useState<StorefrontBusiness | null>(
+    "storefront-business",
+    () => null,
+  );
+  const products = useState<StorefrontProduct[]>(
+    "storefront-products",
+    () => [],
+  );
+  const categories = useState<StorefrontCategory[]>(
+    "storefront-categories",
+    () => [],
+  );
+  const storeInfo = useState<StoreInfo | null>("storefront-info", () => null);
+  const exchangeRate = useState<number | null>("storefront-rate", () => null);
 
   return {
     business: readonly(business),
@@ -176,12 +241,5 @@ export function useStorefront() {
     categories: readonly(categories),
     storeInfo: readonly(storeInfo),
     exchangeRate: readonly(exchangeRate),
-    isLoading: readonly(isLoading),
-    isLoadingMore: readonly(isLoadingMore),
-    hasMore: readonly(hasMore),
-    error: readonly(error),
-    fetchCatalog,
-    fetchMore,
-    refresh,
   };
 }
