@@ -46,6 +46,7 @@ import { dateRangeVET } from "@nova/shared";
 import { getCurrentRate, setCurrentRate } from "../services/exchange-rate";
 import { fetchBcvRates } from "../services/bcv-rates";
 import { generateReceiptPdf } from "../services/pdf-generator";
+import { recalculateSingleCustomerRfm } from "../services/rfm";
 import { handleDbError } from "../utils/db-errors";
 import { ValidationError, UserError } from "../utils/errors";
 import { createRevenueEntry } from "../utils/accounting";
@@ -733,6 +734,14 @@ salesRoutes.post("/sales", zValidator("json", createSaleSchema), async (c) => {
     const dbErr = handleDbError(err);
     if (dbErr) return c.json({ error: dbErr.message }, dbErr.status);
     throw err;
+  }
+
+  // Recalculate RFM for the customer (fire-and-forget, non-blocking).
+  // This runs outside the transaction so it doesn't slow down the sale response.
+  if (data.customerId) {
+    recalculateSingleCustomerRfm(db, businessId, data.customerId).catch(() => {
+      // Non-critical: RFM will be recalculated on next dashboard load
+    });
   }
 
   return c.json({ sale: result }, 201);

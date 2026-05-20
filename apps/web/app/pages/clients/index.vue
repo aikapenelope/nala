@@ -1,11 +1,12 @@
 <script setup lang="ts">
 /**
- * Customer list page with search and segment badges.
+ * Customer list page with search and RFM segment badges.
  *
  * Connected to: GET /api/customers?search=&page=&limit=
  */
 
-import type { CustomerSegment } from "@nova/shared";
+import type { RfmSegment } from "@nova/shared";
+import { RFM_SEGMENT_LABELS, RFM_SEGMENT_COLORS } from "@nova/shared";
 import { Search, UserPlus } from "lucide-vue-next";
 
 const { isDesktop } = useDevice();
@@ -16,16 +17,6 @@ const searchQuery = ref("");
 const isLoading = ref(true);
 const loadError = ref("");
 
-const segmentConfig: Record<CustomerSegment, { label: string; color: string }> =
-  {
-    vip: { label: "VIP", color: "bg-purple-50 text-purple-700" },
-    frequent: { label: "Frecuente", color: "bg-blue-50 text-blue-700" },
-    at_risk: { label: "En riesgo", color: "bg-orange-50 text-orange-700" },
-    new: { label: "Nuevo", color: "bg-green-50 text-green-700" },
-    with_debt: { label: "Con deuda", color: "bg-red-50 text-red-700" },
-    inactive: { label: "Inactivo", color: "bg-gray-100 text-gray-500" },
-  };
-
 interface Customer {
   id: string;
   name: string;
@@ -33,6 +24,8 @@ interface Customer {
   totalPurchases: number;
   averageTicketUsd: string;
   balanceUsd: string;
+  rfmSegment: RfmSegment | null;
+  rfmScore: string | null;
 }
 
 const customersList = ref<Customer[]>([]);
@@ -75,12 +68,17 @@ onMounted(async () => {
   fetchCustomers();
 });
 
-/** Derive simple segments from customer data for badge display. */
-function getSegments(c: Customer): CustomerSegment[] {
-  const segments: CustomerSegment[] = [];
-  if (Number(c.balanceUsd) > 0) segments.push("with_debt");
-  if (c.totalPurchases >= 20) segments.push("frequent");
-  return segments;
+/** Get display info for the RFM segment badge. */
+function getRfmBadge(c: Customer): { label: string; color: string } | null {
+  if (!c.rfmSegment) {
+    // Fallback for customers without RFM (not yet calculated)
+    if (Number(c.balanceUsd) > 0) return { label: "Con deuda", color: "bg-red-50 text-red-700" };
+    return null;
+  }
+  return {
+    label: RFM_SEGMENT_LABELS[c.rfmSegment] ?? c.rfmSegment,
+    color: RFM_SEGMENT_COLORS[c.rfmSegment] ?? "bg-gray-100 text-gray-500",
+  };
 }
 
 /** Edit customer modal. */
@@ -249,12 +247,17 @@ async function submitEdit() {
               <td class="px-4 py-3.5">
                 <div class="flex flex-wrap gap-1">
                   <span
-                    v-for="seg in getSegments(c)"
-                    :key="seg"
+                    v-if="getRfmBadge(c)"
                     class="rounded-full px-2 py-0.5 text-[10px] font-bold"
-                    :class="segmentConfig[seg].color"
+                    :class="getRfmBadge(c)!.color"
                   >
-                    {{ segmentConfig[seg].label }}
+                    {{ getRfmBadge(c)!.label }}
+                  </span>
+                  <span
+                    v-if="Number(c.balanceUsd) > 0 && c.rfmSegment"
+                    class="rounded-full px-2 py-0.5 text-[10px] font-bold bg-red-50 text-red-700"
+                  >
+                    Con deuda
                   </span>
                 </div>
               </td>
@@ -295,12 +298,11 @@ async function submitEdit() {
             <div class="flex items-center gap-2">
               <p class="truncate font-semibold text-gray-800">{{ c.name }}</p>
               <span
-                v-for="seg in getSegments(c).slice(0, 2)"
-                :key="seg"
+                v-if="getRfmBadge(c)"
                 class="rounded-full px-1.5 py-0.5 text-[9px] font-bold"
-                :class="segmentConfig[seg].color"
+                :class="getRfmBadge(c)!.color"
               >
-                {{ segmentConfig[seg].label }}
+                {{ getRfmBadge(c)!.label }}
               </span>
             </div>
             <p class="text-xs font-medium text-gray-500">{{ c.totalPurchases }} compras</p>

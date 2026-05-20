@@ -8,6 +8,47 @@ import { CLIENT_AT_RISK_DAYS, CLIENT_INACTIVE_DAYS, AGING_THRESHOLDS } from "./c
 export type CustomerSegment = "vip" | "frequent" | "at_risk" | "new" | "with_debt" | "inactive";
 export type AgingColor = "green" | "yellow" | "red";
 
+/** RFM-derived segments (calculated server-side with adaptive quintiles). */
+export type RfmSegment =
+  | "champion"
+  | "loyal"
+  | "potential_loyal"
+  | "new"
+  | "promising"
+  | "needs_attention"
+  | "about_to_sleep"
+  | "at_risk"
+  | "hibernating"
+  | "lost";
+
+/** Spanish labels for RFM segments. */
+export const RFM_SEGMENT_LABELS: Record<RfmSegment, string> = {
+  champion: "Campeón",
+  loyal: "Leal",
+  potential_loyal: "Potencial leal",
+  new: "Nuevo",
+  promising: "Prometedor",
+  needs_attention: "Necesita atención",
+  about_to_sleep: "Por dormirse",
+  at_risk: "En riesgo",
+  hibernating: "Hibernando",
+  lost: "Perdido",
+};
+
+/** CSS-friendly color classes for RFM segments. */
+export const RFM_SEGMENT_COLORS: Record<RfmSegment, string> = {
+  champion: "bg-amber-50 text-amber-700",
+  loyal: "bg-purple-50 text-purple-700",
+  potential_loyal: "bg-blue-50 text-blue-700",
+  new: "bg-green-50 text-green-700",
+  promising: "bg-cyan-50 text-cyan-700",
+  needs_attention: "bg-orange-50 text-orange-700",
+  about_to_sleep: "bg-yellow-50 text-yellow-700",
+  at_risk: "bg-red-50 text-red-700",
+  hibernating: "bg-gray-100 text-gray-500",
+  lost: "bg-gray-50 text-gray-400",
+};
+
 export const createCustomerSchema = z.object({
   name: z.string().min(1).max(200),
   phone: z.string().max(20).optional(),

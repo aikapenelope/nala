@@ -671,6 +671,22 @@ export const customers = pgTable(
     creditLimitUsd: numeric("credit_limit_usd", { precision: 12, scale: 2 })
       .notNull()
       .default("0"),
+
+    // --- RFM Scoring (auto-calculated, not user-editable) ---
+
+    /** Recency: days since last purchase. Lower = better. */
+    rfmRecency: integer("rfm_recency"),
+    /** Frequency: number of purchases in the scoring window (90 days). */
+    rfmFrequency: integer("rfm_frequency"),
+    /** Monetary: total spent (USD) in the scoring window. */
+    rfmMonetary: numeric("rfm_monetary", { precision: 12, scale: 2 }),
+    /** RFM score triplet, e.g. "543" (R=5, F=4, M=3). */
+    rfmScore: text("rfm_score"),
+    /** Derived segment from the RFM triplet (champion, loyal, at_risk, etc.). */
+    rfmSegment: text("rfm_segment"),
+    /** When the RFM was last calculated for this customer. */
+    rfmCalculatedAt: timestamp("rfm_calculated_at", { withTimezone: true }),
+
     isActive: boolean("is_active").notNull().default(true),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()

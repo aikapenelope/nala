@@ -3,12 +3,15 @@
  * Customer stats detail page.
  *
  * Shows purchase history, top products, spending trend,
- * and visit frequency for a single customer.
+ * RFM scoring profile, and visit frequency for a single customer.
  *
  * Connected to:
  * - GET /api/reports/customer-stats/:id
  * - GET /api/customers/:id
  */
+
+import type { RfmSegment } from "@nova/shared";
+import { RFM_SEGMENT_LABELS, RFM_SEGMENT_COLORS } from "@nova/shared";
 
 const route = useRoute();
 const { $api } = useApi();
@@ -27,6 +30,12 @@ interface CustomerDetail {
   totalSpentUsd: string;
   averageTicketUsd: string;
   lastPurchaseAt: string | null;
+  rfmRecency: number | null;
+  rfmFrequency: number | null;
+  rfmMonetary: string | null;
+  rfmScore: string | null;
+  rfmSegment: RfmSegment | null;
+  rfmCalculatedAt: string | null;
 }
 
 interface CustomerStats {
@@ -132,6 +141,75 @@ function formatMonth(month: string): string {
         >
           Deuda pendiente: ${{ Number(customer.balanceUsd).toFixed(2) }}
         </div>
+      </div>
+
+      <!-- RFM Profile -->
+      <div
+        v-if="customer.rfmSegment"
+        class="mb-6 rounded-xl bg-white p-6 shadow-sm"
+      >
+        <div class="mb-4 flex items-center justify-between">
+          <h2 class="text-sm font-semibold text-gray-700">Perfil RFM</h2>
+          <span
+            class="rounded-full px-2.5 py-1 text-[11px] font-bold"
+            :class="RFM_SEGMENT_COLORS[customer.rfmSegment] ?? 'bg-gray-100 text-gray-500'"
+          >
+            {{ RFM_SEGMENT_LABELS[customer.rfmSegment] ?? customer.rfmSegment }}
+          </span>
+        </div>
+
+        <!-- R, F, M bars -->
+        <div class="space-y-3">
+          <div>
+            <div class="mb-1 flex items-center justify-between text-xs">
+              <span class="font-medium text-gray-600">Recencia</span>
+              <span class="text-gray-400">
+                {{ customer.rfmRecency != null ? `${customer.rfmRecency} dias` : '-' }}
+              </span>
+            </div>
+            <div class="h-2 w-full rounded-full bg-gray-100">
+              <div
+                class="h-2 rounded-full bg-nova-primary transition-all"
+                :style="{ width: `${customer.rfmScore ? Number(customer.rfmScore[0]) * 20 : 0}%` }"
+              />
+            </div>
+          </div>
+          <div>
+            <div class="mb-1 flex items-center justify-between text-xs">
+              <span class="font-medium text-gray-600">Frecuencia</span>
+              <span class="text-gray-400">
+                {{ customer.rfmFrequency != null ? `${customer.rfmFrequency} compras (90d)` : '-' }}
+              </span>
+            </div>
+            <div class="h-2 w-full rounded-full bg-gray-100">
+              <div
+                class="h-2 rounded-full bg-nova-accent transition-all"
+                :style="{ width: `${customer.rfmScore ? Number(customer.rfmScore[1]) * 20 : 0}%` }"
+              />
+            </div>
+          </div>
+          <div>
+            <div class="mb-1 flex items-center justify-between text-xs">
+              <span class="font-medium text-gray-600">Valor monetario</span>
+              <span class="text-gray-400">
+                {{ customer.rfmMonetary != null ? `$${Number(customer.rfmMonetary).toFixed(0)} (90d)` : '-' }}
+              </span>
+            </div>
+            <div class="h-2 w-full rounded-full bg-gray-100">
+              <div
+                class="h-2 rounded-full bg-emerald-500 transition-all"
+                :style="{ width: `${customer.rfmScore ? Number(customer.rfmScore[2]) * 20 : 0}%` }"
+              />
+            </div>
+          </div>
+        </div>
+
+        <p
+          v-if="customer.rfmCalculatedAt"
+          class="mt-3 text-[10px] text-gray-400"
+        >
+          Calculado: {{ new Date(customer.rfmCalculatedAt).toLocaleDateString('es-VE') }}
+        </p>
       </div>
 
       <!-- Top products -->
