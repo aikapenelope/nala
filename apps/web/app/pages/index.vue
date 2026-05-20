@@ -45,6 +45,7 @@ const { isOpen: cashIsOpen, checkOpenStatus } = useCashStatus();
 
 const isLoading = ref(true);
 const loadError = ref("");
+const lastUpdatedAt = ref<Date | null>(null);
 
 /** Daily data. */
 const todaySales = ref(0);
@@ -324,6 +325,7 @@ async function loadDashboard() {
   } finally {
     isLoading.value = false;
     loadInProgress = false;
+    lastUpdatedAt.value = new Date();
   }
 }
 
@@ -476,12 +478,20 @@ function openRateEditor() {
             </button>
           </p>
         </div>
-        <button
-          class="text-gray-300 transition-spring hover:text-gray-500"
-          @click="loadDashboard"
-        >
-          <RefreshCw :size="16" />
-        </button>
+        <div class="flex items-center gap-2">
+          <span
+            v-if="lastUpdatedAt"
+            class="text-[10px] font-medium text-gray-300"
+          >
+            {{ lastUpdatedAt.toLocaleTimeString("es-VE", { hour: "2-digit", minute: "2-digit", timeZone: "America/Caracas" }) }}
+          </span>
+          <button
+            class="text-gray-300 transition-spring hover:text-gray-500"
+            @click="loadDashboard"
+          >
+            <RefreshCw :size="16" />
+          </button>
+        </div>
       </div>
 
       <!-- ONBOARDING (compact, only if incomplete) -->
@@ -556,6 +566,24 @@ function openRateEditor() {
           </span>
         </div>
       </NuxtLink>
+
+      <!-- EMPTY STATE: No sales today (motivational for new businesses) -->
+      <div
+        v-if="todayCount === 0 && !isLoading"
+        class="mt-2.5 rounded-[18px] border border-dashed border-gray-200 bg-white/40 p-5 text-center"
+      >
+        <p class="text-sm font-bold text-gray-700">Sin ventas hoy</p>
+        <p class="mt-1 text-xs text-gray-400">
+          Registra tu primera venta y Nala organiza todo automaticamente.
+        </p>
+        <NuxtLink
+          to="/sales"
+          class="mt-3 inline-flex items-center gap-1.5 rounded-xl bg-nova-primary/10 px-4 py-2 text-xs font-bold text-nova-primary transition-spring hover:bg-nova-primary/20"
+        >
+          <DollarSign :size="14" />
+          Registrar venta
+        </NuxtLink>
+      </div>
 
       <!-- 3 CARDS: Fiado + Stock + Pedidos -->
       <div class="mt-2.5 grid grid-cols-3 gap-2">
