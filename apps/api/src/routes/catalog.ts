@@ -78,62 +78,58 @@ catalog.get("/:slug", async (c) => {
     return c.json({ error: "Business not found" }, 404);
   }
 
-  // Fetch active products (paginated)
-  const productRows = await db
-    .select({
-      id: products.id,
-      name: products.name,
-      description: products.description,
-      price: products.price,
-      stock: products.stock,
-      stockMin: products.stockMin,
-      stockCritical: products.stockCritical,
-      categoryId: products.categoryId,
-      imageUrl: products.imageUrl,
-      lastSoldAt: products.lastSoldAt,
-      sku: products.sku,
-      brand: products.brand,
-      hasVariants: products.hasVariants,
-      isService: products.isService,
-    })
-    .from(products)
-    .where(
-      and(
-        eq(products.businessId, business.id),
-        eq(products.isActive, true),
-      ),
-    )
-    .orderBy(desc(products.updatedAt))
-    .limit(limit)
-    .offset(offset);
+  // Fetch products + total count + categories in parallel.
+  // Uses COUNT(*) OVER() window function to get the total in the same query
+  // as the paginated results — eliminates a separate COUNT query.
+  // Categories are independent so they run in parallel.
+  const [productRows, categoryRows] = await Promise.all([
+    db
+      .select({
+        id: products.id,
+        name: products.name,
+        description: products.description,
+        price: products.price,
+        stock: products.stock,
+        stockMin: products.stockMin,
+        stockCritical: products.stockCritical,
+        categoryId: products.categoryId,
+        imageUrl: products.imageUrl,
+        lastSoldAt: products.lastSoldAt,
+        sku: products.sku,
+        brand: products.brand,
+        hasVariants: products.hasVariants,
+        isService: products.isService,
+        // Window function: total count without a separate query
+        totalCount: sql<number>`count(*) over()`.as("total_count"),
+      })
+      .from(products)
+      .where(
+        and(
+          eq(products.businessId, business.id),
+          eq(products.isActive, true),
+        ),
+      )
+      .orderBy(desc(products.updatedAt))
+      .limit(limit)
+      .offset(offset),
+    db
+      .select({
+        id: categories.id,
+        name: categories.name,
+        sortOrder: categories.sortOrder,
+      })
+      .from(categories)
+      .where(
+        and(
+          eq(categories.businessId, business.id),
+          eq(categories.isActive, true),
+        ),
+      )
+      .orderBy(categories.sortOrder),
+  ]);
 
-  // Count total products for pagination metadata
-  const [countResult] = await db
-    .select({ count: sql<number>`count(*)::int` })
-    .from(products)
-    .where(
-      and(
-        eq(products.businessId, business.id),
-        eq(products.isActive, true),
-      ),
-    );
-  const totalProducts = countResult?.count ?? 0;
-
-  // Fetch categories for this business
-  const categoryRows = await db
-    .select({
-      id: categories.id,
-      name: categories.name,
-      sortOrder: categories.sortOrder,
-    })
-    .from(categories)
-    .where(
-      and(
-        eq(categories.businessId, business.id),
-        eq(categories.isActive, true),
-      ),
-    )
-    .orderBy(categories.sortOrder);
+  // Extract total from the window function (same value on every row)
+  const totalProducts = productRows[0]?.totalCount ?? 0;
 
   // Build category map for grouping
   const categoryMap = new Map(categoryRows.map((cat) => [cat.id, cat.name]));
@@ -165,46 +161,26 @@ catalog.get("/:slug", async (c) => {
   });
 
   // Batch-fetch image galleries for all products in this page.
-  // Single query with IN clause — much faster than N+1 queries.
+  // Fetch images + exchange rate in parallel (both independent of each other).
+  // Images use IN clause (batch, not N+1). Exchange rate uses a transaction
+  // with transaction-local set_config for RLS bypass.
   const productIds = catalogProducts.map((p) => p.id);
-  if (productIds.length > 0) {
-    const allImages = await db
-      .select({
-        id: productImages.id,
-        productId: productImages.productId,
-        sortOrder: productImages.sortOrder,
-      })
-      .from(productImages)
-      .where(inArray(productImages.productId, productIds))
-      .orderBy(productImages.sortOrder);
 
-    // Group images by product ID
-    const imagesByProduct = new Map<string, typeof allImages>();
-    for (const img of allImages) {
-      const existing = imagesByProduct.get(img.productId) ?? [];
-      existing.push(img);
-      imagesByProduct.set(img.productId, existing);
-    }
-
-    // Attach images to each product
-    for (const product of catalogProducts) {
-      const imgs = imagesByProduct.get(product.id) ?? [];
-      product.images = imgs.map((img) => ({
-        id: img.id,
-        url: `/images/products/${product.id}/${img.id}`,
-        sortOrder: img.sortOrder,
-      }));
-    }
-  }
-
-  // Fetch exchange rate for Bs display (non-blocking, optional).
-  // The catalog runs without RLS tenant context, but exchange_rates has
-  // RLS enabled. We use a transaction to pin set_config + the query to
-  // the same pooled connection, with transaction-local scope (true) so
-  // the variable auto-reverts on commit — no manual cleanup needed.
-  let exchangeRate: number | null = null;
-  try {
-    const rate = await db.transaction(async (tx) => {
+  const [allImages, exchangeRateResult] = await Promise.all([
+    // Images batch query
+    productIds.length > 0
+      ? db
+          .select({
+            id: productImages.id,
+            productId: productImages.productId,
+            sortOrder: productImages.sortOrder,
+          })
+          .from(productImages)
+          .where(inArray(productImages.productId, productIds))
+          .orderBy(productImages.sortOrder)
+      : Promise.resolve([]),
+    // Exchange rate (transaction-local RLS context)
+    db.transaction(async (tx) => {
       await tx.execute(
         sql`SELECT set_config('app.current_business_id', ${business.id}, true)`,
       );
@@ -215,11 +191,28 @@ catalog.get("/:slug", async (c) => {
         .orderBy(desc(exchangeRates.date))
         .limit(1);
       return latest ?? null;
-    });
-    exchangeRate = rate ? Number(rate.rateBcv) : null;
-  } catch {
-    // Rate not configured -- that's fine, just don't show Bs prices
+    }).catch(() => null),
+  ]);
+
+  // Attach images to products
+  if (allImages.length > 0) {
+    const imagesByProduct = new Map<string, typeof allImages>();
+    for (const img of allImages) {
+      const existing = imagesByProduct.get(img.productId) ?? [];
+      existing.push(img);
+      imagesByProduct.set(img.productId, existing);
+    }
+    for (const product of catalogProducts) {
+      const imgs = imagesByProduct.get(product.id) ?? [];
+      product.images = imgs.map((img) => ({
+        id: img.id,
+        url: `/images/products/${product.id}/${img.id}`,
+        sortOrder: img.sortOrder,
+      }));
+    }
   }
+
+  const exchangeRate = exchangeRateResult ? Number(exchangeRateResult.rateBcv) : null;
 
   const responseData = {
     business: {

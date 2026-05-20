@@ -1,19 +1,26 @@
 /**
- * Health check endpoint.
+ * Health check endpoints.
  *
- * Returns the status of the API and its dependent services.
- * Used by monitoring tools (Uptime Kuma) and load balancers.
+ * Two probes following Kubernetes/Docker best practices:
  *
- * HTTP status codes:
- * - 200: Process is alive and can serve requests
- * - 503: Process is alive but critical services (DB) are down
+ * GET /health/live  — Liveness probe
+ *   Returns 200 if the process is alive and can handle requests.
+ *   Does NOT check external dependencies (DB, Redis).
+ *   Used by Docker HEALTHCHECK and orchestrators to detect crashed processes.
+ *   If this fails, the container should be restarted.
  *
- * The response body always contains honest service status regardless
- * of the HTTP code. Monitoring tools should check body.services for
- * detailed status.
+ * GET /health/ready — Readiness probe
+ *   Returns 200 if the process can serve traffic (DB + Redis connected).
+ *   Returns 503 if critical dependencies are down.
+ *   Used by load balancers to stop routing traffic to unhealthy instances.
+ *   During migrations or DB restarts, this returns 503 but the container
+ *   should NOT be restarted (liveness is still 200).
+ *
+ * GET /health       — Legacy (alias for /health/ready, backward compatible)
  */
 
 import { Hono } from "hono";
+import type { Context } from "hono";
 import { sql } from "drizzle-orm";
 import type { HealthCheckResponse } from "@nova/shared";
 import { tryGetDb } from "../db";
@@ -21,7 +28,29 @@ import { getRedis } from "../redis";
 
 export const health = new Hono();
 
+/**
+ * Liveness probe: process is alive.
+ * Always returns 200 — if this endpoint responds, the process is healthy.
+ * No external dependency checks (those belong in readiness).
+ */
+health.get("/live", (c) => {
+  return c.json({ status: "ok", timestamp: new Date().toISOString() });
+});
+
+/**
+ * Readiness probe: process can serve traffic.
+ * Checks DB connectivity (read + write) and Redis.
+ */
+health.get("/ready", async (c) => {
+  return readinessCheck(c);
+});
+
+/** Legacy endpoint (backward compatible — same as /ready). */
 health.get("/", async (c) => {
+  return readinessCheck(c);
+});
+
+async function readinessCheck(c: Context) {
   let dbOk = false;
   let redisOk = false;
 
@@ -92,4 +121,4 @@ health.get("/", async (c) => {
   const httpStatus = status === "error" ? 503 : 200;
 
   return c.json(response, httpStatus);
-});
+}
