@@ -55,9 +55,9 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="flex min-h-screen flex-col bg-white transition-colors dark:bg-gray-950">
+  <div class="flex min-h-screen flex-col bg-white transition-colors dark:bg-black">
     <!-- HEADER -->
-    <header class="shrink-0 bg-white pt-[env(safe-area-inset-top)] z-30 dark:bg-gray-950">
+    <header class="shrink-0 bg-white pt-[env(safe-area-inset-top)] z-30 dark:bg-black">
       <div class="px-5 pb-3 pt-4">
         <div class="flex items-center justify-between">
           <div class="flex flex-col">
@@ -76,7 +76,7 @@ onMounted(() => {
           <div class="flex items-center gap-2">
             <!-- Dark mode toggle -->
             <button
-              class="flex h-10 w-10 items-center justify-center rounded-full border border-gray-100 bg-gray-50 text-gray-600 transition-colors hover:bg-gray-100 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800"
+              class="flex h-10 w-10 items-center justify-center rounded-full border border-gray-100 bg-gray-50 text-gray-600 transition-colors hover:bg-gray-100 dark:border-white/8 dark:bg-[#111] dark:text-gray-300 dark:hover:bg-white/10"
               :aria-label="isDark ? 'Modo claro' : 'Modo oscuro'"
               @click="toggleColorMode"
             >
@@ -87,7 +87,7 @@ onMounted(() => {
             <!-- Cart -->
             <NuxtLink
               to="/tienda/cart"
-              class="relative flex h-10 w-10 items-center justify-center rounded-full border border-gray-100 bg-gray-50 transition-colors hover:bg-gray-100 dark:border-gray-800 dark:bg-gray-900 dark:hover:bg-gray-800"
+              class="relative flex h-10 w-10 items-center justify-center rounded-full border border-gray-100 bg-gray-50 transition-colors hover:bg-gray-100 dark:border-white/8 dark:bg-[#111] dark:hover:bg-white/10"
               aria-label="Ver carrito"
             >
               <ShoppingCart :size="18" class="text-gray-800 dark:text-gray-200" />
@@ -111,7 +111,7 @@ onMounted(() => {
     <!-- PWA INSTALL BANNER -->
     <div
       v-if="showBanner"
-      class="fixed bottom-[90px] left-4 right-4 z-50 rounded-2xl border border-gray-100 bg-white p-4 shadow-[0_8px_30px_rgba(0,0,0,0.12)] dark:border-gray-800 dark:bg-gray-900"
+      class="fixed bottom-[90px] left-4 right-4 z-50 rounded-2xl border border-gray-100 bg-white p-4 shadow-[0_8px_30px_rgba(0,0,0,0.12)] dark:border-white/8 dark:bg-[#111]"
     >
       <div class="flex items-center gap-3">
         <div class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-gray-900 dark:bg-white">
@@ -149,7 +149,7 @@ onMounted(() => {
     </div>
 
     <!-- BOTTOM NAVIGATION -->
-    <nav class="fixed bottom-0 w-full border-t border-gray-100 bg-white pb-[env(safe-area-inset-bottom)] pt-3 z-40 shadow-[0_-4px_20px_rgba(0,0,0,0.04)] dark:border-gray-800 dark:bg-gray-950">
+    <nav class="fixed bottom-0 w-full border-t border-gray-100 bg-white pb-[env(safe-area-inset-bottom)] pt-3 z-40 shadow-[0_-4px_20px_rgba(0,0,0,0.04)] dark:border-white/8 dark:bg-black">
       <div class="flex items-center justify-around px-4">
         <!-- Catalogo -->
         <NuxtLink
@@ -225,7 +225,7 @@ onMounted(() => {
     </nav>
 
     <!-- Footer -->
-    <footer class="border-t border-gray-100 bg-white/60 py-6 dark:border-gray-800 dark:bg-gray-950/60">
+    <footer class="border-t border-gray-100 bg-white/60 py-6 dark:border-white/8 dark:bg-black/60">
       <div class="px-5 text-center text-xs text-gray-400 dark:text-gray-500">
         <p>Tienda en linea · Precios en USD</p>
         <p v-if="tenantSlug" class="mt-1">

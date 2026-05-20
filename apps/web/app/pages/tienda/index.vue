@@ -154,18 +154,18 @@ onMounted(() => {
     <!-- ============================================================ -->
     <div v-if="isLoading" class="px-5 pt-5">
       <div class="mb-4">
-        <div class="h-12 flex-1 rounded-2xl bg-gray-100 animate-pulse dark:bg-gray-800" />
+        <div class="h-12 flex-1 rounded-2xl bg-gray-100 animate-pulse dark:bg-white/5" />
       </div>
       <div class="mb-5 flex gap-2.5">
-        <div v-for="n in 4" :key="n" class="h-10 w-20 rounded-full bg-gray-100 animate-pulse dark:bg-gray-800" />
+        <div v-for="n in 4" :key="n" class="h-10 w-20 rounded-full bg-gray-100 animate-pulse dark:bg-white/5" />
       </div>
       <div class="grid grid-cols-2 gap-x-4 gap-y-7">
         <div v-for="n in 6" :key="n" class="flex flex-col">
-          <div class="aspect-[4/5] rounded-[24px] bg-gray-100 animate-pulse mb-3 dark:bg-gray-800" />
+          <div class="aspect-[4/5] rounded-[24px] bg-gray-100 animate-pulse mb-3 dark:bg-white/5" />
           <div class="space-y-2 px-1">
-            <div class="h-3 w-16 rounded bg-gray-100 animate-pulse dark:bg-gray-800" />
-            <div class="h-4 w-28 rounded bg-gray-100 animate-pulse dark:bg-gray-800" />
-            <div class="h-5 w-20 rounded bg-gray-100 animate-pulse dark:bg-gray-800" />
+            <div class="h-3 w-16 rounded bg-gray-100 animate-pulse dark:bg-white/5" />
+            <div class="h-4 w-28 rounded bg-gray-100 animate-pulse dark:bg-white/5" />
+            <div class="h-5 w-20 rounded bg-gray-100 animate-pulse dark:bg-white/5" />
           </div>
         </div>
       </div>
@@ -190,7 +190,7 @@ onMounted(() => {
     <template v-else>
       <!-- Store disabled -->
       <div v-if="business && !storeInfo" class="px-5 py-16 text-center">
-        <div class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800">
+        <div class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gray-100 dark:bg-white/5">
           <ShoppingBag :size="28" class="text-gray-400" />
         </div>
         <p class="text-base font-medium text-gray-600 dark:text-gray-300">Esta tienda no esta disponible</p>
@@ -199,7 +199,7 @@ onMounted(() => {
 
       <!-- No products -->
       <div v-else-if="products.length === 0" class="px-5 py-16 text-center">
-        <div class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800">
+        <div class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gray-100 dark:bg-white/5">
           <ShoppingBag :size="28" class="text-gray-400" />
         </div>
         <p class="text-base font-medium text-gray-600 dark:text-gray-300">No hay productos disponibles</p>
@@ -218,7 +218,7 @@ onMounted(() => {
               v-model="searchQuery"
               type="text"
               :placeholder="`Buscar en ${business?.name ?? 'tienda'}...`"
-              class="w-full rounded-2xl border-transparent bg-gray-50 py-3.5 pl-11 pr-4 text-sm font-medium text-gray-900 placeholder-gray-400 outline-none transition-all focus:border-gray-200 focus:bg-white focus:ring-4 focus:ring-gray-50 dark:bg-gray-800 dark:text-white dark:placeholder-gray-500 dark:focus:border-gray-700 dark:focus:bg-gray-800 dark:focus:ring-gray-800/50"
+              class="w-full rounded-2xl border-transparent bg-gray-50 py-3.5 pl-11 pr-4 text-sm font-medium text-gray-900 placeholder-gray-400 outline-none transition-all focus:border-gray-200 focus:bg-white focus:ring-4 focus:ring-gray-50 dark:bg-white/5 dark:text-white dark:placeholder-gray-500 dark:focus:border-gray-700 dark:focus:bg-gray-800 dark:focus:ring-gray-800/50"
             >
           </div>
         </div>
@@ -226,7 +226,7 @@ onMounted(() => {
         <!-- CATEGORY CHIPS (sticky) -->
         <div
           v-if="categories.length > 0"
-          class="sticky top-0 z-20 border-b border-gray-100 bg-white py-3 pl-5 shadow-[0_4px_20px_-10px_rgba(0,0,0,0.05)] dark:border-gray-800 dark:bg-gray-950"
+          class="sticky top-0 z-20 border-b border-gray-100 bg-white py-3 pl-5 shadow-[0_4px_20px_-10px_rgba(0,0,0,0.05)] dark:border-white/8 dark:bg-black"
         >
           <div class="no-scrollbar flex gap-2.5 overflow-x-auto pr-5 pb-1">
             <button
@@ -234,7 +234,7 @@ onMounted(() => {
               :class="
                 selectedCategory === null
                   ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900'
-                  : 'border border-gray-100 bg-gray-50 text-gray-600 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300'
+                  : 'border border-gray-100 bg-gray-50 text-gray-600 hover:bg-gray-100 dark:border-white/8 dark:bg-white/5 dark:text-gray-300'
               "
               @click="selectedCategory = null"
             >
@@ -248,7 +248,7 @@ onMounted(() => {
               :class="
                 selectedCategory === cat.name
                   ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900'
-                  : 'border border-gray-100 bg-gray-50 text-gray-600 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300'
+                  : 'border border-gray-100 bg-gray-50 text-gray-600 hover:bg-gray-100 dark:border-white/8 dark:bg-white/5 dark:text-gray-300'
               "
               @click="selectedCategory = cat.name"
             >
@@ -258,11 +258,11 @@ onMounted(() => {
         </div>
 
         <!-- SCROLLABLE CONTENT -->
-        <div class="bg-[#FAFAFA] px-5 pt-5 dark:bg-gray-900/50">
+        <div class="bg-[#FAFAFA] px-5 pt-5 dark:bg-black">
           <!-- INFO BANNER -->
           <div
             v-if="storeInfo && (storeInfo.welcomeMessage || todayHours || exchangeRate || storeInfo.deliveryEnabled)"
-            class="mb-6 flex items-start gap-3 rounded-2xl border border-gray-100 bg-white p-3.5 shadow-sm dark:border-gray-800 dark:bg-gray-900"
+            class="mb-6 flex items-start gap-3 rounded-2xl border border-gray-100 bg-white p-3.5 shadow-sm dark:border-white/8 dark:bg-[#111]"
           >
             <div class="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-500 dark:bg-blue-900/30 dark:text-blue-400">
               <Info :size="14" />

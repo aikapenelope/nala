@@ -37,9 +37,9 @@ function handleScroll(event: Event) {
 </script>
 
 <template>
-  <div class="group flex flex-col overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm transition-all hover:shadow-md dark:border-gray-800 dark:bg-gray-900" :class="{ 'animate-[cartBounce_0.4s_ease-out]': isAdded }">
+  <div class="group flex flex-col overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm transition-all hover:shadow-md dark:border-white/8 dark:bg-[#111]" :class="{ 'animate-[cartBounce_0.4s_ease-out]': isAdded }">
     <!-- Image (links to product detail) -->
-    <NuxtLink :to="`/tienda/product/${product.id}`" class="relative aspect-square w-full overflow-hidden bg-gray-50 dark:bg-gray-800">
+    <NuxtLink :to="`/tienda/product/${product.id}`" class="relative aspect-square w-full overflow-hidden bg-gray-50 dark:bg-white/5">
       <!-- Multi-image carousel -->
       <template v-if="product.images && product.images.length > 1">
         <div
@@ -80,7 +80,7 @@ function handleScroll(event: Event) {
       </template>
       <!-- No image -->
       <template v-else>
-        <div class="flex h-full w-full items-center justify-center bg-gray-100 text-gray-300 dark:bg-gray-800 dark:text-gray-600">
+        <div class="flex h-full w-full items-center justify-center bg-gray-100 text-gray-300 dark:bg-white/5 dark:text-gray-600">
           <ShoppingBag :size="36" />
         </div>
       </template>
@@ -88,7 +88,7 @@ function handleScroll(event: Event) {
       <!-- Out of stock overlay -->
       <div
         v-if="!product.available"
-        class="absolute inset-0 flex items-center justify-center bg-white/80 backdrop-blur-[2px] dark:bg-gray-900/80"
+        class="absolute inset-0 flex items-center justify-center bg-white/80 backdrop-blur-[2px] dark:bg-black/85"
       >
         <span class="rounded-full bg-red-50 px-4 py-1.5 text-xs font-bold text-red-600 ring-1 ring-red-100 dark:bg-red-900/30 dark:text-red-400 dark:ring-red-800">
           Agotado
@@ -153,7 +153,7 @@ function handleScroll(event: Event) {
       <!-- Out of stock: disabled button -->
       <div
         v-else
-        class="mt-3 flex h-10 w-full items-center justify-center rounded-xl bg-gray-100 text-xs font-bold text-gray-400 dark:bg-gray-800 dark:text-gray-500"
+        class="mt-3 flex h-10 w-full items-center justify-center rounded-xl bg-gray-100 text-xs font-bold text-gray-400 dark:bg-white/5 dark:text-gray-500"
       >
         Agotado
       </div>
