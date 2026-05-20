@@ -48,7 +48,7 @@ async function createCustomer() {
     isSubmitting.value = false;
   }
 }
-onMounted(async () => { await useOwnerLockRedirect(); });
+
 </script>
 
 <template>

@@ -2,15 +2,16 @@
  * Owner Lock composable.
  *
  * PIN-based lock for sensitive sections. Architecture:
- * - Protected pages call useOwnerLockRedirect() in onMounted()
- * - A watcher auto-redirects when the 15-min timer expires
- * - /unlock page shows PIN pad and redirects back on success
+ * - A global route middleware (owner-lock.global.ts) intercepts
+ *   navigation to protected routes and redirects to /unlock if locked.
+ * - A watcher in the layout auto-redirects when the 15-min timer
+ *   expires while the user is on a protected route.
+ * - /unlock page shows PIN pad and redirects back on success.
  *
- * Why onMounted instead of middleware:
- * useApi() depends on useClerk() which requires Vue component setup
- * context. Nuxt route middlewares don't have this context, so API
- * calls fail silently. onMounted runs inside the component where
- * Clerk is available.
+ * The middleware approach eliminates:
+ * - Content flash (page never mounts if locked)
+ * - Duplicate redirects (single interception point)
+ * - KeepAlive destruction (layout slot is never conditionally hidden)
  */
 
 import { LOCKED_ROUTES } from "~/utils/locked-routes";
@@ -29,8 +30,42 @@ const lockEnabled = ref(false);
 const unlocked = ref(false);
 let initPromise: Promise<void> | null = null;
 let unlockTimer: ReturnType<typeof setTimeout> | null = null;
-let watcherSetup = false;
-let activeScope: ReturnType<typeof effectScope> | null = null;
+
+/**
+ * Fetch lock status using $fetch directly.
+ * Works in any context (middleware, plugin, component) because it
+ * doesn't depend on useClerk() — it gets the token from useAuth().
+ *
+ * If Clerk hasn't loaded yet, returns { enabled: false } to avoid
+ * blocking the app. The middleware will re-check on next navigation.
+ */
+async function fetchLockStatus(): Promise<{ enabled: boolean }> {
+  if (!import.meta.client) return { enabled: false };
+
+  const { isLoaded, getToken } = useAuth();
+
+  // Clerk not ready — can't authenticate the request.
+  // Return disabled to avoid blocking; middleware will retry next nav.
+  if (!isLoaded.value) return { enabled: false };
+
+  const config = useRuntimeConfig();
+  const apiBase = config.public.apiBase as string;
+  const headers: Record<string, string> = {};
+
+  try {
+    const token = await getToken.value();
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+  } catch {
+    // Token retrieval failed — proceed without auth
+  }
+
+  return await $fetch<{ enabled: boolean }>("/api/owner-lock/status", {
+    baseURL: apiBase,
+    headers,
+  });
+}
 
 export function useOwnerLock() {
   const { $api } = useApi();
@@ -48,22 +83,36 @@ export function useOwnerLock() {
 
   const isEnabled = computed(() => lockEnabled.value);
 
+  /**
+   * Initialize lock status. Idempotent — safe to call multiple times.
+   * Uses $fetch directly so it works in middleware, plugins, and components.
+   *
+   * If Clerk isn't loaded yet, does NOT mark statusChecked = true,
+   * allowing the next call to retry once Clerk is ready.
+   */
   async function ensureInitialized(): Promise<void> {
     if (statusChecked.value) return;
     if (initPromise) return initPromise;
 
     initPromise = (async () => {
       try {
-        const result = await $api<{ enabled: boolean }>(
-          "/api/owner-lock/status",
-          { silent: true },
-        );
+        // Check if Clerk is loaded before attempting fetch
+        if (import.meta.client) {
+          const { isLoaded } = useAuth();
+          if (!isLoaded.value) {
+            // Clerk not ready — don't mark as checked, allow retry
+            return;
+          }
+        }
+
+        const result = await fetchLockStatus();
         lockEnabled.value = result.enabled;
+        statusChecked.value = true;
       } catch {
         // API failed: assume disabled so we don't permanently block the app
         lockEnabled.value = false;
-      } finally {
         statusChecked.value = true;
+      } finally {
         initPromise = null;
       }
     })();
@@ -152,43 +201,6 @@ export function useOwnerLock() {
     }
   }
 
-  /**
-   * Set up a watcher that auto-redirects to /unlock when the timer
-   * expires and the user is on a protected route.
-   *
-   * Uses effectScope(true) to create a detached scope that survives
-   * component unmounts. Without this, the watcher dies when the first
-   * protected page unmounts, breaking auto-redirect for the session.
-   */
-  function setupAutoRedirect() {
-    if (!import.meta.client) return;
-    if (watcherSetup) return;
-    watcherSetup = true;
-
-    // Stop previous scope if it exists (handles Vite HMR re-evaluation)
-    activeScope?.stop();
-    activeScope = effectScope(true);
-    activeScope.run(() => {
-      const router = useRouter();
-      const route = useRoute();
-
-      watch(isLocked, (nowLocked) => {
-        if (!nowLocked) return;
-
-        const isProtected = LOCKED_ROUTES.some(
-          (r) => route.path === r || route.path.startsWith(r + "/"),
-        );
-
-        if (isProtected) {
-          router.replace({
-            path: "/unlock",
-            query: { redirect: route.fullPath },
-          });
-        }
-      });
-    });
-  }
-
   /** True once the initial status check has completed. */
   const isReady = computed(() => statusChecked.value);
 
@@ -201,29 +213,35 @@ export function useOwnerLock() {
     lock,
     setupPin,
     disablePin,
-    setupAutoRedirect,
   };
 }
 
 /**
- * Call in onMounted() of any protected page.
- * Checks lock status and redirects to /unlock if locked.
- * Also sets up the auto-redirect watcher for timer expiry.
+ * Set up a watcher that auto-redirects to /unlock when the 15-min
+ * timer expires and the user is on a protected route.
+ *
+ * Call this once from the layout component. The watcher lives as long
+ * as the layout lives (which is the entire app session).
  */
-export async function useOwnerLockRedirect() {
+export function useOwnerLockAutoRedirect() {
   if (!import.meta.client) return;
 
-  const { isLocked, ensureInitialized, setupAutoRedirect } = useOwnerLock();
-  const route = useRoute();
+  const { isLocked } = useOwnerLock();
   const router = useRouter();
+  const route = useRoute();
 
-  await ensureInitialized();
-  setupAutoRedirect();
+  watch(isLocked, (nowLocked) => {
+    if (!nowLocked) return;
 
-  if (isLocked.value) {
-    router.replace({
-      path: "/unlock",
-      query: { redirect: route.fullPath },
-    });
-  }
+    const isProtected = LOCKED_ROUTES.some(
+      (r) => route.path === r || route.path.startsWith(r + "/"),
+    );
+
+    if (isProtected) {
+      router.replace({
+        path: "/unlock",
+        query: { redirect: route.fullPath },
+      });
+    }
+  });
 }

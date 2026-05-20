@@ -50,7 +50,6 @@ const customer = ref<CustomerDetail | null>(null);
 const stats = ref<CustomerStats | null>(null);
 
 onMounted(async () => {
-  await useOwnerLockRedirect();
   try {
     // Load customer detail first (critical)
     const custResult = await $api<{ customer: CustomerDetail }>(

@@ -164,8 +164,7 @@ async function loadAccounts() {
   }
 }
 
-onMounted(async () => {
-  await useOwnerLockRedirect();
+onMounted(() => {
   loadAccounts();
 });
 

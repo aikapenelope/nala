@@ -64,7 +64,6 @@ function onSearchInput() {
 }
 
 onMounted(async () => {
-  await useOwnerLockRedirect();
   await fetchCustomers();
 
   // Auto-calculate RFM if no customers have scores yet.

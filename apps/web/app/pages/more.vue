@@ -27,6 +27,8 @@ import { LOCKED_ROUTES } from "~/utils/locked-routes";
 const { user } = useNovaAuth();
 const { isLocked, isReady, ensureInitialized } = useOwnerLock();
 
+// Initialize lock status so lock icons display correctly.
+// This is a non-protected page, so the middleware won't trigger init.
 onMounted(() => { ensureInitialized(); });
 
 function isRouteLocked(path: string): boolean {

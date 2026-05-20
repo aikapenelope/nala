@@ -43,8 +43,7 @@ async function fetchSuppliers() {
   }
 }
 
-onMounted(async () => {
-  await useOwnerLockRedirect();
+onMounted(() => {
   fetchSuppliers();
 });
 
