@@ -27,6 +27,45 @@ const PUBLIC_LIMIT: RateLimitConfig = { max: 60, windowSeconds: 60 };
 const AUTH_LIMIT: RateLimitConfig = { max: 120, windowSeconds: 60 };
 const WRITE_LIMIT: RateLimitConfig = { max: 30, windowSeconds: 60 };
 
+/**
+ * Whether to trust proxy headers (X-Forwarded-For, X-Real-IP).
+ *
+ * When TRUSTED_PROXY is set (any truthy value), the rate limiter uses
+ * the IP from proxy headers. When not set, it falls back to a generic
+ * identifier — this prevents attackers from spoofing their IP via headers
+ * when there's no reverse proxy sanitizing them.
+ *
+ * In production behind Cloudflare/Nginx/Coolify, set TRUSTED_PROXY=1.
+ */
+const TRUST_PROXY = Boolean(process.env.TRUSTED_PROXY);
+
+/**
+ * Extract the client IP address for rate limiting.
+ *
+ * Security: only trusts X-Forwarded-For/X-Real-IP when TRUSTED_PROXY is set.
+ * Without a trusted proxy, these headers are user-controlled and spoofable.
+ */
+function getClientIp(c: Context): string {
+  if (TRUST_PROXY) {
+    const xff = c.req.header("x-forwarded-for");
+    if (xff) {
+      const firstIp = xff.split(",")[0]?.trim();
+      if (firstIp) return firstIp;
+    }
+    const realIp = c.req.header("x-real-ip");
+    if (realIp) return realIp;
+  }
+
+  // Fallback: still attempt headers (better than "unknown" for basic tracking)
+  const xff = c.req.header("x-forwarded-for");
+  if (xff) {
+    const firstIp = xff.split(",")[0]?.trim();
+    if (firstIp) return firstIp;
+  }
+
+  return c.req.header("x-real-ip") ?? "unknown";
+}
+
 /** In-memory fallback when Redis is unavailable. */
 const memoryStore = new Map<string, { count: number; resetAt: number }>();
 
@@ -115,11 +154,7 @@ function checkMemory(
  * Limits by client IP address.
  */
 export async function publicRateLimit(c: Context, next: Next) {
-  const ip =
-    c.req.header("x-forwarded-for")?.split(",")[0]?.trim() ??
-    c.req.header("x-real-ip") ??
-    "unknown";
-
+  const ip = getClientIp(c);
   const key = `rl:pub:${ip}`;
   const { allowed, remaining } = await checkRedis(key, PUBLIC_LIMIT);
 
@@ -141,11 +176,7 @@ export async function publicRateLimit(c: Context, next: Next) {
  * 3 requests per minute per IP.
  */
 export async function uploadRateLimit(c: Context, next: Next) {
-  const ip =
-    c.req.header("x-forwarded-for")?.split(",")[0]?.trim() ??
-    c.req.header("x-real-ip") ??
-    "unknown";
-
+  const ip = getClientIp(c);
   const config: RateLimitConfig = { max: 3, windowSeconds: 60 };
   const key = `rl:upload:${ip}`;
   const { allowed, remaining } = await checkRedis(key, config);
@@ -170,11 +201,7 @@ export async function uploadRateLimit(c: Context, next: Next) {
  * an attacker could exhaust all possibilities in ~3 minutes.
  */
 export async function pinVerifyRateLimit(c: Context, next: Next) {
-  const ip =
-    c.req.header("x-forwarded-for")?.split(",")[0]?.trim() ??
-    c.req.header("x-real-ip") ??
-    "unknown";
-
+  const ip = getClientIp(c);
   const config: RateLimitConfig = { max: 5, windowSeconds: 60 };
   const key = `rl:pin:${ip}`;
   const { allowed, remaining } = await checkRedis(key, config);
