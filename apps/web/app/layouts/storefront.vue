@@ -108,43 +108,42 @@ onMounted(() => {
       <slot />
     </main>
 
-    <!-- PWA INSTALL BANNER -->
+    <!-- PWA INSTALL BANNER (centered, modern) -->
     <div
       v-if="showBanner"
-      class="fixed bottom-[90px] left-4 right-4 z-50 rounded-2xl border border-gray-100 bg-white p-4 shadow-[0_8px_30px_rgba(0,0,0,0.12)] dark:border-white/8 dark:bg-[#111]"
+      class="fixed bottom-[90px] left-4 right-4 z-50 rounded-2xl border border-gray-100 bg-white p-5 shadow-[0_12px_40px_rgba(0,0,0,0.15)] dark:border-white/10 dark:bg-[#111] dark:shadow-[0_12px_40px_rgba(0,0,0,0.6)]"
     >
-      <div class="flex items-center gap-3">
-        <div class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-gray-900 dark:bg-white">
+      <div class="flex flex-col items-center gap-3 text-center">
+        <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-gray-900 shadow-lg dark:bg-white">
           <svg
-            xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+            xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
             class="text-white dark:text-gray-900"
           >
             <rect width="14" height="20" x="5" y="2" rx="2" ry="2" /><path d="M12 18h.01" />
           </svg>
         </div>
-        <div class="min-w-0 flex-1">
-          <p class="text-sm font-semibold text-gray-900 dark:text-white">Instala esta tienda</p>
-          <p v-if="isIos" class="text-xs text-gray-500 dark:text-gray-400">
+        <div>
+          <p class="text-sm font-bold text-gray-900 dark:text-white">Instala {{ storeName }}</p>
+          <p v-if="isIos" class="mt-1 text-xs text-gray-500 dark:text-gray-400">
             Toca compartir y luego "Agregar a inicio"
           </p>
-          <p v-else class="text-xs text-gray-500 dark:text-gray-400">Accede rapido desde tu celular</p>
+          <p v-else class="mt-1 text-xs text-gray-500 dark:text-gray-400">Accede rapido desde tu celular</p>
         </div>
-        <button
-          v-if="canInstall"
-          class="flex-shrink-0 rounded-xl bg-gray-900 px-4 py-2 text-xs font-bold text-white dark:bg-white dark:text-gray-900"
-          @click="handleInstall"
-        >
-          Instalar
-        </button>
-        <button
-          class="flex-shrink-0 p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-          aria-label="Cerrar"
-          @click="dismiss"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M18 6 6 18" /><path d="m6 6 12 12" />
-          </svg>
-        </button>
+        <div class="flex w-full gap-2">
+          <button
+            v-if="canInstall"
+            class="flex-1 rounded-xl bg-gray-900 py-2.5 text-sm font-bold text-white shadow-md transition-all active:scale-[0.97] dark:bg-white dark:text-black dark:shadow-[0_4px_16px_rgba(255,255,255,0.12)]"
+            @click="handleInstall"
+          >
+            Instalar app
+          </button>
+          <button
+            class="rounded-xl px-4 py-2.5 text-sm font-medium text-gray-400 transition-colors hover:text-gray-700 dark:hover:text-gray-200"
+            @click="dismiss"
+          >
+            Ahora no
+          </button>
+        </div>
       </div>
     </div>
 
