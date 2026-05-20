@@ -570,22 +570,31 @@ const businessHoursSchema = z
   })
   .nullable();
 
+/**
+ * Payment method configuration schema for store settings.
+ * Each entry defines a method the store accepts, with a display label
+ * and key-value details (bank name, phone, CI, etc.).
+ */
+const storePaymentMethodSchema = z.object({
+  method: z.string().min(1).max(50),
+  label: z.string().min(1).max(100),
+  details: z.record(z.string().max(200)).refine(
+    (obj) => Object.keys(obj).length <= 10,
+    { message: "Maximo 10 campos por metodo de pago" },
+  ),
+});
+
 const updateStoreSettingsSchema = z.object({
   storeEnabled: z.boolean().optional(),
   paymentMethods: z
-    .array(
-      z.object({
-        method: z.string().min(1),
-        label: z.string().min(1),
-        details: z.record(z.string()),
-      }),
-    )
+    .array(storePaymentMethodSchema)
+    .max(10, "Maximo 10 metodos de pago")
     .optional(),
   deliveryEnabled: z.boolean().optional(),
-  deliveryFee: z.number().min(0).optional(),
+  deliveryFee: z.number().min(0).max(9999).optional(),
   deliveryZones: z.string().max(500).optional().nullable(),
   welcomeMessage: z.string().max(500).optional().nullable(),
-  minOrderAmount: z.number().min(0).optional(),
+  minOrderAmount: z.number().min(0).max(99999).optional(),
   businessHours: businessHoursSchema.optional(),
 });
 
