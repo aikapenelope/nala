@@ -37,6 +37,7 @@ import { suppliersRoutes } from "./routes/suppliers";
 import { configRoutes } from "./routes/config";
 import { ordersRoutes } from "./routes/orders";
 import { pushRoutes } from "./routes/push";
+import { dashboardRoutes } from "./routes/dashboard";
 import { authMiddleware } from "./middleware/auth";
 import { tenantMiddleware } from "./middleware/tenant";
 import { publicRateLimit, apiRateLimit } from "./middleware/rate-limit";
@@ -243,6 +244,9 @@ api.get("/me", (c) => {
   const user = c.get("user");
   return c.json({ user });
 });
+
+// Consolidated dashboard (single call replaces 12 individual calls)
+api.route("/", dashboardRoutes);
 
 // Business settings
 api.route("/", businessSettings);
