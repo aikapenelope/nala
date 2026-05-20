@@ -1068,9 +1068,19 @@ reports.get("/reports/customer-stats/:id", validateUuidParam, async (c) => {
 
   try {
 
-  // Verify customer exists
+  // Verify customer exists — use explicit columns to avoid dependency on
+  // schema additions (e.g., RFM columns) that might not exist in the DB yet.
   const [customer] = await db
-    .select()
+    .select({
+      id: customers.id,
+      name: customers.name,
+      phone: customers.phone,
+      totalPurchases: customers.totalPurchases,
+      totalSpentUsd: customers.totalSpentUsd,
+      averageTicketUsd: customers.averageTicketUsd,
+      balanceUsd: customers.balanceUsd,
+      lastPurchaseAt: customers.lastPurchaseAt,
+    })
     .from(customers)
     .where(
       and(eq(customers.id, customerId), eq(customers.businessId, businessId)),

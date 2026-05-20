@@ -52,17 +52,22 @@ const stats = ref<CustomerStats | null>(null);
 onMounted(async () => {
   await useOwnerLockRedirect();
   try {
-    const [custResult, statsResult] = await Promise.all([
-      $api<{ customer: CustomerDetail }>(
-        `/api/customers/${customerId.value}`,
-      ),
-      $api<CustomerStats>(
-        `/api/reports/customer-stats/${customerId.value}`,
-      ),
-    ]);
-
+    // Load customer detail first (critical)
+    const custResult = await $api<{ customer: CustomerDetail }>(
+      `/api/customers/${customerId.value}`,
+    );
     customer.value = custResult.customer;
-    stats.value = statsResult;
+
+    // Load stats separately (non-critical — page still works without it)
+    try {
+      const statsResult = await $api<CustomerStats>(
+        `/api/reports/customer-stats/${customerId.value}`,
+      );
+      stats.value = statsResult;
+    } catch {
+      // Stats failed but customer loaded — show what we have
+      stats.value = null;
+    }
   } catch (err) {
     const message =
       err instanceof Error ? err.message : "Error cargando datos del cliente";
@@ -108,7 +113,7 @@ function formatMonth(month: string): string {
       {{ loadError }}
     </div>
 
-    <template v-else-if="customer && stats">
+    <template v-else-if="customer">
       <!-- Customer header -->
       <div class="mb-6 rounded-xl bg-white p-6 shadow-sm">
         <h2 class="text-lg font-bold text-gray-900">{{ customer.name }}</h2>
@@ -214,7 +219,7 @@ function formatMonth(month: string): string {
 
       <!-- Top products -->
       <div
-        v-if="stats.topProducts.length > 0"
+        v-if="stats && stats.topProducts.length > 0"
         class="mb-6 rounded-xl bg-white p-6 shadow-sm"
       >
         <h2 class="mb-4 text-sm font-semibold text-gray-700">
@@ -241,7 +246,7 @@ function formatMonth(month: string): string {
 
       <!-- Monthly trend -->
       <div
-        v-if="stats.monthlyTrend.length > 0"
+        v-if="stats && stats.monthlyTrend.length > 0"
         class="mb-6 rounded-xl bg-white p-6 shadow-sm"
       >
         <h2 class="mb-4 text-sm font-semibold text-gray-700">
