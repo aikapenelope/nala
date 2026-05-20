@@ -263,6 +263,20 @@ async function submitOrder() {
       </div>
     </div>
 
+    <!-- Store address (helps buyer know where to pick up or where the store is) -->
+    <div
+      v-if="business?.address"
+      class="mb-5 flex items-start gap-3 rounded-2xl border border-gray-100 bg-white/70 p-4 backdrop-blur-md"
+    >
+      <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+      </div>
+      <div>
+        <p class="text-xs font-bold text-gray-700">Ubicacion de la tienda</p>
+        <p class="mt-0.5 text-sm text-gray-600">{{ business.address }}</p>
+      </div>
+    </div>
+
     <!-- Customer info form -->
     <div class="space-y-4">
       <div>
