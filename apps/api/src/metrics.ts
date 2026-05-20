@@ -21,6 +21,7 @@
 import {
   Registry,
   Counter,
+  Gauge,
   Histogram,
   collectDefaultMetrics,
 } from "prom-client";
@@ -65,6 +66,54 @@ export const httpRequestDuration = new Histogram({
 });
 
 // ---------------------------------------------------------------------------
+// Infrastructure metrics
+// ---------------------------------------------------------------------------
+
+/**
+ * Number of database queries currently in-flight.
+ * Approximates pool utilization: if this approaches the pool max (20),
+ * queries are likely waiting for a free connection.
+ */
+export const dbQueriesInFlight = new Gauge({
+  name: "db_queries_inflight",
+  help: "Number of database queries currently executing",
+  registers: [metricsRegistry],
+});
+
+/**
+ * Total Redis operations counter.
+ * Labels: operation (get/set/eval/etc.), status (ok/error)
+ * Tracks how Nova interacts with Redis — not Redis health itself.
+ */
+export const redisOperationsTotal = new Counter({
+  name: "redis_operations_total",
+  help: "Total Redis operations from the application",
+  labelNames: ["operation", "status"] as const,
+  registers: [metricsRegistry],
+});
+
+// ---------------------------------------------------------------------------
+// Path normalization (fallback when routePath is unavailable)
+// ---------------------------------------------------------------------------
+
+/** Paths to exclude from metrics (internal/infra endpoints). */
+const EXCLUDED_PATHS = new Set(["/metrics", "/health"]);
+
+/**
+ * Normalize a URL path by replacing UUIDs and numeric IDs with placeholders.
+ * Used as fallback when `c.req.routePath` is not available (e.g., 404 handlers).
+ * Prevents label cardinality explosion in Prometheus.
+ */
+function normalizePath(path: string): string {
+  return path
+    .replace(
+      /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi,
+      ":id",
+    )
+    .replace(/\/\d+/g, "/:id");
+}
+
+// ---------------------------------------------------------------------------
 // Middleware: measures every request
 // ---------------------------------------------------------------------------
 
@@ -74,16 +123,23 @@ export const httpRequestDuration = new Histogram({
  * Place AFTER the logger middleware and BEFORE route definitions.
  * Uses `c.req.routePath` when available (matched route pattern like "/api/sales/:id")
  * to avoid high-cardinality labels from dynamic paths.
+ *
+ * Excludes /metrics and /health to avoid noise from Prometheus scrapes
+ * and load balancer health checks.
  */
 export async function metricsMiddleware(c: Context, next: Next) {
   const start = performance.now();
 
   await next();
 
+  // Skip internal endpoints (Prometheus scrapes, health checks)
+  const rawPath = c.req.path;
+  if (EXCLUDED_PATHS.has(rawPath)) return;
+
   const duration = (performance.now() - start) / 1000;
-  // Use route pattern (e.g., "/api/sales/:id") instead of actual path
-  // to prevent label explosion from dynamic segments (UUIDs, etc.)
-  const path = c.req.routePath || c.req.path;
+  // Use route pattern (e.g., "/api/sales/:id") instead of actual path.
+  // Fall back to normalized path to prevent label explosion from UUIDs.
+  const path = c.req.routePath || normalizePath(rawPath);
   const method = c.req.method;
   const status = String(c.res.status);
 

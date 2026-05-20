@@ -6,6 +6,7 @@
  */
 
 import Redis from "ioredis";
+import { logger } from "./logger";
 
 let _redis: Redis | null = null;
 
@@ -21,7 +22,7 @@ export function initRedis(): Redis | null {
 
   const url = process.env.REDIS_URL;
   if (!url) {
-    console.warn("REDIS_URL not set. Redis features disabled.");
+    logger.warn("redis", "REDIS_URL not set, features disabled");
     return null;
   }
 
@@ -34,7 +35,7 @@ export function initRedis(): Redis | null {
   });
 
   _redis.on("error", (err) => {
-    console.error("Redis connection error:", err.message);
+    logger.error("redis", "Connection error", { error: err.message });
   });
 
   return _redis;

@@ -22,6 +22,7 @@
  */
 
 import sharp from "sharp";
+import { logger } from "../logger";
 
 /**
  * Configure sharp for production:
@@ -113,7 +114,7 @@ export async function processProductImage(
   } catch (err) {
     // Log but don't throw — caller will use original as fallback
     const message = err instanceof Error ? err.message : String(err);
-    console.error(`[image-processing] Failed to process image: ${message}`);
+    logger.error("image-processing", "Failed to process image", { error: message });
     return null;
   }
 }

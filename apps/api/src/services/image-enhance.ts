@@ -28,6 +28,7 @@
 
 import { fal } from "@fal-ai/client";
 import sharp from "sharp";
+import { logger } from "../logger";
 
 /** Configure fal.ai client from environment. */
 const FAL_KEY = process.env.FAL_KEY ?? "";
@@ -80,12 +81,15 @@ export async function enhanceProductImage(
   publicImageUrl: string,
 ): Promise<EnhancedImage | null> {
   if (!isEnhanceConfigured) {
-    console.warn("[image-enhance] FAL_KEY not configured. Enhancement disabled.");
+    logger.warn("image-enhance", "FAL_KEY not configured, enhancement disabled");
     return null;
   }
 
   if (imageBuffer.length > MAX_ENHANCE_SIZE) {
-    console.warn("[image-enhance] Image too large for enhancement:", imageBuffer.length);
+    logger.warn("image-enhance", "Image too large for enhancement", {
+      size: imageBuffer.length,
+      maxSize: MAX_ENHANCE_SIZE,
+    });
     return null;
   }
 
@@ -113,20 +117,22 @@ export async function enhanceProductImage(
 
     // Check if aborted
     if (controller.signal.aborted) {
-      console.error("[image-enhance] Timeout: fal.ai took longer than 25s");
+      logger.error("image-enhance", "Timeout: fal.ai took longer than 25s");
       return null;
     }
 
     const outputUrl = result.data?.image?.url;
     if (!outputUrl) {
-      console.error("[image-enhance] BiRefNet returned no image URL");
+      logger.error("image-enhance", "BiRefNet returned no image URL");
       return null;
     }
 
     // Step 2: Download the background-removed PNG from fal.ai CDN.
     const response = await fetch(outputUrl, { signal: controller.signal });
     if (!response.ok) {
-      console.error("[image-enhance] Failed to download result:", response.status);
+      logger.error("image-enhance", "Failed to download result", {
+        status: response.status,
+      });
       return null;
     }
 
@@ -149,10 +155,12 @@ export async function enhanceProductImage(
       })
       .toBuffer({ resolveWithObject: true });
 
-    console.log(
-      `[image-enhance] Success: ${imageBuffer.length} → ${enhanced.data.length} bytes ` +
-        `(${enhanced.info.width}x${enhanced.info.height}px, white background)`,
-    );
+    logger.info("image-enhance", "Enhancement successful", {
+      originalSize: imageBuffer.length,
+      outputSize: enhanced.data.length,
+      width: enhanced.info.width,
+      height: enhanced.info.height,
+    });
 
     return {
       buffer: enhanced.data,
@@ -162,7 +170,7 @@ export async function enhanceProductImage(
     };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    console.error(`[image-enhance] Enhancement failed: ${message}`);
+    logger.error("image-enhance", "Enhancement failed", { error: message });
     return null;
   }
 }

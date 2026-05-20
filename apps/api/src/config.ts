@@ -10,6 +10,8 @@
  * (e.g., auth middleware will reject requests without CLERK_SECRET_KEY).
  */
 
+import { logger } from "./logger";
+
 const NODE_ENV = process.env.NODE_ENV ?? "production";
 const isDev = NODE_ENV === "development";
 
@@ -40,23 +42,12 @@ function validateEnv(): void {
   }
 
   if (missing.length > 0) {
-    const message = [
-      "",
-      "Missing required environment variables:",
-      ...missing,
-      "",
-    ].join("\n");
-
     if (isDev) {
-      console.warn(`[config] WARNING: ${message}`);
-      console.warn(
-        "[config] Running in development mode. Some features will not work.\n",
-      );
+      logger.warn("config", "Missing required environment variables", { missing });
+      logger.warn("config", "Running in development mode, some features will not work");
     } else {
-      console.error(`[config] FATAL: ${message}`);
-      console.error(
-        "[config] Set NODE_ENV=development to run without these variables.\n",
-      );
+      logger.fatal("config", "Missing required environment variables", { missing });
+      logger.fatal("config", "Set NODE_ENV=development to run without these variables");
       process.exit(1);
     }
   }
@@ -64,7 +55,7 @@ function validateEnv(): void {
   // Log optional vars status
   for (const [key, description] of Object.entries(OPTIONAL_VARS)) {
     if (!process.env[key]) {
-      console.warn(`[config] Optional: ${key} not set (${description})`);
+      logger.warn("config", "Optional variable not set", { key, description });
     }
   }
 }

@@ -24,6 +24,7 @@ import {
   ListObjectsV2Command,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { logger } from "../logger";
 
 const MINIO_ENDPOINT = process.env.MINIO_ENDPOINT ?? "http://10.0.1.20:9000";
 const MINIO_ACCESS_KEY = process.env.MINIO_ACCESS_KEY ?? "";
@@ -74,16 +75,14 @@ const LEGACY_BUCKET = "order-proofs";
  */
 export async function initStorage(): Promise<void> {
   if (!isStorageConfigured) {
-    console.warn(
-      "[storage] MinIO not configured (MINIO_ACCESS_KEY/MINIO_SECRET_KEY empty). " +
-        "File uploads will be disabled.",
-    );
+    logger.warn("storage", "MinIO not configured, file uploads disabled");
     return;
   }
 
-  console.log(
-    `[storage] Connecting to MinIO at ${MINIO_ENDPOINT}, bucket: ${MINIO_BUCKET}`,
-  );
+  logger.info("storage", "Connecting to MinIO", {
+    endpoint: MINIO_ENDPOINT,
+    bucket: MINIO_BUCKET,
+  });
 
   const client = getClient();
 
@@ -100,7 +99,7 @@ export async function initStorage(): Promise<void> {
     await migrateLegacyBucket(client);
   }
 
-  console.log("[storage] Storage ready.");
+  logger.info("storage", "Storage ready");
 }
 
 /**
@@ -113,22 +112,19 @@ async function ensureBucketExists(
 ): Promise<boolean> {
   try {
     await client.send(new HeadBucketCommand({ Bucket: bucket }));
-    console.log(`[storage] Bucket "${bucket}" verified.`);
+    logger.info("storage", "Bucket verified", { bucket });
     return true;
   } catch {
     // Bucket doesn't exist — try to create it
-    console.warn(`[storage] Bucket "${bucket}" not found. Creating...`);
+    logger.warn("storage", "Bucket not found, creating", { bucket });
     try {
       await client.send(new CreateBucketCommand({ Bucket: bucket }));
-      console.log(`[storage] Bucket "${bucket}" created.`);
+      logger.info("storage", "Bucket created", { bucket });
       return true;
     } catch (createErr) {
       const msg =
         createErr instanceof Error ? createErr.message : String(createErr);
-      console.error(
-        `[storage] FATAL: Cannot create bucket "${bucket}": ${msg}. ` +
-          `Check MINIO_ENDPOINT, MINIO_ACCESS_KEY, MINIO_SECRET_KEY.`,
-      );
+      logger.error("storage", "Cannot create bucket", { bucket, error: msg });
       return false;
     }
   }
@@ -153,9 +149,9 @@ async function migrateLegacyBucket(client: S3Client): Promise<void> {
     return;
   }
 
-  console.log(
-    `[storage] Legacy bucket "${LEGACY_BUCKET}" found. Checking for objects to migrate...`,
-  );
+  logger.info("storage", "Legacy bucket found, checking for objects to migrate", {
+    bucket: LEGACY_BUCKET,
+  });
 
   let migrated = 0;
   let skipped = 0;
@@ -200,9 +196,10 @@ async function migrateLegacyBucket(client: S3Client): Promise<void> {
       } catch (copyErr) {
         const msg =
           copyErr instanceof Error ? copyErr.message : String(copyErr);
-        console.error(
-          `[storage] Failed to migrate "${obj.Key}": ${msg}`,
-        );
+        logger.error("storage", "Failed to migrate object", {
+          key: obj.Key,
+          error: msg,
+        });
         failed++;
       }
     }
@@ -213,13 +210,16 @@ async function migrateLegacyBucket(client: S3Client): Promise<void> {
   } while (continuationToken);
 
   if (migrated > 0 || failed > 0) {
-    console.log(
-      `[storage] Legacy migration complete: ${migrated} copied, ${skipped} already existed, ${failed} failed.`,
-    );
+    logger.info("storage", "Legacy migration complete", {
+      migrated,
+      skipped,
+      failed,
+    });
   } else if (skipped > 0) {
-    console.log(
-      `[storage] Legacy migration: all ${skipped} objects already in "${MINIO_BUCKET}". Nothing to do.`,
-    );
+    logger.info("storage", "Legacy migration: all objects already migrated", {
+      skipped,
+      bucket: MINIO_BUCKET,
+    });
   }
 }
 
@@ -345,7 +345,7 @@ export async function deleteProductImage(storageKey: string): Promise<void> {
   } catch {
     // Non-critical: orphaned files in MinIO are harmless.
     // Log but don't throw — the DB record is the source of truth.
-    console.warn(`[storage] Failed to delete object: ${storageKey}`);
+    logger.warn("storage", "Failed to delete object", { key: storageKey });
   }
 }
 

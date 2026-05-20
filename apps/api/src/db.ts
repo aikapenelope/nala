@@ -7,6 +7,7 @@
 
 import { sql } from "drizzle-orm";
 import { createDb, type Database } from "@nova/db";
+import { logger } from "./logger";
 
 let _db: Database | null = null;
 
@@ -152,10 +153,10 @@ export async function applyRlsPolicies(): Promise<void> {
     const columns = tableColumns.get(table);
     if (!columns || !columns.has(column)) {
       missingColumn.push(`${table}.${column}`);
-      console.error(
-        `[startup] RLS ERROR: table "${table}" exists but column "${column}" does not. ` +
-          `Fix the tenantPolicies config in db.ts or add the column via migration.`,
-      );
+      logger.error("rls", "Table exists but isolation column does not", {
+        table,
+        column,
+      });
       continue;
     }
 
@@ -195,10 +196,9 @@ export async function applyRlsPolicies(): Promise<void> {
 
   // Report results
   if (skipped.length > 0) {
-    console.warn(
-      `[startup] RLS skipped for missing tables: ${skipped.join(", ")}. ` +
-        `These will be applied on the next deploy after migrations run.`,
-    );
+    logger.warn("rls", "Skipped missing tables (pending migrations)", {
+      tables: skipped,
+    });
   }
 
   if (missingColumn.length > 0) {

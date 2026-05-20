@@ -17,6 +17,7 @@
  */
 
 import * as Sentry from "@sentry/node";
+import { logger } from "./logger";
 
 const dsn = process.env.BUGSINK_DSN;
 
@@ -40,9 +41,9 @@ if (dsn) {
     },
   });
 
-  console.log("[sentry] Error tracking enabled (Bugsink).");
+  logger.info("sentry", "Error tracking enabled (Bugsink)");
 } else {
-  console.warn("[sentry] BUGSINK_DSN not set. Error tracking disabled.");
+  logger.warn("sentry", "BUGSINK_DSN not set, error tracking disabled");
 }
 
 export { Sentry };

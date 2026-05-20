@@ -14,6 +14,8 @@ import { desc, eq } from "drizzle-orm";
 import { exchangeRates } from "@nova/db";
 import { getRedis } from "../redis";
 import { tryGetDb } from "../db";
+import { logger } from "../logger";
+import { redisOperationsTotal } from "../metrics";
 
 /** Redis key scoped to a specific business. */
 function redisKey(businessId: string): string {
@@ -48,11 +50,16 @@ export async function getCurrentRate(
   if (redis) {
     try {
       const cached = await redis.get(key);
+      redisOperationsTotal.inc({ operation: "get", status: "ok" });
       if (cached) {
         return JSON.parse(cached) as ExchangeRateInfo;
       }
-    } catch {
-      // Redis error - fall through to DB
+    } catch (err) {
+      redisOperationsTotal.inc({ operation: "get", status: "error" });
+      logger.debug("exchange-rate", "Redis read failed, falling through to DB", {
+        businessId,
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
   }
 
@@ -78,15 +85,23 @@ export async function getCurrentRate(
         if (redis) {
           try {
             await redis.set(key, JSON.stringify(info), "EX", 300);
-          } catch {
-            // Non-critical
+            redisOperationsTotal.inc({ operation: "set", status: "ok" });
+          } catch (err) {
+            redisOperationsTotal.inc({ operation: "set", status: "error" });
+            logger.debug("exchange-rate", "Redis cache write failed", {
+              businessId,
+              error: err instanceof Error ? err.message : String(err),
+            });
           }
         }
 
         return info;
       }
-    } catch {
-      // DB error
+    } catch (err) {
+      logger.debug("exchange-rate", "DB read failed", {
+        businessId,
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
   }
 

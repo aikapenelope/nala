@@ -38,6 +38,7 @@ import { reportsXlsx } from "./reports-xlsx";
 import { reportsEmail } from "./reports-email";
 import { validateUuidParam } from "../middleware/validate-uuid";
 import { reportCache } from "../middleware/report-cache";
+import { logger } from "../logger";
 import type { AppEnv } from "../types";
 
 const reports = new Hono<AppEnv>();
@@ -1171,7 +1172,11 @@ reports.get("/reports/customer-stats/:id", validateUuidParam, async (c) => {
 
   } catch (err) {
     const message = err instanceof Error ? err.message : "Error loading customer stats";
-    console.error(`[customer-stats] ${customerId}: ${message}`, err instanceof Error ? err.stack : "");
+    logger.error("customer-stats", "Failed to load customer stats", {
+      customerId,
+      error: message,
+      stack: err instanceof Error ? err.stack : undefined,
+    });
     return c.json({ error: message }, 500);
   }
 });

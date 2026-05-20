@@ -53,6 +53,7 @@ import {
 } from "../services/image-enhance";
 import { processProductImage } from "../services/image-processing";
 import { isValidImageBuffer } from "../utils/magic-bytes";
+import { logger } from "../logger";
 import type { AppEnv } from "../types";
 
 const inventory = new Hono<AppEnv>();
@@ -912,11 +913,13 @@ inventory.post("/products/:id/image", validateUuidParam, async (c) => {
   const uploadContentType = processed ? processed.contentType : file.type;
 
   if (processed) {
-    console.log(
-      `[image-upload] Optimized: ${processed.originalSize} → ${processed.processedSize} bytes ` +
-        `(${Math.round((1 - processed.processedSize / processed.originalSize) * 100)}% reduction, ` +
-        `${processed.width}x${processed.height}px)`,
-    );
+    logger.info("image-upload", "Image optimized", {
+      originalSize: processed.originalSize,
+      processedSize: processed.processedSize,
+      reductionPct: Math.round((1 - processed.processedSize / processed.originalSize) * 100),
+      width: processed.width,
+      height: processed.height,
+    });
   }
 
   // Generate a unique image ID for the storage key
@@ -966,7 +969,11 @@ inventory.post("/products/:id/image", validateUuidParam, async (c) => {
   } catch (err) {
     const message =
       err instanceof Error ? err.message : "Error subiendo imagen";
-    console.error(`[image-upload] Product ${productId}: ${message}`, err instanceof Error ? err.stack : "");
+    logger.error("image-upload", "Upload failed", {
+      productId,
+      error: message,
+      stack: err instanceof Error ? err.stack : undefined,
+    });
     return c.json({ error: message }, 500);
   }
 });
@@ -1259,7 +1266,7 @@ inventory.post(
       });
     } catch (err) {
       const message = err instanceof Error ? err.message : "Error guardando imagen";
-      console.error(`[image-enhance] Upload failed: ${message}`);
+      logger.error("image-enhance", "Upload failed", { error: message });
       return c.json({ error: "Error guardando la imagen mejorada" }, 500);
     }
   },
