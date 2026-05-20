@@ -105,7 +105,26 @@ onMounted(() => {
 
     <!-- MAIN CONTENT -->
     <main class="flex-1 pb-24">
-      <slot />
+      <NuxtErrorBoundary>
+        <slot />
+        <template #error="{ error: err, clearError }">
+          <div class="px-5 py-16 text-center">
+            <div class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-red-50 dark:bg-red-900/20">
+              <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-red-500">
+                <circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/>
+              </svg>
+            </div>
+            <p class="text-base font-medium text-gray-700 dark:text-gray-200">Algo salio mal</p>
+            <p class="mt-1 text-sm text-gray-400">{{ err?.message ?? 'Error inesperado' }}</p>
+            <button
+              class="mt-5 rounded-2xl bg-gray-900 px-6 py-3 text-sm font-semibold text-white shadow-md active:scale-95 transition-transform dark:bg-white dark:text-gray-900"
+              @click="clearError"
+            >
+              Reintentar
+            </button>
+          </div>
+        </template>
+      </NuxtErrorBoundary>
     </main>
 
     <!-- PWA INSTALL BANNER (centered, modern) -->

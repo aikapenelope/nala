@@ -54,6 +54,8 @@ function handleScroll(event: Event) {
             <img
               :src="resolveImageUrl(img.url)"
               :alt="product.name"
+              width="300"
+              height="300"
               class="h-full w-full object-cover object-center transition-transform duration-500 ease-out group-hover:scale-105"
               :loading="img.sortOrder === 0 ? 'eager' : 'lazy'"
             >
@@ -74,6 +76,8 @@ function handleScroll(event: Event) {
         <img
           :src="resolveImageUrl(product.imageUrl)"
           :alt="product.name"
+          width="300"
+          height="300"
           class="h-full w-full object-cover object-center transition-transform duration-500 ease-out group-hover:scale-105"
           loading="lazy"
         >
