@@ -167,7 +167,7 @@ onMounted(() => {
     </div>
 
     <!-- BOTTOM NAVIGATION -->
-    <nav class="fixed bottom-0 w-full border-t border-gray-100 bg-white pb-[env(safe-area-inset-bottom)] pt-3 z-40 shadow-[0_-4px_20px_rgba(0,0,0,0.04)] dark:border-white/8 dark:bg-black">
+    <nav class="fixed bottom-0 w-full border-t border-gray-100 bg-white pb-[env(safe-area-inset-bottom)] pt-3 z-40 shadow-[0_-4px_20px_rgba(0,0,0,0.04)] dark:border-white/8 dark:bg-black will-change-transform">
       <div class="flex items-center justify-around px-4">
         <!-- Catalogo -->
         <NuxtLink

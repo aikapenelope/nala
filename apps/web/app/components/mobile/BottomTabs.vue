@@ -26,7 +26,7 @@ const { pendingCount } = useOrdersBadge();
 
 <template>
   <nav
-    class="glass-strong fixed bottom-0 left-0 right-0 z-50 flex rounded-t-3xl pb-[env(safe-area-inset-bottom)] shadow-[0_-4px_20px_-4px_rgba(0,0,0,0.06)]"
+    class="glass-strong fixed bottom-0 left-0 right-0 z-50 flex rounded-t-3xl pb-[env(safe-area-inset-bottom)] shadow-[0_-4px_20px_-4px_rgba(0,0,0,0.06)] will-change-transform"
   >
     <NuxtLink
       v-for="tab in tabs"
