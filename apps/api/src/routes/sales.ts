@@ -784,47 +784,51 @@ salesRoutes.post("/sales/quick", async (c) => {
     const totalBs = rateBcv > 0 ? Math.round(totalUsd * rateBcv * 100) / 100 : null;
 
     try {
-      const [sale] = await db
-        .insert(sales)
-        .values({
+      // Atomic transaction: sale + payment + audit log must all succeed or all fail.
+      // Prevents orphaned sales without payment records.
+      const result = await db.transaction(async (tx) => {
+        const [sale] = await tx
+          .insert(sales)
+          .values({
+            businessId,
+            userId: user.id,
+            totalUsd: String(totalUsd),
+            totalBs: totalBs !== null ? String(totalBs) : null,
+            exchangeRate: rateBcv > 0 ? String(rateBcv) : null,
+            channel: data.channel,
+            notes: data.description ?? null,
+            status: "completed",
+          })
+          .returning({ id: sales.id });
+
+        if (!sale) {
+          throw new Error("Failed to insert sale");
+        }
+
+        await tx.insert(salePayments).values({
+          saleId: sale.id,
+          businessId,
+          method: data.method,
+          amountUsd: String(totalUsd),
+          amountBs: totalBs !== null ? String(totalBs) : null,
+          exchangeRate: rateBcv > 0 ? String(rateBcv) : null,
+          reference: data.reference ?? null,
+        });
+
+        await tx.insert(activityLog).values({
           businessId,
           userId: user.id,
-          totalUsd: String(totalUsd),
-          totalBs: totalBs !== null ? String(totalBs) : null,
-          exchangeRate: rateBcv > 0 ? String(rateBcv) : null,
-          channel: data.channel,
-          notes: data.description ?? null,
-          status: "completed",
-        })
-        .returning({ id: sales.id });
+          action: "sale_created",
+          detail: `Venta rapida $${totalUsd} (${data.method})`,
+        });
 
-      if (!sale) {
-        return c.json({ error: "Error creating sale" }, 500);
-      }
-
-      // Insert single payment
-      await db.insert(salePayments).values({
-        saleId: sale.id,
-        businessId,
-        method: data.method,
-        amountUsd: String(totalUsd),
-        amountBs: totalBs !== null ? String(totalBs) : null,
-        exchangeRate: rateBcv > 0 ? String(rateBcv) : null,
-        reference: data.reference ?? null,
-      });
-
-      // Log activity (quick sales were missing from audit trail)
-      await db.insert(activityLog).values({
-        businessId,
-        userId: user.id,
-        action: "sale_created",
-        detail: `Venta rapida $${totalUsd} (${data.method})`,
+        return sale;
       });
 
       return c.json(
         {
           sale: {
-            id: sale.id,
+            id: result.id,
             totalUsd,
             totalBs,
             method: data.method,

@@ -15,14 +15,14 @@ import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { eq, and, desc, inArray, sql } from "drizzle-orm";
 import { businesses, products, productImages, categories, storeSettings, orders, exchangeRates } from "@nova/db";
-import { calculateStockSemaphore } from "@nova/shared";
+import { calculateStockSemaphore, paymentMethodSchema } from "@nova/shared";
 import { tryGetDb } from "../db";
 import { getRedis } from "../redis";
 import { uploadPaymentProof, isStorageConfigured } from "../services/storage";
 import { logActivity } from "../utils/audit";
 import { PriceError, StockError, MinOrderError } from "../utils/errors";
 import { isValidImageBuffer } from "../utils/magic-bytes";
-import { publicRateLimit, uploadRateLimit } from "../middleware/rate-limit";
+import { uploadRateLimit } from "../middleware/rate-limit";
 import { notifyNewOrder } from "../services/push-notifications";
 
 export const catalog = new Hono();
@@ -336,7 +336,7 @@ const createOrderSchema = z.object({
   customerPhone: z.string().min(5).max(30),
   customerNotes: z.string().max(500).optional(),
   items: z.array(orderItemSchema).min(1).max(20),
-  paymentMethod: z.string().min(1).max(50),
+  paymentMethod: paymentMethodSchema,
   paymentReference: z.string().max(100).optional(),
   deliveryRequested: z.boolean().default(false),
   idempotencyKey: z.string().max(64).optional(),
@@ -350,7 +350,8 @@ const createOrderSchema = z.object({
  */
 catalog.post(
   "/:slug/orders",
-  publicRateLimit,
+  // Note: publicRateLimit is already applied globally via app.use("/catalog/*", ...)
+  // in app.ts. No need to apply it again here.
   zValidator("json", createOrderSchema),
   async (c) => {
     const slug = c.req.param("slug");

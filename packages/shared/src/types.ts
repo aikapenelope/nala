@@ -38,6 +38,7 @@ export type BusinessType =
 /** Payment methods available in Venezuela. */
 export type PaymentMethod =
   | "efectivo"
+  | "efectivo_usd"
   | "pago_movil"
   | "binance"
   | "zinli"
