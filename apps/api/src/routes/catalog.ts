@@ -345,6 +345,26 @@ catalog.post(
   "/:slug/orders",
   // Note: publicRateLimit is already applied globally via app.use("/catalog/*", ...)
   // in app.ts. No need to apply it again here.
+  //
+  // CSRF protection: verify Origin header matches the tenant domain.
+  // Browsers always send Origin on cross-origin POST requests.
+  // If Origin is missing (non-browser client like curl), allow it (API clients are fine).
+  // If Origin is present but doesn't match, reject (likely CSRF attack).
+  async (c, next) => {
+    const origin = c.req.header("origin");
+    if (origin) {
+      const tenantDomain = process.env.TENANT_DOMAIN ?? process.env.NUXT_PUBLIC_TENANT_DOMAIN ?? "novaincs.com";
+      const allowed =
+        origin.endsWith(`.${tenantDomain}`) ||
+        origin === `https://${tenantDomain}` ||
+        origin === `http://${tenantDomain}` ||
+        origin.includes("localhost");
+      if (!allowed) {
+        return c.json({ error: "Origin not allowed" }, 403);
+      }
+    }
+    await next();
+  },
   zValidator("json", createOrderSchema),
   async (c) => {
     const slug = c.req.param("slug");

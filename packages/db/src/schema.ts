@@ -704,7 +704,22 @@ export const customers = pgTable(
   ],
 );
 
-/** Customer segments - auto-calculated labels (VIP, at_risk, etc.). */
+/**
+ * Customer segments — rule-based labels (VIP, at_risk, with_debt, etc.).
+ *
+ * ROLE: Deterministic segmentation based on business rules (thresholds).
+ * Recalculated on-demand via POST /customers/recalculate-segments.
+ * A customer can have multiple segments simultaneously.
+ *
+ * DISTINCTION FROM RFM:
+ * - customer_segments: rule-based, multi-label, recalculated on demand
+ * - customers.rfm_segment: statistical (quintile-based), single label, auto-calculated
+ *
+ * Both coexist with different purposes:
+ * - RFM answers: "how valuable is this customer statistically?"
+ * - Segments answer: "what actionable labels apply right now?"
+ *   (e.g., "with_debt" is not an RFM concept but is critical for collections)
+ */
 export const customerSegments = pgTable("customer_segments", {
   id: uuid("id")
     .default(sql`gen_random_uuid()`)
@@ -966,7 +981,10 @@ export const productAliases = pgTable(
     businessId: uuid("business_id")
       .notNull()
       .references(() => businesses.id),
-    supplierId: text("supplier_id"),
+    /** Supplier name as it appeared on the invoice (OCR-extracted text). */
+    supplierName: text("supplier_name"),
+    /** Link to supplier record (optional, for structured lookups). */
+    supplierId: uuid("supplier_id").references(() => suppliers.id, { onDelete: "set null" }),
     /** The text as it appears on the supplier's invoice. */
     aliasText: text("alias_text").notNull(),
     /** The Nova product this alias maps to. */
@@ -980,7 +998,7 @@ export const productAliases = pgTable(
   (table) => [
     index("idx_aliases_business_supplier").on(
       table.businessId,
-      table.supplierId,
+      table.supplierName,
     ),
   ],
 );
