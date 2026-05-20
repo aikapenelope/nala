@@ -58,7 +58,6 @@ const expenseSubmitting = ref(false);
 const expenseError = ref("");
 
 onMounted(async () => {
-  await useOwnerLockRedirect();
   try {
     const [accResult, entResult] = await Promise.all([
       $api<{ accounts: Account[] }>("/api/accounting/accounts"),

@@ -45,7 +45,6 @@ const account = ref<AccountSummary | null>(null);
 const recentExpenses = ref<RecentExpense[]>([]);
 
 onMounted(async () => {
-  await useOwnerLockRedirect();
   try {
     const result = await $api<{
       supplier: Supplier;

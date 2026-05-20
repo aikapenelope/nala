@@ -44,8 +44,7 @@ async function fetchQuotations() {
   }
 }
 
-onMounted(async () => {
-  await useOwnerLockRedirect();
+onMounted(() => {
   fetchQuotations();
 });
 

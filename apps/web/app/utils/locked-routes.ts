@@ -1,7 +1,7 @@
 /**
  * Routes that require Owner Lock PIN to access.
  *
- * Shared between useOwnerLockRedirect() (page-level guard)
+ * Used by the owner-lock.global.ts middleware (navigation guard)
  * and the auto-redirect watcher (timer expiry).
  *
  * Settings is NOT locked (it's where the PIN is configured).

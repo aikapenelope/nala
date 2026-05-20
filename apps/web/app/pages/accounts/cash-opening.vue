@@ -24,7 +24,6 @@ const isSubmitting = ref(false);
 const submitError = ref("");
 
 onMounted(async () => {
-  await useOwnerLockRedirect();
   try {
     const result = await $api<{ opening: { cashAmount: string } | null }>(
       "/api/cash-opening/latest",

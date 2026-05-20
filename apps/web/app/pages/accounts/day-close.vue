@@ -34,7 +34,6 @@ const daySummary = ref({
 
 /** Load today's summary on mount. */
 onMounted(async () => {
-  await useOwnerLockRedirect();
   try {
     const daily = await $api<{
       data: {

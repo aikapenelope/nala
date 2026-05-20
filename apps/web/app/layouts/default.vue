@@ -5,44 +5,25 @@
  * Desktop (>1025px): Glass sidebar + main content on gradient bg.
  * Mobile (<768px): Content + glass bottom tabs.
  *
- * Includes owner lock guard: pages in LOCKED_ROUTES are hidden
- * until the lock status is resolved. This prevents the "flash of
- * protected content" that was visible for 300-800ms before the
- * redirect to /unlock kicked in.
+ * Access control is handled by the owner-lock.global.ts middleware,
+ * which prevents navigation to protected routes when locked.
+ * The layout's only job is layout — not access control.
+ *
+ * The auto-redirect watcher handles the edge case where the 15-min
+ * unlock timer expires while the user is viewing a protected page.
  */
-
-import { LOCKED_ROUTES } from "~/utils/locked-routes";
 
 const { isDesktop } = useDevice();
 const { user } = useNovaAuth();
 const { sessionExpired } = useApi();
-const { isLocked, isReady } = useOwnerLock();
-const route = useRoute();
 
 const { updateAvailable, applyUpdate } = usePwaUpdate();
 
 const businessName = computed(() => user.value?.businessName || "Nova");
 
-/**
- * Whether the current route is protected by the owner lock.
- * Only these routes get the content-hiding guard.
- */
-const isProtectedRoute = computed(() =>
-  LOCKED_ROUTES.some(
-    (r) => route.path === r || route.path.startsWith(r + "/"),
-  ),
-);
-
-/**
- * Whether to show the page content.
- * - Non-protected routes: always show
- * - Protected routes: show only when lock status is resolved AND unlocked
- */
-const showContent = computed(() => {
-  if (!isProtectedRoute.value) return true;
-  if (!isReady.value) return false; // Still checking lock status
-  return !isLocked.value;
-});
+// Auto-redirect to /unlock when the 15-min timer expires on a protected route.
+// This watcher lives as long as the layout (entire app session).
+useOwnerLockAutoRedirect();
 
 function reAuthenticate() {
   sessionExpired.value = false;
@@ -104,7 +85,7 @@ function reAuthenticate() {
       <div class="flex min-w-0 flex-1 flex-col overflow-hidden pl-3">
         <SharedAppHeader :business-name="businessName" />
         <main class="flex-1 overflow-y-auto p-5">
-          <slot v-if="showContent" />
+          <slot />
         </main>
       </div>
     </div>
@@ -117,7 +98,7 @@ function reAuthenticate() {
     >
       <SharedAppHeader :business-name="businessName" />
       <main class="flex-1 px-4 pb-24">
-        <slot v-if="showContent" />
+        <slot />
       </main>
       <MobileBottomTabs />
     </div>

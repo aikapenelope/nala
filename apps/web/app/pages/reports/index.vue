@@ -207,7 +207,7 @@ async function exportExcel() {
   }
 }
 // Owner Lock: redirect to /unlock if PIN is active
-onMounted(async () => { await useOwnerLockRedirect(); });
+
 </script>
 
 <template>

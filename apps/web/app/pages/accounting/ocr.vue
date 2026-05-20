@@ -102,7 +102,7 @@ async function confirmItems() {
     isConfirming.value = false;
   }
 }
-onMounted(async () => { await useOwnerLockRedirect(); });
+
 </script>
 
 <template>
