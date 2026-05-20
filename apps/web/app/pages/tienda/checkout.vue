@@ -39,6 +39,45 @@ const submitError = ref<string | null>(null);
 // Idempotency key: generated once per checkout session, reused on retries
 const idempotencyKey = ref(import.meta.client ? crypto.randomUUID() : "");
 
+// --- Returning customer auto-fill ---
+// Saves name + phone after a successful order so repeat buyers don't re-type.
+const CUSTOMER_STORAGE_KEY = "nova-storefront-customer";
+
+function getCustomerStorageKey(): string {
+  return tenantSlug.value
+    ? `${CUSTOMER_STORAGE_KEY}-${tenantSlug.value}`
+    : CUSTOMER_STORAGE_KEY;
+}
+
+if (import.meta.client) {
+  try {
+    const saved = localStorage.getItem(getCustomerStorageKey());
+    if (saved) {
+      const parsed = JSON.parse(saved) as { name?: string; phone?: string };
+      if (parsed.name) customerName.value = parsed.name;
+      if (parsed.phone) customerPhone.value = parsed.phone;
+    }
+  } catch {
+    // Corrupted or unavailable localStorage — ignore
+  }
+}
+
+/** Persist customer info for next visit. */
+function saveCustomerInfo() {
+  if (!import.meta.client) return;
+  try {
+    localStorage.setItem(
+      getCustomerStorageKey(),
+      JSON.stringify({
+        name: customerName.value.trim(),
+        phone: customerPhone.value.trim(),
+      }),
+    );
+  } catch {
+    // Storage full or unavailable — non-critical
+  }
+}
+
 /** Delivery fee. */
 const deliveryFee = computed(() => {
   if (!deliveryRequested.value || !storeInfo.value?.deliveryEnabled) return 0;
@@ -110,6 +149,9 @@ async function submitOrder() {
 
     // Clear cart after successful order
     clear();
+
+    // Save customer info for auto-fill on next visit
+    saveCustomerInfo();
 
     // Redirect to WhatsApp if link available, otherwise to confirmation
     if (response.waLink && import.meta.client) {
