@@ -12,6 +12,8 @@
 
 import type { Context, Next } from "hono";
 import { getRedis } from "../redis";
+import { logger } from "../logger";
+import { redisOperationsTotal } from "../metrics";
 
 /** Rate limit configuration. */
 interface RateLimitConfig {
@@ -74,10 +76,15 @@ async function checkRedis(
       key,
       String(config.windowSeconds),
     )) as number;
+    redisOperationsTotal.inc({ operation: "eval", status: "ok" });
     const remaining = Math.max(0, config.max - count);
     return { allowed: count <= config.max, remaining };
-  } catch {
-    // Redis error -- fall back to memory
+  } catch (err) {
+    redisOperationsTotal.inc({ operation: "eval", status: "error" });
+    logger.debug("rate-limit", "Redis error, falling back to memory", {
+      key,
+      error: err instanceof Error ? err.message : String(err),
+    });
     return checkMemory(key, config);
   }
 }

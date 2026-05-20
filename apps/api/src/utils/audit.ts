@@ -10,6 +10,7 @@
 
 import { activityLog } from "@nova/db";
 import type { Database } from "@nova/db";
+import { logger } from "../logger";
 
 interface LogActivityParams {
   db: Database;
@@ -39,6 +40,9 @@ export async function logActivity({
     });
   } catch (err) {
     // Audit logging should never break the primary operation
-    console.error("[audit] Failed to log activity:", action, err);
+    logger.error("audit", "Failed to log activity", {
+      action,
+      error: err instanceof Error ? err.message : String(err),
+    });
   }
 }

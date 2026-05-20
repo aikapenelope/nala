@@ -8,6 +8,7 @@
 import { eq, and } from "drizzle-orm";
 import { accountingAccounts, accountingEntries } from "@nova/db";
 import type { Database } from "@nova/db";
+import { logger } from "../logger";
 
 /** Transaction-compatible DB type (works with both db and tx). */
 type TxOrDb = Parameters<Parameters<Database["transaction"]>[0]>[0] | Database;
@@ -67,11 +68,11 @@ export async function createRevenueEntry(
       referenceId,
     });
   } else {
-    console.warn(
-      `[accounting] Entry skipped: missing accounts ` +
-        `(4101: ${!!revenueAccounts[0]}, 1101: ${!!cashAccounts[0]}). ` +
-        `Run onboarding to create default accounts.`,
-    );
+    logger.warn("accounting", "Revenue entry skipped: missing accounts", {
+      businessId,
+      has4101: !!revenueAccounts[0],
+      has1101: !!cashAccounts[0],
+    });
   }
 }
 
@@ -124,10 +125,10 @@ export async function createReversalEntry(
       referenceId,
     });
   } else {
-    console.warn(
-      `[accounting] Reversal entry skipped: missing accounts ` +
-        `(4101: ${!!revenueAccounts[0]}, 1101: ${!!cashAccounts[0]}). ` +
-        `Run onboarding to create default accounts.`,
-    );
+    logger.warn("accounting", "Reversal entry skipped: missing accounts", {
+      businessId,
+      has4101: !!revenueAccounts[0],
+      has1101: !!cashAccounts[0],
+    });
   }
 }

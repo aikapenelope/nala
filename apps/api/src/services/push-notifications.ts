@@ -15,6 +15,7 @@ import webpush from "web-push";
 import { eq, and } from "drizzle-orm";
 import { pushSubscriptions } from "@nova/db";
 import type { Database } from "@nova/db";
+import { logger } from "../logger";
 
 /** Whether push notifications are configured. */
 export const isPushConfigured =
@@ -101,10 +102,10 @@ export async function sendPushToBusinessOwners(
           .where(eq(pushSubscriptions.id, sub.id));
         removed++;
       } else {
-        console.error(
-          `[push] Failed to send to subscription ${sub.id}:`,
-          err instanceof Error ? err.message : err,
-        );
+        logger.error("push", "Failed to send notification", {
+          subscriptionId: sub.id,
+          error: err instanceof Error ? err.message : String(err),
+        });
         failed++;
       }
     }
@@ -142,9 +143,9 @@ export async function notifyNewOrder(
     });
   } catch (err) {
     // Fire-and-forget: don't let push failures affect order creation
-    console.error(
-      `[push] Error notifying new order ${orderInfo.orderId}:`,
-      err instanceof Error ? err.message : err,
-    );
+    logger.error("push", "Error notifying new order", {
+      orderId: orderInfo.orderId,
+      error: err instanceof Error ? err.message : String(err),
+    });
   }
 }

@@ -24,22 +24,25 @@ import { app } from "./app";
 import { initDb, applyRlsPolicies } from "./db";
 import { initRedis, closeRedis } from "./redis";
 import { initStorage } from "./services/storage";
+import { logger } from "./logger";
 
 // Initialize database (required in production, optional in dev)
 if (config.databaseUrl) {
   try {
     initDb();
-    console.log("[startup] Database connected.");
+    logger.info("startup", "Database connected");
 
     // Apply RLS policies (idempotent, safe on every deploy)
     await applyRlsPolicies();
-    console.log("[startup] RLS policies applied.");
+    logger.info("startup", "RLS policies applied");
   } catch (err) {
-    console.error("[startup] FATAL: Database connection failed:", err);
+    logger.fatal("startup", "Database connection failed", {
+      error: err instanceof Error ? err.message : String(err),
+    });
     process.exit(1);
   }
 } else if (!config.isDev) {
-  console.error("[startup] FATAL: DATABASE_URL is required in production.");
+  logger.fatal("startup", "DATABASE_URL is required in production");
   process.exit(1);
 }
 
@@ -47,26 +50,24 @@ if (config.databaseUrl) {
 if (config.redisUrl) {
   const redis = initRedis();
   if (redis) {
-    console.log("[startup] Redis connected.");
+    logger.info("startup", "Redis connected");
   }
 } else {
-  console.warn(
-    "[startup] Redis not configured. Exchange rate caching disabled.",
-  );
+  logger.warn("startup", "Redis not configured, exchange rate caching disabled");
 }
 
 // Initialize MinIO storage (optional, degrades gracefully)
 await initStorage();
 
 // Start server
-console.log(`[startup] Nova API starting on port ${config.port}...`);
+logger.info("startup", "Nova API starting", { port: config.port });
 
 const server = serve({
   fetch: app.fetch,
   port: config.port,
 });
 
-console.log(`[startup] Nova API running at http://localhost:${config.port}`);
+logger.info("startup", "Nova API running", { port: config.port });
 
 // ---------------------------------------------------------------------------
 // Graceful shutdown
@@ -89,27 +90,27 @@ async function shutdown(signal: string) {
   if (isShuttingDown) return;
   isShuttingDown = true;
 
-  console.log(`[shutdown] ${signal} received. Closing server...`);
+  logger.info("shutdown", "Signal received, closing server", { signal });
 
   // Force exit after timeout if graceful shutdown hangs
   const forceTimer = setTimeout(() => {
-    console.error("[shutdown] Timeout reached. Forcing exit.");
+    logger.error("shutdown", "Timeout reached, forcing exit");
     process.exit(1);
   }, SHUTDOWN_TIMEOUT_MS);
   forceTimer.unref();
 
   // Stop accepting new connections, wait for in-flight to finish
   server.close(async () => {
-    console.log("[shutdown] HTTP server closed.");
+    logger.info("shutdown", "HTTP server closed");
 
     try {
       await closeRedis();
-      console.log("[shutdown] Redis disconnected.");
+      logger.info("shutdown", "Redis disconnected");
     } catch {
       // Non-critical: Redis may already be disconnected
     }
 
-    console.log("[shutdown] Clean exit.");
+    logger.info("shutdown", "Clean exit");
     process.exit(0);
   });
 }

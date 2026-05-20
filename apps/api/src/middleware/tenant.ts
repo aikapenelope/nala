@@ -22,6 +22,7 @@
 import { sql } from "drizzle-orm";
 import type { Context, Next } from "hono";
 import type { Database } from "@nova/db";
+import { dbQueriesInFlight } from "../metrics";
 
 /**
  * Tenant middleware - sets RLS context per request and clears it after.
@@ -55,9 +56,11 @@ export async function tenantMiddleware(c: Context, next: Next) {
     sql`SELECT set_config('app.current_business_id', ${businessId}, false)`,
   );
 
+  dbQueriesInFlight.inc();
   try {
     await next();
   } finally {
+    dbQueriesInFlight.dec();
     // Clear the RLS variable so the pooled connection doesn't carry
     // a stale tenant context to the next request.
     await db.execute(
