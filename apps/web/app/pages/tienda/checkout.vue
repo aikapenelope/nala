@@ -200,7 +200,7 @@ async function submitOrder() {
     <h1 class="mb-5 text-xl font-bold text-gray-900 dark:text-white">Confirmar pedido</h1>
 
     <!-- Order summary -->
-    <div class="mb-5 rounded-2xl border border-white/60 bg-white/70 p-4 backdrop-blur-md dark:border-gray-800/60 dark:bg-gray-900/70">
+    <div class="mb-5 rounded-2xl border border-white/60 bg-white/70 p-4 backdrop-blur-md dark:border-white/8 dark:bg-[#111]">
       <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
         Resumen
       </p>
@@ -210,12 +210,12 @@ async function submitOrder() {
           :key="item.productId"
           class="flex justify-between text-sm"
         >
-          <span class="text-gray-700">
+          <span class="text-gray-700 dark:text-gray-200">
             {{ item.name }}
             <span class="text-gray-400">x{{ item.quantity }}</span>
           </span>
           <div class="text-right">
-            <span class="font-semibold text-gray-900">
+            <span class="font-semibold text-gray-900 dark:text-white">
               ${{ (item.price * item.quantity).toFixed(2) }}
             </span>
             <p
@@ -227,11 +227,11 @@ async function submitOrder() {
           </div>
         </div>
       </div>
-      <div class="mt-3 border-t border-gray-100 pt-2">
+      <div class="mt-3 border-t border-gray-100 pt-2 dark:border-white/8">
         <div class="flex justify-between text-sm">
-          <span class="text-gray-600">Subtotal</span>
+          <span class="text-gray-600 dark:text-gray-400">Subtotal</span>
           <div class="text-right">
-            <span class="font-semibold">${{ subtotal.toFixed(2) }}</span>
+            <span class="font-semibold dark:text-white">${{ subtotal.toFixed(2) }}</span>
             <p v-if="exchangeRate" class="text-[11px] text-gray-400">
               Bs. {{ (subtotal * exchangeRate).toFixed(2) }}
             </p>
@@ -241,15 +241,15 @@ async function submitOrder() {
           v-if="deliveryRequested && deliveryFee > 0"
           class="flex justify-between text-sm"
         >
-          <span class="text-gray-600">Delivery</span>
-          <span class="font-semibold">${{ deliveryFee.toFixed(2) }}</span>
+          <span class="text-gray-600 dark:text-gray-400">Delivery</span>
+          <span class="font-semibold dark:text-white">${{ deliveryFee.toFixed(2) }}</span>
         </div>
         <div
           v-if="isIgtfApplicable && igtfAmount > 0"
           class="flex justify-between text-sm"
         >
-          <span class="text-gray-600">IGTF (3%)</span>
-          <span class="font-semibold">${{ igtfAmount.toFixed(2) }}</span>
+          <span class="text-gray-600 dark:text-gray-400">IGTF (3%)</span>
+          <span class="font-semibold dark:text-white">${{ igtfAmount.toFixed(2) }}</span>
         </div>
         <div class="mt-1 flex justify-between text-base font-bold text-gray-900 dark:text-white">
           <span>Total</span>
@@ -266,59 +266,59 @@ async function submitOrder() {
     <!-- Store address (helps buyer know where to pick up or where the store is) -->
     <div
       v-if="business?.address"
-      class="mb-5 flex items-start gap-3 rounded-2xl border border-gray-100 bg-white/70 p-4 backdrop-blur-md"
+      class="mb-5 flex items-start gap-3 rounded-2xl border border-gray-100 bg-white/70 p-4 backdrop-blur-md dark:border-white/8 dark:bg-[#111]"
     >
-      <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+      <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-500/15 dark:text-blue-400">
         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
       </div>
       <div>
-        <p class="text-xs font-bold text-gray-700">Ubicacion de la tienda</p>
-        <p class="mt-0.5 text-sm text-gray-600">{{ business.address }}</p>
+        <p class="text-xs font-bold text-gray-700 dark:text-gray-200">Ubicacion de la tienda</p>
+        <p class="mt-0.5 text-sm text-gray-600 dark:text-gray-400">{{ business.address }}</p>
       </div>
     </div>
 
     <!-- Customer info form -->
     <div class="space-y-4">
       <div>
-        <label class="mb-1.5 block text-sm font-semibold text-gray-700">
+        <label class="mb-1.5 block text-sm font-semibold text-gray-700 dark:text-gray-200">
           Tu nombre *
         </label>
         <input
           v-model="customerName"
           type="text"
           placeholder="Nombre completo"
-          class="w-full rounded-2xl border border-white/60 bg-white/70 px-4 py-3 text-sm text-gray-900 shadow-sm outline-none backdrop-blur-md transition-all focus:border-gray-300 focus:ring-2 focus:ring-gray-200/50 dark:border-gray-700/60 dark:bg-gray-800/70 dark:text-white dark:focus:border-gray-600 dark:focus:ring-gray-700/50"
+          class="w-full rounded-2xl border border-white/60 bg-white/70 px-4 py-3 text-sm text-gray-900 shadow-sm outline-none backdrop-blur-md transition-all focus:border-gray-300 focus:ring-2 focus:ring-gray-200/50 dark:border-white/10 dark:bg-white/5 dark:text-white dark:focus:border-white/20 dark:focus:ring-white/5"
         >
       </div>
 
       <div>
-        <label class="mb-1.5 block text-sm font-semibold text-gray-700">
+        <label class="mb-1.5 block text-sm font-semibold text-gray-700 dark:text-gray-200">
           Tu telefono *
         </label>
         <input
           v-model="customerPhone"
           type="tel"
           placeholder="0412-1234567"
-          class="w-full rounded-2xl border border-white/60 bg-white/70 px-4 py-3 text-sm text-gray-900 shadow-sm outline-none backdrop-blur-md transition-all focus:border-gray-300 focus:ring-2 focus:ring-gray-200/50 dark:border-gray-700/60 dark:bg-gray-800/70 dark:text-white dark:focus:border-gray-600 dark:focus:ring-gray-700/50"
+          class="w-full rounded-2xl border border-white/60 bg-white/70 px-4 py-3 text-sm text-gray-900 shadow-sm outline-none backdrop-blur-md transition-all focus:border-gray-300 focus:ring-2 focus:ring-gray-200/50 dark:border-white/10 dark:bg-white/5 dark:text-white dark:focus:border-white/20 dark:focus:ring-white/5"
         >
       </div>
 
       <div>
-        <label class="mb-1.5 block text-sm font-semibold text-gray-700">
+        <label class="mb-1.5 block text-sm font-semibold text-gray-700 dark:text-gray-200">
           Nota (opcional)
         </label>
         <textarea
           v-model="customerNotes"
           rows="2"
           placeholder="Instrucciones especiales, direccion, etc."
-          class="w-full resize-none rounded-2xl border border-white/60 bg-white/70 px-4 py-3 text-sm text-gray-900 shadow-sm outline-none backdrop-blur-md transition-all focus:border-gray-300 focus:ring-2 focus:ring-gray-200/50 dark:border-gray-700/60 dark:bg-gray-800/70 dark:text-white dark:focus:border-gray-600 dark:focus:ring-gray-700/50"
+          class="w-full resize-none rounded-2xl border border-white/60 bg-white/70 px-4 py-3 text-sm text-gray-900 shadow-sm outline-none backdrop-blur-md transition-all focus:border-gray-300 focus:ring-2 focus:ring-gray-200/50 dark:border-white/10 dark:bg-white/5 dark:text-white dark:focus:border-white/20 dark:focus:ring-white/5"
         />
       </div>
 
       <!-- Delivery option -->
       <div
         v-if="storeInfo?.deliveryEnabled"
-        class="flex items-center gap-3 rounded-xl border border-gray-200 bg-white p-3"
+        class="flex items-center gap-3 rounded-xl border border-gray-200 bg-white p-3 dark:border-white/10 dark:bg-white/5"
       >
         <input
           id="delivery-check"
@@ -326,7 +326,7 @@ async function submitOrder() {
           type="checkbox"
           class="h-4 w-4 rounded border-gray-300 text-gray-900"
         >
-        <label for="delivery-check" class="text-sm text-gray-700">
+        <label for="delivery-check" class="text-sm text-gray-700 dark:text-gray-200">
           Solicitar delivery
           <span v-if="storeInfo.deliveryFee > 0" class="text-gray-400">
             (+${{ storeInfo.deliveryFee.toFixed(2) }})
@@ -345,7 +345,7 @@ async function submitOrder() {
 
       <!-- Payment method selection -->
       <div>
-        <p class="mb-2 text-sm font-semibold text-gray-700">
+        <p class="mb-2 text-sm font-semibold text-gray-700 dark:text-gray-200">
           Metodo de pago *
         </p>
 
@@ -369,8 +369,8 @@ async function submitOrder() {
             class="flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition-all"
             :class="
               selectedPaymentMethod === pm.method
-                ? 'border-gray-900 bg-gray-50 shadow-sm dark:border-white dark:bg-gray-800'
-                : 'border-white/60 bg-white/70 backdrop-blur-sm hover:border-gray-300 dark:border-gray-700/60 dark:bg-gray-800/70 dark:hover:border-gray-600'
+                ? 'border-gray-900 bg-gray-50 shadow-sm dark:border-white/30 dark:bg-white/10'
+                : 'border-white/60 bg-white/70 backdrop-blur-sm hover:border-gray-300 dark:border-white/8 dark:bg-white/5 dark:hover:border-white/15'
             "
           >
             <input
@@ -380,15 +380,15 @@ async function submitOrder() {
               class="mt-0.5 h-4 w-4 border-gray-300 text-gray-900"
             >
             <div>
-              <p class="text-sm font-semibold text-gray-900">{{ pm.label }}</p>
+              <p class="text-sm font-semibold text-gray-900 dark:text-white">{{ pm.label }}</p>
               <!-- Payment details (bank, phone, CI, etc.) -->
               <div class="mt-1 space-y-0.5">
                 <p
                   v-for="(value, key) in pm.details"
                   :key="key"
-                  class="text-xs text-gray-500"
+                  class="text-xs text-gray-500 dark:text-gray-400"
                 >
-                  <span class="font-medium capitalize text-gray-600">{{ key }}:</span>
+                  <span class="font-medium capitalize text-gray-600 dark:text-gray-300">{{ key }}:</span>
                   {{ value }}
                 </p>
               </div>
@@ -400,26 +400,26 @@ async function submitOrder() {
       <!-- IGTF notice -->
       <div
         v-if="isIgtfApplicable"
-        class="rounded-xl border border-amber-200 bg-amber-50/50 px-4 py-3"
+        class="rounded-xl border border-amber-200 bg-amber-50/50 px-4 py-3 dark:border-amber-500/30 dark:bg-amber-500/10"
       >
-        <p class="text-xs font-semibold text-amber-700">
+        <p class="text-xs font-semibold text-amber-700 dark:text-amber-300">
           Este metodo de pago incluye IGTF (3%): +${{ igtfAmount.toFixed(2) }}
         </p>
-        <p class="mt-0.5 text-[11px] text-amber-600">
+        <p class="mt-0.5 text-[11px] text-amber-600 dark:text-amber-400/80">
           Impuesto a las Grandes Transacciones Financieras sobre pagos en divisas.
         </p>
       </div>
 
       <!-- Payment reference -->
       <div v-if="selectedPaymentMethod">
-        <label class="mb-1.5 block text-sm font-semibold text-gray-700">
+        <label class="mb-1.5 block text-sm font-semibold text-gray-700 dark:text-gray-200">
           Referencia de pago (opcional)
         </label>
         <input
           v-model="paymentReference"
           type="text"
           placeholder="Nro. de transferencia o referencia"
-          class="w-full rounded-2xl border border-white/60 bg-white/70 px-4 py-3 text-sm text-gray-900 shadow-sm outline-none backdrop-blur-md transition-all focus:border-gray-300 focus:ring-2 focus:ring-gray-200/50 dark:border-gray-700/60 dark:bg-gray-800/70 dark:text-white dark:focus:border-gray-600 dark:focus:ring-gray-700/50"
+          class="w-full rounded-2xl border border-white/60 bg-white/70 px-4 py-3 text-sm text-gray-900 shadow-sm outline-none backdrop-blur-md transition-all focus:border-gray-300 focus:ring-2 focus:ring-gray-200/50 dark:border-white/10 dark:bg-white/5 dark:text-white dark:focus:border-white/20 dark:focus:ring-white/5"
         >
       </div>
 
