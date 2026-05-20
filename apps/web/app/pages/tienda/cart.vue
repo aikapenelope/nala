@@ -57,7 +57,7 @@ const meetsMinimum = computed(() => {
 
     <!-- Empty cart -->
     <div v-if="itemCount === 0" class="py-16 text-center">
-      <div class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800">
+      <div class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gray-100 dark:bg-white/5">
         <ShoppingBag :size="28" class="text-gray-400" />
       </div>
       <p class="text-base font-medium text-gray-600 dark:text-gray-300">Tu carrito esta vacio</p>
@@ -81,7 +81,7 @@ const meetsMinimum = computed(() => {
           class="flex gap-3 rounded-2xl border border-gray-100 bg-white p-3 shadow-sm dark:border-gray-800 dark:bg-gray-900"
         >
           <!-- Product image -->
-          <div class="h-20 w-20 flex-shrink-0 overflow-hidden rounded-[16px] bg-gray-100 dark:bg-gray-800">
+          <div class="h-20 w-20 flex-shrink-0 overflow-hidden rounded-[16px] bg-gray-100 dark:bg-white/5">
             <img
               v-if="item.imageUrl"
               :src="resolveImageUrl(item.imageUrl)"
@@ -115,7 +115,7 @@ const meetsMinimum = computed(() => {
               <!-- Quantity controls -->
               <div class="flex items-center gap-1.5">
                 <button
-                  class="flex h-8 w-8 items-center justify-center rounded-xl bg-gray-50 border border-gray-100 text-gray-700 hover:bg-gray-100 transition-colors dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700"
+                  class="flex h-8 w-8 items-center justify-center rounded-xl bg-gray-50 border border-gray-100 text-gray-700 hover:bg-gray-100 transition-colors dark:bg-white/5 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700"
                   @click="updateQuantity(item.productId, item.quantity - 1)"
                 >
                   <Minus :size="14" />
@@ -124,7 +124,7 @@ const meetsMinimum = computed(() => {
                   {{ item.quantity }}
                 </span>
                 <button
-                  class="flex h-8 w-8 items-center justify-center rounded-xl bg-gray-50 border border-gray-100 text-gray-700 hover:bg-gray-100 transition-colors dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700"
+                  class="flex h-8 w-8 items-center justify-center rounded-xl bg-gray-50 border border-gray-100 text-gray-700 hover:bg-gray-100 transition-colors dark:bg-white/5 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700"
                   @click="updateQuantity(item.productId, item.quantity + 1)"
                 >
                   <Plus :size="14" />
@@ -205,7 +205,7 @@ const meetsMinimum = computed(() => {
         :class="
           meetsMinimum
             ? 'bg-gray-900 text-white shadow-md hover:bg-gray-800 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-100'
-            : 'pointer-events-none bg-gray-200 text-gray-400 dark:bg-gray-800 dark:text-gray-600'
+            : 'pointer-events-none bg-gray-200 text-gray-400 dark:bg-white/5 dark:text-gray-600'
         "
       >
         Continuar al pago

@@ -246,3 +246,27 @@ body {
   opacity: 0;
   transform: translateY(-4px);
 }
+
+/* ============================================
+   Storefront Dark Mode — True black premium
+   ============================================
+   Base: pure black (#000)
+   Cards: #111111 with white/8% borders
+   Text: white > gray-200 > gray-400
+   Buttons: white with subtle glow
+   ============================================ */
+
+.dark .storefront-card {
+  background: #111111;
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.dark .storefront-btn-primary {
+  background: #ffffff;
+  color: #000000;
+  box-shadow: 0 8px 20px -4px rgba(255, 255, 255, 0.12);
+}
+
+.dark .storefront-btn-primary:hover {
+  box-shadow: 0 12px 28px -4px rgba(255, 255, 255, 0.18);
+}
