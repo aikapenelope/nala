@@ -175,9 +175,9 @@ onMounted(() => {
     <!-- ERROR STATE -->
     <!-- ============================================================ -->
     <div v-else-if="error" class="px-5 py-16 text-center">
-      <p class="text-base font-medium text-gray-600">{{ error }}</p>
+      <p class="text-base font-medium text-gray-600 dark:text-gray-400">{{ error }}</p>
       <button
-        class="mt-4 rounded-2xl bg-gray-900 px-6 py-3 text-sm font-semibold text-white shadow-md active:scale-95 transition-transform"
+        class="mt-4 rounded-2xl bg-gray-900 px-6 py-3 text-sm font-semibold text-white shadow-md active:scale-95 transition-transform dark:bg-white dark:text-gray-900"
         @click="fetchCatalog"
       >
         Reintentar
@@ -190,20 +190,20 @@ onMounted(() => {
     <template v-else>
       <!-- Store disabled -->
       <div v-if="business && !storeInfo" class="px-5 py-16 text-center">
-        <div class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gray-100">
+        <div class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800">
           <ShoppingBag :size="28" class="text-gray-400" />
         </div>
-        <p class="text-base font-medium text-gray-600">Esta tienda no esta disponible</p>
-        <p class="mt-1 text-sm text-gray-400">El vendedor aun no ha activado su tienda online.</p>
+        <p class="text-base font-medium text-gray-600 dark:text-gray-300">Esta tienda no esta disponible</p>
+        <p class="mt-1 text-sm text-gray-400 dark:text-gray-500">El vendedor aun no ha activado su tienda online.</p>
       </div>
 
       <!-- No products -->
       <div v-else-if="products.length === 0" class="px-5 py-16 text-center">
-        <div class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gray-100">
+        <div class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800">
           <ShoppingBag :size="28" class="text-gray-400" />
         </div>
-        <p class="text-base font-medium text-gray-600">No hay productos disponibles</p>
-        <p class="mt-1 text-sm text-gray-400">El vendedor aun no ha agregado productos a su tienda.</p>
+        <p class="text-base font-medium text-gray-600 dark:text-gray-300">No hay productos disponibles</p>
+        <p class="mt-1 text-sm text-gray-400 dark:text-gray-500">El vendedor aun no ha agregado productos a su tienda.</p>
       </div>
 
       <!-- ============================================================ -->
@@ -218,7 +218,7 @@ onMounted(() => {
               v-model="searchQuery"
               type="text"
               :placeholder="`Buscar en ${business?.name ?? 'tienda'}...`"
-              class="w-full rounded-2xl border-transparent bg-gray-50 py-3.5 pl-11 pr-4 text-sm font-medium text-gray-900 placeholder-gray-400 outline-none transition-all focus:border-gray-200 focus:bg-white focus:ring-4 focus:ring-gray-50"
+              class="w-full rounded-2xl border-transparent bg-gray-50 py-3.5 pl-11 pr-4 text-sm font-medium text-gray-900 placeholder-gray-400 outline-none transition-all focus:border-gray-200 focus:bg-white focus:ring-4 focus:ring-gray-50 dark:bg-gray-800 dark:text-white dark:placeholder-gray-500 dark:focus:border-gray-700 dark:focus:bg-gray-800 dark:focus:ring-gray-800/50"
             >
           </div>
         </div>
@@ -262,17 +262,17 @@ onMounted(() => {
           <!-- INFO BANNER -->
           <div
             v-if="storeInfo && (storeInfo.welcomeMessage || todayHours || exchangeRate || storeInfo.deliveryEnabled)"
-            class="mb-6 flex items-start gap-3 rounded-2xl border border-gray-100 bg-white p-3.5 shadow-sm"
+            class="mb-6 flex items-start gap-3 rounded-2xl border border-gray-100 bg-white p-3.5 shadow-sm dark:border-gray-800 dark:bg-gray-900"
           >
-            <div class="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-500">
+            <div class="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-500 dark:bg-blue-900/30 dark:text-blue-400">
               <Info :size="14" />
             </div>
-            <div class="text-[11px] font-medium leading-relaxed text-gray-500">
+            <div class="text-[11px] font-medium leading-relaxed text-gray-500 dark:text-gray-400">
               <p v-if="storeInfo.welcomeMessage" class="mb-1">
-                <span class="font-semibold text-gray-900">{{ storeInfo.welcomeMessage }}</span>
+                <span class="font-semibold text-gray-900 dark:text-white">{{ storeInfo.welcomeMessage }}</span>
               </p>
               <p v-if="exchangeRate">
-                <span class="font-semibold text-gray-900">Tasa BCV:</span>
+                <span class="font-semibold text-gray-900 dark:text-white">Tasa BCV:</span>
                 Bs. {{ exchangeRate.toFixed(2) }} por $1.
               </p>
               <p v-if="todayHours" class="flex items-center gap-1">
@@ -295,10 +295,10 @@ onMounted(() => {
 
           <!-- SECTION TITLE -->
           <div class="mb-4 flex items-end justify-between px-1">
-            <h2 class="text-lg font-bold tracking-tight text-gray-900">
+            <h2 class="text-lg font-bold tracking-tight text-gray-900 dark:text-white">
               {{ selectedCategory ?? "Productos" }}
             </h2>
-            <span class="mb-1 text-xs font-semibold uppercase tracking-wider text-gray-400">
+            <span class="mb-1 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
               {{ filteredProducts.length }} {{ filteredProducts.length === 1 ? "producto" : "productos" }}
             </span>
           </div>
