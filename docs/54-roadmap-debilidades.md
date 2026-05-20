@@ -1,198 +1,269 @@
-# Roadmap de Debilidades — Auditoría Backend Mayo 2026
+# Roadmap de Debilidades — Auditoría Completa Mayo 2026
 
-> Score actual: 8.2/10
+> Score actual: 8.2/10 (era 7.8 antes de los sprints)
 > Objetivo: 9.0/10
 > Última revisión: Mayo 2026
+> Progreso: 11 de 41 items resueltos
 
 ---
 
-## Prioridad Alta (bloquean escala o tienen riesgo de datos)
+## RESUELTOS
+
+| # | Item | PR | Sprint |
+|---|------|-----|--------|
+| 2 | Unique constraint SKU por negocio | #369 | 1 |
+| 3 | Quick sales envueltas en db.transaction() | #369 | 1 |
+| 5 | Exchange rates unique index DATE() + UPSERT | #369 | 1 |
+| 6 | ON DELETE RESTRICT en saleItems→products | #369 | 1 |
+| 13 | Payment method validado con Zod enum | #369 | 1 |
+| 17 | Rate limit duplicado en catalog orders removido | #369 | 1 |
+| 19 | x-forwarded-for validación con TRUSTED_PROXY | #370 | 2 |
+| 34 | Error boundary (NuxtErrorBoundary) en storefront | #371 | 3 |
+| 35 | bcryptjs removido del frontend (dead dep) | #371 | 3 |
+| 36 | Width/height en imágenes de productos (CLS fix) | #371 | 3 |
+| 37 | CSS muerto (.storefront-card) eliminado | #369 | 1 |
+
+Adicionalmente, PR #368 resolvió problemas de performance del storefront:
+- SSR data fetching con useAsyncData (eliminó waterfall client-side)
+- Font non-blocking (preconnect + media swap)
+- CDN cache headers (s-maxage en route rules)
+- Code splitting (Clerk, chart.js, xlsx en chunks separados)
+- Workbox optimizado (runtime caching por tipo de recurso)
+
+---
+
+## PENDIENTES — Prioridad Alta (bloquean escala o riesgo de datos)
 
 ### 1. FORCE ROW LEVEL SECURITY en todas las tablas
 - **Categoría:** Seguridad
-- **Riesgo:** Si la app se conecta como table owner (rol `platform`), RLS se bypasea silenciosamente. El middleware siempre setea `set_config` pero no hay defensa si un bug lo omite.
-- **Fix:** `ALTER TABLE <table> FORCE ROW LEVEL SECURITY` en todas las tablas con RLS.
-- **Impacto:** Previene data leaks si un endpoint olvida pasar por tenant middleware.
-- **Esfuerzo:** 2h (migración + test de que migraciones siguen funcionando con FORCE).
-
-### 2. Unique constraint en (business_id, sku) para productos
-- **Categoría:** Modelo de datos
-- **Riesgo:** Dos productos del mismo negocio pueden tener el mismo SKU. El import de Excel no detecta duplicados correctamente si no hay constraint en DB.
-- **Fix:** `CREATE UNIQUE INDEX idx_products_business_sku ON products(business_id, sku) WHERE sku IS NOT NULL`
-- **Impacto:** Previene datos corruptos en inventario.
-- **Esfuerzo:** 30min (migración + verificar que no hay duplicados existentes).
-
-### 3. Quick sales sin transacción atómica
-- **Categoría:** Integridad transaccional
-- **Riesgo:** `POST /sales/quick` inserta la venta y luego el pago en statements separados. Si el insert de payment falla, queda una venta sin pago registrado.
-- **Fix:** Envolver en `db.transaction()`.
-- **Impacto:** Previene ventas huérfanas sin pago.
-- **Esfuerzo:** 30min.
+- **Riesgo:** Si la app se conecta como table owner, RLS se bypasea silenciosamente.
+- **Fix:** `ALTER TABLE <table> FORCE ROW LEVEL SECURITY` en todas las tablas.
+- **Esfuerzo:** 2h
 
 ### 4. Validación de JSONB fields (surcharges, businessHours, paymentMethods)
 - **Categoría:** Validación de datos
-- **Riesgo:** Estos campos aceptan cualquier JSON. Un cliente malicioso o un bug en el frontend puede guardar datos malformados que rompen el rendering.
-- **Fix:** Zod schemas para cada JSONB field, validados en el endpoint antes de guardar.
-- **Impacto:** Previene datos corruptos que causan crashes en el frontend.
-- **Esfuerzo:** 2h.
+- **Riesgo:** Campos aceptan cualquier JSON. Datos malformados rompen el frontend.
+- **Fix:** Zod schemas para cada JSONB field, validados antes de guardar.
+- **Esfuerzo:** 2h
 
-### 5. exchange_rates unique index usa timestamp en vez de date
-- **Categoría:** Modelo de datos
-- **Riesgo:** El unique index es `(business_id, date)` pero `date` es `timestamp with time zone`. Dos rates el mismo día con diferente hora (ej: 8am y 2pm) crearían dos registros. El query `ORDER BY date DESC LIMIT 1` devuelve el último, pero la intención es una rate por día.
-- **Fix:** Cambiar el tipo de `date` a `date` (sin timezone) o usar `DATE(date)` en el unique index.
-- **Impacto:** Previene rates duplicados por día.
-- **Esfuerzo:** 1h (migración + ajustar queries).
+### 7. PgBouncer (connection pooler externo)
+- **Categoría:** Escalabilidad
+- **Riesgo:** 20 conexiones directas por replica. Con 3+ replicas satura PostgreSQL.
+- **Fix:** PgBouncer en modo transaction entre API y PostgreSQL.
+- **Esfuerzo:** 4h
 
----
-
-## Prioridad Media (mejoran resiliencia y operabilidad)
-
-### 6. Circuit breaker para servicios externos
-- **Categoría:** Manejo de errores
-- **Riesgo:** Si fal.ai, BCV scraper, o Resend están caídos, cada request que los usa espera hasta timeout (25-30s). No hay backoff ni circuit breaker.
-- **Fix:** Implementar circuit breaker pattern (3 fallos consecutivos → open → skip por 60s → half-open → retry).
-- **Impacto:** Requests no se bloquean esperando servicios caídos.
-- **Esfuerzo:** 4h.
-
-### 7. set_config RLS fuera de transacción de venta
-- **Categoría:** Integridad transaccional
-- **Riesgo:** El tenant middleware hace `set_config` y luego `await next()`. Si postgres.js reasigna la conexión del pool entre el set_config y la transacción de venta (teóricamente posible bajo alta carga), el RLS context podría ser incorrecto.
-- **Fix:** Mover el `set_config` dentro de cada transacción que lo necesita, o usar `set_config(..., true)` (transaction-local) dentro del `db.transaction()`.
-- **Impacto:** Elimina un vector teórico de data leak bajo carga extrema.
-- **Esfuerzo:** 3h (refactor del tenant middleware).
-
-### 8. productAliases.supplierId es text en vez de uuid
-- **Categoría:** Modelo de datos
-- **Riesgo:** Inconsistencia de tipos. No hay FK constraint, permite valores inválidos.
-- **Fix:** Migración para cambiar a `uuid` con FK a `suppliers.id`.
-- **Impacto:** Integridad referencial.
-- **Esfuerzo:** 1h.
-
-### 9. customer_segments tabla redundante con RFM
-- **Categoría:** Modelo de datos
-- **Riesgo:** Dos sistemas de segmentación coexisten: `customer_segments` (tabla N:M con labels simples) y `customers.rfm_segment` (columna con scoring real). El frontend usa ambos en diferentes lugares.
-- **Fix:** Deprecar `customer_segments` y migrar todo a `rfm_segment`. O mantener ambos con roles claros (RFM = scoring automático, segments = tags manuales del usuario).
-- **Impacto:** Reduce confusión y queries innecesarios.
-- **Esfuerzo:** 2h (decidir estrategia + migrar frontend).
-
-### 10. paymentMethod sin validación de enum
-- **Categoría:** Validación de datos
-- **Riesgo:** El campo `method` en sale_payments y `paymentMethod` en orders acepta cualquier string. Un typo ("pago_moivl") crea un método fantasma que aparece en reportes.
-- **Fix:** Zod enum con los métodos válidos: `z.enum(["efectivo", "pago_movil", "zelle", "binance", "zinli", "transferencia", "fiado", "efectivo_usd"])`.
-- **Impacto:** Datos limpios en reportes de métodos de pago.
-- **Esfuerzo:** 1h.
-
-### 11. Reports sin paginación
-- **Categoría:** Performance
-- **Riesgo:** `GET /quotations` devuelve hasta 500 rows. Reportes de inventario devuelven todos los productos. Con 1,000 negocios y 200+ productos cada uno, estos responses pueden ser grandes.
-- **Fix:** Agregar paginación con cursor o offset a endpoints que devuelven listas largas.
-- **Impacto:** Reduce memoria del servidor y tiempo de respuesta.
-- **Esfuerzo:** 3h.
-
-### 12. Dashboard hace 12 API calls en paralelo
-- **Categoría:** Performance
-- **Riesgo:** En conexión 3G venezolana (300-500ms RTT), 12 calls en paralelo saturan el ancho de banda. El skeleton se muestra 3-5 segundos.
-- **Fix:** Dividir en 2 fases: critical (4 calls) → render → deferred (8 calls). O crear un endpoint `/api/dashboard` que devuelve todo en una sola respuesta.
-- **Impacto:** First paint 2-3x más rápido.
-- **Esfuerzo:** 4h (endpoint consolidado) o 2h (two-phase loading).
-
----
-
-## Prioridad Baja (hardening, nice-to-have)
-
-### 13. No hay tests de concurrencia
-- **Categoría:** Testing
-- **Riesgo:** No se verifica que dos ventas simultáneas del último item no creen overselling. El código usa `WHERE stock >= qty` que es correcto, pero no hay test que lo demuestre.
-- **Fix:** Test que lanza 10 ventas concurrentes del mismo producto con stock=1 y verifica que solo 1 tiene éxito.
-- **Impacto:** Confianza en el sistema bajo carga.
-- **Esfuerzo:** 3h.
-
-### 14. No hay tests para void/return flows
-- **Categoría:** Testing
-- **Riesgo:** El flujo de void (restaurar stock, revertir fiado, revertir stats) y return (parcial) no tienen tests de integración. Un cambio en el código podría romper la reversión sin que nadie se entere.
-- **Fix:** Tests e2e: crear venta → void → verificar stock restaurado + customer stats revertidos.
-- **Impacto:** Previene regresiones en flujos críticos.
-- **Esfuerzo:** 4h.
-
-### 15. No hay tests para RFM scoring
-- **Categoría:** Testing
-- **Riesgo:** El servicio de RFM calcula quintiles y asigna segmentos. Si la lógica tiene un bug (ej: todos los clientes quedan como "lost"), no hay test que lo detecte.
-- **Fix:** Unit tests con datos sintéticos: 10 clientes con diferentes patrones → verificar que los segmentos son correctos.
-- **Impacto:** Confianza en la segmentación.
-- **Esfuerzo:** 2h.
-
-### 16. No hay distributed tracing (OpenTelemetry)
-- **Categoría:** Observabilidad
-- **Riesgo:** Cuando un request es lento, no se puede ver qué parte del pipeline (auth, RLS, query, external service) es la culpable.
-- **Fix:** Integrar OpenTelemetry SDK con spans para: auth, tenant, DB queries, Redis, external APIs.
-- **Impacto:** Debugging de latencia en producción.
-- **Esfuerzo:** 1 día.
-
-### 17. No hay readiness probe separada del liveness probe
-- **Categoría:** Deployment
-- **Riesgo:** El health check actual verifica DB + Redis. Si la DB está caída, el container se marca como unhealthy y se reinicia. Pero durante migraciones, la DB puede estar temporalmente inaccesible — el container no debería reiniciarse, solo dejar de recibir tráfico.
-- **Fix:** Separar en `/health/live` (proceso vivo) y `/health/ready` (DB + Redis accesibles).
-- **Impacto:** Deploys más estables.
-- **Esfuerzo:** 1h.
-
-### 18. No hay rollback automático de migraciones
-- **Categoría:** Deployment
-- **Riesgo:** Si una migración falla a mitad (ej: ALTER TABLE en tabla grande timeout), la DB queda en estado inconsistente. No hay forma automática de revertir.
-- **Fix:** Cada migración debería tener un archivo `down` correspondiente. O usar migraciones idempotentes (IF NOT EXISTS, IF EXISTS).
-- **Impacto:** Recovery más rápido de deploys fallidos.
-- **Esfuerzo:** 4h (escribir downs para las 22 migraciones existentes).
-
-### 19. orders.items como JSONB pierde integridad referencial
-- **Categoría:** Modelo de datos
-- **Riesgo:** Si un producto se elimina, el snapshot en `orders.items` mantiene el `productId` pero no se puede hacer JOIN para obtener datos actualizados. Esto es intencional (snapshot del momento de la orden) pero dificulta reportes que cruzan órdenes con productos.
-- **Fix:** Aceptable como está (es un snapshot por diseño). Documentar que `orders.items` es inmutable y no debe joinarse con `products`.
-- **Impacto:** Ninguno funcional — solo claridad de diseño.
-- **Esfuerzo:** 0 (documentación).
-
-### 20. /metrics endpoint sin auth en red privada
+### 8. CSRF protection en storefront checkout
 - **Categoría:** Seguridad
-- **Riesgo:** Si la red privada se compromete, un atacante puede ver métricas operacionales (request rates, error rates, memory usage). No datos de negocio, pero sí información útil para reconocimiento.
-- **Fix:** Agregar basic auth o IP whitelist al endpoint `/metrics`.
-- **Impacto:** Defensa en profundidad.
-- **Esfuerzo:** 30min.
+- **Riesgo:** POST /catalog/:slug/orders sin auth ni CSRF. Sitio malicioso puede forzar pedidos.
+- **Fix:** Token CSRF o verificación de Origin header.
+- **Esfuerzo:** 2h
 
 ---
 
-## Resumen por esfuerzo
+## PENDIENTES — Prioridad Media (resiliencia y operabilidad)
 
-| Esfuerzo | Items | IDs |
-|----------|-------|-----|
-| < 1 hora | 5 | #2, #3, #10, #17, #20 |
-| 1-2 horas | 5 | #1, #4, #5, #8, #15 |
-| 3-4 horas | 5 | #6, #7, #11, #13, #14 |
-| 1 día | 3 | #12, #16, #18 |
-| Decisión de diseño | 2 | #9, #19 |
+### 9. Circuit breaker para servicios externos
+- **Categoría:** Manejo de errores
+- **Riesgo:** Servicios caídos (fal.ai, BCV, Resend) bloquean requests 25-30s.
+- **Fix:** Circuit breaker pattern (3 fallos → open 60s → half-open → retry).
+- **Esfuerzo:** 4h
+
+### 10. set_config RLS dentro de transacciones
+- **Categoría:** Integridad transaccional
+- **Riesgo:** Reasignación de conexión del pool entre set_config y transacción.
+- **Fix:** Mover set_config dentro de cada db.transaction().
+- **Esfuerzo:** 3h
+
+### 11. productAliases.supplierId text → uuid con FK
+- **Categoría:** Modelo de datos
+- **Riesgo:** Inconsistencia de tipos, sin FK constraint.
+- **Fix:** Migración para cambiar tipo + agregar FK.
+- **Esfuerzo:** 1h
+
+### 12. customer_segments redundante con RFM
+- **Categoría:** Modelo de datos
+- **Riesgo:** Dos sistemas de segmentación coexisten sin claridad.
+- **Fix:** Deprecar customer_segments o definir roles claros.
+- **Esfuerzo:** 2h (decisión de diseño)
+
+### 14. Reports sin paginación
+- **Categoría:** Performance
+- **Riesgo:** Endpoints devuelven hasta 500 rows sin paginar.
+- **Fix:** Paginación con cursor o offset.
+- **Esfuerzo:** 3h
+
+### 15. Dashboard 12 API calls → consolidar
+- **Categoría:** Performance
+- **Riesgo:** 12 calls en paralelo saturan conexiones 3G venezolanas.
+- **Fix:** Endpoint /api/dashboard consolidado o two-phase loading.
+- **Esfuerzo:** 4h
+
+### 16. Catálogo público 6 round-trips → 3
+- **Categoría:** Performance
+- **Riesgo:** 6 queries separadas al DB por cada request de catálogo.
+- **Fix:** Consolidar con CTEs o window functions.
+- **Esfuerzo:** 2h
+
+### 18. Health check: separar liveness de readiness
+- **Categoría:** Deployment
+- **Riesgo:** Container se reinicia durante migraciones (DB temporalmente inaccesible).
+- **Fix:** /health/live (proceso vivo) + /health/ready (DB + Redis ok).
+- **Esfuerzo:** 1h
+
+### 20. Partitioning en sales/stock_movements
+- **Categoría:** Escalabilidad
+- **Riesgo:** Con >1M rows, queries de reportes por fecha se degradan.
+- **Fix:** PostgreSQL native partitioning por mes.
+- **Esfuerzo:** 1 día
+
+### 21. CDN (Cloudflare)
+- **Categoría:** Performance
+- **Riesgo:** Sin CDN, los cache headers no tienen efecto. Alta latencia para usuarios.
+- **Fix:** Cloudflare free tier delante del dominio.
+- **Esfuerzo:** 2h
+
+### 22. Staging environment
+- **Categoría:** Deployment
+- **Riesgo:** Cambios van directo de dev a prod sin validación intermedia.
+- **Fix:** Ambiente staging en Coolify con DB separada.
+- **Esfuerzo:** 4h
+
+### 33. /metrics auth (bearer token)
+- **Categoría:** Seguridad
+- **Riesgo:** Métricas operacionales expuestas sin autenticación.
+- **Fix:** Bearer token via METRICS_TOKEN env var.
+- **Esfuerzo:** 30min
 
 ---
 
-## Orden recomendado de implementación
+## PENDIENTES — Prioridad Baja (hardening, testing)
 
-### Sprint A (1 día): Integridad de datos
-- #2 Unique constraint SKU
-- #3 Quick sales transacción
-- #5 Exchange rates date type
-- #10 Payment method enum
+### 23. Tests E2E frontend (Playwright)
+- **Categoría:** Testing
+- **Riesgo:** No hay tests automatizados del flujo de compra del storefront.
+- **Fix:** Playwright con 3-5 tests E2E del flujo completo.
+- **Esfuerzo:** 1 día
 
-### Sprint B (1 día): Seguridad
+### 24. Tests de concurrencia
+- **Categoría:** Testing
+- **Riesgo:** No se verifica que ventas simultáneas no creen overselling.
+- **Fix:** Test con 10 ventas concurrentes del mismo producto (stock=1).
+- **Esfuerzo:** 3h
+
+### 25. Tests de void/return flows
+- **Categoría:** Testing
+- **Riesgo:** Flujos de void y return parcial sin tests de integración.
+- **Fix:** Tests e2e: venta → void → verificar stock + stats revertidos.
+- **Esfuerzo:** 4h
+
+### 26. Tests de RFM scoring
+- **Categoría:** Testing
+- **Riesgo:** Lógica de quintiles y segmentos sin tests.
+- **Fix:** Unit tests con datos sintéticos.
+- **Esfuerzo:** 2h
+
+### 27. Load testing (k6)
+- **Categoría:** Testing
+- **Riesgo:** No se conoce el punto de quiebre del sistema.
+- **Fix:** Script k6 con 100 usuarios concurrentes.
+- **Esfuerzo:** 4h
+
+### 28. Contract testing API↔Frontend
+- **Categoría:** Testing
+- **Riesgo:** Cambios en API responses rompen frontend en runtime.
+- **Fix:** Tipos generados del schema o Zod compartidos.
+- **Esfuerzo:** 4h
+
+### 29. OpenTelemetry (distributed tracing)
+- **Categoría:** Observabilidad
+- **Riesgo:** No se puede diagnosticar qué parte del pipeline es lenta.
+- **Fix:** OpenTelemetry SDK con spans por capa.
+- **Esfuerzo:** 1 día
+
+### 30. Readiness probe separada
+- **Categoría:** Deployment
+- **Riesgo:** Container se reinicia innecesariamente durante migraciones.
+- **Fix:** /health/live + /health/ready separados.
+- **Esfuerzo:** 1h
+
+### 31. Rollback automático de migraciones
+- **Categoría:** Deployment
+- **Riesgo:** Migraciones fallidas dejan DB inconsistente.
+- **Fix:** Archivos down para cada migración.
+- **Esfuerzo:** 4h
+
+### 32. orders.items JSONB — documentar diseño
+- **Categoría:** Modelo de datos
+- **Riesgo:** Ninguno funcional (es snapshot por diseño).
+- **Fix:** Documentar que es inmutable.
+- **Esfuerzo:** 0
+
+### 38. Backup strategy documentada
+- **Categoría:** Operaciones
+- **Riesgo:** Sin procedimiento de backup/restore documentado.
+- **Fix:** pg_dump diario + retención 30 días + procedimiento de restore.
+- **Esfuerzo:** 4h
+
+### 39. Secrets rotation
+- **Categoría:** Seguridad
+- **Riesgo:** Credenciales estáticas sin mecanismo de rotación.
+- **Fix:** Secrets manager con rotation policy.
+- **Esfuerzo:** 1 día
+
+### 40. Dockerfile optimizado (node_modules)
+- **Categoría:** Build
+- **Riesgo:** Imagen API copia todo node_modules (~500MB).
+- **Fix:** npm ci --omit=dev o copiar solo externals de tsup.
+- **Esfuerzo:** 2h
+
+### 41. Test coverage medido en CI
+- **Categoría:** Testing
+- **Riesgo:** No se sabe qué porcentaje del código está cubierto.
+- **Fix:** --coverage en vitest + threshold mínimo.
+- **Esfuerzo:** 1h
+
+---
+
+## Próximos sprints recomendados
+
+### Sprint 4 (1 día): Seguridad + Validación
 - #1 FORCE ROW LEVEL SECURITY
 - #4 Validación JSONB fields
-- #20 Auth en /metrics
+- #33 /metrics auth
+- #8 CSRF protection
 
-### Sprint C (1 día): Performance
-- #12 Dashboard endpoint consolidado o two-phase
-- #11 Paginación en reports
+### Sprint 5 (1 día): Performance backend
+- #15 Dashboard consolidado
+- #16 Catálogo 6→3 round-trips
+- #14 Paginación en reports
 
-### Sprint D (1 día): Testing
-- #13 Tests de concurrencia
-- #14 Tests de void/return
-- #15 Tests de RFM
+### Sprint 6 (1 día): Infraestructura
+- #21 CDN (Cloudflare)
+- #18 Liveness vs readiness probe
+- #40 Dockerfile optimizado
+- #41 Test coverage en CI
 
-### Sprint E (1 día): Resiliencia
-- #6 Circuit breaker
-- #7 set_config dentro de transacciones
-- #17 Readiness probe
+### Sprint 7 (1 día): Testing
+- #24 Tests de concurrencia
+- #25 Tests de void/return
+- #26 Tests de RFM
+
+### Sprint 8 (1 día): Escalabilidad
+- #7 PgBouncer
+- #9 Circuit breaker
+- #22 Staging environment
+
+---
+
+## Métricas de progreso
+
+| Área | Antes | Ahora | Objetivo |
+|------|-------|-------|----------|
+| Base de datos | 8.5 | 9.0 | 9.5 |
+| Comunicación API↔DB | 8.0 | 8.5 | 9.0 |
+| Backend API | 8.0 | 8.5 | 9.0 |
+| Frontend | 7.5 | 8.5 | 9.0 |
+| Seguridad | 8.0 | 8.5 | 9.0 |
+| Infraestructura | 7.0 | 7.5 | 8.5 |
+| Testing | 6.5 | 6.5 | 8.0 |
+| **TOTAL** | **7.8** | **8.2** | **9.0** |
