@@ -48,7 +48,6 @@ async function createCustomer() {
     isSubmitting.value = false;
   }
 }
-
 </script>
 
 <template>

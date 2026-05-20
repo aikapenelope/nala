@@ -102,7 +102,6 @@ async function confirmItems() {
     isConfirming.value = false;
   }
 }
-
 </script>
 
 <template>
