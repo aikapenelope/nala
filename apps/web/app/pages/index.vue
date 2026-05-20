@@ -306,9 +306,22 @@ async function loadDashboard() {
       pendingOrders.value = ordersResult.value.orders.slice(0, 5);
     }
 
-    // Build activity feed from recent sales
+    // Build activity feed from recent sales + pending orders
     if (recentSalesResult.status === "fulfilled") {
       const feed: FeedItem[] = [];
+
+      // Add pending orders to feed (most actionable items first)
+      for (const order of pendingOrders.value.slice(0, 2)) {
+        feed.push({
+          id: `order-${order.id}`,
+          icon: "📦",
+          text: `Pedido de ${order.customerName} $${order.total.toFixed(2)}`,
+          time: timeAgo(order.createdAt),
+          to: "/orders",
+        });
+      }
+
+      // Add recent sales
       for (const sale of recentSalesResult.value.sales.slice(0, 5)) {
         const channelLabel = sale.channel === "pos" ? "POS" : sale.channel === "online" ? "Online" : sale.channel;
         feed.push({
@@ -319,7 +332,8 @@ async function loadDashboard() {
           to: `/sales/history`,
         });
       }
-      activityFeed.value = feed;
+
+      activityFeed.value = feed.slice(0, 7);
     }
 
     if (storeSettingsResult.status === "fulfilled") {
