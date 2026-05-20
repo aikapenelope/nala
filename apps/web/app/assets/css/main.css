@@ -1,5 +1,9 @@
 @import "tailwindcss";
-@import url("https://api.fontshare.com/v2/css?f[]=plus-jakarta-sans@500,700,800&display=swap");
+
+/*
+ * Plus Jakarta Sans is loaded via <link rel="preload"> in nuxt.config.ts
+ * to avoid render-blocking @import. The font-family is declared below.
+ */
 
 /* Enable class-based dark mode (toggle via .dark on <html>). */
 @custom-variant dark (&:where(.dark, .dark *));

@@ -11,8 +11,11 @@
  * 5. Import (skip duplicates or update them)
  */
 
-import * as XLSX from "xlsx";
 import { AlertTriangle } from "lucide-vue-next";
+
+// Dynamic import: xlsx (~300KB) is loaded only when this page is visited,
+// not included in the initial storefront bundle.
+const loadXLSX = () => import("xlsx");
 
 const { $api } = useApi();
 
@@ -115,6 +118,7 @@ async function handleFileUpload(event: Event) {
   fileName.value = file.name;
 
   const data = await file.arrayBuffer();
+  const XLSX = await loadXLSX();
   const workbook = XLSX.read(data, { type: "array" });
   const sheetName = workbook.SheetNames[0];
   if (!sheetName) return;
