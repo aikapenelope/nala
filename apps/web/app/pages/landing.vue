@@ -277,9 +277,10 @@ definePageMeta({ layout: false });
             <p class="mt-2 text-sm text-gray-500">Para probar Nala y dejar el cuaderno.</p>
             <div class="mt-8 flex items-end gap-1"><span class="text-5xl font-bold tracking-tight text-gray-900">$0</span><span class="mb-1.5 text-sm text-gray-400">/mes</span></div>
             <ul class="mt-8 space-y-3 text-sm text-gray-600">
-              <li class="flex gap-2.5"><Check :size="18" class="mt-0.5 shrink-0 text-[#31c863]" />Ventas rapidas</li>
-              <li class="flex gap-2.5"><Check :size="18" class="mt-0.5 shrink-0 text-[#31c863]" />Inventario basico</li>
-              <li class="flex gap-2.5"><Check :size="18" class="mt-0.5 shrink-0 text-[#31c863]" />Clientes basicos</li>
+              <li class="flex gap-2.5"><Check :size="18" class="mt-0.5 shrink-0 text-[#31c863]" />Hasta 50 productos</li>
+              <li class="flex gap-2.5"><Check :size="18" class="mt-0.5 shrink-0 text-[#31c863]" />100 ventas por mes</li>
+              <li class="flex gap-2.5"><Check :size="18" class="mt-0.5 shrink-0 text-[#31c863]" />Inventario y clientes</li>
+              <li class="flex gap-2.5"><Check :size="18" class="mt-0.5 shrink-0 text-[#31c863]" />1 usuario</li>
             </ul>
             <NuxtLink to="/auth/signup" class="mt-10 flex h-12 w-full items-center justify-center rounded-xl bg-white text-sm font-bold text-[#ff321f] ring-1 ring-gray-200 transition-all hover:ring-[#ff321f]/30">Empezar gratis</NuxtLink>
           </article>
@@ -287,27 +288,30 @@ definePageMeta({ layout: false });
           <article class="relative rounded-3xl bg-[#ff321f] p-8 text-white shadow-2xl shadow-[#ff321f]/25">
             <div class="absolute right-6 top-6 rounded-full bg-white px-3 py-1 text-xs font-bold text-[#ff321f]">Popular</div>
             <h3 class="text-2xl font-bold">Pro</h3>
-            <p class="mt-2 text-sm text-white/70">Para negocios que venden por WhatsApp y online.</p>
+            <p class="mt-2 text-sm text-white/70">Para negocios que venden todos los dias.</p>
             <div class="mt-8 flex items-end gap-1"><span class="text-5xl font-bold tracking-tight">$9</span><span class="mb-1.5 text-sm text-white/50">/mes</span></div>
             <ul class="mt-8 space-y-3 text-sm text-white/85">
-              <li class="flex gap-2.5"><Check :size="18" class="mt-0.5 shrink-0" />Tienda online</li>
+              <li class="flex gap-2.5"><Check :size="18" class="mt-0.5 shrink-0" />Productos ilimitados</li>
+              <li class="flex gap-2.5"><Check :size="18" class="mt-0.5 shrink-0" />Ventas ilimitadas</li>
+              <li class="flex gap-2.5"><Check :size="18" class="mt-0.5 shrink-0" />Tienda online + pedidos</li>
               <li class="flex gap-2.5"><Check :size="18" class="mt-0.5 shrink-0" />Reportes con IA</li>
               <li class="flex gap-2.5"><Check :size="18" class="mt-0.5 shrink-0" />Fiados por WhatsApp</li>
-              <li class="flex gap-2.5"><Check :size="18" class="mt-0.5 shrink-0" />Importar productos</li>
+              <li class="flex gap-2.5"><Check :size="18" class="mt-0.5 shrink-0" />Importar desde Excel</li>
             </ul>
-            <NuxtLink to="/auth/signup" class="mt-10 flex h-12 w-full items-center justify-center rounded-xl bg-white text-sm font-bold text-[#ff321f] shadow-lg transition-all hover:shadow-xl">Probar Pro</NuxtLink>
+            <NuxtLink to="/auth/signup" class="mt-10 flex h-12 w-full items-center justify-center rounded-xl bg-white text-sm font-bold text-[#ff321f] shadow-lg transition-all hover:shadow-xl">Probar Pro gratis</NuxtLink>
           </article>
 
           <article class="rounded-3xl bg-[#fafafa] p-8 ring-1 ring-gray-100">
-            <h3 class="text-2xl font-bold text-gray-900">Enterprise</h3>
-            <p class="mt-2 text-sm text-gray-500">Para equipos con necesidades especiales.</p>
-            <div class="mt-8"><span class="text-3xl font-bold tracking-tight text-gray-900">A medida</span></div>
+            <h3 class="text-2xl font-bold text-gray-900">Equipo</h3>
+            <p class="mt-2 text-sm text-gray-500">Para negocios con varios vendedores.</p>
+            <div class="mt-8 flex items-end gap-1"><span class="text-5xl font-bold tracking-tight text-gray-900">$19</span><span class="mb-1.5 text-sm text-gray-400">/mes</span></div>
             <ul class="mt-8 space-y-3 text-sm text-gray-600">
-              <li class="flex gap-2.5"><Check :size="18" class="mt-0.5 shrink-0 text-[#31c863]" />Consultoria</li>
-              <li class="flex gap-2.5"><Check :size="18" class="mt-0.5 shrink-0 text-[#31c863]" />Integraciones</li>
+              <li class="flex gap-2.5"><Check :size="18" class="mt-0.5 shrink-0 text-[#31c863]" />Todo lo de Pro</li>
+              <li class="flex gap-2.5"><Check :size="18" class="mt-0.5 shrink-0 text-[#31c863]" />Hasta 5 vendedores</li>
+              <li class="flex gap-2.5"><Check :size="18" class="mt-0.5 shrink-0 text-[#31c863]" />Reportes por vendedor</li>
               <li class="flex gap-2.5"><Check :size="18" class="mt-0.5 shrink-0 text-[#31c863]" />Soporte prioritario</li>
             </ul>
-            <NuxtLink to="/auth/signup" class="mt-10 flex h-12 w-full items-center justify-center rounded-xl bg-white text-sm font-bold text-[#ff321f] ring-1 ring-gray-200 transition-all hover:ring-[#ff321f]/30">Contactar</NuxtLink>
+            <NuxtLink to="/auth/signup" class="mt-10 flex h-12 w-full items-center justify-center rounded-xl bg-white text-sm font-bold text-[#ff321f] ring-1 ring-gray-200 transition-all hover:ring-[#ff321f]/30">Empezar con Equipo</NuxtLink>
           </article>
         </div>
       </div>
@@ -325,31 +329,37 @@ definePageMeta({ layout: false });
           </h2>
         </div>
 
-        <div class="mx-auto mt-16 max-w-4xl overflow-hidden rounded-3xl bg-white shadow-lg">
-          <div class="grid grid-cols-5 bg-[#ff321f] text-white">
-            <div class="p-4 text-sm font-bold lg:p-5">Necesidad</div>
-            <div class="p-4 text-sm font-bold lg:p-5">Nala</div>
-            <div class="p-4 text-sm font-bold lg:p-5">Cuaderno</div>
-            <div class="p-4 text-sm font-bold lg:p-5">Excel</div>
-            <div class="p-4 text-sm font-bold lg:p-5">ERP</div>
-          </div>
-          <div
-            v-for="row in [
-              { need: 'Registrar ventas', nala: '2 toques', cuaderno: 'Manual', excel: 'Manual', erp: 'Lento' },
-              { need: 'Inventario', nala: 'Automatico', cuaderno: 'No', excel: 'Formulas', erp: 'Si' },
-              { need: 'Clientes y fiados', nala: 'WhatsApp', cuaderno: 'Se pierde', excel: 'Manual', erp: 'Complejo' },
-              { need: 'Tienda online', nala: 'Incluida', cuaderno: 'No', excel: 'No', erp: 'Extra' },
-              { need: 'Aprendizaje', nala: 'Minutos', cuaderno: 'Ninguno', excel: 'Medio', erp: 'Alto' },
-            ]"
-            :key="row.need"
-            class="grid grid-cols-5 border-b border-gray-100 text-sm"
-          >
-            <div class="p-4 font-semibold text-gray-900 lg:p-5">{{ row.need }}</div>
-            <div class="p-4 font-semibold text-[#31c863] lg:p-5">{{ row.nala }}</div>
-            <div class="p-4 text-gray-400 lg:p-5">{{ row.cuaderno }}</div>
-            <div class="p-4 text-gray-400 lg:p-5">{{ row.excel }}</div>
-            <div class="p-4 text-gray-400 lg:p-5">{{ row.erp }}</div>
-          </div>
+        <div class="mx-auto mt-16 max-w-4xl overflow-x-auto rounded-3xl bg-white shadow-lg">
+          <table class="w-full min-w-[600px] text-left">
+            <thead>
+              <tr class="bg-[#ff321f] text-white">
+                <th class="p-4 text-sm font-bold lg:p-5">Necesidad</th>
+                <th class="p-4 text-sm font-bold lg:p-5">Nala</th>
+                <th class="p-4 text-sm font-bold lg:p-5">Cuaderno</th>
+                <th class="p-4 text-sm font-bold lg:p-5">Excel</th>
+                <th class="p-4 text-sm font-bold lg:p-5">ERP</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="row in [
+                  { need: 'Registrar ventas', nala: '2 toques', cuaderno: 'Manual', excel: 'Manual', erp: 'Lento' },
+                  { need: 'Inventario', nala: 'Automatico', cuaderno: 'No', excel: 'Formulas', erp: 'Si' },
+                  { need: 'Clientes y fiados', nala: 'WhatsApp', cuaderno: 'Se pierde', excel: 'Manual', erp: 'Complejo' },
+                  { need: 'Tienda online', nala: 'Incluida', cuaderno: 'No', excel: 'No', erp: 'Extra' },
+                  { need: 'Aprendizaje', nala: 'Minutos', cuaderno: 'Ninguno', excel: 'Medio', erp: 'Alto' },
+                ]"
+                :key="row.need"
+                class="border-b border-gray-100"
+              >
+                <td class="p-4 font-semibold text-gray-900 lg:p-5">{{ row.need }}</td>
+                <td class="p-4 font-semibold text-[#31c863] lg:p-5">{{ row.nala }}</td>
+                <td class="p-4 text-gray-400 lg:p-5">{{ row.cuaderno }}</td>
+                <td class="p-4 text-gray-400 lg:p-5">{{ row.excel }}</td>
+                <td class="p-4 text-gray-400 lg:p-5">{{ row.erp }}</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </div>
     </section>
