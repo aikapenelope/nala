@@ -96,6 +96,7 @@ interface DueReceivable {
   customerPhone: string | null;
   balanceUsd: string;
   dueDate: string | null;
+  createdAt?: string;
 }
 const dueToday = ref<DueReceivable[]>([]);
 
@@ -262,11 +263,22 @@ async function loadDashboard() {
     if (receivableResult.status === "fulfilled") {
       receivableTotal.value = receivableResult.value.totalPending;
 
-      // Filter receivables due today or overdue for the dashboard section
+      // Show receivables that need attention:
+      // 1. Past due date (overdue)
+      // 2. No due date but older than 15 days (needs reminder)
+      // Sorted by age (oldest first) — these are the most urgent to collect.
       const today = new Date();
+      const fifteenDaysAgo = new Date(today);
+      fifteenDaysAgo.setDate(fifteenDaysAgo.getDate() - 15);
       today.setHours(23, 59, 59, 999);
+
       dueToday.value = (receivableResult.value.accounts ?? [])
-        .filter((a) => a.dueDate && new Date(a.dueDate) <= today)
+        .filter((a) => {
+          if (a.dueDate && new Date(a.dueDate) <= today) return true;
+          // No due date but created >15 days ago — needs a reminder
+          if (!a.dueDate && a.createdAt && new Date(a.createdAt) <= fifteenDaysAgo) return true;
+          return false;
+        })
         .slice(0, 5);
     }
 
@@ -680,7 +692,7 @@ function openRateEditor() {
       <div class="mt-3 rounded-[18px] border border-amber-200/60 bg-gradient-to-br from-[#FFFBEB] to-[#FEF3C7] p-3.5">
         <div class="flex items-center justify-between">
           <p class="text-[11px] font-bold uppercase tracking-wider text-amber-700">
-            Cobros {{ dueToday.length > 0 ? `(${dueToday.length})` : "" }}
+            Recordar pago {{ dueToday.length > 0 ? `(${dueToday.length})` : "" }}
           </p>
           <NuxtLink to="/accounts" class="text-[10px] font-bold text-amber-600 hover:underline">
             Ver todo
@@ -708,7 +720,7 @@ function openRateEditor() {
           </div>
         </div>
         <p v-else class="mt-1.5 text-[11px] font-medium text-amber-600/70">
-          No hay cobros pendientes hoy
+          No hay pagos pendientes por recordar
         </p>
       </div>
 
