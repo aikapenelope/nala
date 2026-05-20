@@ -53,20 +53,20 @@ const meetsMinimum = computed(() => {
       Seguir comprando
     </NuxtLink>
 
-    <h1 class="mb-5 text-xl font-bold tracking-tight text-gray-900">Tu carrito</h1>
+    <h1 class="mb-5 text-xl font-bold tracking-tight text-gray-900 dark:text-white">Tu carrito</h1>
 
     <!-- Empty cart -->
     <div v-if="itemCount === 0" class="py-16 text-center">
-      <div class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gray-100">
+      <div class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800">
         <ShoppingBag :size="28" class="text-gray-400" />
       </div>
-      <p class="text-base font-medium text-gray-600">Tu carrito esta vacio</p>
-      <p class="mt-1 text-sm text-gray-400">
+      <p class="text-base font-medium text-gray-600 dark:text-gray-300">Tu carrito esta vacio</p>
+      <p class="mt-1 text-sm text-gray-400 dark:text-gray-500">
         Agrega productos desde el catalogo.
       </p>
       <NuxtLink
         to="/tienda"
-        class="mt-5 inline-block rounded-2xl bg-gray-900 px-6 py-3 text-sm font-bold text-white shadow-md transition-transform active:scale-95"
+        class="mt-5 inline-block rounded-2xl bg-gray-900 px-6 py-3 text-sm font-bold text-white shadow-md transition-transform active:scale-95 dark:bg-white dark:text-gray-900"
       >
         Ver catalogo
       </NuxtLink>
@@ -78,10 +78,10 @@ const meetsMinimum = computed(() => {
         <div
           v-for="item in items"
           :key="item.productId"
-          class="flex gap-3 rounded-2xl border border-gray-100 bg-white p-3 shadow-sm"
+          class="flex gap-3 rounded-2xl border border-gray-100 bg-white p-3 shadow-sm dark:border-gray-800 dark:bg-gray-900"
         >
           <!-- Product image -->
-          <div class="h-20 w-20 flex-shrink-0 overflow-hidden rounded-[16px] bg-gray-100">
+          <div class="h-20 w-20 flex-shrink-0 overflow-hidden rounded-[16px] bg-gray-100 dark:bg-gray-800">
             <img
               v-if="item.imageUrl"
               :src="resolveImageUrl(item.imageUrl)"
@@ -99,7 +99,7 @@ const meetsMinimum = computed(() => {
           <!-- Item details -->
           <div class="flex min-w-0 flex-1 flex-col justify-between">
             <div class="flex items-start justify-between gap-2">
-              <p class="text-sm font-bold leading-tight text-gray-900">
+              <p class="text-sm font-bold leading-tight text-gray-900 dark:text-white">
                 {{ item.name }}
               </p>
               <button
@@ -115,16 +115,16 @@ const meetsMinimum = computed(() => {
               <!-- Quantity controls -->
               <div class="flex items-center gap-1.5">
                 <button
-                  class="flex h-8 w-8 items-center justify-center rounded-xl bg-gray-50 border border-gray-100 text-gray-700 hover:bg-gray-100 transition-colors"
+                  class="flex h-8 w-8 items-center justify-center rounded-xl bg-gray-50 border border-gray-100 text-gray-700 hover:bg-gray-100 transition-colors dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700"
                   @click="updateQuantity(item.productId, item.quantity - 1)"
                 >
                   <Minus :size="14" />
                 </button>
-                <span class="min-w-[28px] text-center text-sm font-bold text-gray-900">
+                <span class="min-w-[28px] text-center text-sm font-bold text-gray-900 dark:text-white">
                   {{ item.quantity }}
                 </span>
                 <button
-                  class="flex h-8 w-8 items-center justify-center rounded-xl bg-gray-50 border border-gray-100 text-gray-700 hover:bg-gray-100 transition-colors"
+                  class="flex h-8 w-8 items-center justify-center rounded-xl bg-gray-50 border border-gray-100 text-gray-700 hover:bg-gray-100 transition-colors dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700"
                   @click="updateQuantity(item.productId, item.quantity + 1)"
                 >
                   <Plus :size="14" />
@@ -133,7 +133,7 @@ const meetsMinimum = computed(() => {
 
               <!-- Line total -->
               <div class="text-right">
-                <p class="text-[15px] font-bold tracking-tight text-gray-900">
+                <p class="text-[15px] font-bold tracking-tight text-gray-900 dark:text-white">
                   ${{ (item.price * item.quantity).toFixed(2) }}
                 </p>
                 <p
@@ -158,7 +158,7 @@ const meetsMinimum = computed(() => {
       </button>
 
       <!-- Summary -->
-      <div class="mt-6 space-y-2.5 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
+      <div class="mt-6 space-y-2.5 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900">
         <div class="flex justify-between text-sm text-gray-600">
           <span>Subtotal ({{ itemCount }} {{ itemCount === 1 ? "item" : "items" }})</span>
           <div class="text-right">
@@ -177,8 +177,8 @@ const meetsMinimum = computed(() => {
             {{ deliveryFee > 0 ? `$${deliveryFee.toFixed(2)}` : "Gratis" }}
           </span>
         </div>
-        <div class="border-t border-gray-100 pt-2.5">
-          <div class="flex justify-between text-base font-bold text-gray-900">
+        <div class="border-t border-gray-100 pt-2.5 dark:border-gray-800">
+          <div class="flex justify-between text-base font-bold text-gray-900 dark:text-white">
             <span>Total</span>
             <div class="text-right">
               <span class="text-lg">${{ total.toFixed(2) }}</span>
@@ -204,8 +204,8 @@ const meetsMinimum = computed(() => {
         class="mt-4 block w-full rounded-2xl py-3.5 text-center text-sm font-bold transition-all active:scale-[0.98]"
         :class="
           meetsMinimum
-            ? 'bg-gray-900 text-white shadow-md hover:bg-gray-800'
-            : 'pointer-events-none bg-gray-200 text-gray-400'
+            ? 'bg-gray-900 text-white shadow-md hover:bg-gray-800 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-100'
+            : 'pointer-events-none bg-gray-200 text-gray-400 dark:bg-gray-800 dark:text-gray-600'
         "
       >
         Continuar al pago

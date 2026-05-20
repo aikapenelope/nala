@@ -39,7 +39,7 @@ function handleScroll(event: Event) {
 <template>
   <div class="group flex flex-col overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm transition-all hover:shadow-md dark:border-gray-800 dark:bg-gray-900" :class="{ 'animate-[cartBounce_0.4s_ease-out]': isAdded }">
     <!-- Image (links to product detail) -->
-    <NuxtLink :to="`/tienda/product/${product.id}`" class="relative aspect-square w-full overflow-hidden bg-gray-50">
+    <NuxtLink :to="`/tienda/product/${product.id}`" class="relative aspect-square w-full overflow-hidden bg-gray-50 dark:bg-gray-800">
       <!-- Multi-image carousel -->
       <template v-if="product.images && product.images.length > 1">
         <div
@@ -80,7 +80,7 @@ function handleScroll(event: Event) {
       </template>
       <!-- No image -->
       <template v-else>
-        <div class="flex h-full w-full items-center justify-center bg-gray-100 text-gray-300">
+        <div class="flex h-full w-full items-center justify-center bg-gray-100 text-gray-300 dark:bg-gray-800 dark:text-gray-600">
           <ShoppingBag :size="36" />
         </div>
       </template>
