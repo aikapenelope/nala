@@ -58,6 +58,21 @@ onMounted(async () => {
     );
     customer.value = custResult.customer;
 
+    // If this customer has purchases but no RFM score, trigger calculation
+    if (customer.value.totalPurchases > 0 && !customer.value.rfmSegment) {
+      $api("/api/customers/rfm/recalculate", { method: "POST" })
+        .then(async () => {
+          // Refresh customer data to show the new RFM score
+          const refreshed = await $api<{ customer: CustomerDetail }>(
+            `/api/customers/${customerId.value}`,
+          );
+          customer.value = refreshed.customer;
+        })
+        .catch(() => {
+          // Non-critical: RFM will show on next visit
+        });
+    }
+
     // Load stats separately (non-critical — page still works without it)
     try {
       const statsResult = await $api<CustomerStats>(

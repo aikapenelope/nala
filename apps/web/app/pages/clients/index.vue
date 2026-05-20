@@ -65,7 +65,22 @@ function onSearchInput() {
 
 onMounted(async () => {
   await useOwnerLockRedirect();
-  fetchCustomers();
+  await fetchCustomers();
+
+  // Auto-calculate RFM if no customers have scores yet.
+  // Runs once after initial load, then refreshes the list to show badges.
+  // This is idempotent and fast (~50-100ms for 200 customers).
+  const needsRfm = customersList.value.length > 0 &&
+    customersList.value.every((c) => !c.rfmSegment);
+
+  if (needsRfm) {
+    try {
+      await $api("/api/customers/rfm/recalculate", { method: "POST" });
+      await fetchCustomers();
+    } catch {
+      // Non-critical: RFM will calculate on next sale
+    }
+  }
 });
 
 /** Get display info for the RFM segment badge. */
