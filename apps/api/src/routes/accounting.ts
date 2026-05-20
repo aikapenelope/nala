@@ -354,7 +354,7 @@ accounting.post(
           // 5. Save alias for future matching
           await tx.insert(productAliases).values({
             businessId,
-            supplierId: data.invoice.supplier,
+            supplierName: data.invoice.supplier,
             aliasText: item.description,
             productId: newProduct.id,
           });
@@ -374,7 +374,7 @@ accounting.post(
             .insert(productAliases)
             .values({
               businessId,
-              supplierId: data.invoice.supplier,
+              supplierName: data.invoice.supplier,
               aliasText: item.description,
               productId,
             })
