@@ -44,6 +44,7 @@ import {
 } from "@nova/db";
 import { handleDbError } from "../utils/db-errors";
 import { validateUuidParam } from "../middleware/validate-uuid";
+import { recalculateBusinessRfm } from "../services/rfm";
 import type { AppEnv } from "../types";
 
 const customersRoutes = new Hono<AppEnv>();
@@ -319,6 +320,21 @@ customersRoutes.post("/customers/recalculate-segments", async (c) => {
     customersProcessed: allCustomers.length,
     segmentsAssigned: totalSegments,
   });
+});
+
+/**
+ * POST /customers/rfm/recalculate - Recalculate RFM scores for all customers.
+ *
+ * Uses adaptive quintiles calibrated to this business's data distribution.
+ * Safe to call on every dashboard load (~50-100ms for 200 customers).
+ * Idempotent: calling multiple times produces the same result.
+ */
+customersRoutes.post("/customers/rfm/recalculate", async (c) => {
+  const db = c.get("db");
+  const businessId = c.get("businessId");
+
+  const result = await recalculateBusinessRfm(db, businessId);
+  return c.json(result);
 });
 
 // ============================================================
