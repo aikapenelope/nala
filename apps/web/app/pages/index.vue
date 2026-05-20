@@ -32,6 +32,13 @@ import {
 } from "lucide-vue-next";
 import { currentHourVET } from "@nova/shared";
 
+/**
+ * Keep this page alive in memory when navigating away.
+ * On return, the component is reactivated instantly (no re-render, no re-fetch).
+ * Data refreshes automatically if stale (>5 minutes old).
+ */
+definePageMeta({ keepalive: true });
+
 const { user } = useNovaAuth();
 const { $api } = useApi();
 const { pendingCount: pendingOrdersCount } = useOrdersBadge();
@@ -362,6 +369,21 @@ onMounted(() => {
   loadDashboard();
   refreshOnboarding();
   checkOpenStatus();
+});
+
+/**
+ * KeepAlive reactivation: refresh data if stale (>5 minutes).
+ * This fires when the user navigates BACK to the dashboard.
+ * If data is fresh, the page appears instantly without any fetch.
+ */
+const STALE_THRESHOLD_MS = 5 * 60 * 1000;
+onActivated(() => {
+  if (lastUpdatedAt.value) {
+    const age = Date.now() - lastUpdatedAt.value.getTime();
+    if (age > STALE_THRESHOLD_MS) {
+      loadDashboard();
+    }
+  }
 });
 
 async function saveRate() {
