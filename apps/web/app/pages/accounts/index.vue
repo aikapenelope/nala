@@ -136,6 +136,8 @@ const showPayPayable = ref(false);
 const payPayableId = ref("");
 const payPayableBalance = ref(0);
 const payPayableAmount = ref("");
+const payPayableMethod = ref("efectivo");
+const payPayableReference = ref("");
 const payPayableSubmitting = ref(false);
 const payPayableError = ref("");
 
@@ -261,6 +263,8 @@ function openPayPayable(pay: Payable) {
   payPayableId.value = pay.id;
   payPayableBalance.value = Number(pay.balanceUsd);
   payPayableAmount.value = pay.balanceUsd;
+  payPayableMethod.value = "efectivo";
+  payPayableReference.value = "";
   payPayableError.value = "";
   showPayPayable.value = true;
 }
@@ -277,7 +281,11 @@ async function submitPayPayable() {
   try {
     await $api(`/api/accounts/payable/${payPayableId.value}/pay`, {
       method: "PATCH",
-      body: { amountUsd: amount },
+      body: {
+        amountUsd: amount,
+        method: payPayableMethod.value,
+        reference: payPayableReference.value || undefined,
+      },
     });
     showPayPayable.value = false;
     await loadAccounts();
@@ -627,17 +635,43 @@ async function submitPayPayable() {
           <p class="mb-5 text-[13px] font-medium text-gray-500">
             Saldo pendiente: ${{ payPayableBalance.toFixed(2) }}
           </p>
-          <div>
-            <label class="mb-1.5 block text-[13px] font-bold text-gray-600">Monto ($)</label>
-            <input
-              v-model="payPayableAmount"
-              type="number"
-              step="0.01"
-              min="0"
-              :max="payPayableBalance"
-              class="w-full rounded-2xl border border-white bg-white/60 px-4 py-3 text-sm font-semibold text-gray-800 shadow-[inset_0_2px_4px_rgba(0,0,0,0.03)] outline-none transition-spring placeholder:text-gray-400 focus:bg-white focus:ring-[3px] focus:ring-nova-accent/20"
-              autofocus
-            >
+          <div class="space-y-4">
+            <div>
+              <label class="mb-1.5 block text-[13px] font-bold text-gray-600">Monto ($)</label>
+              <input
+                v-model="payPayableAmount"
+                type="number"
+                step="0.01"
+                min="0"
+                :max="payPayableBalance"
+                class="w-full rounded-2xl border border-white bg-white/60 px-4 py-3 text-sm font-semibold text-gray-800 shadow-[inset_0_2px_4px_rgba(0,0,0,0.03)] outline-none transition-spring placeholder:text-gray-400 focus:bg-white focus:ring-[3px] focus:ring-nova-accent/20"
+                autofocus
+              >
+            </div>
+            <div>
+              <label class="mb-1.5 block text-[13px] font-bold text-gray-600">Metodo de pago</label>
+              <select
+                v-model="payPayableMethod"
+                class="w-full rounded-2xl border border-white bg-white/60 px-4 py-3 text-sm font-semibold text-gray-800 outline-none transition-spring focus:bg-white focus:ring-[3px] focus:ring-nova-accent/20"
+              >
+                <option value="efectivo">Efectivo</option>
+                <option value="pago_movil">Pago Movil</option>
+                <option value="transferencia">Transferencia</option>
+                <option value="zelle">Zelle</option>
+                <option value="binance">Binance</option>
+                <option value="zinli">Zinli</option>
+                <option value="efectivo_usd">Efectivo USD</option>
+              </select>
+            </div>
+            <div>
+              <label class="mb-1.5 block text-[13px] font-bold text-gray-600">Referencia (opcional)</label>
+              <input
+                v-model="payPayableReference"
+                type="text"
+                placeholder="Numero de referencia"
+                class="w-full rounded-2xl border border-white bg-white/60 px-4 py-3 text-sm font-semibold text-gray-800 shadow-[inset_0_2px_4px_rgba(0,0,0,0.03)] outline-none transition-spring placeholder:text-gray-400 focus:bg-white focus:ring-[3px] focus:ring-nova-accent/20"
+              >
+            </div>
           </div>
           <p v-if="payPayableError" class="mt-3 text-sm font-semibold text-red-500">{{ payPayableError }}</p>
           <div class="mt-5 flex gap-3">
