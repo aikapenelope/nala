@@ -57,8 +57,22 @@ export default defineNuxtConfig({
       // Only precache essential assets — avoid downloading the entire admin dashboard
       // on first PWA install. Runtime caching handles the rest on-demand.
       globPatterns: ["**/*.{css,html,png,svg,ico}"],
-      // Exclude heavy admin-only chunks from precache
-      globIgnores: ["**/clerk*.js", "**/charts*.js", "**/xlsx*.js"],
+      // Exclude heavy admin-only JS chunks and non-shell static assets.
+      // Note on maximumFileSizeToCacheInBytes: the vite-plugin-pwa default is
+      // 2 MiB and hard-errors on build when exceeded. Raising that limit is NOT
+      // the right fix — it would push large files into every PWA install payload.
+      // Instead, exclude files that are not part of the app shell:
+      //   - logo.png         : nav/sidebar logo (512 KB). Not needed on SW
+      //                        install; loads with the first authenticated page.
+      //   - og-storefront.png: 1.7 MB social-preview image. Never requested
+      //                        by the PWA shell at runtime.
+      globIgnores: [
+        "**/clerk*.js",
+        "**/charts*.js",
+        "**/xlsx*.js",
+        "logo.png",
+        "og-storefront.png",
+      ],
       // Import push notification handler into the service worker
       importScripts: ["/push-sw.js"],
       runtimeCaching: [
