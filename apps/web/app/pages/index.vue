@@ -490,7 +490,7 @@ function openRateEditor() {
             {{ greeting }}
           </h1>
           <p class="mt-0.5 text-sm font-medium text-gray-500">
-            {{ user?.businessName ?? "Nala" }}
+            {{ user?.businessName ?? "novaincs" }}
             <button
               class="ml-1 rounded-lg px-1.5 py-0.5 text-xs font-bold transition-spring"
               :class="exchangeRate ? 'bg-green-50 text-green-700' : 'bg-yellow-100 text-yellow-700'"
@@ -596,7 +596,7 @@ function openRateEditor() {
       >
         <p class="text-sm font-bold text-gray-700">Sin ventas hoy</p>
         <p class="mt-1 text-xs text-gray-400">
-          Registra tu primera venta y Nala organiza todo automaticamente.
+          Registra tu primera venta y novaincs organiza todo automaticamente.
         </p>
         <NuxtLink
           to="/sales"
