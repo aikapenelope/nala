@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * Landing page for Nala.
+ * Landing page for novaincs.
  *
  * Clean, professional design. No miniature mockups or decorative
  * artifacts. Every section is readable and interactive.
@@ -36,7 +36,10 @@ definePageMeta({ layout: false });
     <!-- ============================================================ -->
     <header class="fixed left-0 right-0 top-0 z-50 border-b border-white/10 bg-white/80 backdrop-blur-xl">
       <div class="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
-        <NuxtLink to="/" class="text-xl font-bold tracking-tight text-[#ff321f]">Nala</NuxtLink>
+        <!-- Logo: sube apps/web/public/logo.png para que aparezca aquí -->
+        <NuxtLink to="/" class="flex items-center">
+          <img src="/logo.png" alt="novaincs" class="h-8 w-auto object-contain" />
+        </NuxtLink>
         <nav class="flex items-center gap-6">
           <NuxtLink to="/auth/login" class="hidden text-sm font-medium text-gray-600 hover:text-gray-900 sm:block">Entrar</NuxtLink>
           <NuxtLink to="/auth/signup" class="rounded-xl bg-[#ff321f] px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-[#ff321f]/20 transition-all hover:shadow-xl hover:shadow-[#ff321f]/30">
@@ -138,12 +141,12 @@ definePageMeta({ layout: false });
       <div class="mx-auto max-w-6xl px-6">
         <div class="grid items-center gap-12 md:grid-cols-2">
           <div>
-            <div class="mb-4 inline-flex rounded-full border border-[#f0c7bd] px-4 py-1.5 text-xs font-semibold text-[#d68172]">Filosofia Nala</div>
+            <div class="mb-4 inline-flex rounded-full border border-[#f0c7bd] px-4 py-1.5 text-xs font-semibold text-[#d68172]">Filosofia novaincs</div>
             <h2 class="text-4xl font-bold leading-[0.95] tracking-tight text-[#ff321f] md:text-5xl lg:text-6xl">
               La venta genera el dato.
             </h2>
             <p class="mt-6 max-w-md text-lg leading-relaxed text-[#8b4c43]">
-              El vendedor no llena un sistema. Vende, y Nala organiza inventario, clientes, estadisticas y contabilidad automaticamente.
+              El vendedor no llena un sistema. Vende, y novaincs organiza inventario, clientes, estadisticas y contabilidad automaticamente.
             </p>
             <NuxtLink to="/auth/signup" class="mt-8 inline-flex items-center gap-2 text-base font-bold text-[#ff321f] hover:gap-3 transition-all">
               Empezar ahora <ChevronRight :size="18" />
@@ -186,7 +189,7 @@ definePageMeta({ layout: false });
             Todo lo que antes estaba regado, ahora se organiza solo.
           </h2>
           <p class="mt-6 text-lg leading-relaxed text-gray-500">
-            Nala convierte cada venta en inventario actualizado, cliente registrado y reporte listo.
+            novaincs convierte cada venta en inventario actualizado, cliente registrado y reporte listo.
           </p>
         </div>
 
@@ -236,7 +239,7 @@ definePageMeta({ layout: false });
                 <p class="text-sm font-medium text-[#ff321f]/70">Bodega · 80 productos</p>
               </div>
             </div>
-            <p class="text-xl font-semibold leading-snug tracking-tight text-gray-900">"Antes cerraba el dia contando el cuaderno. Ahora vendo y Nala me dice que salio y que queda."</p>
+            <p class="text-xl font-semibold leading-snug tracking-tight text-gray-900">"Antes cerraba el dia contando el cuaderno. Ahora vendo y novaincs me dice que salio y que queda."</p>
             <div class="mt-6 flex items-center gap-2 text-sm font-semibold text-[#31c863]"><CheckCircle2 :size="18" /> Inventario al dia</div>
           </article>
 
@@ -282,7 +285,7 @@ definePageMeta({ layout: false });
         <div class="mx-auto mt-16 grid max-w-4xl grid-cols-1 gap-6 lg:grid-cols-3">
           <article class="rounded-3xl bg-[#fafafa] p-8 ring-1 ring-gray-100">
             <h3 class="text-2xl font-bold text-gray-900">Gratis</h3>
-            <p class="mt-2 text-sm text-gray-500">Para probar Nala y dejar el cuaderno.</p>
+            <p class="mt-2 text-sm text-gray-500">Para probar novaincs y dejar el cuaderno.</p>
             <div class="mt-8 flex items-end gap-1"><span class="text-5xl font-bold tracking-tight text-gray-900">$0</span><span class="mb-1.5 text-sm text-gray-400">/mes</span></div>
             <ul class="mt-8 space-y-3 text-sm text-gray-600">
               <li class="flex gap-2.5"><Check :size="18" class="mt-0.5 shrink-0 text-[#31c863]" />Hasta 50 productos</li>
@@ -342,7 +345,7 @@ definePageMeta({ layout: false });
             <thead>
               <tr class="bg-[#ff321f] text-white">
                 <th class="p-4 text-sm font-bold lg:p-5">Necesidad</th>
-                <th class="p-4 text-sm font-bold lg:p-5">Nala</th>
+                <th class="p-4 text-sm font-bold lg:p-5">novaincs</th>
                 <th class="p-4 text-sm font-bold lg:p-5">Cuaderno</th>
                 <th class="p-4 text-sm font-bold lg:p-5">Excel</th>
                 <th class="p-4 text-sm font-bold lg:p-5">ERP</th>
@@ -389,7 +392,7 @@ definePageMeta({ layout: false });
           Digitaliza tu negocio sin dejar de vender.
         </h2>
         <p class="mx-auto mt-6 max-w-lg text-lg leading-relaxed text-white/80">
-          Empieza con ventas e inventario basico. Si Nala no te ahorra tiempo desde la primera semana, no pagas Pro.
+          Empieza con ventas e inventario basico. Si novaincs no te ahorra tiempo desde la primera semana, no pagas Pro.
         </p>
         <div class="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
           <NuxtLink to="/auth/signup" class="inline-flex h-14 items-center gap-2 rounded-2xl bg-white px-8 text-base font-bold text-[#ff321f] shadow-[0_20px_50px_rgba(0,0,0,.15)] transition-all hover:scale-105">
@@ -405,7 +408,7 @@ definePageMeta({ layout: false });
           </a>
         </div>
         <div class="mt-8 flex items-center justify-center gap-2 text-sm font-medium text-white/70">
-          <ShieldCheck :size="18" /> Garantia sin riesgo: prueba Nala antes de pagar.
+          <ShieldCheck :size="18" /> Garantia sin riesgo: prueba novaincs antes de pagar.
         </div>
       </div>
     </section>
@@ -417,7 +420,7 @@ definePageMeta({ layout: false });
       <div class="mx-auto max-w-6xl px-6">
         <div class="flex flex-col items-center gap-6 sm:flex-row sm:justify-between">
           <div class="text-center sm:text-left">
-            <p class="text-sm font-bold text-gray-900">Nala</p>
+            <p class="text-sm font-bold text-gray-900">novaincs</p>
             <p class="mt-1 text-xs text-gray-400">POS + Tienda Online para comerciantes</p>
           </div>
           <div class="flex flex-wrap items-center justify-center gap-4 text-xs font-medium text-gray-500">
