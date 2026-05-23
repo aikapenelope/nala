@@ -42,7 +42,7 @@ export function useStorefrontSeo(options: StorefrontSeoOptions = {}) {
    * OG image for WhatsApp/social link previews.
    *
    * Uses a static image from the web app's public folder.
-   * Recommended: 1200x630px PNG/JPG with Nala branding.
+   * Recommended: 1200x630px PNG/JPG with novaincs branding.
    * Replace /og-storefront.png with a real branded image.
    *
    * To upload: place the image at apps/web/public/og-storefront.png
@@ -78,7 +78,7 @@ export function useStorefrontSeo(options: StorefrontSeoOptions = {}) {
         { property: "og:image:width", content: "1200" },
         { property: "og:image:height", content: "630" },
         { property: "og:locale", content: "es_VE" },
-        { property: "og:site_name", content: business.value?.name ?? "Nala" },
+        { property: "og:site_name", content: business.value?.name ?? "novaincs" },
         // Twitter
         { name: "twitter:card", content: "summary_large_image" },
         { name: "twitter:title", content: pageTitle.value },
