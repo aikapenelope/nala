@@ -65,6 +65,17 @@ const paymentReference = ref("");
 const paymentSubmitting = ref(false);
 const paymentError = ref("");
 
+/** Shared payment method options for both modals. */
+const paymentMethodOptions = [
+  { value: "efectivo",     label: "Efectivo" },
+  { value: "pago_movil",   label: "Pago Movil" },
+  { value: "transferencia", label: "Transferencia" },
+  { value: "zelle",        label: "Zelle" },
+  { value: "binance",      label: "Binance" },
+  { value: "zinli",        label: "Zinli" },
+  { value: "efectivo_usd", label: "USD" },
+] as const;
+
 /** Create payable modal. */
 const showCreatePayable = ref(false);
 const newPayable = reactive({
@@ -443,11 +454,12 @@ async function submitPayPayable() {
     <Teleport to="body">
       <div
         v-if="showPaymentModal"
-        class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+        class="fixed inset-0 z-50 flex items-end justify-center bg-black/40 backdrop-blur-sm sm:items-center"
         @click.self="showPaymentModal = false"
       >
-        <div class="glass-strong w-full max-w-sm rounded-[32px] p-7 shadow-[0_30px_60px_-15px_rgba(0,0,0,0.2)]">
-          <h3 class="mb-1 text-xl font-extrabold tracking-tight text-gradient">Registrar abono</h3>
+        <div class="glass-strong w-full max-w-sm overflow-y-auto rounded-t-[32px] p-7 shadow-[0_-8px_40px_rgba(0,0,0,0.2)] sm:rounded-[32px] sm:shadow-[0_30px_60px_-15px_rgba(0,0,0,0.2)]">
+          <div class="mb-1 h-1 w-10 rounded-full bg-gray-300 mx-auto sm:hidden" />
+          <h3 class="mt-4 mb-1 text-xl font-extrabold tracking-tight text-gradient sm:mt-0">Registrar abono</h3>
           <p class="mb-5 text-[13px] font-medium text-gray-500">
             Saldo pendiente: ${{ paymentTargetBalance.toFixed(2) }}
           </p>
@@ -457,26 +469,29 @@ async function submitPayPayable() {
               <input
                 v-model="paymentAmount"
                 type="number"
+                inputmode="decimal"
                 step="0.01"
                 min="0"
                 :max="paymentTargetBalance"
-                class="w-full rounded-2xl border border-white bg-white/60 px-4 py-3 text-sm font-semibold text-gray-800 shadow-[inset_0_2px_4px_rgba(0,0,0,0.03)] outline-none transition-spring placeholder:text-gray-400 focus:bg-white focus:ring-[3px] focus:ring-nova-accent/20"
-                autofocus
+                class="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-800 shadow-sm outline-none transition-spring placeholder:text-gray-400 focus:border-nova-primary focus:ring-[3px] focus:ring-nova-primary/20"
               >
             </div>
             <div>
-              <label class="mb-1.5 block text-[13px] font-bold text-gray-600">Metodo</label>
-              <select
-                v-model="paymentMethod"
-                class="w-full rounded-2xl border border-white bg-white/60 px-4 py-3 text-sm font-semibold text-gray-800 outline-none transition-spring focus:bg-white focus:ring-[3px] focus:ring-nova-accent/20"
-              >
-                <option value="efectivo">Efectivo</option>
-                <option value="pago_movil">Pago Movil</option>
-                <option value="transferencia">Transferencia</option>
-                <option value="binance">Binance</option>
-                <option value="zelle">Zelle</option>
-                <option value="zinli">Zinli</option>
-              </select>
+              <label class="mb-2 block text-[13px] font-bold text-gray-600">Metodo de pago</label>
+              <div class="grid grid-cols-3 gap-2">
+                <button
+                  v-for="m in paymentMethodOptions"
+                  :key="m.value"
+                  type="button"
+                  class="rounded-xl py-2.5 text-xs font-bold transition-spring"
+                  :class="paymentMethod === m.value
+                    ? 'dark-pill'
+                    : 'border border-gray-200 bg-white text-gray-600 hover:bg-gray-50'"
+                  @click="paymentMethod = m.value"
+                >
+                  {{ m.label }}
+                </button>
+              </div>
             </div>
             <div>
               <label class="mb-1.5 block text-[13px] font-bold text-gray-600">Referencia (opcional)</label>
@@ -484,7 +499,7 @@ async function submitPayPayable() {
                 v-model="paymentReference"
                 type="text"
                 placeholder="Numero de referencia"
-                class="w-full rounded-2xl border border-white bg-white/60 px-4 py-3 text-sm font-semibold text-gray-800 shadow-[inset_0_2px_4px_rgba(0,0,0,0.03)] outline-none transition-spring placeholder:text-gray-400 focus:bg-white focus:ring-[3px] focus:ring-nova-accent/20"
+                class="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-800 shadow-sm outline-none transition-spring placeholder:text-gray-400 focus:border-nova-primary focus:ring-[3px] focus:ring-nova-primary/20"
               >
             </div>
           </div>
@@ -627,11 +642,12 @@ async function submitPayPayable() {
     <Teleport to="body">
       <div
         v-if="showPayPayable"
-        class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+        class="fixed inset-0 z-50 flex items-end justify-center bg-black/40 backdrop-blur-sm sm:items-center"
         @click.self="showPayPayable = false"
       >
-        <div class="glass-strong w-full max-w-sm rounded-[32px] p-7 shadow-[0_30px_60px_-15px_rgba(0,0,0,0.2)]">
-          <h3 class="mb-1 text-xl font-extrabold tracking-tight text-gradient">Registrar pago</h3>
+        <div class="glass-strong w-full max-w-sm overflow-y-auto rounded-t-[32px] p-7 shadow-[0_-8px_40px_rgba(0,0,0,0.2)] sm:rounded-[32px] sm:shadow-[0_30px_60px_-15px_rgba(0,0,0,0.2)]">
+          <div class="mb-1 h-1 w-10 rounded-full bg-gray-300 mx-auto sm:hidden" />
+          <h3 class="mt-4 mb-1 text-xl font-extrabold tracking-tight text-gradient sm:mt-0">Registrar pago</h3>
           <p class="mb-5 text-[13px] font-medium text-gray-500">
             Saldo pendiente: ${{ payPayableBalance.toFixed(2) }}
           </p>
@@ -641,27 +657,29 @@ async function submitPayPayable() {
               <input
                 v-model="payPayableAmount"
                 type="number"
+                inputmode="decimal"
                 step="0.01"
                 min="0"
                 :max="payPayableBalance"
-                class="w-full rounded-2xl border border-white bg-white/60 px-4 py-3 text-sm font-semibold text-gray-800 shadow-[inset_0_2px_4px_rgba(0,0,0,0.03)] outline-none transition-spring placeholder:text-gray-400 focus:bg-white focus:ring-[3px] focus:ring-nova-accent/20"
-                autofocus
+                class="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-800 shadow-sm outline-none transition-spring placeholder:text-gray-400 focus:border-nova-primary focus:ring-[3px] focus:ring-nova-primary/20"
               >
             </div>
             <div>
-              <label class="mb-1.5 block text-[13px] font-bold text-gray-600">Metodo de pago</label>
-              <select
-                v-model="payPayableMethod"
-                class="w-full rounded-2xl border border-white bg-white/60 px-4 py-3 text-sm font-semibold text-gray-800 outline-none transition-spring focus:bg-white focus:ring-[3px] focus:ring-nova-accent/20"
-              >
-                <option value="efectivo">Efectivo</option>
-                <option value="pago_movil">Pago Movil</option>
-                <option value="transferencia">Transferencia</option>
-                <option value="zelle">Zelle</option>
-                <option value="binance">Binance</option>
-                <option value="zinli">Zinli</option>
-                <option value="efectivo_usd">Efectivo USD</option>
-              </select>
+              <label class="mb-2 block text-[13px] font-bold text-gray-600">Metodo de pago</label>
+              <div class="grid grid-cols-3 gap-2">
+                <button
+                  v-for="m in paymentMethodOptions"
+                  :key="m.value"
+                  type="button"
+                  class="rounded-xl py-2.5 text-xs font-bold transition-spring"
+                  :class="payPayableMethod === m.value
+                    ? 'dark-pill'
+                    : 'border border-gray-200 bg-white text-gray-600 hover:bg-gray-50'"
+                  @click="payPayableMethod = m.value"
+                >
+                  {{ m.label }}
+                </button>
+              </div>
             </div>
             <div>
               <label class="mb-1.5 block text-[13px] font-bold text-gray-600">Referencia (opcional)</label>
@@ -669,7 +687,7 @@ async function submitPayPayable() {
                 v-model="payPayableReference"
                 type="text"
                 placeholder="Numero de referencia"
-                class="w-full rounded-2xl border border-white bg-white/60 px-4 py-3 text-sm font-semibold text-gray-800 shadow-[inset_0_2px_4px_rgba(0,0,0,0.03)] outline-none transition-spring placeholder:text-gray-400 focus:bg-white focus:ring-[3px] focus:ring-nova-accent/20"
+                class="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-800 shadow-sm outline-none transition-spring placeholder:text-gray-400 focus:border-nova-primary focus:ring-[3px] focus:ring-nova-primary/20"
               >
             </div>
           </div>
