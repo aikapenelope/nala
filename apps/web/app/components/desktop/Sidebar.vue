@@ -113,13 +113,9 @@ function toggleTools() {
       >
         <span class="text-sm font-extrabold text-white">N</span>
       </div>
-      <!-- Logo: sube apps/web/public/logo.png para que aparezca aquí -->
-      <img
-        v-if="!isCollapsed"
-        src="/logo.png"
-        alt="novaincs"
-        class="h-7 w-auto object-contain"
-      />
+      <span v-if="!isCollapsed" class="text-xl font-extrabold text-gradient">
+        novaincs
+      </span>
     </div>
 
     <!-- Core navigation -->
