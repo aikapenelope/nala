@@ -18,6 +18,7 @@ import {
   ShoppingBag,
   ChevronDown,
   Mail,
+  MapPin,
   Phone,
   Save,
   RefreshCw,
@@ -373,6 +374,19 @@ async function handlePinDisable() {
                 placeholder="+58 412 1234567"
                 class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm focus:border-nova-primary focus:outline-none"
               >
+            </div>
+            <div>
+              <div class="mb-2 flex items-center gap-2">
+                <MapPin :size="14" class="text-blue-600" />
+                <label class="text-sm font-medium text-gray-700">Direccion del negocio</label>
+              </div>
+              <input
+                v-model="businessAddress"
+                type="text"
+                placeholder="Av. Principal, Sector, Ciudad"
+                class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm focus:border-nova-primary focus:outline-none"
+              >
+              <p class="mt-1 text-[11px] text-gray-400">Se muestra en la pagina de info de tu tienda online</p>
             </div>
             <div>
               <div class="mb-2 flex items-center gap-2">
