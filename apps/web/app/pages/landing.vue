@@ -38,7 +38,7 @@ definePageMeta({ layout: false });
       <div class="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
         <!-- Logo: sube apps/web/public/logo.png para que aparezca aquí -->
         <NuxtLink to="/" class="flex items-center">
-          <img src="/logo.png" alt="novaincs" class="h-8 w-auto object-contain" />
+          <img src="/logo-app.png" alt="novaincs" class="h-8 w-auto object-contain" />
         </NuxtLink>
         <nav class="flex items-center gap-6">
           <NuxtLink to="/auth/login" class="hidden text-sm font-medium text-gray-600 hover:text-gray-900 sm:block">Entrar</NuxtLink>

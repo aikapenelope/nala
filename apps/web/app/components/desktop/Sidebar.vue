@@ -116,7 +116,7 @@ function toggleTools() {
       <!-- Logo: sube apps/web/public/logo.png para que aparezca aquí -->
       <img
         v-if="!isCollapsed"
-        src="/logo.png"
+        src="/logo-app.png"
         alt="novaincs"
         class="h-7 w-auto object-contain"
       />
